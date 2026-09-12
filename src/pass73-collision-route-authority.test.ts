@@ -179,7 +179,8 @@ describe('Pass 73 exact collision/visual route authority', () => {
       const house = arena.houses.find((candidate) => candidate.id === entry.houseId)!;
       const [minX, , minZ, maxX, maxY, maxZ] = entry.expectedBounds;
       for (const stance of PASS73_ROUTE_STANCES) {
-        physics.teleportEye({ x: 0, y: 4, z: 0 });
+        // Staging point must be open road clear of the central bus at the origin.
+        physics.teleportEye({ x: -16, y: 4, z: 0 });
         expect(physics.setStance('stand'), `${entry.solidId}:reset`).toBe(true);
         expect(physics.setStance(stance), `${entry.solidId}:${stance}`).toBe(true);
         const shape = STANCE_SHAPES[stance];

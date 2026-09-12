@@ -1,0 +1,13 @@
+[iso] prone crawl 1.8m/s thickness=0.15: finalX=1.540 escaped=true
+[iso] prone crawl 1.8m/s thickness=0.3: finalX=1.690 escaped=true
+[iso] prone crawl 1.8m/s thickness=0.5: finalX=1.870 escaped=true
+[iso] prone crawl 1.8m/s thickness=1: finalX=2.380 escaped=true
+[iso] prone thickness=0.15 speed=0.5: finalX=1.517 escaped=true
+[iso] prone thickness=0.15 speed=1: finalX=1.517 escaped=true
+[iso] prone thickness=0.15 speed=1.8: finalX=1.540 escaped=true
+[iso] prone thickness=0.15 speed=3.5: finalX=1.558 escaped=true
+[iso] stand speed=8.7: finalX=0.395 escaped=false
+[iso] crouch speed=3.5: finalX=0.415 escaped=false
+[iso] stand speed=3: finalX=0.395 escaped=false
+[iso] crouch speed=8.7: finalX=0.415 escaped=false
+[iso] prone 0.2m/s: finalX=1.513

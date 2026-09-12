@@ -1,0 +1,1416 @@
+{
+ "arena": "farcrysis",
+ "contract": "every substantial visible mesh is rated for gunfire, excluded by a stated rule, or accepted below with a reason; unrated is the honest remainder",
+ "completionPercent": 100,
+ "ratchet": {
+  "unratedAfterLedger": 0,
+  "ceiling": 0,
+  "withinCeiling": true
+ },
+ "census": {
+  "total": 157,
+  "ratedDirect": 26,
+  "ratedByFootprint": 0,
+  "dynamicTargets": 0,
+  "excludedByRule": 131,
+  "unrated": 0,
+  "acceptedByLedger": 0,
+  "unratedAfterLedger": 0
+ },
+ "shotSurfaceStats": {
+  "total": 229,
+  "byMaterial": {
+   "wood": 118,
+   "concrete": 50,
+   "structural-metal": 21,
+   "thin-metal": 30,
+   "earth": 10
+  },
+  "byClassification": {
+   "explicit": 229
+  }
+ },
+ "excludedByRule": {
+  "water volume presentation": 131
+ },
+ "footprintExplained": [],
+ "acceptedShootThrough": [],
+ "unratedMeshes": [],
+ "staleLedgerRows": [],
+ "shotSurfaces": [
+  {
+   "id": "farcrysis-shot-0",
+   "name": "farcrysis-palm-trunk--54--54",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-1",
+   "name": "farcrysis-palm-trunk-54--54",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-2",
+   "name": "farcrysis-palm-trunk--54-54",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-3",
+   "name": "farcrysis-palm-trunk-54-54",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-4",
+   "name": "farcrysis-palm-trunk--44--60",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-5",
+   "name": "farcrysis-palm-trunk-44--60",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-6",
+   "name": "farcrysis-palm-trunk--44-60",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-7",
+   "name": "farcrysis-palm-trunk-44-60",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-8",
+   "name": "farcrysis-skiff-nw",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-9",
+   "name": "farcrysis-skiff-se",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-10",
+   "name": "farcrysis-rock-nw",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-11",
+   "name": "farcrysis-rock-ne",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-12",
+   "name": "farcrysis-rock-sw",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-13",
+   "name": "farcrysis-rock-se",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-14",
+   "name": "farcrysis-ruined-wall-nw-a",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-15",
+   "name": "farcrysis-ruined-wall-nw-b",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-16",
+   "name": "farcrysis-crate-nw",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-17",
+   "name": "farcrysis-crate-nw-solo",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-18",
+   "name": "farcrysis-ruined-wall-ne-a",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-19",
+   "name": "farcrysis-ruined-wall-ne-b",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-20",
+   "name": "farcrysis-crate-ne",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-21",
+   "name": "farcrysis-crate-ne-solo",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-22",
+   "name": "farcrysis-ruined-wall-sw-a",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-23",
+   "name": "farcrysis-ruined-wall-sw-b",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-24",
+   "name": "farcrysis-crate-sw",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-25",
+   "name": "farcrysis-crate-sw-solo",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-26",
+   "name": "farcrysis-ruined-wall-se-a",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-27",
+   "name": "farcrysis-ruined-wall-se-b",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-28",
+   "name": "farcrysis-crate-se",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-29",
+   "name": "farcrysis-crate-se-solo",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-30",
+   "name": "farcrysis-canopy-trunk-nw-0",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-31",
+   "name": "farcrysis-canopy-trunk-nw-1",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-32",
+   "name": "farcrysis-canopy-trunk-nw-2",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-33",
+   "name": "farcrysis-canopy-trunk-ne-0",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-34",
+   "name": "farcrysis-canopy-trunk-ne-1",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-35",
+   "name": "farcrysis-canopy-trunk-ne-2",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-36",
+   "name": "farcrysis-canopy-trunk-sw-0",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-37",
+   "name": "farcrysis-canopy-trunk-sw-1",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-38",
+   "name": "farcrysis-canopy-trunk-sw-2",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-39",
+   "name": "farcrysis-canopy-trunk-se-0",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-40",
+   "name": "farcrysis-canopy-trunk-se-1",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-41",
+   "name": "farcrysis-canopy-trunk-se-2",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-42",
+   "name": "farcrysis-core-wall-n-west",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-43",
+   "name": "farcrysis-core-wall-n-east",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-44",
+   "name": "farcrysis-core-wall-s-west",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-45",
+   "name": "farcrysis-core-wall-s-east",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-46",
+   "name": "farcrysis-core-wall-w",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-47",
+   "name": "farcrysis-core-wall-e",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-48",
+   "name": "farcrysis-core-door-n",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-49",
+   "name": "farcrysis-core-door-s",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-50",
+   "name": "farcrysis-core-catwalk",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-51",
+   "name": "farcrysis-core-stair-0",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-52",
+   "name": "farcrysis-core-stair-1",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-53",
+   "name": "farcrysis-core-stair-2",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-54",
+   "name": "farcrysis-core-stair-3",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-55",
+   "name": "farcrysis-core-stair-4",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-56",
+   "name": "farcrysis-core-stair-5",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-57",
+   "name": "farcrysis-core-stair-6",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-58",
+   "name": "farcrysis-core-desk",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-59",
+   "name": "farcrysis-core-crate-a",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-60",
+   "name": "farcrysis-core-crate-b",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-61",
+   "name": "farcrysis-throwback-seaplane-collider",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-62",
+   "name": "farcrysis-throwback-signal-beacon-collider",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-63",
+   "name": "farcrysis-throwback-barrel-collider--40-40",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-64",
+   "name": "farcrysis-throwback-barrel-collider-40--40",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-65",
+   "name": "farcrysis-throwback-barrel-collider--10--48",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-66",
+   "name": "farcrysis-throwback-barrel-collider-10-48",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-67",
+   "name": "farcrysis-art-tower-leg-collider--1.3--1.3",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-68",
+   "name": "farcrysis-art-tower-leg-collider-1.3--1.3",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-69",
+   "name": "farcrysis-art-tower-leg-collider--1.3-1.3",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-70",
+   "name": "farcrysis-art-tower-leg-collider-1.3-1.3",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-71",
+   "name": "farcrysis-art-cave-pillar-collider-l",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-72",
+   "name": "farcrysis-art-cave-pillar-collider-r",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-73",
+   "name": "farcrysis-enhanced-palm-trunk-collider-0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-74",
+   "name": "farcrysis-enhanced-palm-trunk-collider-1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-75",
+   "name": "farcrysis-enhanced-palm-trunk-collider-2",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-76",
+   "name": "farcrysis-enhanced-palm-trunk-collider-3",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-77",
+   "name": "farcrysis-enhanced-palm-trunk-collider-4",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-78",
+   "name": "farcrysis-enhanced-palm-trunk-collider-5",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-79",
+   "name": "farcrysis-enhanced-palm-trunk-collider-6",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-80",
+   "name": "farcrysis-enhanced-palm-trunk-collider-7",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-81",
+   "name": "farcrysis-enhanced-palm-trunk-collider-8",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-82",
+   "name": "farcrysis-enhanced-palm-trunk-collider-9",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-83",
+   "name": "farcrysis-enhanced-palm-trunk-collider-10",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-84",
+   "name": "farcrysis-enhanced-palm-trunk-collider-11",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-85",
+   "name": "farcrysis-enhanced-palm-trunk-collider-12",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-86",
+   "name": "farcrysis-enhanced-palm-trunk-collider-13",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-87",
+   "name": "farcrysis-enhanced-palm-trunk-collider-14",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-88",
+   "name": "farcrysis-enhanced-palm-trunk-collider-15",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-89",
+   "name": "farcrysis-enhanced-palm-trunk-collider-16",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-90",
+   "name": "farcrysis-enhanced-palm-trunk-collider-17",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-91",
+   "name": "farcrysis-enhanced-palm-trunk-collider-18",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-92",
+   "name": "farcrysis-enhanced-palm-trunk-collider-19",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-93",
+   "name": "farcrysis-enhanced-palm-trunk-collider-20",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-94",
+   "name": "farcrysis-enhanced-palm-trunk-collider-21",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-95",
+   "name": "farcrysis-enhanced-palm-trunk-collider-22",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-96",
+   "name": "farcrysis-enhanced-palm-trunk-collider-23",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-97",
+   "name": "farcrysis-enhanced-palm-trunk-collider-24",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-98",
+   "name": "farcrysis-enhanced-palm-trunk-collider-25",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-99",
+   "name": "farcrysis-enhanced-palm-trunk-collider-26",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-100",
+   "name": "farcrysis-enhanced-palm-trunk-collider-27",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-101",
+   "name": "farcrysis-enhanced-palm-trunk-collider-28",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-102",
+   "name": "farcrysis-enhanced-palm-trunk-collider-29",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-103",
+   "name": "farcrysis-enhanced-palm-trunk-collider-30",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-104",
+   "name": "farcrysis-enhanced-palm-trunk-collider-31",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-105",
+   "name": "farcrysis-enhanced-palm-trunk-collider-32",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-106",
+   "name": "farcrysis-enhanced-palm-trunk-collider-33",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-107",
+   "name": "farcrysis-enhanced-palm-trunk-collider-34",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-108",
+   "name": "farcrysis-enhanced-palm-trunk-collider-35",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-109",
+   "name": "farcrysis-enhanced-palm-trunk-collider-36",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-110",
+   "name": "farcrysis-enhanced-palm-trunk-collider-37",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-111",
+   "name": "farcrysis-enhanced-palm-trunk-collider-38",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-112",
+   "name": "farcrysis-enhanced-palm-trunk-collider-39",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-113",
+   "name": "farcrysis-enhanced-palm-trunk-collider-40",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-114",
+   "name": "farcrysis-enhanced-palm-trunk-collider-41",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-115",
+   "name": "farcrysis-enhanced-palm-trunk-collider-42",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-116",
+   "name": "farcrysis-enhanced-palm-trunk-collider-43",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-117",
+   "name": "farcrysis-enhanced-palm-trunk-collider-44",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-118",
+   "name": "farcrysis-enhanced-palm-trunk-collider-45",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-119",
+   "name": "farcrysis-enhanced-palm-trunk-collider-46",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-120",
+   "name": "farcrysis-enhanced-palm-trunk-collider-47",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-121",
+   "name": "farcrysis-enhanced-palm-trunk-collider-48",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-122",
+   "name": "farcrysis-enhanced-palm-trunk-collider-49",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-123",
+   "name": "farcrysis-enhanced-palm-trunk-collider-50",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-124",
+   "name": "farcrysis-enhanced-palm-trunk-collider-51",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-01",
+   "name": "farcrysis-crate-01",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-17",
+   "name": "farcrysis-crate-17",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-sandbag-03",
+   "name": "farcrysis-sandbag-03",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-04",
+   "name": "farcrysis-crate-04",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-20",
+   "name": "farcrysis-crate-20",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-10",
+   "name": "farcrysis-barrel-10",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-03",
+   "name": "farcrysis-crate-03",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-19",
+   "name": "farcrysis-crate-19",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-09",
+   "name": "farcrysis-barrel-09",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-02",
+   "name": "farcrysis-crate-02",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-18",
+   "name": "farcrysis-crate-18",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-sandbag-04",
+   "name": "farcrysis-sandbag-04",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-05",
+   "name": "farcrysis-crate-05",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-06",
+   "name": "farcrysis-crate-06",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-07",
+   "name": "farcrysis-crate-07",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-08",
+   "name": "farcrysis-crate-08",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-09",
+   "name": "farcrysis-crate-09",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-10",
+   "name": "farcrysis-crate-10",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-11",
+   "name": "farcrysis-crate-11",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-12",
+   "name": "farcrysis-crate-12",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-13",
+   "name": "farcrysis-crate-13",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-14",
+   "name": "farcrysis-crate-14",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-15",
+   "name": "farcrysis-crate-15",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-16",
+   "name": "farcrysis-crate-16",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-01",
+   "name": "farcrysis-barrel-01",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-02",
+   "name": "farcrysis-barrel-02",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-03",
+   "name": "farcrysis-barrel-03",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-04",
+   "name": "farcrysis-barrel-04",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-05",
+   "name": "farcrysis-barrel-05",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-06",
+   "name": "farcrysis-barrel-06",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-07",
+   "name": "farcrysis-barrel-07",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-08",
+   "name": "farcrysis-barrel-08",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-sandbag-01",
+   "name": "farcrysis-sandbag-01",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-sandbag-02",
+   "name": "farcrysis-sandbag-02",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-cover-jungle-01",
+   "name": "farcrysis-cover-jungle-01",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-cover-jungle-02",
+   "name": "farcrysis-cover-jungle-02",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-cover-jungle-03-c0",
+   "name": "farcrysis-cover-jungle-03-c0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-cover-jungle-03-c1",
+   "name": "farcrysis-cover-jungle-03-c1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-cover-jungle-04-c0",
+   "name": "farcrysis-cover-jungle-04-c0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-cover-jungle-04-c1",
+   "name": "farcrysis-cover-jungle-04-c1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-21",
+   "name": "farcrysis-crate-21",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-22",
+   "name": "farcrysis-crate-22",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-11",
+   "name": "farcrysis-barrel-11",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-12",
+   "name": "farcrysis-barrel-12",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-13",
+   "name": "farcrysis-barrel-13",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-14",
+   "name": "farcrysis-barrel-14",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-cover-jungle-05",
+   "name": "farcrysis-cover-jungle-05",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-cover-jungle-06",
+   "name": "farcrysis-cover-jungle-06",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-cover-rock-01",
+   "name": "farcrysis-cover-rock-01",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-cover-rock-02",
+   "name": "farcrysis-cover-rock-02",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-vantage-01-base-0",
+   "name": "farcrysis-vantage-01-base-0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-vantage-01-base-1",
+   "name": "farcrysis-vantage-01-base-1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-vantage-01-base-2",
+   "name": "farcrysis-vantage-01-base-2",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-vantage-01-base-3",
+   "name": "farcrysis-vantage-01-base-3",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-vantage-01-plank",
+   "name": "farcrysis-vantage-01-plank",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-vantage-02-base-0",
+   "name": "farcrysis-vantage-02-base-0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-vantage-02-base-1",
+   "name": "farcrysis-vantage-02-base-1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-vantage-02-base-2",
+   "name": "farcrysis-vantage-02-base-2",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-vantage-02-base-3",
+   "name": "farcrysis-vantage-02-base-3",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-vantage-02-plank",
+   "name": "farcrysis-vantage-02-plank",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-23",
+   "name": "farcrysis-crate-23",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-24",
+   "name": "farcrysis-crate-24",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-25",
+   "name": "farcrysis-crate-25",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-26",
+   "name": "farcrysis-crate-26",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-27",
+   "name": "farcrysis-crate-27",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-28",
+   "name": "farcrysis-crate-28",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-15",
+   "name": "farcrysis-barrel-15",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-16",
+   "name": "farcrysis-barrel-16",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-17",
+   "name": "farcrysis-barrel-17",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-18",
+   "name": "farcrysis-barrel-18",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-core-door-sandbag-s-seg-0",
+   "name": "farcrysis-core-door-sandbag-s-seg-0",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-core-door-sandbag-s-seg-1",
+   "name": "farcrysis-core-door-sandbag-s-seg-1",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-core-door-sandbag-s-seg-2",
+   "name": "farcrysis-core-door-sandbag-s-seg-2",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-core-door-sandbag-s-seg-3",
+   "name": "farcrysis-core-door-sandbag-s-seg-3",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-core-door-sandbag-n-seg-0",
+   "name": "farcrysis-core-door-sandbag-n-seg-0",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-core-door-sandbag-n-seg-1",
+   "name": "farcrysis-core-door-sandbag-n-seg-1",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-core-door-sandbag-n-seg-2",
+   "name": "farcrysis-core-door-sandbag-n-seg-2",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-core-door-sandbag-n-seg-3",
+   "name": "farcrysis-core-door-sandbag-n-seg-3",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-29",
+   "name": "farcrysis-crate-29",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-30",
+   "name": "farcrysis-crate-30",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-19",
+   "name": "farcrysis-barrel-19",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-20",
+   "name": "farcrysis-barrel-20",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-31",
+   "name": "farcrysis-crate-31",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-21",
+   "name": "farcrysis-barrel-21",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-32",
+   "name": "farcrysis-crate-32",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-22",
+   "name": "farcrysis-barrel-22",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-sandbag-05",
+   "name": "farcrysis-sandbag-05",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-sandbag-06",
+   "name": "farcrysis-sandbag-06",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-sandbag-07",
+   "name": "farcrysis-sandbag-07",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-crate-33",
+   "name": "farcrysis-crate-33",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-23",
+   "name": "farcrysis-barrel-23",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-cover-jungle-07",
+   "name": "farcrysis-cover-jungle-07",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-cover-jungle-08-c0",
+   "name": "farcrysis-cover-jungle-08-c0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-cover-jungle-08-c1",
+   "name": "farcrysis-cover-jungle-08-c1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-sandbag-08",
+   "name": "farcrysis-sandbag-08",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-24",
+   "name": "farcrysis-barrel-24",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-cover-jungle-09-c0",
+   "name": "farcrysis-cover-jungle-09-c0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-cover-jungle-09-c1",
+   "name": "farcrysis-cover-jungle-09-c1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-barrel-25",
+   "name": "farcrysis-barrel-25",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-farcrysis-cover-jungle-10",
+   "name": "farcrysis-cover-jungle-10",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-225",
+   "name": "farcrysis-bound-n",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-226",
+   "name": "farcrysis-bound-s",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-227",
+   "name": "farcrysis-bound-w",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "farcrysis-shot-228",
+   "name": "farcrysis-bound-e",
+   "material": "concrete",
+   "classification": "explicit"
+  }
+ ]
+}

@@ -1,0 +1,26 @@
+
+ RUN  v4.1.9 C:/Users/david/projects/aa-claude-i1
+
+ ❯ src/ballistics.test.ts (31 tests | 1 failed) 3711ms
+     × gives every registered arena an explicit fallback ceiling that only shrinks 1210ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ballistics.test.ts > shared wall-penetration authority > gives every registered arena an explicit fallback ceiling that only shrinks
+AssertionError: nuketown2: 30 unshootable reinforced fallback surface(s) over ceiling 0: nuketown2 north car body | nuketown2 north car cabin | nuketown2 north path buttress east | nuketown2 north path buttress west | nuketown2 north verge drive edge | nuketown2 north verge sign board | nuketown2 north verge speed limit sign | nuketown2 north verge wheelie bin 0 | nuketown2 north verge wheelie bin 1 | nuketown2 north yard butt | nuketown2 north yard far crate | nuketown2 north yard far store | nuketown2 north yard patio table | nuketown2 north yard porch | nuketown2 north yard side store | nuketown2 south car body | nuketown2 south car cabin | nuketown2 south path buttress east | nuketown2 south path buttress west | nuketown2 south verge drive edge | nuketown2 south verge sign board | nuketown2 south verge speed limit sign | nuketown2 south verge wheelie bin 0 | nuketown2 south verge wheelie bin 1 | nuketown2 south yard butt | nuketown2 south yard far crate | nuketown2 south yard far store | nuketown2 south yard patio table | nuketown2 south yard porch | nuketown2 south yard side store: expected 30 to be less than or equal to 0
+ ❯ src/ballistics.test.ts:303:9
+    301|         `${arenaId}: ${fallbacks.length} unshootable reinforced fallba…
+    302|         + `${[...new Set(fallbacks.map((entry) => entry.name))].sort()…
+    303|       ).toBeLessThanOrEqual(ceiling);
+       |         ^
+    304|     }
+    305|   }, 300_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 30 passed (31)
+   Start at  11:51:10
+   Duration  3.97s (transform 3.08s, setup 0ms, import 144ms, tests 3.71s, environment 0ms)
+

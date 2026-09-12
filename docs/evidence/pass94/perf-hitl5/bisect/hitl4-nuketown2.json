@@ -1,0 +1,5438 @@
+{
+  "contract": "perf-hitl5-bisect-v1",
+  "measuredAt": "2026-09-04T16:33:56.060Z",
+  "label": "hitl4",
+  "arena": "nuketown2",
+  "base": "http://127.0.0.1:4300/",
+  "viewport": {
+    "width": 2560,
+    "height": 1440
+  },
+  "seconds": 8,
+  "settle": 4,
+  "toggles": [
+    {
+      "toggle": "baseline",
+      "applied": "nothing hidden",
+      "frames": 392,
+      "elapsedMs": 8035,
+      "fps": 48.8,
+      "frameMs": {
+        "p50": 19.8,
+        "p95": 39.3,
+        "p99": 44.9,
+        "mean": 20.41
+      },
+      "perFrame": {
+        "draws": 169.4,
+        "triangles": 326302.3,
+        "instances": 10846.6,
+        "renderPasses": 24.1,
+        "submits": 24.1
+      },
+      "created": {
+        "renderPipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 420
+      },
+      "cpu": {
+        "busyMs": 5959.533,
+        "idleMs": 51.205,
+        "gcMs": 32.042,
+        "programMs": 2880.015,
+        "top": [
+          {
+            "fn": "updateMatrixWorld vendor-three-D6Yw0MvX.js:0",
+            "ms": 656
+          },
+          {
+            "fn": "multiplyMatrices vendor-three-D6Yw0MvX.js:0",
+            "ms": 584.5
+          },
+          {
+            "fn": "updateWorldMatrix vendor-three-D6Yw0MvX.js:0",
+            "ms": 321.5
+          },
+          {
+            "fn": "_renderObjectDirect vendor-three-D6Yw0MvX.js:4135",
+            "ms": 303.6
+          },
+          {
+            "fn": "QEe legacy-main-CY9mr4UI.js:758",
+            "ms": 258.7
+          },
+          {
+            "fn": "updateByType vendor-three-D6Yw0MvX.js:4135",
+            "ms": 198.7
+          },
+          {
+            "fn": "writeBuffer :-1",
+            "ms": 185.7
+          },
+          {
+            "fn": "update vendor-three-D6Yw0MvX.js:4135",
+            "ms": 183.3
+          },
+          {
+            "fn": "_projectObject vendor-three-D6Yw0MvX.js:4135",
+            "ms": 124.2
+          },
+          {
+            "fn": "updateForRender vendor-three-D6Yw0MvX.js:4135",
+            "ms": 95.2
+          },
+          {
+            "fn": "update vendor-three-D6Yw0MvX.js:4123",
+            "ms": 94.9
+          },
+          {
+            "fn": "submit :-1",
+            "ms": 92.3
+          },
+          {
+            "fn": "_update vendor-three-D6Yw0MvX.js:4129",
+            "ms": 90.9
+          },
+          {
+            "fn": "get vendor-three-D6Yw0MvX.js:4129",
+            "ms": 77.4
+          },
+          {
+            "fn": "o collision-CR4h6GQS.js:0",
+            "ms": 74.4
+          },
+          {
+            "fn": "updateNumber vendor-three-D6Yw0MvX.js:4135",
+            "ms": 61.2
+          },
+          {
+            "fn": "setVertexBuffer :-1",
+            "ms": 51.3
+          },
+          {
+            "fn": "wasm-function[338] 005fccd2:0",
+            "ms": 50.8
+          },
+          {
+            "fn": "beginRenderPass :-1",
+            "ms": 49.3
+          },
+          {
+            "fn": "decompose vendor-three-D6Yw0MvX.js:0",
+            "ms": 44.6
+          },
+          {
+            "fn": "invert vendor-three-D6Yw0MvX.js:0",
+            "ms": 40.1
+          },
+          {
+            "fn": "_renderScene vendor-three-D6Yw0MvX.js:4135",
+            "ms": 39.6
+          },
+          {
+            "fn": "traverse vendor-three-D6Yw0MvX.js:0",
+            "ms": 38.9
+          },
+          {
+            "fn": "setFromRotationMatrix vendor-three-D6Yw0MvX.js:0",
+            "ms": 37.8
+          },
+          {
+            "fn": "Gme legacy-main-CY9mr4UI.js:709",
+            "ms": 37.7
+          }
+        ],
+        "busyMsPerFrame": 15.2,
+        "programMsPerFrame": 7.35
+      }
+    },
+    {
+      "toggle": "wear",
+      "applied": "stripped wear graphs from 50 nuketown2 material(s)",
+      "frames": 537,
+      "elapsedMs": 8030,
+      "fps": 66.9,
+      "frameMs": {
+        "p50": 14.7,
+        "p95": 18.3,
+        "p99": 26.2,
+        "mean": 14.92
+      },
+      "perFrame": {
+        "draws": 169,
+        "triangles": 325472,
+        "instances": 10819,
+        "renderPasses": 24,
+        "submits": 24
+      },
+      "created": {
+        "renderPipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 425
+      }
+    },
+    {
+      "toggle": "veg",
+      "applied": "hid 1 vegetation group(s)",
+      "frames": 512,
+      "elapsedMs": 8021,
+      "fps": 63.8,
+      "frameMs": {
+        "p50": 15.3,
+        "p95": 20.2,
+        "p99": 32.9,
+        "mean": 15.63
+      },
+      "perFrame": {
+        "draws": 158.3,
+        "triangles": 317210.3,
+        "instances": 10779,
+        "renderPasses": 24,
+        "submits": 24
+      },
+      "created": {
+        "renderPipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 425
+      }
+    },
+    {
+      "toggle": "lawn",
+      "applied": "hid 0 lawn-field mesh(es)",
+      "frames": 497,
+      "elapsedMs": 8019,
+      "fps": 62,
+      "frameMs": {
+        "p50": 16,
+        "p95": 20.7,
+        "p99": 33.1,
+        "mean": 16.1
+      },
+      "perFrame": {
+        "draws": 169,
+        "triangles": 325472,
+        "instances": 10819,
+        "renderPasses": 24,
+        "submits": 24
+      },
+      "created": {
+        "renderPipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 425
+      }
+    },
+    {
+      "toggle": "vehicles",
+      "applied": "hid 6 vehicle-forge group(s)",
+      "frames": 464,
+      "elapsedMs": 8014,
+      "fps": 57.9,
+      "frameMs": {
+        "p50": 16.7,
+        "p95": 32.4,
+        "p99": 38,
+        "mean": 17.23
+      },
+      "perFrame": {
+        "draws": 169.4,
+        "triangles": 326173.4,
+        "instances": 10842.3,
+        "renderPasses": 24.1,
+        "submits": 24.1
+      },
+      "created": {
+        "renderPipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 425
+      }
+    },
+    {
+      "toggle": "grime",
+      "applied": "hid 6 grime decal mesh(es)",
+      "frames": 487,
+      "elapsedMs": 8017,
+      "fps": 60.7,
+      "frameMs": {
+        "p50": 16.2,
+        "p95": 24.5,
+        "p99": 33.8,
+        "mean": 16.43
+      },
+      "perFrame": {
+        "draws": 163.3,
+        "triangles": 325923.9,
+        "instances": 10835.2,
+        "renderPasses": 24,
+        "submits": 24
+      },
+      "created": {
+        "renderPipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 425
+      }
+    },
+    {
+      "toggle": "props",
+      "applied": "hid 9 yard-prop mesh(es)",
+      "frames": 455,
+      "elapsedMs": 8028,
+      "fps": 56.7,
+      "frameMs": {
+        "p50": 16.6,
+        "p95": 33.3,
+        "p99": 40.2,
+        "mean": 17.61
+      },
+      "perFrame": {
+        "draws": 160.4,
+        "triangles": 318253.9,
+        "instances": 10833.8,
+        "renderPasses": 24.1,
+        "submits": 24.1
+      },
+      "created": {
+        "renderPipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 425
+      }
+    },
+    {
+      "toggle": "pool",
+      "applied": "hid 1 pool-water mesh(es)",
+      "frames": 453,
+      "elapsedMs": 8020,
+      "fps": 56.5,
+      "frameMs": {
+        "p50": 16.7,
+        "p95": 35.2,
+        "p99": 41.1,
+        "mean": 17.65
+      },
+      "perFrame": {
+        "draws": 168.4,
+        "triangles": 326166.4,
+        "instances": 10841.9,
+        "renderPasses": 24.1,
+        "submits": 24.1
+      },
+      "created": {
+        "renderPipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 425
+      }
+    },
+    {
+      "toggle": "operators",
+      "applied": "hid 28 operator visual(s)",
+      "frames": 467,
+      "elapsedMs": 8029,
+      "fps": 58.2,
+      "frameMs": {
+        "p50": 16.6,
+        "p95": 33,
+        "p99": 36.3,
+        "mean": 17.15
+      },
+      "perFrame": {
+        "draws": 160.3,
+        "triangles": 318398.3,
+        "instances": 10833.1,
+        "renderPasses": 24.1,
+        "submits": 24.1
+      },
+      "created": {
+        "renderPipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 425
+      }
+    },
+    {
+      "toggle": "shadows",
+      "applied": "disabled castShadow on 2 light(s)",
+      "frames": 186,
+      "elapsedMs": 10733,
+      "fps": 17.3,
+      "frameMs": {
+        "p50": 8.8,
+        "p95": 19.3,
+        "p99": 39.3,
+        "mean": 10.07
+      },
+      "perFrame": {
+        "draws": 20.9,
+        "triangles": 40246.5,
+        "instances": 1337.8,
+        "renderPasses": 3,
+        "submits": 3
+      },
+      "created": {
+        "renderPipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 520
+      }
+    },
+    {
+      "toggle": "baseline-again",
+      "applied": "nothing hidden (repeat, drift check)",
+      "frames": 39,
+      "elapsedMs": 8085,
+      "fps": 4.8,
+      "frameMs": {
+        "p50": 8.8,
+        "p95": 1623.5,
+        "p99": 3820.7,
+        "mean": 152.27
+      },
+      "perFrame": {
+        "draws": 23.1,
+        "triangles": 44068.7,
+        "instances": 1388.5,
+        "renderPasses": 3.1,
+        "submits": 3.1
+      },
+      "created": {
+        "renderPipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 602
+      }
+    }
+  ],
+  "profileState": {
+    "graphicsPreset": "high",
+    "renderBackend": "webgpu",
+    "effective": "EFFECTIVE: HIGH"
+  },
+  "census": {
+    "meshes": 7075,
+    "visibleMeshes": 145,
+    "materials": 1822,
+    "rows": [
+      {
+        "material": "Olive worn edge",
+        "type": "MeshStandardMaterial",
+        "meshes": 192,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 153600,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Frag_BodyMeridian_1",
+          "Frag_BodyMeridian_2",
+          "Frag_BodyMeridian_3",
+          "Frag_BodyRing_1"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_carbine_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 19,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 137240,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "carbine_WORLD_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+          "",
+          "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+          "carbine_WORLD_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR"
+        ]
+      },
+      {
+        "material": "(unnamed MeshStandardNodeMaterial)",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 10,
+        "instanced": 9,
+        "instances": 8822,
+        "tris": 130710,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": true,
+        "names": [
+          "nuketown2-lawn-region-0",
+          "nuketown2-lawn-region-1",
+          "nuketown2-lawn-region-2",
+          "nuketown2-lawn-region-3"
+        ]
+      },
+      {
+        "material": "MAT_HunterDrone_DarkArmor",
+        "type": "MeshStandardMaterial",
+        "meshes": 302,
+        "instanced": 2,
+        "instances": 0,
+        "tris": 106100,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Drone_AftPower_LOD0",
+          "Drone_Antenna_-1_LOD0",
+          "Drone_Antenna_1_LOD0",
+          "Drone_NoseBrow_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_HunterDrone_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 756,
+        "instanced": 6,
+        "instances": 0,
+        "tris": 103000,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Drone_GunBarrel_0_LOD0",
+          "Drone_GunBarrel_1_LOD0",
+          "Drone_GunBarrel_2_LOD0",
+          "Drone_GunReceiver_LOD0"
+        ]
+      },
+      {
+        "material": "through-wall-operator-orange-halo",
+        "type": "MeshBasicMaterial",
+        "meshes": 81,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 69786,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "through-wall-operator-orange-halo",
+          "through-wall-operator-orange-halo",
+          "through-wall-operator-orange-halo",
+          "through-wall-operator-orange-halo"
+        ]
+      },
+      {
+        "material": "(unnamed MeshStandardMaterial)",
+        "type": "MeshStandardMaterial",
+        "meshes": 77,
+        "instanced": 4,
+        "instances": 960,
+        "tris": 62116,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "pass65-bomb-shell-pool-1",
+          "pass65-bomb-shell-pool-2",
+          "pass65-bomb-shell-pool-3",
+          "pass65-bomb-shell-pool-4"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_carbine_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 39,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 53124,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "carbine_WORLD_LOD0_Runtime_static_MAT_Pass65_carbine_Gunmetal",
+          "carbine_WORLD_LOD0_Runtime_action_MAT_Pass65_carbine_Gunmetal",
+          "carbine_WORLD_LOD0_Runtime_magazine_MAT_Pass65_carbine_Gunmetal",
+          ""
+        ]
+      },
+      {
+        "material": "MAT_Pass65_m4a1_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 7,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 52432,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "M4A1_WORLD_LOD0_Runtime_static_MAT_Pass65_m4a1_Primary_PBR",
+          "M4A1_WORLD_LOD0_Runtime_action_MAT_Pass65_m4a1_Primary_PBR",
+          "M4A1_WORLD_LOD0_Runtime_magazine_MAT_Pass65_m4a1_Primary_PBR",
+          ""
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 175,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 52208,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Chopper_UpperSwitch_0_LOD0",
+          "Chopper_UpperSwitch_1_LOD0",
+          "Chopper_UpperSwitch_2_LOD0",
+          "Chopper_UpperSwitch_3_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_PanelWear",
+        "type": "MeshStandardMaterial",
+        "meshes": 165,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 51972,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Chopper_Dashboard_Fastener_0_LOD0",
+          "Chopper_Dashboard_Fastener_1_LOD0",
+          "Chopper_Dashboard_Fastener_2_LOD0",
+          "Chopper_Dashboard_Fastener_3_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_Metal",
+        "type": "MeshStandardMaterial",
+        "meshes": 241,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 45992,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Care_FuselageServiceLatch_-1_0_LOD0",
+          "Care_FuselageServiceLatch_-1_1_LOD0",
+          "Care_FuselageServiceLatch_-1_2_LOD0",
+          "Care_FuselageServiceLatch_1_0_LOD0"
+        ]
+      },
+      {
+        "material": "(unnamed MeshBasicMaterial)",
+        "type": "MeshBasicMaterial",
+        "meshes": 460,
+        "instanced": 7,
+        "instances": 515,
+        "tris": 40529,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "pass65-impact-flash-pool-1",
+          "pass65-impact-flash-pool-2",
+          "pass65-impact-flash-pool-3",
+          "pass65-impact-flash-pool-4"
+        ]
+      },
+      {
+        "material": "nuketown2-foliage-clipped-box-hedge",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 25,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 38824,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": true,
+        "names": [
+          "nuketown2-hedges-north-verge-front-hedge-L0",
+          "nuketown2-hedges-north-verge-front-hedge-L1",
+          "nuketown2-hedges-north-verge-front-hedge-L2",
+          "nuketown2-hedges-south-verge-front-hedge-L0"
+        ]
+      },
+      {
+        "material": "Pull pin",
+        "type": "MeshStandardMaterial",
+        "meshes": 72,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 32832,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Frag_PinStem",
+          "Frag_PullRing",
+          "Frag_StrikerPivot",
+          "Frag_PinStem"
+        ]
+      },
+      {
+        "material": "Olive cast steel",
+        "type": "MeshStandardMaterial",
+        "meshes": 24,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 30720,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Frag_Body",
+          "Frag_Body",
+          "Frag_Body",
+          "Frag_Body"
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_DarkArmor",
+        "type": "MeshStandardMaterial",
+        "meshes": 103,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 28144,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Chopper_GunnerViewReceiver_LOD0",
+          "Chopper_CollectiveGrip_LOD0",
+          "Chopper_CyclicGrip_LOD0",
+          "pass65-chopper-cockpit-static-batch-15"
+        ]
+      },
+      {
+        "material": "nuketown2-foliage-deciduous-avenue-tree",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 12,
+        "instanced": 12,
+        "instances": 162,
+        "tris": 27864,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": true,
+        "names": [
+          "nuketown2-avenue-sector-0-L0",
+          "nuketown2-avenue-sector-0-L1",
+          "nuketown2-avenue-sector-0-L2",
+          "nuketown2-avenue-sector-1-L0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_carbine_Polymer_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 19,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 25080,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "carbine_WORLD_LOD0_Runtime_static_MAT_Pass65_carbine_Polymer_PBR",
+          "",
+          "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Polymer_PBR",
+          "carbine_WORLD_LOD0_Runtime_static_MAT_Pass65_carbine_Polymer_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_flamethrower_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 13,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 25068,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "flamethrower_WORLD_LOD0_Runtime_static_MAT_Pass65_flamethrower_Gunmetal",
+          "flamethrower_WORLD_LOD0_Runtime_action_MAT_Pass65_flamethrower_Gunmetal",
+          "flamethrower_WORLD_LOD0_Runtime_magazine_MAT_Pass65_flamethrower_Gunmetal",
+          ""
+        ]
+      },
+      {
+        "material": "nuketown2-forge-coach",
+        "type": "MeshPhysicalNodeMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 25046,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "vehicle-forge nuketown2-coach paint",
+          ""
+        ]
+      },
+      {
+        "material": "MAT_Pass65_m4a1_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 7,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 23004,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "M4A1_WORLD_LOD0_Runtime_static_MAT_Pass65_m4a1_Gunmetal",
+          "M4A1_WORLD_LOD0_Runtime_action_MAT_Pass65_m4a1_Gunmetal",
+          "M4A1_WORLD_LOD0_Runtime_magazine_MAT_Pass65_m4a1_Gunmetal",
+          ""
+        ]
+      },
+      {
+        "material": "MAT_Pass65_pistol_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 11,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 22044,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "pistol_WORLD_LOD0_Runtime_static_MAT_Pass65_pistol_Gunmetal",
+          "pistol_WORLD_LOD0_Runtime_action_MAT_Pass65_pistol_Gunmetal",
+          "pistol_WORLD_LOD0_Runtime_magazine_MAT_Pass65_pistol_Gunmetal",
+          ""
+        ]
+      },
+      {
+        "material": "Swat_Black",
+        "type": "MeshStandardMaterial",
+        "meshes": 24,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 21516,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Cube018_2",
+          "Swat_Feet",
+          "Cube037",
+          "Cube023_1"
+        ]
+      },
+      {
+        "material": "Safety lever",
+        "type": "MeshStandardMaterial",
+        "meshes": 72,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 21216,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Frag_FuseHead",
+          "Frag_LeverTip",
+          "Frag_SafetyLever",
+          "Frag_FuseHead"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_lmg_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 21200,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "lmg_WORLD_LOD0_Runtime_static_MAT_Pass65_lmg_Primary_PBR",
+          "",
+          "lmg_FP_LOD0_Runtime_static_MAT_Pass65_lmg_Primary_PBR",
+          "lmg_WORLD_LOD0_Runtime_static_MAT_Pass65_lmg_Primary_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_PanelSeam",
+        "type": "MeshStandardMaterial",
+        "meshes": 80,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 21036,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Chopper_Dashboard_LowerSeam_LOD0",
+          "Chopper_UpperSwitchGuard_0_LOD0",
+          "Chopper_UpperSwitchGuard_1_LOD0",
+          "Chopper_UpperSwitchGuard_2_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_CockpitFrame",
+        "type": "MeshStandardMaterial",
+        "meshes": 57,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 19588,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Chopper_MFD_Bezel_0_LOD0",
+          "Chopper_MFD_Bezel_1_LOD0",
+          "Chopper_MFD_Bezel_2_LOD0",
+          "Chopper_InnerWindscreenHeader_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_m14_ebr_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 19372,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "m14-ebr_WORLD_LOD0_Runtime_static_MAT_Pass65_m14_ebr_Primary_PBR",
+          "m14-ebr_WORLD_LOD0_Runtime_magazine_MAT_Pass65_m14_ebr_Primary_PBR",
+          "",
+          "m14-ebr_FP_LOD0_Runtime_static_MAT_Pass65_m14_ebr_Primary_PBR"
+        ]
+      },
+      {
+        "material": "vehicle-forge-tyre",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 7,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 19360,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "vehicle-forge nuketown2-coach tyre",
+          "vehicle-forge nuketown2-truck-cab tyre",
+          "vehicle-forge nuketown2-truck-bogie tyre",
+          "vehicle-forge nuketown2-sedan tyre"
+        ]
+      },
+      {
+        "material": "Safety marking",
+        "type": "MeshStandardMaterial",
+        "meshes": 24,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 19200,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Frag_MarkingBand",
+          "Frag_MarkingBand",
+          "Frag_MarkingBand",
+          "Frag_MarkingBand"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_Blade",
+        "type": "MeshStandardMaterial",
+        "meshes": 96,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 18144,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Care_PropBlade_0_0_LOD0",
+          "Care_PropBlade_0_1_LOD0",
+          "Care_PropBlade_0_2_LOD0",
+          "Care_PropBlade_0_3_LOD0"
+        ]
+      },
+      {
+        "material": "Semtex red PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 96,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 18048,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "semtex-block-1",
+          "semtex-block-2",
+          "semtex-block-3",
+          "semtex-block-4"
+        ]
+      },
+      {
+        "material": "Swat",
+        "type": "MeshStandardMaterial",
+        "meshes": 18,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 17964,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Cube018_1",
+          "Cube037_1",
+          "Cube023",
+          "Cube018_1"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_lmg_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 8,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 16932,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "lmg_WORLD_LOD0_Runtime_static_MAT_Pass65_lmg_Gunmetal",
+          "lmg_WORLD_LOD0_Runtime_action_MAT_Pass65_lmg_Gunmetal",
+          "",
+          "lmg_FP_LOD0_Runtime_static_MAT_Pass65_lmg_Gunmetal"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_flamethrower_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 13,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 16288,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "flamethrower_WORLD_LOD0_Runtime_static_MAT_Pass65_flamethrower_Primary_PBR",
+          "flamethrower_WORLD_LOD0_Runtime_action_MAT_Pass65_flamethrower_Primary_PBR",
+          "flamethrower_WORLD_LOD0_Runtime_magazine_MAT_Pass65_flamethrower_Primary_PBR",
+          ""
+        ]
+      },
+      {
+        "material": "MAT_HunterDrone_Armor_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 151,
+        "instanced": 1,
+        "instances": 0,
+        "tris": 16200,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Drone_Hull_LOD0",
+          "Drone_Spine_LOD0",
+          "Drone_RotorArm_0_LOD0",
+          "Drone_RotorArm_1_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_HunterDrone_Vents",
+        "type": "MeshStandardMaterial",
+        "meshes": 151,
+        "instanced": 1,
+        "instances": 0,
+        "tris": 16200,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Drone_Vent_-1_0_LOD0",
+          "Drone_Vent_-1_1_LOD0",
+          "Drone_Vent_-1_2_LOD0",
+          "Drone_Vent_1_0_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_smg_Polymer_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 7,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 15980,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "smg_WORLD_LOD0_Runtime_static_MAT_Pass65_smg_Polymer_PBR",
+          "",
+          "smg_FP_LOD0_Runtime_static_MAT_Pass65_smg_Polymer_PBR",
+          "smg_WORLD_LOD0_Runtime_static_MAT_Pass65_smg_Polymer_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_smg_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 15,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 15924,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "smg_WORLD_LOD0_Runtime_static_MAT_Pass65_smg_Gunmetal",
+          "smg_WORLD_LOD0_Runtime_action_MAT_Pass65_smg_Gunmetal",
+          "smg_WORLD_LOD0_Runtime_magazine_MAT_Pass65_smg_Gunmetal",
+          ""
+        ]
+      },
+      {
+        "material": "vehicle-forge-chrome",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 7,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 14608,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "vehicle-forge nuketown2-coach chrome",
+          "vehicle-forge nuketown2-truck-cab chrome",
+          "vehicle-forge nuketown2-truck-bogie chrome",
+          "vehicle-forge nuketown2-sedan chrome"
+        ]
+      },
+      {
+        "material": "Skin",
+        "type": "MeshStandardMaterial",
+        "meshes": 14,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 14588,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Cube018",
+          "Cube018",
+          "Cube018",
+          "Cube018"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_sniper_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 8,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 14420,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "sniper_WORLD_LOD0_Runtime_static_MAT_Pass65_sniper_Primary_PBR",
+          "sniper_WORLD_LOD0_Runtime_magazine_MAT_Pass65_sniper_Primary_PBR",
+          "",
+          "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Primary_PBR"
+        ]
+      },
+      {
+        "material": "operator-look-vanguard-woodland-garmentDark",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 16,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 14344,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "Cube018_2",
+          "Swat_Feet",
+          "Cube037",
+          "Cube023_1"
+        ]
+      },
+      {
+        "material": "through-wall-exact:operator-look-vanguard-woodland-garmentDark",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 16,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 14344,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model"
+        ]
+      },
+      {
+        "material": "operator-look-marauder-arid-garmentDark",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 16,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 14344,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "Cube018_2",
+          "Swat_Feet",
+          "Cube037",
+          "Cube023_1"
+        ]
+      },
+      {
+        "material": "through-wall-exact:operator-look-marauder-arid-garmentDark",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 16,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 14344,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_smg_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 7,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 14300,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "smg_WORLD_LOD0_Runtime_static_MAT_Pass65_smg_Primary_PBR",
+          "",
+          "smg_FP_LOD0_Runtime_static_MAT_Pass65_smg_Primary_PBR",
+          "smg_WORLD_LOD0_Runtime_static_MAT_Pass65_smg_Primary_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_FieldKnife_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 145,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 14060,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Cube_001091",
+          "Cube_001092",
+          "Cube_001093",
+          "Cube_001084"
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_GreenInstrument",
+        "type": "MeshStandardMaterial",
+        "meshes": 47,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 14052,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Chopper_Annunciator_0_LOD0",
+          "Chopper_Annunciator_3_LOD0",
+          "Chopper_AttitudePitch_-0019_LOD0",
+          "Chopper_AttitudePitch_-0038_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_mini_uzi_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 7,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 13980,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "mini-uzi_WORLD_LOD0_Runtime_static_MAT_Pass65_mini_uzi_Gunmetal",
+          "mini-uzi_WORLD_LOD0_Runtime_action_MAT_Pass65_mini_uzi_Gunmetal",
+          "mini-uzi_WORLD_LOD0_Runtime_magazine_MAT_Pass65_mini_uzi_Gunmetal",
+          ""
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_CyanInstrument",
+        "type": "MeshStandardMaterial",
+        "meshes": 48,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 13816,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Chopper_AmmoBar_0_LOD0",
+          "Chopper_AmmoBar_1_LOD0",
+          "Chopper_AmmoBar_2_LOD0",
+          "Chopper_Annunciator_1_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_mini_uzi_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 13688,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "mini-uzi_WORLD_LOD0_Runtime_static_MAT_Pass65_mini_uzi_Primary_PBR",
+          "",
+          "mini-uzi_FP_LOD0_Runtime_static_MAT_Pass65_mini_uzi_Primary_PBR"
+        ]
+      },
+      {
+        "material": "nuketown2-forge-car",
+        "type": "MeshPhysicalNodeMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 13596,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "vehicle-forge nuketown2-sedan paint",
+          "vehicle-forge nuketown2-sedan paint",
+          "vehicle-forge nuketown2-sedan paint"
+        ]
+      },
+      {
+        "material": "Semtex woven retaining tape",
+        "type": "MeshStandardMaterial",
+        "meshes": 72,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 13536,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "semtex-fuse",
+          "semtex-wrap-band-horizontal",
+          "semtex-wrap-band-vertical",
+          "semtex-fuse"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_pistol_Polymer_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 13228,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "pistol_WORLD_LOD0_Runtime_static_MAT_Pass65_pistol_Polymer_PBR",
+          "",
+          "pistol_FP_LOD0_Runtime_static_MAT_Pass65_pistol_Polymer_PBR",
+          "pistol_WORLD_LOD0_Runtime_static_MAT_Pass65_pistol_Polymer_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_machine_pistol_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 7,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 12968,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "machine-pistol_WORLD_LOD0_Runtime_static_MAT_Pass65_machine_pistol_Gunmetal",
+          "machine-pistol_WORLD_LOD0_Runtime_action_MAT_Pass65_machine_pistol_Gunmetal",
+          "machine-pistol_WORLD_LOD0_Runtime_magazine_MAT_Pass65_machine_pistol_Gunmetal",
+          ""
+        ]
+      },
+      {
+        "material": "MAT_Pass65_sniper_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 8,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 12940,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "sniper_WORLD_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+          "sniper_WORLD_LOD0_Runtime_action_MAT_Pass65_sniper_Gunmetal",
+          "",
+          "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_magnum_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 12636,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "magnum_WORLD_LOD0_Runtime_static_MAT_Pass65_magnum_Rubber",
+          "",
+          "magnum_FP_LOD0_Runtime_static_MAT_Pass65_magnum_Rubber"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_lmg_Accent",
+        "type": "MeshStandardMaterial",
+        "meshes": 8,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 12464,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "lmg_WORLD_LOD0_Runtime_static_MAT_Pass65_lmg_Accent",
+          "lmg_WORLD_LOD0_Runtime_magazine_MAT_Pass65_lmg_Accent",
+          "",
+          "lmg_FP_LOD0_Runtime_static_MAT_Pass65_lmg_Accent"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_ak_47_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 12308,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "ak-47_WORLD_LOD0_Runtime_static_MAT_Pass65_ak_47_Primary_PBR",
+          "ak-47_WORLD_LOD0_Runtime_magazine_MAT_Pass65_ak_47_Primary_PBR",
+          "",
+          "ak-47_FP_LOD0_Runtime_static_MAT_Pass65_ak_47_Primary_PBR"
+        ]
+      },
+      {
+        "material": "Phosphate fuse",
+        "type": "MeshStandardMaterial",
+        "meshes": 24,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 12192,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Frag_FuseCollar",
+          "Frag_FuseCollar",
+          "Frag_FuseCollar",
+          "Frag_FuseCollar"
+        ]
+      },
+      {
+        "material": "operator-look-vanguard-woodland-garment",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 12,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 11976,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "Cube018_1",
+          "Cube037_1",
+          "Cube023",
+          "Cube018_1"
+        ]
+      },
+      {
+        "material": "through-wall-exact:operator-look-vanguard-woodland-garment",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 12,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 11976,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model"
+        ]
+      },
+      {
+        "material": "operator-look-marauder-arid-garment",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 12,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 11976,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "Cube018_1",
+          "Cube037_1",
+          "Cube023",
+          "Cube018_1"
+        ]
+      },
+      {
+        "material": "through-wall-exact:operator-look-marauder-arid-garment",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 12,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 11976,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_scattergun_Accent",
+        "type": "MeshStandardMaterial",
+        "meshes": 8,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 11740,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "scattergun_WORLD_LOD0_Runtime_static_MAT_Pass65_scattergun_Accent",
+          "scattergun_WORLD_LOD0_Runtime_magazine_MAT_Pass65_scattergun_Accent",
+          "",
+          "scattergun_FP_LOD0_Runtime_static_MAT_Pass65_scattergun_Accent"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_slug_shotgun_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 11616,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "slug-shotgun_WORLD_LOD0_Runtime_static_MAT_Pass65_slug_shotgun_Primary_PBR",
+          "",
+          "slug-shotgun_FP_LOD0_Runtime_static_MAT_Pass65_slug_shotgun_Primary_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_railgun_Emissive",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 11548,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "railgun_FP_LOD0_Runtime_static_MAT_Pass65_railgun_Emissive",
+          "railgun_FP_LOD0_Runtime_action_MAT_Pass65_railgun_Emissive"
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_Armor_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 38,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 11384,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Chopper_ArmoredNose_LOD0",
+          "Chopper_EngineDeck_LOD0",
+          "Chopper_EnginePod_-1_LOD0",
+          "Chopper_EnginePod_1_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_flashlight_pistol_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 10932,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "flashlight-pistol_FP_LOD0_Runtime_static_MAT_Pass65_flashlight_pistol_Gunmetal",
+          "flashlight-pistol_FP_LOD0_Runtime_action_MAT_Pass65_flashlight_pistol_Gunmetal",
+          "flashlight-pistol_FP_LOD0_Runtime_magazine_MAT_Pass65_flashlight_pistol_Gunmetal"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_mp5_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 10412,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "mp5_WORLD_LOD0_Runtime_static_MAT_Pass65_mp5_Primary_PBR",
+          "mp5_WORLD_LOD0_Runtime_magazine_MAT_Pass65_mp5_Primary_PBR",
+          "",
+          "mp5_FP_LOD0_Runtime_static_MAT_Pass65_mp5_Primary_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_ParachuteRib",
+        "type": "MeshStandardMaterial",
+        "meshes": 26,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 10336,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Care_ParachuteRib_0_LOD0",
+          "Care_ParachuteRib_10_LOD0",
+          "Care_ParachuteRib_11_LOD0",
+          "Care_ParachuteRib_1_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_magnum_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 7,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 10272,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "magnum_WORLD_LOD0_Runtime_static_MAT_Pass65_magnum_Gunmetal",
+          "magnum_WORLD_LOD0_Runtime_action_MAT_Pass65_magnum_Gunmetal",
+          "magnum_WORLD_LOD0_Runtime_magazine_MAT_Pass65_magnum_Gunmetal",
+          ""
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_Dark",
+        "type": "MeshStandardMaterial",
+        "meshes": 48,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 10060,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Cube101",
+          "Care_HeavyBelly_LOD0",
+          "Care_MainGearSponson_-1_LOD0",
+          "Care_MainGearSponson_1_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_mp5_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 10056,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "mp5_WORLD_LOD0_Runtime_static_MAT_Pass65_mp5_Gunmetal",
+          "mp5_WORLD_LOD0_Runtime_action_MAT_Pass65_mp5_Gunmetal",
+          "",
+          "mp5_FP_LOD0_Runtime_static_MAT_Pass65_mp5_Gunmetal"
+        ]
+      },
+      {
+        "material": "MAT_HunterDrone_Optic",
+        "type": "MeshStandardMaterial",
+        "meshes": 26,
+        "instanced": 1,
+        "instances": 0,
+        "tris": 9500,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Drone_OpticLens_LOD0",
+          "Drone_OpticLens_LOD0",
+          "Drone_OpticLens_LOD0",
+          "Drone_OpticLens_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_scattergun_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 9436,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "scattergun_WORLD_LOD0_Runtime_static_MAT_Pass65_scattergun_Primary_PBR",
+          "",
+          "scattergun_FP_LOD0_Runtime_static_MAT_Pass65_scattergun_Primary_PBR",
+          "scattergun_WORLD_LOD0_Runtime_static_MAT_Pass65_scattergun_Primary_PBR"
+        ]
+      },
+      {
+        "material": "through-wall-exact:Skin",
+        "type": "MeshStandardMaterial",
+        "meshes": 9,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 9378,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_m4a1_Polymer_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 8316,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "M4A1_WORLD_LOD0_Runtime_static_MAT_Pass65_m4a1_Polymer_PBR",
+          "",
+          "M4A1_FP_LOD0_Runtime_static_MAT_Pass65_m4a1_Polymer_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_RearTailArmor_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 27,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 8312,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Chopper_RearCabin_LOD0",
+          "Chopper_RearEngineCowling_LOD0",
+          "Chopper_TailFin_LOD0",
+          "Chopper_TailBoom_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_scattergun_Polymer_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 8,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 8064,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "scattergun_WORLD_LOD0_Runtime_static_MAT_Pass65_scattergun_Polymer_PBR",
+          "scattergun_WORLD_LOD0_Runtime_action_MAT_Pass65_scattergun_Polymer_PBR",
+          "",
+          "scattergun_FP_LOD0_Runtime_static_MAT_Pass65_scattergun_Polymer_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_lmg_Polymer_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 8,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 7964,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "lmg_WORLD_LOD0_Runtime_static_MAT_Pass65_lmg_Polymer_PBR",
+          "lmg_WORLD_LOD0_Runtime_magazine_MAT_Pass65_lmg_Polymer_PBR",
+          "",
+          "lmg_FP_LOD0_Runtime_static_MAT_Pass65_lmg_Polymer_PBR"
+        ]
+      },
+      {
+        "material": "nuketown2-trim",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 239,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 7824,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north house wall east lintel",
+          "nuketown2 south house wall east lintel",
+          "nuketown2 north house front window sill 0",
+          "nuketown2 south house front window sill 0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_magnum_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 7660,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "magnum_WORLD_LOD0_Runtime_static_MAT_Pass65_magnum_Primary_PBR",
+          "magnum_WORLD_LOD0_Runtime_action_MAT_Pass65_magnum_Primary_PBR",
+          "",
+          "magnum_FP_LOD0_Runtime_static_MAT_Pass65_magnum_Primary_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_Tire",
+        "type": "MeshStandardMaterial",
+        "meshes": 25,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 7504,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Care_MainWheel_-1_0_LOD0",
+          "Care_MainWheel_-1_1_LOD0",
+          "Care_MainWheel_-1_2_LOD0",
+          "Care_MainWheel_1_0_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_machine_pistol_Polymer_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 7440,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "machine-pistol_WORLD_LOD0_Runtime_static_MAT_Pass65_machine_pistol_Polymer_PBR",
+          "",
+          "machine-pistol_FP_LOD0_Runtime_static_MAT_Pass65_machine_pistol_Polymer_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65CareAircraft_EngineNacelle",
+        "type": "MeshStandardMaterial",
+        "meshes": 15,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 7072,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Care_EngineNacelle_0_LOD0",
+          "Care_EngineNacelle_1_LOD0",
+          "Care_EngineNacelle_2_LOD0",
+          "Care_EngineNacelle_3_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_FieldKnife_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 160,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 7040,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Cube_001085",
+          "Cube_001086",
+          "Cube_001087",
+          "Cube_001088"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_m4a1_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 6996,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "M4A1_WORLD_LOD0_Runtime_static_MAT_Pass65_m4a1_Rubber",
+          "",
+          "M4A1_FP_LOD0_Runtime_static_MAT_Pass65_m4a1_Rubber"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_ak_47_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 6984,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "ak-47_WORLD_LOD0_Runtime_static_MAT_Pass65_ak_47_Gunmetal",
+          "ak-47_WORLD_LOD0_Runtime_action_MAT_Pass65_ak_47_Gunmetal",
+          "",
+          "ak-47_FP_LOD0_Runtime_static_MAT_Pass65_ak_47_Gunmetal"
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_HUDGlass",
+        "type": "MeshStandardMaterial",
+        "meshes": 23,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 6932,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Cube100",
+          "Chopper_SensorLens_0_LOD0",
+          "Chopper_SensorLens_1_LOD0",
+          "Chopper_MissileSeeker_-1_0_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_FieldKnife_G10_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 32,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 6896,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "FieldKnife_HandleScale_-1_001003",
+          "FieldKnife_HandleScale_1_001003",
+          "FieldKnife_HandleScale_-1",
+          "FieldKnife_HandleScale_1"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_FieldKnife_Accent",
+        "type": "MeshStandardMaterial",
+        "meshes": 48,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 6768,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Cylinder_001010",
+          "Cylinder_001011",
+          "Cylinder_001012",
+          "Cylinder"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_m14_ebr_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 6704,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "m14-ebr_WORLD_LOD0_Runtime_static_MAT_Pass65_m14_ebr_Gunmetal",
+          "m14-ebr_WORLD_LOD0_Runtime_action_MAT_Pass65_m14_ebr_Gunmetal",
+          "",
+          "m14-ebr_FP_LOD0_Runtime_static_MAT_Pass65_m14_ebr_Gunmetal"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_flare_gun_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 10,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 6568,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "flare-gun_WORLD_LOD0_Runtime_static_MAT_Pass65_flare_gun_Gunmetal",
+          "flare-gun_WORLD_LOD0_Runtime_action_MAT_Pass65_flare_gun_Gunmetal",
+          "flare-gun_WORLD_LOD0_Runtime_magazine_MAT_Pass65_flare_gun_Gunmetal",
+          ""
+        ]
+      },
+      {
+        "material": "MAT_Pass65_slug_shotgun_Accent",
+        "type": "MeshStandardMaterial",
+        "meshes": 7,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 6552,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "slug-shotgun_WORLD_LOD0_Runtime_static_MAT_Pass65_slug_shotgun_Accent",
+          "slug-shotgun_WORLD_LOD0_Runtime_action_MAT_Pass65_slug_shotgun_Accent",
+          "slug-shotgun_WORLD_LOD0_Runtime_magazine_MAT_Pass65_slug_shotgun_Accent",
+          ""
+        ]
+      },
+      {
+        "material": "MAT_Pass65_pistol_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 8,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 6416,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "pistol_WORLD_LOD0_Runtime_static_MAT_Pass65_pistol_Primary_PBR",
+          "pistol_WORLD_LOD0_Runtime_action_MAT_Pass65_pistol_Primary_PBR",
+          "",
+          "pistol_FP_LOD0_Runtime_static_MAT_Pass65_pistol_Primary_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_sniper_Polymer_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 6300,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "sniper_WORLD_LOD0_Runtime_static_MAT_Pass65_sniper_Polymer_PBR",
+          "",
+          "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Polymer_PBR",
+          "sniper_WORLD_LOD0_Runtime_static_MAT_Pass65_sniper_Polymer_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_flare_gun_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 7,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 6244,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "flare-gun_WORLD_LOD0_Runtime_static_MAT_Pass65_flare_gun_Primary_PBR",
+          "flare-gun_WORLD_LOD0_Runtime_action_MAT_Pass65_flare_gun_Primary_PBR",
+          "",
+          "flare-gun_FP_LOD0_Runtime_static_MAT_Pass65_flare_gun_Primary_PBR"
+        ]
+      },
+      {
+        "material": "Semtex detonator steel",
+        "type": "MeshStandardMaterial",
+        "meshes": 24,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 6048,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "semtex-detonator",
+          "semtex-detonator",
+          "semtex-detonator",
+          "semtex-detonator"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_flamethrower_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 5776,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "flamethrower_WORLD_LOD0_Runtime_static_MAT_Pass65_flamethrower_Rubber",
+          "",
+          "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Rubber",
+          "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Rubber"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_Bomb",
+        "type": "MeshStandardMaterial",
+        "meshes": 18,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 5680,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Carpet_Bomb_-1_0_LOD0",
+          "Carpet_Bomb_-1_1_LOD0",
+          "Carpet_Bomb_-1_2_LOD0",
+          "Carpet_Bomb_-1_3_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_PanelSeam",
+        "type": "MeshStandardMaterial",
+        "meshes": 61,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 5536,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Care_FuselagePanel_-1_0_LOD0",
+          "Care_FuselagePanel_-1_1_LOD0",
+          "Care_FuselagePanel_-1_2_LOD0",
+          "Care_FuselagePanel_-1_3_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_RescueAccent",
+        "type": "MeshStandardMaterial",
+        "meshes": 33,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 5508,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Chopper_MainBladeTip_0_LOD0",
+          "Chopper_MainBladeTip_1_LOD0",
+          "Chopper_MainBladeTip_2_LOD0",
+          "Chopper_MainBladeTip_3_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_HunterDrone_IdentityLight",
+        "type": "MeshStandardMaterial",
+        "meshes": 51,
+        "instanced": 1,
+        "instances": 0,
+        "tris": 5400,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Drone_IdentityStrip_-1_LOD0",
+          "Drone_IdentityStrip_1_LOD0",
+          "Drone_IdentityStrip_-1_LOD0",
+          "Drone_IdentityStrip_1_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_minigun_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 5324,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "minigun_FP_LOD0_Runtime_static_MAT_Pass65_minigun_Gunmetal",
+          "minigun_FP_LOD0_Runtime_action_MAT_Pass65_minigun_Gunmetal",
+          "minigun_FP_LOD0_Runtime_magazine_MAT_Pass65_minigun_Gunmetal"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_smg_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 7,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 5264,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "smg_WORLD_LOD0_Runtime_static_MAT_Pass65_smg_Rubber",
+          "",
+          "smg_FP_LOD0_Runtime_static_MAT_Pass65_smg_Rubber",
+          "smg_WORLD_LOD0_Runtime_static_MAT_Pass65_smg_Rubber"
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_RotorBlade",
+        "type": "MeshStandardMaterial",
+        "meshes": 30,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 5184,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Chopper_MainBlade_0_LOD0",
+          "Chopper_MainBlade_1_LOD0",
+          "Chopper_MainBlade_2_LOD0",
+          "Chopper_MainBlade_3_LOD0"
+        ]
+      },
+      {
+        "material": "piloted-drone-hostile-through-wall",
+        "type": "MeshBasicMaterial",
+        "meshes": 64,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 5152,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "drone-sensor-head",
+          "drone-sensor-torso",
+          "drone-sensor-leg-left",
+          "drone-sensor-leg-right"
+        ]
+      },
+      {
+        "material": "vehicle-forge-lining",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 6,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 4992,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "vehicle-forge nuketown2-coach lining",
+          "vehicle-forge nuketown2-truck-cab lining",
+          "vehicle-forge nuketown2-sedan lining",
+          "vehicle-forge nuketown2-sedan lining"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_carbine_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 19,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 4888,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "carbine_WORLD_LOD0_Runtime_static_MAT_Pass65_carbine_Rubber",
+          "",
+          "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Rubber",
+          "carbine_WORLD_LOD0_Runtime_static_MAT_Pass65_carbine_Rubber"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_machine_pistol_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 4852,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "machine-pistol_WORLD_LOD0_Runtime_static_MAT_Pass65_machine_pistol_Primary_PBR",
+          "machine-pistol_WORLD_LOD0_Runtime_action_MAT_Pass65_machine_pistol_Primary_PBR",
+          "",
+          "machine-pistol_FP_LOD0_Runtime_static_MAT_Pass65_machine_pistol_Primary_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_scattergun_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 8,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 4768,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "scattergun_WORLD_LOD0_Runtime_static_MAT_Pass65_scattergun_Gunmetal",
+          "scattergun_WORLD_LOD0_Runtime_action_MAT_Pass65_scattergun_Gunmetal",
+          "",
+          "scattergun_FP_LOD0_Runtime_static_MAT_Pass65_scattergun_Gunmetal"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_ak_47_LaminateWood_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 4752,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "ak-47_WORLD_LOD0_Runtime_static_MAT_Pass65_ak_47_LaminateWood_PBR",
+          "",
+          "ak-47_FP_LOD0_Runtime_static_MAT_Pass65_ak_47_LaminateWood_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_HUDCyan",
+        "type": "MeshStandardMaterial",
+        "meshes": 33,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 4700,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Chopper_MFD_Label_0_LOD0",
+          "Chopper_MFD_Label_1_LOD0",
+          "Chopper_MFD_Label_2_LOD0",
+          "chopper-cockpit-hud-horizon"
+        ]
+      },
+      {
+        "material": "nuketown-forest-contact-skirt",
+        "type": "MeshStandardMaterial",
+        "meshes": 1,
+        "instanced": 1,
+        "instances": 520,
+        "tris": 4680,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "forest-contact-skirts"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_mini_uzi_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 4512,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "mini-uzi_WORLD_LOD0_Runtime_static_MAT_Pass65_mini_uzi_Rubber",
+          "",
+          "mini-uzi_FP_LOD0_Runtime_static_MAT_Pass65_mini_uzi_Rubber"
+        ]
+      },
+      {
+        "material": "Semtex pressure adhesive",
+        "type": "MeshStandardMaterial",
+        "meshes": 24,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 4512,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "semtex-sticky-pad",
+          "semtex-sticky-pad",
+          "semtex-sticky-pad",
+          "semtex-sticky-pad"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_railgun_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 4460,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "railgun_FP_LOD0_Runtime_static_MAT_Pass65_railgun_Primary_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_HUDGreen",
+        "type": "MeshStandardMaterial",
+        "meshes": 24,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 4360,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Chopper_MFD_Readout_0_LOD0",
+          "Chopper_MFD_Readout_1_LOD0",
+          "Chopper_MFD_Readout_2_LOD0",
+          "chopper-cockpit-hud-reticle"
+        ]
+      },
+      {
+        "material": "Semtex insulated wire",
+        "type": "MeshStandardMaterial",
+        "meshes": 24,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 4320,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "semtex-wire",
+          "semtex-wire",
+          "semtex-wire",
+          "semtex-wire"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_slug_shotgun_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3992,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "slug-shotgun_WORLD_LOD0_Runtime_static_MAT_Pass65_slug_shotgun_Gunmetal",
+          "slug-shotgun_WORLD_LOD0_Runtime_action_MAT_Pass65_slug_shotgun_Gunmetal",
+          "",
+          "slug-shotgun_FP_LOD0_Runtime_static_MAT_Pass65_slug_shotgun_Gunmetal"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_flamethrower_Accent",
+        "type": "MeshStandardMaterial",
+        "meshes": 8,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3984,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "flamethrower_WORLD_LOD0_Runtime_action_MAT_Pass65_flamethrower_Accent",
+          "flamethrower_WORLD_LOD0_Runtime_magazine_MAT_Pass65_flamethrower_Accent",
+          "flamethrower_FP_LOD0_Runtime_action_MAT_Pass65_flamethrower_Accent",
+          "flamethrower_FP_LOD0_Runtime_magazine_MAT_Pass65_flamethrower_Accent"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_FieldKnife_Fuller",
+        "type": "MeshStandardMaterial",
+        "meshes": 32,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3968,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "field-knife-fuller",
+          "field-knife-lanyard-hole",
+          "field-knife-fuller",
+          "field-knife-lanyard-hole"
+        ]
+      },
+      {
+        "material": "pass66-cloud-veil-primary",
+        "type": "MeshBasicMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3968,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "pass66-cloud-veil-primary-layer"
+        ]
+      },
+      {
+        "material": "pass66-cloud-veil-secondary",
+        "type": "MeshBasicMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3968,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "pass66-cloud-veil-secondary-layer"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_flare_gun_Accent",
+        "type": "MeshStandardMaterial",
+        "meshes": 10,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3964,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "flare-gun_WORLD_LOD0_Runtime_static_MAT_Pass65_flare_gun_Accent",
+          "flare-gun_WORLD_LOD0_Runtime_action_MAT_Pass65_flare_gun_Accent",
+          "flare-gun_WORLD_LOD0_Runtime_magazine_MAT_Pass65_flare_gun_Accent",
+          ""
+        ]
+      },
+      {
+        "material": "MAT_Pass65_slug_shotgun_Polymer_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3960,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "slug-shotgun_WORLD_LOD0_Runtime_static_MAT_Pass65_slug_shotgun_Polymer_PBR",
+          "",
+          "slug-shotgun_FP_LOD0_Runtime_static_MAT_Pass65_slug_shotgun_Polymer_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_pistol_Accent",
+        "type": "MeshStandardMaterial",
+        "meshes": 8,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3928,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "pistol_WORLD_LOD0_Runtime_static_MAT_Pass65_pistol_Accent",
+          "pistol_WORLD_LOD0_Runtime_action_MAT_Pass65_pistol_Accent",
+          "",
+          "pistol_FP_LOD0_Runtime_static_MAT_Pass65_pistol_Accent"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_PanelWear",
+        "type": "MeshStandardMaterial",
+        "meshes": 69,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3844,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Care_FuselageLongitudinalBreak_-1_0_LOD0",
+          "Care_FuselageLongitudinalBreak_-1_1_LOD0",
+          "Care_FuselageLongitudinalBreak_1_0_LOD0",
+          "Care_FuselageLongitudinalBreak_1_1_LOD0"
+        ]
+      },
+      {
+        "material": "Semtex arming lamp",
+        "type": "MeshStandardMaterial",
+        "meshes": 24,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3744,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "semtex-arming-light",
+          "semtex-arming-light",
+          "semtex-arming-light",
+          "semtex-arming-light"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_FieldKnife_HonedEdge",
+        "type": "MeshStandardMaterial",
+        "meshes": 32,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3712,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Cube_001080",
+          "field-knife-cutting-edge",
+          "Cube",
+          "field-knife-cutting-edge"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_machine_pistol_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 7,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3648,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "machine-pistol_WORLD_LOD0_Runtime_static_MAT_Pass65_machine_pistol_Rubber",
+          "machine-pistol_WORLD_LOD0_Runtime_action_MAT_Pass65_machine_pistol_Rubber",
+          "machine-pistol_WORLD_LOD0_Runtime_magazine_MAT_Pass65_machine_pistol_Rubber",
+          ""
+        ]
+      },
+      {
+        "material": "MAT_Pass65_minigun_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3620,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "minigun_FP_LOD0_Runtime_static_MAT_Pass65_minigun_Primary_PBR",
+          "minigun_FP_LOD0_Runtime_action_MAT_Pass65_minigun_Primary_PBR"
+        ]
+      },
+      {
+        "material": "through-wall-exact:Swat_Black",
+        "type": "MeshStandardMaterial",
+        "meshes": 4,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3586,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_carbine_Lens",
+        "type": "MeshStandardMaterial",
+        "meshes": 19,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3572,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "carbine_WORLD_LOD0_Runtime_static_MAT_Pass65_carbine_Lens",
+          "",
+          "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Lens",
+          "carbine_WORLD_LOD0_Runtime_static_MAT_Pass65_carbine_Lens"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_flare_gun_Polymer_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 4,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3504,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "flare-gun_WORLD_LOD0_Runtime_static_MAT_Pass65_flare_gun_Polymer_PBR",
+          "",
+          "flare-gun_FP_LOD0_Runtime_static_MAT_Pass65_flare_gun_Polymer_PBR",
+          "flare-gun_WORLD_LOD0_Runtime_static_MAT_Pass65_flare_gun_Polymer_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass70_DroneSwarmLogo_WhiteMark",
+        "type": "MeshBasicMaterial",
+        "meshes": 97,
+        "instanced": 1,
+        "instances": 0,
+        "tris": 3360,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "pass70-drone-swarm-body-logo-top-hollow-ring",
+          "pass70-drone-swarm-body-logo-top-open-chevron",
+          "pass70-drone-swarm-body-logo-bottom-hollow-ring",
+          "pass70-drone-swarm-body-logo-bottom-open-chevron"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_Glass",
+        "type": "MeshStandardMaterial",
+        "meshes": 22,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3276,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Care_FlightDeckFrontPane_0_LOD0",
+          "Care_FlightDeckFrontPane_1_LOD0",
+          "Care_FlightDeckFrontPane_2_LOD0",
+          "Care_FlightDeckFrontPane_3_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_Muzzle",
+        "type": "MeshStandardMaterial",
+        "meshes": 20,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3240,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Chopper_AmmoBar_3_LOD0",
+          "Chopper_Annunciator_2_LOD0",
+          "Chopper_AttitudeCraft_LOD0",
+          "Chopper_CyclicTrigger_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_m14_ebr_Polymer_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3192,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "m14-ebr_WORLD_LOD0_Runtime_static_MAT_Pass65_m14_ebr_Polymer_PBR",
+          "",
+          "m14-ebr_FP_LOD0_Runtime_static_MAT_Pass65_m14_ebr_Polymer_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_Crossbow_Amber",
+        "type": "MeshStandardMaterial",
+        "meshes": 15,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3116,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Crossbow_OpticDial_FP_LOD0",
+          "Crossbow_BoltFletching_-1_FP_LOD0",
+          "Crossbow_BoltFletching_1_FP_LOD0",
+          "Crossbow_ExplosiveTip_FP_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_magnum_Polymer_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3048,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "magnum_WORLD_LOD0_Runtime_static_MAT_Pass65_magnum_Polymer_PBR",
+          "",
+          "magnum_FP_LOD0_Runtime_static_MAT_Pass65_magnum_Polymer_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_Arms_Glove_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 3010,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Pass65_Arms_Batch_Glove"
+        ]
+      },
+      {
+        "material": "through-wall-exact:Swat",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2994,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model"
+        ]
+      },
+      {
+        "material": "nuketown-ridge-painted",
+        "type": "MeshBasicMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2976,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown-mountain-foothills",
+          "nuketown-mountain-ridge",
+          "nuketown-mountain-far-range"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_flashlight_pistol_Polymer_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2916,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "flashlight-pistol_FP_LOD0_Runtime_static_MAT_Pass65_flashlight_pistol_Polymer_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_Crossbow_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 17,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2916,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Crossbow_OpticBody_FP_LOD0",
+          "Crossbow_OpticMount_FP_LOD0",
+          "Crossbow_Cam_L_FP_LOD0",
+          "Crossbow_Cam_R_FP_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_FieldKnife_Blade_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 16,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2908,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "FieldKnife_Blade_drop-lod0_Mesh",
+          "FieldKnife_Blade_fp-lod0_Mesh",
+          "FieldKnife_Blade_world-lod0_Mesh",
+          "FieldKnife_Blade_world-lod0_Mesh"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_mp5_Polymer_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2868,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "mp5_WORLD_LOD0_Runtime_static_MAT_Pass65_mp5_Polymer_PBR",
+          "",
+          "mp5_FP_LOD0_Runtime_static_MAT_Pass65_mp5_Polymer_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_lmg_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2820,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "lmg_WORLD_LOD0_Runtime_static_MAT_Pass65_lmg_Rubber",
+          "",
+          "lmg_FP_LOD0_Runtime_static_MAT_Pass65_lmg_Rubber",
+          "lmg_WORLD_LOD0_Runtime_static_MAT_Pass65_lmg_Rubber"
+        ]
+      },
+      {
+        "material": "vehicle-forge-glass",
+        "type": "MeshPhysicalNodeMaterial",
+        "meshes": 6,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2792,
+        "transparent": true,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "vehicle-forge nuketown2-coach glass",
+          "vehicle-forge nuketown2-truck-cab glass",
+          "vehicle-forge nuketown2-sedan glass",
+          "vehicle-forge nuketown2-sedan glass"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_Carpet_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 21,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2764,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Carpet_BlendedCentreBody_LOD0_Mesh",
+          "Carpet_CentreSpine_LOD0",
+          "Carpet_SweptWing_-1_LOD0_Mesh",
+          "Carpet_SweptWing_1_LOD0_Mesh"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_Arms_FingerGlove_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2702,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Pass65_Arms_Batch_Skin"
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_CockpitInterior",
+        "type": "MeshStandardMaterial",
+        "meshes": 15,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2592,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Chopper_Dashboard_LOD0",
+          "Chopper_CentreConsole_LOD0",
+          "Chopper_SideConsole_-1_LOD0",
+          "Chopper_SideConsole_1_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_Intake",
+        "type": "MeshStandardMaterial",
+        "meshes": 15,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2592,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Carpet_BuriedIntake_0_LOD0",
+          "Carpet_BuriedIntake_1_LOD0",
+          "Carpet_BuriedIntake_2_LOD0",
+          "Carpet_BuriedIntake_3_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_Exhaust",
+        "type": "MeshStandardMaterial",
+        "meshes": 15,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2592,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Carpet_ExhaustSlot_0_LOD0",
+          "Carpet_ExhaustSlot_1_LOD0",
+          "Carpet_ExhaustSlot_2_LOD0",
+          "Carpet_ExhaustSlot_3_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_machine_pistol_Accent",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2508,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "machine-pistol_WORLD_LOD0_Runtime_static_MAT_Pass65_machine_pistol_Accent",
+          "machine-pistol_WORLD_LOD0_Runtime_action_MAT_Pass65_machine_pistol_Accent",
+          "",
+          "machine-pistol_FP_LOD0_Runtime_static_MAT_Pass65_machine_pistol_Accent"
+        ]
+      },
+      {
+        "material": "nuketown2-forge-truck-cab",
+        "type": "MeshPhysicalNodeMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2418,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "vehicle-forge nuketown2-truck-cab paint"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_Arms_Sleeve_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2388,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Pass65_Arms_Batch_Sleeve"
+        ]
+      },
+      {
+        "material": "nuketown2-drywall-dbd1ba",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 77,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2376,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north house upper front subwindow drywall",
+          "nuketown2 south house upper front subwindow drywall",
+          "nuketown2 north house upper back subwindow drywall",
+          "nuketown2 south house upper back subwindow drywall"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_flashlight_pistol_Primary_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2336,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "flashlight-pistol_FP_LOD0_Runtime_static_MAT_Pass65_flashlight_pistol_Primary_PBR",
+          "flashlight-pistol_FP_LOD0_Runtime_action_MAT_Pass65_flashlight_pistol_Primary_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_Armor_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 27,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2304,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Care_BoxedCargoHull_LOD0",
+          "Care_FuselageServiceHatch_-1_0_LOD0",
+          "Care_FuselageServiceHatch_-1_1_LOD0",
+          "Care_FuselageServiceHatch_-1_2_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_CanopyGlass",
+        "type": "MeshStandardMaterial",
+        "meshes": 12,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2232,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Chopper_CanopyGlass_LOD0",
+          "Chopper_TandemGunnerCanopy_LOD0",
+          "Chopper_TandemPilotCanopy_LOD0",
+          "pass65-chopper-exterior-static-batch-16"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_flamethrower_Polymer_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 2160,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "flamethrower_WORLD_LOD0_Runtime_static_MAT_Pass65_flamethrower_Polymer_PBR",
+          "",
+          "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Polymer_PBR",
+          "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Polymer_PBR"
+        ]
+      },
+      {
+        "material": "Visor",
+        "type": "MeshStandardMaterial",
+        "meshes": 14,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1848,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Cube037_2",
+          "Cube037_2",
+          "Cube037_2",
+          "Cube037_2"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_smg_Accent",
+        "type": "MeshStandardMaterial",
+        "meshes": 4,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1732,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "smg_WORLD_LOD0_Runtime_magazine_MAT_Pass65_smg_Accent",
+          "smg_FP_LOD0_Runtime_magazine_MAT_Pass65_smg_Accent",
+          "smg_WORLD_LOD0_Runtime_magazine_MAT_Pass65_smg_Accent",
+          "smg_WORLD_LOD0_Runtime_magazine_MAT_Pass65_smg_Accent"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_CratePallet",
+        "type": "MeshStandardMaterial",
+        "meshes": 10,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1728,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Care_CratePallet_LOD0",
+          "Care_CratePalletSlat_0_LOD0",
+          "Care_CratePalletSlat_1_LOD0",
+          "Care_CratePalletSlat_2_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_minigun_Polymer_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1708,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "minigun_FP_LOD0_Runtime_static_MAT_Pass65_minigun_Polymer_PBR",
+          "minigun_FP_LOD0_Runtime_magazine_MAT_Pass65_minigun_Polymer_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_railgun_Gunmetal",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1708,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "railgun_FP_LOD0_Runtime_static_MAT_Pass65_railgun_Gunmetal",
+          "railgun_FP_LOD0_Runtime_action_MAT_Pass65_railgun_Gunmetal"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_Arms_WristAccent_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1644,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Pass65_Arms_Batch_WristAccent"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_railgun_Polymer_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1636,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "railgun_FP_LOD0_Runtime_static_MAT_Pass65_railgun_Polymer_PBR",
+          "railgun_FP_LOD0_Runtime_magazine_MAT_Pass65_railgun_Polymer_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_flamethrower_Emissive",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1612,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "flamethrower_WORLD_LOD0_Runtime_static_MAT_Pass65_flamethrower_Emissive",
+          "",
+          "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Emissive",
+          "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Emissive"
+        ]
+      },
+      {
+        "material": "nuketown2-ground-scrub",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 67,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1584,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 ground tile 0",
+          "nuketown2 ground tile 1",
+          "nuketown2 ground tile 2",
+          "nuketown2 ground tile 3"
+        ]
+      },
+      {
+        "material": "vehicle-forge-lamp-head",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 6,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1440,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "vehicle-forge nuketown2-coach headLamp",
+          "vehicle-forge nuketown2-truck-cab headLamp",
+          "vehicle-forge nuketown2-sedan headLamp",
+          "vehicle-forge nuketown2-sedan headLamp"
+        ]
+      },
+      {
+        "material": "vehicle-forge-shut-line",
+        "type": "MeshBasicNodeMaterial",
+        "meshes": 6,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1344,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "vehicle-forge nuketown2-coach groove",
+          "vehicle-forge nuketown2-truck-cab groove",
+          "vehicle-forge nuketown2-sedan groove",
+          "vehicle-forge nuketown2-sedan groove"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_pistol_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1304,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "pistol_WORLD_LOD0_Runtime_static_MAT_Pass65_pistol_Rubber",
+          "",
+          "pistol_FP_LOD0_Runtime_static_MAT_Pass65_pistol_Rubber",
+          "pistol_WORLD_LOD0_Runtime_static_MAT_Pass65_pistol_Rubber"
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_Seat",
+        "type": "MeshStandardMaterial",
+        "meshes": 9,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1296,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Chopper_PilotSeatBack_LOD0",
+          "Chopper_PilotSeatBase_LOD0",
+          "pass65-chopper-cockpit-static-batch-17",
+          "Chopper_PilotSeatBack_LOD1"
+        ]
+      },
+      {
+        "material": "MAT_Pass65CareAircraft_LeadingEdge",
+        "type": "MeshStandardMaterial",
+        "meshes": 15,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1296,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Care_MainWing_-1_LOD0_Mesh_2",
+          "Care_MainWing_1_LOD0_Mesh_2",
+          "Care_TailPlane_-1_LOD0_Mesh_2",
+          "Care_TailPlane_1_LOD0_Mesh_2"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_Accent",
+        "type": "MeshStandardMaterial",
+        "meshes": 13,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1284,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Care_TailFinTip_LOD0",
+          "Care_TailFinTip_LOD1",
+          "Care_TailFinTip_LOD2",
+          "Care_CrateLatchPin_0_LOD0"
+        ]
+      },
+      {
+        "material": "through-wall-exact:Visor",
+        "type": "MeshStandardMaterial",
+        "meshes": 9,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1188,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model",
+          "through-wall-exact-operator-model"
+        ]
+      },
+      {
+        "material": "nuketown2-automotive-chrome",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 57,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1152,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north house living wall clock rim",
+          "nuketown2 south house living wall clock rim",
+          "nuketown2 north house living switch toggle",
+          "nuketown2 south house living switch toggle"
+        ]
+      },
+      {
+        "material": "vehicle-forge-lamp-tail",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1152,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "vehicle-forge nuketown2-coach tailLamp",
+          "vehicle-forge nuketown2-sedan tailLamp",
+          "vehicle-forge nuketown2-sedan tailLamp",
+          "vehicle-forge nuketown2-sedan tailLamp"
+        ]
+      },
+      {
+        "material": "pass74-support-shadow-silhouette",
+        "type": "MeshBasicMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1121,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "pass74-support-shadow-silhouette"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_ParachuteLine",
+        "type": "MeshStandardMaterial",
+        "meshes": 22,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1120,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Care_ParachuteLine_0_LOD0",
+          "Care_ParachuteLine_10_LOD0",
+          "Care_ParachuteLine_11_LOD0",
+          "Care_ParachuteLine_1_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_HunterDrone_MuzzleFlash",
+        "type": "MeshStandardMaterial",
+        "meshes": 26,
+        "instanced": 1,
+        "instances": 0,
+        "tris": 1100,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Cylinder012",
+          "Cylinder012",
+          "Cylinder012",
+          "Cylinder012"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_magnum_Accent",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1076,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "magnum_WORLD_LOD0_Runtime_static_MAT_Pass65_magnum_Accent",
+          "magnum_WORLD_LOD0_Runtime_action_MAT_Pass65_magnum_Accent",
+          "",
+          "magnum_FP_LOD0_Runtime_static_MAT_Pass65_magnum_Accent"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_flashlight_pistol_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 1068,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "flashlight-pistol_FP_LOD0_Runtime_static_MAT_Pass65_flashlight_pistol_Rubber"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_scattergun_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 940,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "scattergun_WORLD_LOD0_Runtime_static_MAT_Pass65_scattergun_Rubber",
+          "",
+          "scattergun_FP_LOD0_Runtime_static_MAT_Pass65_scattergun_Rubber",
+          "scattergun_WORLD_LOD0_Runtime_static_MAT_Pass65_scattergun_Rubber"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_sniper_Accent",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 940,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "sniper_WORLD_LOD0_Runtime_static_MAT_Pass65_sniper_Accent",
+          "",
+          "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Accent",
+          "sniper_WORLD_LOD0_Runtime_static_MAT_Pass65_sniper_Accent"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_sniper_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 940,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "sniper_WORLD_LOD0_Runtime_static_MAT_Pass65_sniper_Rubber",
+          "",
+          "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Rubber",
+          "sniper_WORLD_LOD0_Runtime_static_MAT_Pass65_sniper_Rubber"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_Parachute",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 920,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Care_ParachuteCanopy_LOD0",
+          "Care_ParachuteCanopy_LOD1"
+        ]
+      },
+      {
+        "material": "MAT_Pass65CarpetAircraft_LeadingEdge",
+        "type": "MeshStandardMaterial",
+        "meshes": 9,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 882,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Carpet_BlendedCentreBody_LOD0_Mesh_2",
+          "Carpet_SweptWing_-1_LOD0_Mesh_2",
+          "Carpet_SweptWing_1_LOD0_Mesh_2",
+          "Carpet_BlendedCentreBody_LOD1_Mesh_2"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_mini_uzi_Polymer_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 840,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "mini-uzi_WORLD_LOD0_Runtime_static_MAT_Pass65_mini_uzi_Polymer_PBR",
+          "",
+          "mini-uzi_FP_LOD0_Runtime_static_MAT_Pass65_mini_uzi_Polymer_PBR"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_flashlight_pistol_Accent",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 836,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "flashlight-pistol_FP_LOD0_Runtime_static_MAT_Pass65_flashlight_pistol_Accent",
+          "flashlight-pistol_FP_LOD0_Runtime_action_MAT_Pass65_flashlight_pistol_Accent"
+        ]
+      },
+      {
+        "material": "nuketown2-glasshouse-frame",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 24,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 792,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north yard glasshouse eaves",
+          "nuketown2 south yard glasshouse eaves",
+          "nuketown2 north yard glasshouse cill",
+          "nuketown2 south yard glasshouse cill"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_Crossbow_OpticLens",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 760,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Crossbow_OpticFrontLens_FP_LOD0",
+          "Crossbow_OpticRearLens_FP_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_smg_Lens",
+        "type": "MeshStandardMaterial",
+        "meshes": 4,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 752,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "smg_WORLD_LOD0_Runtime_magazine_MAT_Pass65_smg_Lens",
+          "smg_FP_LOD0_Runtime_magazine_MAT_Pass65_smg_Lens",
+          "smg_WORLD_LOD0_Runtime_magazine_MAT_Pass65_smg_Lens",
+          "smg_WORLD_LOD0_Runtime_magazine_MAT_Pass65_smg_Lens"
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_CyanDisplay",
+        "type": "MeshStandardMaterial",
+        "meshes": 6,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 648,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Cube041_instance_0",
+          "chopper-cockpit-display-tactical-0",
+          "Cube185",
+          "chopper-cockpit-display-tactical-1"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_CargoInterior",
+        "type": "MeshStandardMaterial",
+        "meshes": 6,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 648,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Care_RearCargoAperture_LOD0",
+          "Care_RearCargoAperture_LOD1",
+          "Care_RearCargoAperture_LOD2",
+          "Carpet_BombBayCavity_LOD0"
+        ]
+      },
+      {
+        "material": "nuketown2-block",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 25,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 576,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north verge low wall",
+          "nuketown2 south verge low wall",
+          "nuketown2 north verge front planter",
+          "nuketown2 south verge front planter"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_mini_uzi_Accent",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 564,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "mini-uzi_WORLD_LOD0_Runtime_static_MAT_Pass65_mini_uzi_Accent",
+          "",
+          "mini-uzi_FP_LOD0_Runtime_static_MAT_Pass65_mini_uzi_Accent"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_mp5_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 564,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "mp5_WORLD_LOD0_Runtime_static_MAT_Pass65_mp5_Rubber",
+          "",
+          "mp5_FP_LOD0_Runtime_static_MAT_Pass65_mp5_Rubber"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_m14_ebr_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 564,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "m14-ebr_WORLD_LOD0_Runtime_static_MAT_Pass65_m14_ebr_Rubber",
+          "",
+          "m14-ebr_FP_LOD0_Runtime_static_MAT_Pass65_m14_ebr_Rubber"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_slug_shotgun_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 564,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "slug-shotgun_WORLD_LOD0_Runtime_static_MAT_Pass65_slug_shotgun_Rubber",
+          "",
+          "slug-shotgun_FP_LOD0_Runtime_static_MAT_Pass65_slug_shotgun_Rubber"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_Crossbow_Tan",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 540,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Cube012",
+          "Crossbow_CheekPad_FP_LOD0",
+          "Crossbow_Grip_FP_LOD0",
+          "Crossbow_ReceiverPanel_-1_FP_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_CargoLight",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 504,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Sphere",
+          "Sphere001",
+          "Sphere002"
+        ]
+      },
+      {
+        "material": "nuketown2-yard-chrome",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 17,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 504,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north lawn appliance bank plinth",
+          "nuketown2 south lawn appliance bank plinth",
+          "nuketown2 north lawn appliance bank panel 0",
+          "nuketown2 south lawn appliance bank panel 0"
+        ]
+      },
+      {
+        "material": "nuketown2-planter",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 20,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 480,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north verge wheelie bin 0",
+          "nuketown2 south verge wheelie bin 0",
+          "nuketown2 north verge front hedge",
+          "nuketown2 south verge front hedge"
+        ]
+      },
+      {
+        "material": "nuketown2-drive",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 17,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 480,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north yard porch",
+          "nuketown2 south yard porch",
+          "nuketown2 north yard pool coping",
+          "nuketown2 south yard pool coping"
+        ]
+      },
+      {
+        "material": "nuketown2-sign",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 19,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 432,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north house living art canvas",
+          "nuketown2 south house living art canvas",
+          "nuketown2 north verge mailbox",
+          "nuketown2 south verge mailbox"
+        ]
+      },
+      {
+        "material": "nuketown2-tire-rubber",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 25,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 420,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north verge wheelie bin lid 0",
+          "nuketown2 south verge wheelie bin lid 0",
+          "nuketown2 north verge wheelie bin lid 1",
+          "nuketown2 south verge wheelie bin lid 1"
+        ]
+      },
+      {
+        "material": "nuketown2-forge-coach-accent",
+        "type": "MeshPhysicalNodeMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 404,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "vehicle-forge nuketown2-coach accent"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_sniper_Lens",
+        "type": "MeshStandardMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 364,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "sniper_WORLD_LOD0_Runtime_static_MAT_Pass65_sniper_Lens",
+          "",
+          "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Lens",
+          "sniper_WORLD_LOD0_Runtime_static_MAT_Pass65_sniper_Lens"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_Crossbow_Carbon_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 360,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Crossbow_Limb_Left_FP_LOD0",
+          "Crossbow_Limb_Right_FP_LOD0"
+        ]
+      },
+      {
+        "material": "field-shed-frame-structural-steel-v1",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 2,
+        "instances": 30,
+        "tris": 360,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "field-shed-structural-frame",
+          "field-shed-structural-frame"
+        ]
+      },
+      {
+        "material": "nuketown2-lawn-decal",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 12,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 360,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north street lawn front",
+          "nuketown2 south street lawn front",
+          "nuketown2 north street lawn west",
+          "nuketown2 south street lawn west"
+        ]
+      },
+      {
+        "material": "nuketown2-siding-north-blue",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 16,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 360,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north house wall west",
+          "nuketown2 north house wall east 0",
+          "nuketown2 north house wall east 1",
+          "nuketown2 north house wall east upper"
+        ]
+      },
+      {
+        "material": "nuketown2-siding-south-yellow",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 16,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 360,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 south house wall west",
+          "nuketown2 south house wall east 0",
+          "nuketown2 south house wall east 1",
+          "nuketown2 south house wall east upper"
+        ]
+      },
+      {
+        "material": "nuketown2-timber-fence",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 16,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 360,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north house living art frame",
+          "nuketown2 south house living art frame",
+          "nuketown2 north yard fence run 0",
+          "nuketown2 south yard fence run 0"
+        ]
+      },
+      {
+        "material": "nuketown2-warm-ceiling-light",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 10,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 336,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north house front ceiling light lens",
+          "nuketown2 south house front ceiling light lens",
+          "nuketown2 north house back ceiling light lens",
+          "nuketown2 south house back ceiling light lens"
+        ]
+      },
+      {
+        "material": "nuketown2-garage-wall-boards",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 15,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 336,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north garage wall outboard",
+          "nuketown2 south garage wall outboard",
+          "nuketown2 north garage link pier 0",
+          "nuketown2 south garage link pier 0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65Chopper_GreenDisplay",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 324,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "chopper-cockpit-display-green",
+          "chopper-cockpit-display-green",
+          "chopper-cockpit-display-green"
+        ]
+      },
+      {
+        "material": "MAT_Pass65CareAircraft_Underside",
+        "type": "MeshStandardMaterial",
+        "meshes": 15,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 324,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Care_MainWing_-1_LOD0_Mesh_1",
+          "Care_MainWing_1_LOD0_Mesh_1",
+          "Care_TailPlane_-1_LOD0_Mesh_1",
+          "Care_TailPlane_1_LOD0_Mesh_1"
+        ]
+      },
+      {
+        "material": "MAT_Pass65CareAircraft_Tail",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 324,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Care_TailFin_LOD0",
+          "Care_TailFin_LOD1",
+          "Care_TailFin_LOD2"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_Crossbow_Black",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 324,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Crossbow_BoltChannel_FP_LOD0",
+          "Crossbow_CableGuard_FP_LOD0",
+          "Crossbow_StockSpine_FP_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_flamethrower_Lens",
+        "type": "MeshStandardMaterial",
+        "meshes": 4,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 320,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "flamethrower_WORLD_LOD0_Runtime_action_MAT_Pass65_flamethrower_Lens",
+          "flamethrower_FP_LOD0_Runtime_action_MAT_Pass65_flamethrower_Lens",
+          "flamethrower_FP_LOD0_Runtime_action_MAT_Pass65_flamethrower_Lens",
+          "flamethrower_WORLD_LOD0_Runtime_action_MAT_Pass65_flamethrower_Lens"
+        ]
+      },
+      {
+        "material": "nuketown2-truck-box-ribbed",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 16,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 288,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 street-vehicle truck deck",
+          "nuketown2 street-vehicle truck box bulkhead",
+          "nuketown2 street-vehicle truck box flank 0 pier 0",
+          "nuketown2 street-vehicle truck box flank 0 pier 1"
+        ]
+      },
+      {
+        "material": "nuketown2-car-aqua",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 19,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 252,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north yard patio cooler body",
+          "nuketown2 south yard patio cooler body",
+          "nuketown2 street-vehicle head car body",
+          "nuketown2 street-vehicle head car wheel arch 00"
+        ]
+      },
+      {
+        "material": "MAT_Pass65CarpetAircraft_Underside",
+        "type": "MeshStandardMaterial",
+        "meshes": 9,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 243,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Carpet_BlendedCentreBody_LOD0_Mesh_1",
+          "Carpet_SweptWing_-1_LOD0_Mesh_1",
+          "Carpet_SweptWing_1_LOD0_Mesh_1",
+          "Carpet_BlendedCentreBody_LOD1_Mesh_1"
+        ]
+      },
+      {
+        "material": "nuketown2-house-wood-floor",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 10,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 240,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north house floor",
+          "nuketown2 south house floor",
+          "nuketown2 north balcony deck",
+          "nuketown2 south balcony deck"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_m14_ebr_Lens",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 228,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "m14-ebr_WORLD_LOD0_Runtime_static_MAT_Pass65_m14_ebr_Lens",
+          "",
+          "m14-ebr_FP_LOD0_Runtime_static_MAT_Pass65_m14_ebr_Lens"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_flare_gun_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 228,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "flare-gun_WORLD_LOD0_Runtime_action_MAT_Pass65_flare_gun_Rubber",
+          "flare-gun_FP_LOD0_Runtime_action_MAT_Pass65_flare_gun_Rubber",
+          "flare-gun_WORLD_LOD0_Runtime_action_MAT_Pass65_flare_gun_Rubber"
+        ]
+      },
+      {
+        "material": "MAT_Pass65SupportAircraft_Crate_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 216,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Care_CrateBody_LOD0",
+          "Care_CrateBody_LOD1"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_Crossbow_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 216,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Crossbow_ButtPad_FP_LOD0",
+          "Crossbow_Foregrip_FP_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_Crossbow_Armor_PBR",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 216,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Crossbow_RearDeck_FP_LOD0",
+          "Crossbow_Receiver_FP_LOD0"
+        ]
+      },
+      {
+        "material": "nuketown2-garden-pod-shell",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 8,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 192,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north yard garden pod shell",
+          "nuketown2 south yard garden pod shell",
+          "nuketown2 north yard garden pod eave band",
+          "nuketown2 south yard garden pod eave band"
+        ]
+      },
+      {
+        "material": "nuketown2-yard-timber",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 8,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 192,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north yard sand pit kerb",
+          "nuketown2 south yard sand pit kerb",
+          "nuketown2 north yard sand pit seat 0",
+          "nuketown2 south yard sand pit seat 0"
+        ]
+      },
+      {
+        "material": "(unnamed MeshPhysicalMaterial)",
+        "type": "MeshPhysicalMaterial",
+        "meshes": 8,
+        "instanced": 8,
+        "instances": 192,
+        "tris": 192,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "window-debris:nuketown2-ground-window-0:north:shard-cluster",
+          "window-debris:nuketown2-ground-window-0:south:shard-cluster",
+          "window-debris:nuketown2-ground-window-1:north:shard-cluster",
+          "window-debris:nuketown2-ground-window-1:south:shard-cluster"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_minigun_Lens",
+        "type": "MeshStandardMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 188,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "minigun_FP_LOD0_Runtime_static_MAT_Pass65_minigun_Lens"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_Crossbow_Bolt",
+        "type": "MeshStandardMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 188,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "Crossbow_BoltShaft_FP_LOD0"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_railgun_Lens",
+        "type": "MeshStandardMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 188,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "railgun_FP_LOD0_Runtime_static_MAT_Pass65_railgun_Lens"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_railgun_Rubber",
+        "type": "MeshStandardMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 188,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "railgun_FP_LOD0_Runtime_static_MAT_Pass65_railgun_Rubber"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_flashlight_pistol_Lens",
+        "type": "MeshStandardMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 184,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "flashlight-pistol_FP_LOD0_Runtime_static_MAT_Pass65_flashlight_pistol_Lens"
+        ]
+      },
+      {
+        "material": "nuketown2-taillight-lens",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 12,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 168,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 street-vehicle truck taillight -1",
+          "nuketown2 street-vehicle truck taillight 1",
+          "nuketown2 street-vehicle coach taillight -1",
+          "nuketown2 street-vehicle coach taillight 1"
+        ]
+      },
+      {
+        "material": "nuketown2-kerb",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 7,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 144,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north street kerb 0",
+          "nuketown2 south street kerb 0",
+          "nuketown2 north street kerb 1",
+          "nuketown2 south street kerb 1"
+        ]
+      },
+      {
+        "material": "nuketown2-trim-decal",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 7,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 144,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north street dash 0",
+          "nuketown2 south street dash 0",
+          "nuketown2 north street dash 1",
+          "nuketown2 south street dash 1"
+        ]
+      },
+      {
+        "material": "nuketown2-drive-decal",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 6,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 144,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north street driveway",
+          "nuketown2 south street driveway",
+          "nuketown2 north border path",
+          "nuketown2 south border path"
+        ]
+      },
+      {
+        "material": "nuketown2-coach-trim",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 8,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 144,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north verge mailbox flag",
+          "nuketown2 south verge mailbox flag",
+          "nuketown2 north verge hydrant body",
+          "nuketown2 south verge hydrant body"
+        ]
+      },
+      {
+        "material": "nuketown2-grime-tyre",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 6,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 144,
+        "transparent": true,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north drive tyre scuff",
+          "nuketown2 south drive tyre scuff",
+          "nuketown2 north border path tyre track",
+          "nuketown2 south border path tyre track"
+        ]
+      },
+      {
+        "material": "nuketown2-grime-crack",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 6,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 144,
+        "transparent": true,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north drive slab cracking",
+          "nuketown2 south drive slab cracking",
+          "nuketown2 north border path cracking",
+          "nuketown2 south border path cracking"
+        ]
+      },
+      {
+        "material": "nuketown2-wall-grime",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 6,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 144,
+        "transparent": true,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north perimeter wall grime long",
+          "nuketown2 south perimeter wall grime long",
+          "nuketown2 north perimeter wall grime end",
+          "nuketown2 south perimeter wall grime end"
+        ]
+      },
+      {
+        "material": "nuketown2-vehicle-glass",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 10,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 120,
+        "transparent": true,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 street-vehicle truck windshield",
+          "nuketown2 street-vehicle head car cabin",
+          "nuketown2 street-vehicle head car windshield",
+          "nuketown2 street-vehicle head car rear window"
+        ]
+      },
+      {
+        "material": "nuketown2-headlight-lens",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 10,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 120,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 street-vehicle truck headlight -1",
+          "nuketown2 street-vehicle truck headlight 1",
+          "nuketown2 street-vehicle coach headlight -1",
+          "nuketown2 street-vehicle coach headlight 1"
+        ]
+      },
+      {
+        "material": "nuketown2-glasshouse-glazing",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 6,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 120,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north yard glasshouse shell",
+          "nuketown2 south yard glasshouse shell",
+          "nuketown2 north yard garden pod window",
+          "nuketown2 south yard garden pod window"
+        ]
+      },
+      {
+        "material": "MAT_Pass70_DroneSwarmLogo_BlackField",
+        "type": "MeshBasicMaterial",
+        "meshes": 49,
+        "instanced": 1,
+        "instances": 0,
+        "tris": 96,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "pass70-drone-swarm-body-logo-top-black-field",
+          "pass70-drone-swarm-body-logo-bottom-black-field",
+          "pass70-drone-swarm-body-logo-top-black-field",
+          "pass70-drone-swarm-body-logo-bottom-black-field"
+        ]
+      },
+      {
+        "material": "nuketown2-roof-shingles",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 96,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north house roof deck",
+          "nuketown2 south house roof deck",
+          "nuketown2 north garage roof",
+          "nuketown2 south garage roof"
+        ]
+      },
+      {
+        "material": "nuketown2-window-glass",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 8,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 96,
+        "transparent": true,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north house front window glass 0",
+          "nuketown2 south house front window glass 0",
+          "nuketown2 north house front window glass 1",
+          "nuketown2 south house front window glass 1"
+        ]
+      },
+      {
+        "material": "nuketown2-cold-tube-light",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 5,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 96,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north garage tube light tube 0",
+          "nuketown2 south garage tube light tube 0",
+          "nuketown2 north garage tube light tube 1",
+          "nuketown2 south garage tube light tube 1"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_machine_pistol_Emissive",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 72,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "machine-pistol_WORLD_LOD0_Runtime_action_MAT_Pass65_machine_pistol_Emissive",
+          "machine-pistol_FP_LOD0_Runtime_action_MAT_Pass65_machine_pistol_Emissive"
+        ]
+      },
+      {
+        "material": "smoke-grenade-inner-density",
+        "type": "MeshBasicMaterial",
+        "meshes": 12,
+        "instanced": 12,
+        "instances": 36,
+        "tris": 72,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "smoke-grenade-inner-density-cards",
+          "smoke-grenade-inner-density-cards",
+          "smoke-grenade-inner-density-cards",
+          "smoke-grenade-inner-density-cards"
+        ]
+      },
+      {
+        "material": "smoke-grenade-soft-edge",
+        "type": "MeshBasicMaterial",
+        "meshes": 12,
+        "instanced": 12,
+        "instances": 36,
+        "tris": 72,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "smoke-grenade-soft-edge-cards",
+          "smoke-grenade-soft-edge-cards",
+          "smoke-grenade-soft-edge-cards",
+          "smoke-grenade-soft-edge-cards"
+        ]
+      },
+      {
+        "material": "nuketown2-asphalt-road",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 4,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 72,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 street asphalt 0",
+          "nuketown2 street asphalt 1",
+          "nuketown2 street turning head",
+          ""
+        ]
+      },
+      {
+        "material": "nuketown2-house-stair-collision-authority",
+        "type": "MeshBasicMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 72,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north house stair ramp",
+          "nuketown2 south house stair ramp",
+          ""
+        ]
+      },
+      {
+        "material": "nuketown2-pool-water-material",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 4,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 72,
+        "transparent": true,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north yard pool water nuketown2-yard-pool-water",
+          "nuketown2 south yard pool water nuketown2-yard-pool-water",
+          "nuketown2-presentation-presentation-batch-18",
+          ""
+        ]
+      },
+      {
+        "material": "nuketown2-coach-shell",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 6,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 72,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 street-vehicle coach body",
+          "nuketown2 street-vehicle coach roof cap",
+          "nuketown2 street-vehicle coach wheel arch 0 -1",
+          "nuketown2 street-vehicle coach wheel arch 0 1"
+        ]
+      },
+      {
+        "material": "nuketown2-sandpit-sand",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 4,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 72,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north yard sand pit sand",
+          "nuketown2 south yard sand pit sand",
+          "nuketown2-presentation-presentation-batch-28",
+          ""
+        ]
+      },
+      {
+        "material": "nuketown2-grime-oil",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 4,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 72,
+        "transparent": true,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north drive oil stain",
+          "nuketown2 south drive oil stain",
+          "nuketown2-presentation-presentation-batch-31",
+          ""
+        ]
+      },
+      {
+        "material": "nuketown2-court-paint",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 4,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 72,
+        "transparent": true,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north yard shuffleboard court",
+          "nuketown2 south yard shuffleboard court",
+          "nuketown2-presentation-presentation-batch-33",
+          ""
+        ]
+      },
+      {
+        "material": "nuketown2-stepping-stones",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 4,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 72,
+        "transparent": true,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north yard stepping stones",
+          "nuketown2 south yard stepping stones",
+          "nuketown2-presentation-presentation-batch-34",
+          ""
+        ]
+      },
+      {
+        "material": "pass66-aurora-0",
+        "type": "MeshBasicMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 72,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "pass66-aurora-curtain-0"
+        ]
+      },
+      {
+        "material": "pass66-aurora-1",
+        "type": "MeshBasicMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 72,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "pass66-aurora-curtain-1"
+        ]
+      },
+      {
+        "material": "pass66-aurora-2",
+        "type": "MeshBasicMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 72,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "pass66-aurora-curtain-2"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_Crossbow_String",
+        "type": "MeshStandardMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 64,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "crossbow-string_Curve"
+        ]
+      },
+      {
+        "material": "nuketown2-garage-floor-concrete",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 48,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north garage floor",
+          "nuketown2 south garage floor",
+          ""
+        ]
+      },
+      {
+        "material": "nuketown2-garage-door",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 48,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north garage door head",
+          "nuketown2 south garage door head",
+          ""
+        ]
+      },
+      {
+        "material": "nuketown2-appliance-cabinet",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 3,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 48,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north lawn appliance bank cabinet",
+          "nuketown2 south lawn appliance bank cabinet",
+          ""
+        ]
+      },
+      {
+        "material": "field-shed-sheet-corrugated-green-v1",
+        "type": "MeshStandardMaterial",
+        "meshes": 4,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 40,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "field-shed-door-leaf",
+          "field-shed-damageable-shell",
+          "field-shed-door-leaf",
+          "field-shed-damageable-shell"
+        ]
+      },
+      {
+        "material": "MAT_Pass65_Crossbow_Reticle",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 32,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "crossbow-optic-reticle",
+          "crossbow-optic-reticle-vertical"
+        ]
+      },
+      {
+        "material": "field-shed-floor-industrial-v1",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 24,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "field-shed-floor",
+          "field-shed-floor"
+        ]
+      },
+      {
+        "material": "nuketown2-yard-stair-collision-authority",
+        "type": "MeshBasicMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 24,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north yard stair ramp",
+          "nuketown2 south yard stair ramp"
+        ]
+      },
+      {
+        "material": "nuketown2-coach-glass-band",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 24,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 street-vehicle coach window band 0",
+          "nuketown2 street-vehicle coach window band 1"
+        ]
+      },
+      {
+        "material": "nuketown2-appliance-hob-red",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 24,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 north lawn appliance bank hob deck",
+          ""
+        ]
+      },
+      {
+        "material": "nuketown2-appliance-hob-blue",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 2,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 24,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 south lawn appliance bank hob deck",
+          ""
+        ]
+      },
+      {
+        "material": "nuketown2-truck-cab",
+        "type": "MeshStandardNodeMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 12,
+        "transparent": false,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "nuketown2 street-vehicle truck cab"
+        ]
+      },
+      {
+        "material": "(unnamed NodeMaterial)",
+        "type": "NodeMaterial",
+        "meshes": 1,
+        "instanced": 0,
+        "instances": 0,
+        "tris": 12,
+        "transparent": true,
+        "hasColorNode": true,
+        "hasPositionNode": false,
+        "names": [
+          "Pass 64 TSL atmosphere sky"
+        ]
+      },
+      {
+        "material": "smoke-grenade-shot-corridor-mask",
+        "type": "MeshBasicMaterial",
+        "meshes": 12,
+        "instanced": 12,
+        "instances": 0,
+        "tris": 0,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "smoke-grenade-shot-corridor-masks",
+          "smoke-grenade-shot-corridor-masks",
+          "smoke-grenade-shot-corridor-masks",
+          "smoke-grenade-shot-corridor-masks"
+        ]
+      },
+      {
+        "material": "pass76-rain-streak",
+        "type": "MeshBasicMaterial",
+        "meshes": 1,
+        "instanced": 1,
+        "instances": 0,
+        "tris": 0,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "pass76-rain-streaks"
+        ]
+      },
+      {
+        "material": "pass76-rain-splash-ring",
+        "type": "MeshBasicMaterial",
+        "meshes": 1,
+        "instanced": 1,
+        "instances": 0,
+        "tris": 0,
+        "transparent": true,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "pass76-rain-splashes"
+        ]
+      },
+      {
+        "material": "field-shed-aperture-rim-exposed-metal-v1",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 2,
+        "instances": 0,
+        "tris": 0,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "field-shed-aperture-rims",
+          "field-shed-aperture-rims"
+        ]
+      },
+      {
+        "material": "field-shed-dent-stressed-metal-v1",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 2,
+        "instances": 0,
+        "tris": 0,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "field-shed-dents",
+          "field-shed-dents"
+        ]
+      },
+      {
+        "material": "field-shed-debris-corrugated-green-v1",
+        "type": "MeshStandardMaterial",
+        "meshes": 2,
+        "instanced": 2,
+        "instances": 0,
+        "tris": 0,
+        "transparent": false,
+        "hasColorNode": false,
+        "hasPositionNode": false,
+        "names": [
+          "field-shed-major-debris",
+          "field-shed-major-debris"
+        ]
+      }
+    ]
+  },
+  "presentation": {
+    "telemetry": {
+      "status": "healthy",
+      "submissionMode": "warmed-live",
+      "maximumInFlightSubmissions": 3,
+      "inFlightSubmissions": 2,
+      "completionProbeTargetSequence": 544,
+      "outstandingCompletionProbes": 2,
+      "completionProbeCount": 545,
+      "submissionSequence": 545,
+      "completedSequence": 543,
+      "lastSubmittedAt": 88449.79999995232,
+      "lastCompletedAt": 88454.89999997616,
+      "pendingSince": 88454.89999997616,
+      "pendingForMs": 0.3999999761581421,
+      "lastCompletionLatencyMs": 16.300000071525574,
+      "completionFailures": 0,
+      "lastFailure": null,
+      "backpressureActive": false,
+      "skippedSubmissions": 18,
+      "progress": {
+        "windowStartedAt": 77163.79999995232,
+        "elapsedMs": 11291.5,
+        "submissionAdvances": 399,
+        "completionAdvances": 397,
+        "submittedHz": 35.336314927157595,
+        "completedHz": 35.159190541557805,
+        "currentSubmissionGapMs": 5.5,
+        "currentCompletionGapMs": 0.3999999761581421,
+        "maximumSubmissionGapMs": 208,
+        "maximumCompletionGapMs": 291.7000000476837,
+        "maximumPendingForMs": 183.5,
+        "maximumCompletionLatencyMs": 183.5,
+        "submissionPacing": {
+          "ready": true,
+          "sampleCount": 180,
+          "rateHz": 49.10117570069305,
+          "cadenceHz": 50.251256341612226,
+          "meanMs": 20.366111110978657,
+          "p05Ms": 15.100000023841858,
+          "medianMs": 19.899999976158142,
+          "p95Ms": 28.5,
+          "p99Ms": 32.39999997615814,
+          "maxMs": 50.89999997615814,
+          "longFrames": {
+            "over20Ms": 86,
+            "over33Ms": 2,
+            "over50Ms": 1,
+            "over100Ms": 0
+          },
+          "lastResetReason": "animation frame eligibility · recovery 1"
+        },
+        "completionPacing": {
+          "ready": true,
+          "sampleCount": 180,
+          "rateHz": 47.60771244971701,
+          "cadenceHz": 49.75124372208149,
+          "meanMs": 21.004999999867547,
+          "p05Ms": 15.5,
+          "medianMs": 20.100000023841858,
+          "p95Ms": 28.799999952316284,
+          "p99Ms": 52.800000071525574,
+          "maxMs": 77.29999995231628,
+          "longFrames": {
+            "over20Ms": 94,
+            "over33Ms": 6,
+            "over50Ms": 3,
+            "over100Ms": 0
+          },
+          "lastResetReason": "animation frame eligibility · recovery 1"
+        }
+      }
+    },
+    "counters": {
+      "submissionSequence": 545,
+      "completedSequence": 543,
+      "inFlightSubmissions": 2,
+      "maximumInFlightSubmissions": 3,
+      "skippedSubmissions": 18,
+      "starvationRecoveries": 0,
+      "consecutiveRefusedSubmissions": 0,
+      "outstandingCompletionProbes": 2,
+      "lastSubmittedAt": 88449.79999995232,
+      "lastCompletedAt": 88454.89999997616,
+      "lastCompletionLatencyMs": 16.300000071525574,
+      "calls": 169,
+      "triangles": 325369
+    },
+    "lighting": {
+      "choice": "random",
+      "localOverride": null,
+      "hour": 14,
+      "deviation": 0.3659,
+      "sunIntensityScale": 0.873,
+      "shadowFloorScale": 1.2067,
+      "exposureScale": 1.0305,
+      "skyDarkenAmount": 0,
+      "identity": false,
+      "sunReaims": 3,
+      "uniformWrites": 3,
+      "resolves": 3
+    },
+    "weather": {
+      "seed": 2799268197,
+      "rain": {
+        "pass": 76,
+        "enabled": true,
+        "bypassReason": null,
+        "profile": "blender",
+        "quality": "high",
+        "instancedDraws": 2,
+        "looseMeshes": 0,
+        "streakInstances": 0,
+        "splashInstances": 0,
+        "streakOpacity": 0.136,
+        "wetness": 0,
+        "wetSurfaces": 0,
+        "autoAdoptedWetSurfaces": 0,
+        "rainRate": 0,
+        "windSpeed": 3.980568018449355,
+        "weatherIntensity": "storm",
+        "rainDensity": 1,
+        "windStrength": 1,
+        "lightningEnabled": true,
+        "lightningFlash": 0,
+        "lightningStrikeIndex": -1,
+        "sightlineObscuration": 0,
+        "fogNear": 58,
+        "fogFar": 148,
+        "authoredFogFar": 148,
+        "fogDensityMultiplier": 1,
+        "fogAddedExtinctionAt30M": 0,
+        "overcastFillIntensity": 0,
+        "perFrameAllocations": 0
+      },
+      "particles": {
+        "hf": "HF-371",
+        "enabled": true,
+        "bypassReason": null,
+        "profile": "blender",
+        "arenaId": "nuketown2",
+        "arenaLabel": "road-grit-and-dry-lawn-seed",
+        "quality": "high",
+        "instancedDraws": 4,
+        "looseMeshes": 0,
+        "capacityAtQuality": 900,
+        "liveParticles": 347,
+        "visibleParticles": 306,
+        "guardSuppressed": 2,
+        "loadScale": 1,
+        "adaptiveDensityScale": 0.8,
+        "ambientLifeScale": 1,
+        "rainRate": 0,
+        "protectedSightlines": 0,
+        "lightShafts": 0,
+        "families": [
+          {
+            "id": "motes",
+            "instancedDraws": 1,
+            "capacity": 900,
+            "live": 300,
+            "submitted": 300,
+            "visible": 263,
+            "peakOpacity": 0.0809,
+            "guardSuppressed": 2,
+            "perFrameAllocations": 0
+          },
+          {
+            "id": "drift",
+            "instancedDraws": 1,
+            "capacity": 240,
+            "live": 47,
+            "submitted": 47,
+            "visible": 43,
+            "peakOpacity": 0.0792,
+            "guardSuppressed": 0,
+            "perFrameAllocations": 0
+          },
+          {
+            "id": "puff",
+            "instancedDraws": 1,
+            "capacity": 156,
+            "live": 0,
+            "submitted": 0,
+            "visible": 0,
+            "peakOpacity": 0,
+            "guardSuppressed": 0,
+            "perFrameAllocations": 0
+          },
+          {
+            "id": "grit",
+            "instancedDraws": 1,
+            "capacity": 240,
+            "live": 0,
+            "submitted": 0,
+            "visible": 0,
+            "peakOpacity": 0,
+            "guardSuppressed": 0,
+            "perFrameAllocations": 0
+          }
+        ],
+        "perFrameAllocations": 0
+      }
+    }
+  }
+}

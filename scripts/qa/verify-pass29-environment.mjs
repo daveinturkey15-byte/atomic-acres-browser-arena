@@ -8,7 +8,7 @@ const supportedScenarios = new Set(['all', 'ordinary-blender', 'forced-performan
 if (!supportedScenarios.has(scenario)) throw new Error(`Unknown PASS29_SCENARIO: ${scenario}`);
 await mkdir(output, { recursive: true });
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ args: ['--mute-audio'], headless: true });
 const evidence = {};
 
 async function openProfile(query) {

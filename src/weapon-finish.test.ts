@@ -12,8 +12,8 @@ const authoredWeaponIds = new Set<WeaponId>([
 
 describe('Pass 65 authored and procedural-family weapon asset contract', () => {
   it('assigns every weapon a unique finish identity with bounded intentional texture reuse', () => {
-    expect(weapons).toHaveLength(20);
-    expect(new Set(weapons.map((weapon) => WEAPON_FINISH_PROFILES[weapon].id)).size).toBe(20);
+    expect(weapons).toHaveLength(21);
+    expect(new Set(weapons.map((weapon) => WEAPON_FINISH_PROFILES[weapon].id)).size).toBe(21);
     // Family variants intentionally reuse the reviewed original texture sets,
     // while each stable weapon ID retains a unique finish/profile identity.
     expect(new Set(weapons.map((weapon) => WEAPON_FINISH_PROFILES[weapon].albedo)).size).toBe(8);

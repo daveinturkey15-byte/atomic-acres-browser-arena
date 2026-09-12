@@ -1,0 +1,4 @@
+Historical evidence gap: this tracked artifact originally contained zero bytes.
+No command outcome or successful typecheck can be inferred from that empty file.
+The original empty Git blob remains in history. Current reconciliation checks are
+separate, exact-source observations documented in docs/ANCESTRY_RECOVERY_2026-09-09.md.

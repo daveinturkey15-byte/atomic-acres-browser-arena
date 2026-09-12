@@ -1,0 +1,137 @@
+[lock] acquired 11:05:24
+
+> atomic-acres-browser-arena@1.0.0 qa:mp-soak
+> npm run qa:mp-soak:contract && npm run build && node scripts/qa/mp-soak-gate.mjs
+
+
+> atomic-acres-browser-arena@1.0.0 qa:mp-soak:contract
+> node --test scripts/qa/mp-soak-assertions.test.mjs
+
+✔ passes the complete three-minute evidence fixture (3.5813ms)
+✔ fails closed on short replication, missing directions, rejoin, errors, and scoreboard disagreement (1.2149ms)
+✔ does not admit a position divergence at the stated bound (0.8996ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 237.1399
+
+> atomic-acres-browser-arena@1.0.0 build
+> vite build
+
+vite v8.1.3 building client environment for production...
+[2Ktransforming...✓ 576 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                          1.20 kB │ gzip:   0.62 kB
+dist/map3.html                                           1.92 kB │ gzip:   0.89 kB
+dist/assets/legacy-main-BSThLq4n.css                    17.97 kB │ gzip:   4.28 kB
+dist/assets/style-Cz5sWwCB.css                         165.78 kB │ gzip:  34.06 kB
+dist/assets/index-DuippQot.css                         206.48 kB │ gzip:  39.09 kB
+dist/assets/viewmodel-body-fit-BomOnoks.js               0.22 kB │ gzip:   0.15 kB
+dist/assets/map3-arena-CxOMJv1x.js                       0.25 kB │ gzip:   0.18 kB
+dist/assets/retry-load-DIpB1FEH.js                       0.25 kB │ gzip:   0.21 kB
+dist/assets/webgpu-adapter-diagnostics-BNE2ATWW.js       0.34 kB │ gzip:   0.21 kB
+dist/assets/release-identity-Vh8SHw1V.js                 0.51 kB │ gzip:   0.36 kB
+dist/assets/rolldown-runtime-QTnfLwEv.js                 0.69 kB │ gzip:   0.42 kB
+dist/assets/modulepreload-polyfill-Dezn_h7o.js           0.69 kB │ gzip:   0.39 kB
+dist/assets/noise-CaA4Zn7z.js                            1.09 kB │ gzip:   0.56 kB
+dist/assets/map3-5rPaSgEv.js                             1.18 kB │ gzip:   0.73 kB
+dist/assets/test1-ZsRb-S52.js                            1.20 kB │ gzip:   0.73 kB
+dist/assets/webgpu-tint-swizzle-shim-Bn2yF8yy.js         1.24 kB │ gzip:   0.58 kB
+dist/assets/preload-helper-DYl5dUZ5.js                   1.27 kB │ gzip:   0.70 kB
+dist/assets/test2-bTUiQWuw.js                            1.30 kB │ gzip:   0.78 kB
+dist/assets/main-DR0taanI.js                             1.67 kB │ gzip:   1.03 kB
+dist/assets/farcrysis-CtY7Fnct.js                        1.69 kB │ gzip:   0.87 kB
+dist/assets/raid2-7SAkvLPc.js                            1.70 kB │ gzip:   0.91 kB
+dist/assets/atomic-acres-pLd-b8TJ.js                     1.70 kB │ gzip:   0.93 kB
+dist/assets/skyline-terminal-BLj-Fzc7.js                 1.74 kB │ gzip:   0.90 kB
+dist/assets/high-seas-DCfeqxyN.js                        2.42 kB │ gzip:   1.20 kB
+dist/assets/rustworks-1v1-CDvesjeD.js                    2.83 kB │ gzip:   1.20 kB
+dist/assets/webgpu-diagnostics-screen-BO3QB7N0.js        3.45 kB │ gzip:   1.54 kB
+dist/assets/gun-range-rack-presentation-DlILlWJd.js      3.57 kB │ gzip:   1.49 kB
+dist/assets/nuketown2-DxnQ-yxv.js                        3.82 kB │ gzip:   1.38 kB
+dist/assets/index-Z7H2fNDC.js                            4.24 kB │ gzip:   1.85 kB
+dist/assets/map3-arena-BG4UIEwe.js                       4.31 kB │ gzip:   2.14 kB
+dist/assets/gun-range-CPdc8gDK.js                        5.04 kB │ gzip:   1.74 kB
+dist/assets/shared-B6kQDIU4.js                           6.51 kB │ gzip:   2.43 kB
+dist/assets/webgpu-adapter-diagnostics-BK_qrMAJ.js       7.75 kB │ gzip:   3.19 kB
+dist/assets/sky-backdrop-DxBot3Py.js                     9.52 kB │ gzip:   3.55 kB
+dist/assets/deterministic-rng-nx90o3TI.js                9.83 kB │ gzip:   3.89 kB
+dist/assets/combat-feedback-BML2n1ji.js                  9.88 kB │ gzip:   3.84 kB
+dist/assets/raid2-arena-D929X1QL.js                     10.88 kB │ gzip:   3.86 kB
+dist/assets/map3-CIP3QorG.js                            16.95 kB │ gzip:   7.63 kB
+dist/assets/three.webgpu-DDd2cbxu.js                    19.22 kB │ gzip:   7.50 kB
+dist/assets/vendor-three-loaders-I9KTI4XO.js            42.89 kB │ gzip:  12.74 kB
+dist/assets/map-UBPAEbQo.js                             44.50 kB │ gzip:  15.44 kB
+dist/assets/high-seas-BUkawMRW.js                       45.44 kB │ gzip:  14.35 kB
+dist/assets/changelog-CasHtdVI.js                       52.38 kB │ gzip:  18.99 kB
+dist/assets/test-maps-BR48DQKv.js                       53.08 kB │ gzip:  19.37 kB
+dist/assets/vendor-peer-DW-fpQKQ.js                     86.87 kB │ gzip:  23.17 kB
+dist/assets/corridor-colosseum-BJDUz2l1.js              97.25 kB │ gzip:  36.10 kB
+dist/assets/additional-maps-U-ZlgpoB.js                111.53 kB │ gzip:  33.48 kB
+dist/assets/farcrysis-DnV8xYWy.js                      147.83 kB │ gzip:  47.90 kB
+dist/assets/nuke-event-Cla_WUN1.js                     153.77 kB │ gzip:  50.20 kB
+dist/assets/gameplay-DbJjL5IF.js                       541.10 kB │ gzip: 147.36 kB
+dist/assets/vendor-three-DBgW9i60.js                 1,574.44 kB │ gzip: 447.16 kB
+dist/assets/legacy-main-B26NsPEA.js                  1,965.47 kB │ gzip: 604.97 kB
+dist/assets/rapier-USIc5Cek.js                       2,236.65 kB │ gzip: 842.25 kB
+
+✓ built in 1.35s
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+  [high] SWAP-NOT-REPLICATED-guestB-to-host: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestB-to-guestA: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestA-to-host: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestA-to-guestB: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestB-to-host: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestB-to-guestA: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestA-to-host: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestA-to-guestB: a weapon swap never reached another peer
+  [high] RELOAD-NOT-VISIBLE-guestA-post-death: the other guest did not observe the host-authored reload state
+  [high] SWAP-NOT-REPLICATED-guestA-to-host: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestA-to-guestB: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestA-to-host: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestA-to-guestB: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestB-to-host: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestB-to-guestA: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestB-to-host: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestB-to-guestA: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestA-to-host: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestA-to-guestB: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestA-to-host: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestA-to-guestB: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestB-to-guestA: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestB-to-guestA: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestB-to-guestA: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestB-to-guestA: a weapon swap never reached another peer
+  [high] SWAP-NO-EFFECT-guestB: switching weapon slots never changed the held weapon
+  [high] SWAP-NOT-REPLICATED-guestA-to-host: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestA-to-guestB: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestA-to-host: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestA-to-guestB: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestB-to-guestA: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestB-to-guestA: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestB-to-guestA: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestB-to-guestA: a weapon swap never reached another peer
+  [high] SWAP-NO-EFFECT-guestB: switching weapon slots never changed the held weapon
+
+=== mp-soak-gate table ===
+| ID                         | REQUIREMENT                                                                     | RESULT | EVIDENCE                                                                                                                                          |
+| MP-SOAK-DURATION           | scripted play lasts at least three minutes                                      | PASS   | {"completed":true,"durationMs":180401,"requiredDurationMs":180000}                                                                                |
+| MP-SOAK-REPLICATION        | all directed peer pairs replicate every one-second sample within 1.5 m          | FAIL   | {"samples":179,"expectedSamples":180,"divergences":91,"missingDirections":[],"positionBoundM":1.5}                                                |
+| MP-SOAK-REJOIN-DAMAGE      | guest B leaves/rejoins and damage is observed by everyone within one 120 ms RTT | FAIL   | {"role":"guestB","leaveObserved":true,"rejoinObserved":true,"seenByEveryoneAfter":true,"damageTriggered":true,"damageLatencyMs":null,"rttMs":120} |
+| MP-SOAK-RELOAD-AFTER-DEATH | both guests complete a reload after a death                                     | FAIL   | {"guestA":false,"guestB":true}                                                                                                                    |
+| MP-SOAK-RESPAWN-RESET      | respawn restores the authored loadout and usable ammo for both guests           | PASS   | {"guestA":true,"guestB":true}                                                                                                                     |
+| MP-SOAK-STAIR-FIRE         | both guests fire successfully while staged on a house stair                     | PASS   | {"guestA":true,"guestB":true}                                                                                                                     |
+| MP-SOAK-CONSOLE-CLEAN      | the three peers emit no page or console errors                                  | PASS   | {"total":0,"byPeer":{"host":0,"guestA":0,"guestB":0}}                                                                                             |
+| MP-SOAK-SCOREBOARD         | all three peers agree on the final scoreboard                                   | PASS   | {"agreement":true,"peersPresent":["host","guestA","guestB"]}                                                                                      |
+artifact: C:\Users\david\projects\aa-claude-release84\artifacts\qa\mp-soak-gate\hf499-bundle.json
+[exit] 1 at 11:10:02
+[lock] released

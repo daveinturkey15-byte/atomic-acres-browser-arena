@@ -70,8 +70,12 @@ describe('Gun Range grey test-bay authority', () => {
 
   it('projects every canonical weapon and killstreak into one deterministic station plan', () => {
     expect(GUN_RANGE_TEST_BAY_CONTRACT.weaponStations.map(({ id }) => id)).toEqual(WEAPON_IDS);
+    // HF-334: care-package-only weapon rewards are not trainable streaks, so
+    // the bay dispenses exactly the selectable set.
     expect(GUN_RANGE_TEST_BAY_CONTRACT.supportStations.map(({ id }) => id)).toEqual(
-      PASS65_KILLSTREAK_CATALOG.definitions.map(({ id }) => id),
+      PASS65_KILLSTREAK_CATALOG.definitions
+        .filter(({ availability }) => availability !== 'care-only')
+        .map(({ id }) => id),
     );
     expect(GUN_RANGE_TEST_BAY_CONTRACT.weaponStations.every(
       ({ runtimeStatus }) => runtimeStatus === 'active-training-station',

@@ -1,0 +1,1 @@
+# boxes=646 · pairs<=0.03m: 100 · FINDINGS (different materials, no offset): 0 · FENCED (material offset): 77 · SAME-MATERIAL (benign): 23

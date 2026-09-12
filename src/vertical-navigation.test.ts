@@ -18,6 +18,24 @@ const navigation: ArenaVerticalNavigation = {
   ],
 };
 
+const stackedNavigation: ArenaVerticalNavigation = {
+  routes: [
+    { id: 'engine-main', foot: [-6, 0, -6], top: [-6, 3.2, -2] },
+    { id: 'main-upper', foot: [6, 3.2, 2], top: [6, 6.2, 6] },
+  ],
+  ramps: [
+    { id: 'engine-main', from: [-6, 0, -6], to: [-6, 3.2, -2], width: 2.2 },
+    { id: 'main-upper', from: [6, 3.2, 2], to: [6, 6.2, 6], width: 2.2 },
+    { id: 'stacked-engine-main', from: [0, 0, -4], to: [0, 3.2, 4], width: 2.2 },
+    { id: 'stacked-main-upper', from: [0, 3.2, -4], to: [0, 6.2, 4], width: 2.2 },
+  ],
+  platforms: [
+    { id: 'engine-deck', minX: -10, maxX: 10, minZ: -10, maxZ: 10, y: 0 },
+    { id: 'main-deck', minX: -10, maxX: 10, minZ: -10, maxZ: 10, y: 3.2 },
+    { id: 'upper-cabin', minX: -10, maxX: 10, minZ: -10, maxZ: 10, y: 6.2 },
+  ],
+};
+
 describe('authored vertical bot navigation', () => {
   it('interpolates ramps and retains upper surfaces without lifting ground bots through floors', () => {
     expect(authoredElevationAt(navigation, { x: -20, y: 0, z: -20 }, 0)).toBeCloseTo(0);
@@ -62,5 +80,70 @@ describe('authored vertical bot navigation', () => {
   it('does not invent a route when both actors are on the same level', () => {
     expect(authoredVerticalRouteTarget(navigation, { x: 0, y: 0, z: 0 }, { x: 10, y: 1.7, z: 10 })).toBeNull();
     expect(authoredVerticalRouteTarget(navigation, { x: 10, y: 3.34, z: -30 }, { x: -10, y: 5.04, z: -30 })).toBeNull();
+    expect(authoredVerticalRouteTarget(navigation, { x: 12, y: 2.55, z: 2 }, { x: 0, y: 5.04, z: -7 })).toBeNull();
+    expect(authoredVerticalRouteTarget(navigation, { x: 0, y: 3.34, z: -7 }, { x: 12, y: 4.25, z: 2 })).toBeNull();
+  });
+
+  it('retains the nearest of overlapping engine, main, and upper platforms', () => {
+    const position = { x: 9, y: 0, z: 0 };
+    expect(authoredElevationAt(stackedNavigation, position, 0)).toBe(0);
+    expect(authoredElevationAt(stackedNavigation, position, 3.05)).toBe(3.2);
+    expect(authoredElevationAt(stackedNavigation, position, 6.05)).toBe(6.2);
+    expect(authoredElevationAt(stackedNavigation, { x: 12, y: 0, z: 0 }, 6.2)).toBe(0);
+  });
+
+  it('selects the vertically nearest ramp when ramp footprints overlap', () => {
+    const overlap = { x: 0, y: 0, z: 0 };
+    expect(authoredElevationAt(stackedNavigation, overlap, 0)).toBe(0);
+    expect(authoredElevationAt(stackedNavigation, overlap, 1.55)).toBeCloseTo(1.6);
+    expect(authoredElevationAt(stackedNavigation, overlap, 4.75)).toBeCloseTo(4.7);
+    expect(authoredVerticalRouteTarget(
+      stackedNavigation,
+      { x: 0, y: 1.6, z: 0 },
+      { x: 8, y: 7.9, z: 8 },
+    )).toEqual({ x: 0, y: 3.2, z: 4 });
+    expect(authoredVerticalRouteTarget(
+      stackedNavigation,
+      { x: 0, y: 4.7, z: 0 },
+      { x: -8, y: 1.7, z: -8 },
+    )).toEqual({ x: 0, y: 3.2, z: -4 });
+  });
+
+  it('advances engine to main to upper one connected route at a time', () => {
+    const upperEye = { x: 9, y: 7.9, z: 9 };
+    expect(authoredVerticalRouteTarget(stackedNavigation, { x: -9, y: 0, z: -9 }, upperEye))
+      .toEqual({ x: -6, y: 0, z: -6 });
+    expect(authoredVerticalRouteTarget(stackedNavigation, { x: -6.2, y: 0, z: -6.1 }, upperEye))
+      .toEqual({ x: -6, y: 3.2, z: -2 });
+    expect(authoredVerticalRouteTarget(stackedNavigation, { x: -6, y: 3.2, z: -2 }, upperEye))
+      .toEqual({ x: 6, y: 3.2, z: 2 });
+    expect(authoredVerticalRouteTarget(stackedNavigation, { x: 6.1, y: 3.2, z: 2.1 }, upperEye))
+      .toEqual({ x: 6, y: 6.2, z: 6 });
+  });
+
+  it('advances upper to main to engine one connected route at a time', () => {
+    const engineEye = { x: -9, y: 1.7, z: -9 };
+    expect(authoredVerticalRouteTarget(stackedNavigation, { x: 9, y: 6.2, z: 9 }, engineEye))
+      .toEqual({ x: 6, y: 6.2, z: 6 });
+    expect(authoredVerticalRouteTarget(stackedNavigation, { x: 6.1, y: 6.2, z: 6.1 }, engineEye))
+      .toEqual({ x: 6, y: 3.2, z: 2 });
+    expect(authoredVerticalRouteTarget(stackedNavigation, { x: 6, y: 3.2, z: 2 }, engineEye))
+      .toEqual({ x: -6, y: 3.2, z: -2 });
+    expect(authoredVerticalRouteTarget(stackedNavigation, { x: -6.1, y: 3.2, z: -2.1 }, engineEye))
+      .toEqual({ x: -6, y: 0, z: -6 });
+  });
+
+  it('classifies standing, crouched, and prone combat eyes on authored levels', () => {
+    const actor = { x: -9, y: 0, z: -9 };
+    expect(authoredVerticalRouteTarget(stackedNavigation, actor, { x: 0, y: 4.9, z: 0 }))
+      .toEqual({ x: -6, y: 0, z: -6 });
+    expect(authoredVerticalRouteTarget(stackedNavigation, actor, { x: 9, y: 7.9, z: 9 }))
+      .toEqual({ x: -6, y: 0, z: -6 });
+    expect(authoredVerticalRouteTarget(stackedNavigation, actor, { x: 9, y: 7.36, z: 9 }))
+      .toEqual({ x: -6, y: 0, z: -6 });
+    expect(authoredVerticalRouteTarget(stackedNavigation, actor, { x: 9, y: 6.81, z: 9 }))
+      .toEqual({ x: -6, y: 0, z: -6 });
+    expect(authoredVerticalRouteTarget(stackedNavigation, { x: 9, y: 6.2, z: 9 }, { x: 0, y: 4.36, z: 0 }))
+      .toEqual({ x: 6, y: 6.2, z: 6 });
   });
 });

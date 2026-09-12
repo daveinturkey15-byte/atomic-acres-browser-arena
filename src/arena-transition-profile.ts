@@ -3,6 +3,9 @@ import type { ArenaId } from './map-selection';
 export type ArenaTransitionProfilePhase =
   | 'shared-gameplay-assets'
   | 'previous-webgpu-fence'
+  // MAP3 (HF-409): fetching a lazily loaded arena's builder chunk. Only Map 3
+  // is lazy, so this phase is absent from every other arena's profile.
+  | 'arena-factory-load'
   | 'arena-construction'
   | 'interactive-world-construction'
   | 'physics-construction'

@@ -19,12 +19,14 @@ import {
   type WeaponViewmodelCatalogGpuPrewarmEntry,
 } from './weapon-presentation';
 import { WEAPON_IDS, type WeaponId } from './protocol';
+import { FIRST_PERSON_ARM_NORMAL_SCALE } from './operator-model';
 import {
   RUNTIME_WEAPON_RETENTION_LIMIT,
   webGlMatchBoundWeaponPrewarmCatalog,
 } from './weapon-prewarm-catalog';
 import {
   PASS65_AUTHORED_FIREARM_IDS,
+  WEAPON_LIVERY_ALIASES,
   createPass65WeaponModel,
   invalidatePass65PresentationTree,
   loadPass65WeaponAsset,
@@ -214,6 +216,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+// HF-334: every authored firearm stages a model, plus one per livery variant
+// (a variant is its own scene instance reusing another weapon's delivery).
+const STAGED_FIREARM_MODEL_COUNT = PASS65_AUTHORED_FIREARM_IDS.length + Object.keys(WEAPON_LIVERY_ALIASES).length;
+
 describe('Pass 65 managed weapon runtime behavior', () => {
   it('replays the accepted weapon-space palm direction and wrist roll instead of a camera-space approximation', () => {
     const expectedSupport = new THREE.Vector3(0.85, -0.20, -0.45).normalize();
@@ -232,18 +238,18 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(riggedSupportWristRollRadians(1)).toBeCloseTo(THREE.MathUtils.degToRad(-20), 12);
   });
 
-  it('uses one firing hand for sidearms and admits the support hand only during reload', () => {
+  it('keeps two-hand support active for sidearms and long guns under v2 hand policy', () => {
     expect(firstPersonHandPolicy('pistol')).toEqual({
       contract: FIRST_PERSON_HAND_POLICY_CONTRACT,
       gripFamily: 'handgun',
       firingHand: 'right',
-      supportHand: 'reload-only-stowed',
-      activeChainCount: 1,
+      supportHand: 'active',
+      activeChainCount: 2,
     });
     expect(firstPersonHandPolicy('flare-gun')).toMatchObject({
-      gripFamily: 'handgun', supportHand: 'reload-only-stowed', activeChainCount: 1,
+      gripFamily: 'handgun', supportHand: 'active', activeChainCount: 2,
     });
-    expect(firstPersonHandPolicy('pistol', 0.5)).toMatchObject({
+    expect(firstPersonHandPolicy('pistol')).toMatchObject({
       supportHand: 'active', activeChainCount: 2,
     });
     expect(firstPersonHandPolicy('m4a1')).toMatchObject({
@@ -278,7 +284,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
       prewarming: false,
     });
     expect(loadSpy.mock.calls.some(([url]) => String(url).endsWith('pass65-field-knife-drop-lod0.glb'))).toBe(true);
-    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(STAGED_FIREARM_MODEL_COUNT);
   });
 
   it('awaits an exact WebGL match-start weapon before the synchronous visibility swap', async () => {
@@ -644,7 +650,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     for (const [id, model] of stagedModels) {
       expect(presentation.root.getObjectByName(`${id}-pass65-first-person-model`)).toBe(model);
     }
-    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(STAGED_FIREARM_MODEL_COUNT);
   });
 
   it('serializes asset-only catalog generations so the latest request owns residency', async () => {
@@ -711,7 +717,8 @@ describe('Pass 65 managed weapon runtime behavior', () => {
       retainedCount: catalogIds.length,
       loaded: catalogIds.length,
       gpuReady: catalogIds.length,
-      available: PASS65_AUTHORED_FIREARM_IDS.length + 1,
+      // authored firearms + crossbow + livery variants (HF-334)
+      available: STAGED_FIREARM_MODEL_COUNT + 1,
       prewarming: false,
       unpreparedSwitches: 0,
       lastUnpreparedSwitch: null,
@@ -784,7 +791,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(selectedUpdate).toHaveBeenCalled();
     expect(inactiveWorldUpdate).not.toHaveBeenCalled();
     expect(inactiveRecursiveUpdate).not.toHaveBeenCalled();
-    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(STAGED_FIREARM_MODEL_COUNT);
   });
 
   it('prewarms the not-yet-ready deployment catalog in bounded yielded renderer batches', async () => {
@@ -839,7 +846,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(Object.isFrozen(presentation.browserCatalogHealth())).toBe(true);
     expect(presentation.browserCatalogReadiness()).toEqual(presentation.presentationState().browserWeaponCatalog);
     expect(Object.isFrozen(presentation.browserCatalogReadiness())).toBe(true);
-    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(STAGED_FIREARM_MODEL_COUNT);
   });
 
   it('retains the loaded catalog but re-prewarms every model after a render-pipeline change', async () => {
@@ -892,7 +899,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     for (const [id, model] of retainedModels) {
       expect(presentation.root.getObjectByName(`${id}-pass65-first-person-model`)).toBe(model);
     }
-    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(STAGED_FIREARM_MODEL_COUNT);
   });
 
   it('does not admit an old asynchronous GPU-prewarm generation after invalidation', async () => {
@@ -963,7 +970,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
       prewarming: false,
     });
     expect(individualPrewarmer).toHaveBeenCalledTimes(1);
-    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(STAGED_FIREARM_MODEL_COUNT);
   });
 
   it('retires every rejected batch candidate and admits a clean retry', async () => {
@@ -1053,11 +1060,22 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     await presentation.load();
     const arms = presentation.root.getObjectByName('first-person-arms');
     expect(arms?.userData.authoredFirstPersonArms).toBe(true);
-    expect(arms?.userData.armMaterialPresentationContract).toBe('authored-pbr-muted-emissive-warm-key-v1');
+    expect(arms?.userData.armMaterialPresentationContract).toBe('authored-pbr-muted-emissive-warm-key-v2');
     const sleeveFixture = arms?.getObjectByName('authored-sleeve-material-fixture');
     expect(sleeveFixture).toBeInstanceOf(THREE.Mesh);
-    expect(((sleeveFixture as THREE.Mesh).material as THREE.MeshStandardMaterial).normalScale.toArray())
-      .toEqual([1, 1]);
+    // HF-388 follow-up. This previously pinned normalScale at the authored
+    // [1, 1] - "nothing rescales the arm normal map" - which is exactly the
+    // behaviour that changed: the shipped GLB delivers the arm normal map
+    // attenuated to ~0.72 and, with the crushed base-colour map deliberately
+    // dropped, that map is the sleeve's ONLY remaining surface detail, so it
+    // rendered as a smooth latex tube. Re-pinned at EQUAL strictness (still an
+    // exact equality on both components) plus a second assertion the old row
+    // did not make: that the rescale demonstrably HAPPENED, rather than the
+    // expectation merely tracking whatever the constant currently says.
+    const sleeveNormalScale = ((sleeveFixture as THREE.Mesh).material as THREE.MeshStandardMaterial).normalScale;
+    expect(sleeveNormalScale.toArray())
+      .toEqual([FIRST_PERSON_ARM_NORMAL_SCALE, FIRST_PERSON_ARM_NORMAL_SCALE]);
+    expect(sleeveNormalScale.x).toBeGreaterThan(1);
 
     presentation.melee();
     presentation.setMeleeCaptureProgress(0.42);

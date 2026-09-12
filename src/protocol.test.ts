@@ -21,15 +21,20 @@ describe('network protocol guards', () => {
     expect(isGameMessage(state({ ...player, stance: 'prone' as const }))).toBe(true);
   });
 
-  it('accepts only a compact inventory projection bound to the state sequence', () => {
+  it('accepts a compact inventory projection in either revision domain', () => {
     const combatInventory = {
       revision: player.seq,
       primary: { weapon: 'carbine', ammo: 19, reserve: 100 },
       sidearm: { weapon: 'pistol', ammo: 11, reserve: 48 },
       grenades: 0,
     } as const;
+    // Sender-originated: projection captured at the snapshot sequence.
     expect(isGameMessage({ ...state(), combatInventory })).toBe(true);
-    expect(isGameMessage({ ...state(), combatInventory: { ...combatInventory, revision: player.seq - 1 } })).toBe(false);
+    // Host-relayed (HF-533): the relay stamps its inventory-event revision,
+    // which diverges from the live snapshot sequence. Transport must accept
+    // the shape; ordering is enforced by the admission cursors. Demanding
+    // equality here dropped every relayed guest state on observers.
+    expect(isGameMessage({ ...state({ ...player, seq: 179 }), combatInventory: { ...combatInventory, revision: 0 } })).toBe(true);
     expect(isGameMessage({
       ...state(),
       combatInventory: { ...combatInventory, primary: { ...combatInventory.primary, weapon: 'smg' } },
@@ -236,7 +241,7 @@ describe('network protocol guards', () => {
     const timing = { eventSeq: 7, sentAtHostTimeMs: 1_700 };
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'carbine', origin: [0, 1, 2], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], timing, nonce: 3 })).toBe(true);
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'carbine', origin: [0, 1, 2], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], timing: { ...timing, eventSeq: -1 }, nonce: 3 })).toBe(false);
-    const bot = { id: 'host-bot-0', name: 'Hosted Rival 1', team: 1 as const, weapon: 'lmg' as const, x: 1, y: 0, z: 2, yaw: 0, hp: 100, kills: 0, deaths: 0, alive: true, seq: 2 };
+    const bot = { id: 'host-bot-0', name: 'Hosted Rival 1', team: 1 as const, weapon: 'lmg' as const, x: 1, y: 0, z: 2, yaw: 0, stance: 'stand' as const, hp: 100, kills: 0, deaths: 0, alive: true, seq: 2 };
     const botState = { type: 'bot-state' as const, by: 'host', seq: 2, bots: [bot], nonce: 20 };
     const botDamage = { type: 'bot-damage' as const, by: 'host', botId: bot.id, target: 'abc', weapon: bot.weapon, origin: [1, 1.4, 2] as [number, number, number], direction: [0, 0, -1] as [number, number, number], damageApplied: 14, healthBefore: 100, healthAfter: 86, nonce: 21 };
     expect(isGameMessage(botState)).toBe(true);
@@ -362,6 +367,59 @@ describe('network protocol guards', () => {
     expect(messageBelongsToPlayer({ ...brokenWindow, by: 'spoof' }, 'abc')).toBe(false);
   });
 
+  // HF-315(a): the host answers every pickup request so an optimistic guest
+  // swap is confirmed against canonical authority or reverted, never diverged.
+  it('validates canonical host pickup results with an echoed request nonce', () => {
+    const drop = {
+      weapon: 'carbine' as const, ammo: 12, reserve: 40,
+      position: [1, 0.2, 2] as [number, number, number], expiresAt: 31_000,
+    };
+    const result = {
+      type: 'pickup-result' as const, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'host', forPlayerId: 'abc', dropId: 'death-77',
+      status: 'accepted' as const, reason: 'accepted' as const,
+      combatInventory: {
+        revision: 9,
+        primary: { weapon: 'sniper' as const, ammo: 5, reserve: 0 },
+        sidearm: { weapon: 'pistol' as const, ammo: 12, reserve: 48 },
+        grenades: 1 as const,
+      },
+      drop,
+      nonce: 77,
+    } as const;
+    expect(isGameMessage(result)).toBe(true);
+    expect(isHostAuthorityMessage(result)).toBe(true);
+    expect(messageBelongsToPlayer(result, 'host')).toBe(true);
+    expect(messageBelongsToPlayer(result, 'abc')).toBe(false);
+    expect(isGameMessage({ ...result, drop: 'removed' })).toBe(true);
+    expect(isGameMessage({ ...result, status: 'rejected' as const, reason: 'expired' as const })).toBe(true);
+    // Accepted results carry exactly 'accepted'; rejections must name a guard.
+    expect(isGameMessage({ ...result, status: 'rejected' })).toBe(false);
+    expect(isGameMessage({ ...result, reason: 'expired' })).toBe(false);
+    expect(isGameMessage({ ...result, status: 'rejected', reason: 'because' })).toBe(false);
+    expect(isGameMessage({ ...result, drop: { ...drop, ammo: -1 } })).toBe(false);
+    expect(isGameMessage({ ...result, drop: { ...drop, reserve: 10_001 } })).toBe(false);
+    expect(isGameMessage({ ...result, drop: { ...drop, weapon: 'laser' } })).toBe(false);
+    expect(isGameMessage({ ...result, drop: { ...drop, expiresAt: Number.NaN } })).toBe(false);
+    expect(isGameMessage({ ...result, drop: { ...drop, position: [1, Infinity, 2] } })).toBe(false);
+    expect(isGameMessage({ ...result, drop: { ...drop, extra: 1 } })).toBe(false);
+    expect(isGameMessage({ ...result, dropId: '' })).toBe(false);
+    expect(isGameMessage({ ...result, combatInventory: { ...result.combatInventory, revision: -1 } })).toBe(false);
+    expect(isGameMessage({ ...result, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION - 1 })).toBe(false);
+  });
+
+  // HF-326 residual polish: the intentional-reset farewell is host authority
+  // and can never be forged or replayed on behalf of a guest.
+  it('validates the terminal host lobby-closed farewell as unforgeable host authority', () => {
+    const farewell = { type: 'lobby-closed' as const, reason: 'host-reset' as const, nonce: 9 };
+    expect(isGameMessage(farewell)).toBe(true);
+    expect(isHostAuthorityMessage(farewell)).toBe(true);
+    expect(messageBelongsToPlayer(farewell, 'abc')).toBe(false);
+    expect(messageBelongsToPlayer(farewell, 'host')).toBe(false);
+    expect(isGameMessage({ ...farewell, reason: 'rage-quit' })).toBe(false);
+    expect(isGameMessage({ ...farewell, nonce: Number.NaN })).toBe(false);
+  });
+
   it('validates bounded host-authoritative Overdrive claims and state', () => {
     const claim = { type: 'overdrive-claim' as const, by: 'abc', position: [0, 1.7, 0] as [number, number, number], generation: 2, nonce: 90 };
     const state = { type: 'overdrive-state' as const, by: 'host', holderId: 'abc', available: false, generation: 3, position: [0, 0.82, 0] as [number, number, number], activeRemainingMs: 30_000, nextSpawnInMs: 120_000, nonce: 91 };
@@ -392,12 +450,12 @@ describe('network protocol guards', () => {
     const intent = {
       type: 'reload-intent' as const, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
       by: 'abc', connectionEpoch: 'connection_epoch_abc', lifeId: 3,
-      actionSequence: 4, weapon: 'carbine' as const, action: 'start' as const, nonce: 194,
+      actionSequence: 4, requestId: 'reload-request-start-4', weapon: 'carbine' as const, action: 'start' as const, nonce: 194,
     } as const;
     const result = {
       type: 'reload-result' as const, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
       by: 'host', forPlayerId: 'abc', connectionEpoch: intent.connectionEpoch, lifeId: intent.lifeId,
-      actionSequence: intent.actionSequence, weapon: intent.weapon, status: 'started' as const,
+      actionSequence: intent.actionSequence, requestId: intent.requestId, weapon: intent.weapon, status: 'started' as const,
       reason: 'accepted' as const, completesAtHostTimeMs: 4_200, shotSequenceWatermark: 2,
       combatInventory: {
         revision: 11,
@@ -412,6 +470,8 @@ describe('network protocol guards', () => {
     expect(isHostAuthorityMessage(intent)).toBe(false);
     expect(isGameMessage(result)).toBe(true);
     expect(isHostAuthorityMessage(result)).toBe(true);
+    expect(isGameMessage({ ...intent, requestId: undefined })).toBe(false);
+    expect(isGameMessage({ ...result, requestId: undefined })).toBe(false);
     expect(isGameMessage({ ...intent, actionSequence: -1 })).toBe(false);
     expect(isGameMessage({ ...intent, weapon: 'railgun' })).toBe(false);
     expect(isGameMessage({ ...result, combatInventory: { ...result.combatInventory, revision: -1 } })).toBe(false);
@@ -538,7 +598,7 @@ describe('network protocol guards', () => {
         revision: 2,
         hostId: 'host',
         phase: 'waiting' as const,
-        config: { mode: 'tdm' as const, capacity: 4 as const, hostedBotCount: 0 as const, autoBalance: true, arenaId: 'atomic-acres' as const, durationMs: 300_000 },
+        config: { mode: 'tdm' as const, capacity: 4 as const, hostedBotCount: 0 as const, autoBalance: true, arenaId: 'atomic-acres' as const, durationMs: 300_000, scoreLimit: null },
         members: [{ id: 'host', name: 'Host', team: 0 as const, ready: true, connected: true, pingMs: 0, dhv: 10 as const }],
         scores: [{ id: 'host', kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0 }],
         snapshotHostTimeMs: 1_000,

@@ -1,0 +1,3334 @@
+{
+  "schemaVersion": 1,
+  "label": "pass93-live",
+  "baseUrl": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass93/",
+  "requestedUrl": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass93/?release=latest&renderer=webgpu&grass=off&mist=off&clouds=off&rays=off&seed=hf491-audio",
+  "browser": {
+    "channel": "chrome",
+    "headless": true,
+    "args": [
+      "--mute-audio",
+      "--disable-background-timer-throttling",
+      "--disable-renderer-backgrounding",
+      "--disable-backgrounding-occluded-windows",
+      "--window-position=-32000,-32000",
+      "--window-size=2640,1520"
+    ],
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "boot": {
+    "backend": "webgpu",
+    "snapshot": {
+      "alive": true,
+      "position": [
+        14,
+        1.6983986282348633,
+        -31
+      ],
+      "yaw": 2.7173982456860264,
+      "gameStarted": true,
+      "matchPhase": "active",
+      "awaitingCanonicalGuestAuthority": false,
+      "menuHidden": true
+    }
+  },
+  "actions": [
+    {
+      "event": "solo-deploy-requested"
+    },
+    {
+      "event": "weapon-shot-requested",
+      "api": "__ATOMIC_ACRES_DEBUG__.fireOnce"
+    },
+    {
+      "event": "five-forward-steps-requested",
+      "api": "__ATOMIC_ACRES_DEBUG__.setMovement",
+      "pulses": 5,
+      "pulseMs": 300,
+      "gapMs": 100
+    }
+  ],
+  "beforeActions": {
+    "telemetry": {
+      "context": {
+        "source": "standard",
+        "state": "running"
+      },
+      "listener": {
+        "poseMode": "modern-audio-param"
+      },
+      "immersion": {
+        "space": "urban-yard",
+        "arenaSpace": "urban-yard",
+        "overridden": false,
+        "occlusionHook": false,
+        "occludedReports": 0
+      },
+      "explosionMix": {
+        "lastMixAt": null,
+        "requests": 0,
+        "mixes": 0,
+        "coalesced": 0,
+        "coalesceMs": 90
+      },
+      "ambience": {
+        "continuousSources": 2,
+        "busGain": 0.09839999675750732,
+        "arena": "nuketown2",
+        "nextEventInSeconds": 9.66,
+        "ambientEventsPlayed": 1
+      },
+      "combatPrewarm": {
+        "prepared": true,
+        "runs": 1,
+        "sources": 3,
+        "nodes": 5,
+        "broadbandLoopSources": 0
+      },
+      "glassImpactPrewarm": {
+        "prepared": true,
+        "runs": 1,
+        "retainedBroadbandLoops": 0
+      },
+      "grenadeEffectsPrewarm": {
+        "prepared": true,
+        "runs": 1,
+        "warmupSources": 9,
+        "warmupNodes": 14,
+        "retainedSources": 0,
+        "retainedBroadbandLoops": 0,
+        "liveRecipe": "layered-blast-brown-body-sub-and-crackle-debris-v2"
+      },
+      "destructionEffectsPrewarm": {
+        "prepared": false,
+        "runs": 0,
+        "warmupSources": 0,
+        "warmupNodes": 0,
+        "retainedSources": 0,
+        "retainedBroadbandLoops": 0
+      },
+      "lowHealth": {
+        "prepared": true,
+        "sources": 2,
+        "active": false,
+        "audible": false,
+        "breathingGain": 0,
+        "heartbeatGain": 0,
+        "automationWrites": 0,
+        "broadbandSources": 0
+      },
+      "damageFeedback": {
+        "prepared": true,
+        "sources": 1,
+        "pulses": 0
+      },
+      "grenadeFuse": {
+        "beeps": 0,
+        "startMs": 1450
+      },
+      "crossbowFuse": {
+        "beeps": 0,
+        "lastRemainingMs": 0,
+        "lastDistanceM": 0,
+        "startMs": 1250
+      },
+      "minigunDrive": {
+        "active": false,
+        "starts": 0,
+        "stops": 0,
+        "fraction": 0,
+        "phase": "idle"
+      },
+      "support": {
+        "cues": 0,
+        "chopperRotorActive": false,
+        "chopperRotorStarts": 0,
+        "chopperRotorStops": 0
+      },
+      "countdown": {
+        "cues": 4,
+        "lastCue": "engage",
+        "maximumVoicesPerCue": 2,
+        "maximumCueWindowSeconds": 0.36,
+        "buses": [
+          "announcements",
+          "ui"
+        ]
+      },
+      "railgun": {
+        "local": 0,
+        "replicated": 0,
+        "lastAttenuation": 0,
+        "lastDistanceM": 0,
+        "lastSpatial": false,
+        "lastEmitter": null,
+        "layerCount": 10,
+        "pressureDuration": 0.62
+      },
+      "flashbang": {
+        "plays": 0,
+        "lastAudioGain": 0,
+        "immediateOnsets": 0,
+        "scheduledBeeps": 0,
+        "maximumTailMs": 745
+      },
+      "outputProbe": {
+        "available": true,
+        "sampleRate": 96000,
+        "fftSize": 2048,
+        "rms": 0.00147095,
+        "peak": 0.00334269,
+        "crestFactor": 2.272466,
+        "spectralFlatness": 0.01588302,
+        "highFrequencyEnergyRatio": 0.11546879,
+        "suspiciousBroadbandHiss": false
+      },
+      "runtime": {
+        "voices": 7,
+        "spatialChains": 2,
+        "spatialPoolSize": 0,
+        "stolen": 0,
+        "dropped": 0,
+        "globalCap": 48,
+        "spatialCap": 12
+      },
+      "buses": {
+        "master": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.3400000035762787
+        },
+        "sfx": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.7799999713897705
+        },
+        "movement": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.3400000035762787
+        },
+        "ui": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.41999998688697815
+        },
+        "announcements": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.5
+        },
+        "ambience": {
+          "configuredGain": 82,
+          "muted": false,
+          "effectiveGain": 0.09839999675750732
+        },
+        "menu-music": {
+          "configuredGain": 72,
+          "muted": false,
+          "effectiveGain": 0.12960000336170197
+        },
+        "game-music": {
+          "configuredGain": 50,
+          "muted": false,
+          "effectiveGain": 0.013500000350177288
+        }
+      },
+      "gameMusicRunning": true
+    },
+    "snapshot": {
+      "context": {
+        "source": "standard",
+        "state": "running"
+      },
+      "listener": {
+        "poseMode": "modern-audio-param"
+      },
+      "immersion": {
+        "space": "urban-yard",
+        "arenaSpace": "urban-yard",
+        "overridden": false,
+        "occlusionHook": false,
+        "occludedReports": 0
+      },
+      "explosionMix": {
+        "lastMixAt": null,
+        "requests": 0,
+        "mixes": 0,
+        "coalesced": 0,
+        "coalesceMs": 90
+      },
+      "ambience": {
+        "continuousSources": 2,
+        "busGain": 0.09839999675750732,
+        "arena": "nuketown2",
+        "nextEventInSeconds": 9.66,
+        "ambientEventsPlayed": 1
+      },
+      "combatPrewarm": {
+        "prepared": true,
+        "runs": 1,
+        "sources": 3,
+        "nodes": 5,
+        "broadbandLoopSources": 0
+      },
+      "glassImpactPrewarm": {
+        "prepared": true,
+        "runs": 1,
+        "retainedBroadbandLoops": 0
+      },
+      "grenadeEffectsPrewarm": {
+        "prepared": true,
+        "runs": 1,
+        "warmupSources": 9,
+        "warmupNodes": 14,
+        "retainedSources": 0,
+        "retainedBroadbandLoops": 0,
+        "liveRecipe": "layered-blast-brown-body-sub-and-crackle-debris-v2"
+      },
+      "destructionEffectsPrewarm": {
+        "prepared": false,
+        "runs": 0,
+        "warmupSources": 0,
+        "warmupNodes": 0,
+        "retainedSources": 0,
+        "retainedBroadbandLoops": 0
+      },
+      "lowHealth": {
+        "prepared": true,
+        "sources": 2,
+        "active": false,
+        "audible": false,
+        "breathingGain": 0,
+        "heartbeatGain": 0,
+        "automationWrites": 0,
+        "broadbandSources": 0
+      },
+      "damageFeedback": {
+        "prepared": true,
+        "sources": 1,
+        "pulses": 0
+      },
+      "grenadeFuse": {
+        "beeps": 0,
+        "startMs": 1450
+      },
+      "crossbowFuse": {
+        "beeps": 0,
+        "lastRemainingMs": 0,
+        "lastDistanceM": 0,
+        "startMs": 1250
+      },
+      "minigunDrive": {
+        "active": false,
+        "starts": 0,
+        "stops": 0,
+        "fraction": 0,
+        "phase": "idle"
+      },
+      "support": {
+        "cues": 0,
+        "chopperRotorActive": false,
+        "chopperRotorStarts": 0,
+        "chopperRotorStops": 0
+      },
+      "countdown": {
+        "cues": 4,
+        "lastCue": "engage",
+        "maximumVoicesPerCue": 2,
+        "maximumCueWindowSeconds": 0.36,
+        "buses": [
+          "announcements",
+          "ui"
+        ]
+      },
+      "railgun": {
+        "local": 0,
+        "replicated": 0,
+        "lastAttenuation": 0,
+        "lastDistanceM": 0,
+        "lastSpatial": false,
+        "lastEmitter": null,
+        "layerCount": 10,
+        "pressureDuration": 0.62
+      },
+      "flashbang": {
+        "plays": 0,
+        "lastAudioGain": 0,
+        "immediateOnsets": 0,
+        "scheduledBeeps": 0,
+        "maximumTailMs": 745
+      },
+      "outputProbe": {
+        "available": true,
+        "sampleRate": 96000,
+        "fftSize": 2048,
+        "rms": 0.00147095,
+        "peak": 0.00334269,
+        "crestFactor": 2.272466,
+        "spectralFlatness": 0.01588302,
+        "highFrequencyEnergyRatio": 0.11546879,
+        "suspiciousBroadbandHiss": false
+      },
+      "runtime": {
+        "voices": 7,
+        "spatialChains": 2,
+        "spatialPoolSize": 0,
+        "stolen": 0,
+        "dropped": 0,
+        "globalCap": 48,
+        "spatialCap": 12
+      },
+      "buses": {
+        "master": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.3400000035762787
+        },
+        "sfx": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.7799999713897705
+        },
+        "movement": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.3400000035762787
+        },
+        "ui": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.41999998688697815
+        },
+        "announcements": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.5
+        },
+        "ambience": {
+          "configuredGain": 82,
+          "muted": false,
+          "effectiveGain": 0.09839999675750732
+        },
+        "menu-music": {
+          "configuredGain": 72,
+          "muted": false,
+          "effectiveGain": 0.12960000336170197
+        },
+        "game-music": {
+          "configuredGain": 50,
+          "muted": false,
+          "effectiveGain": 0.013500000350177288
+        }
+      },
+      "occlusion": {
+        "frameId": -1,
+        "checks": 0,
+        "maximumPerFrame": 4,
+        "denied": 0
+      }
+    },
+    "webAudio": [
+      {
+        "sampleRate": 96000,
+        "stateAtCreate": "running",
+        "createBuffer": 5,
+        "createBufferSource": 5,
+        "createOscillator": 26,
+        "createGain": 39,
+        "createPanner": 5,
+        "createBiquadFilter": 16,
+        "createAnalyser": 1,
+        "starts": 26,
+        "stops": 23,
+        "decodeCalls": 0,
+        "decodeErrors": [],
+        "state": "running"
+      }
+    ]
+  },
+  "afterFire": {
+    "telemetry": {
+      "context": {
+        "source": "standard",
+        "state": "running"
+      },
+      "listener": {
+        "poseMode": "modern-audio-param"
+      },
+      "immersion": {
+        "space": "urban-yard",
+        "arenaSpace": "urban-yard",
+        "overridden": false,
+        "occlusionHook": false,
+        "occludedReports": 0
+      },
+      "explosionMix": {
+        "lastMixAt": null,
+        "requests": 0,
+        "mixes": 0,
+        "coalesced": 0,
+        "coalesceMs": 90
+      },
+      "ambience": {
+        "continuousSources": 2,
+        "busGain": 0.09839999675750732,
+        "arena": "nuketown2",
+        "nextEventInSeconds": 9.34,
+        "ambientEventsPlayed": 1
+      },
+      "combatPrewarm": {
+        "prepared": true,
+        "runs": 1,
+        "sources": 3,
+        "nodes": 5,
+        "broadbandLoopSources": 0
+      },
+      "glassImpactPrewarm": {
+        "prepared": true,
+        "runs": 1,
+        "retainedBroadbandLoops": 0
+      },
+      "grenadeEffectsPrewarm": {
+        "prepared": true,
+        "runs": 1,
+        "warmupSources": 9,
+        "warmupNodes": 14,
+        "retainedSources": 0,
+        "retainedBroadbandLoops": 0,
+        "liveRecipe": "layered-blast-brown-body-sub-and-crackle-debris-v2"
+      },
+      "destructionEffectsPrewarm": {
+        "prepared": false,
+        "runs": 0,
+        "warmupSources": 0,
+        "warmupNodes": 0,
+        "retainedSources": 0,
+        "retainedBroadbandLoops": 0
+      },
+      "lowHealth": {
+        "prepared": true,
+        "sources": 2,
+        "active": false,
+        "audible": false,
+        "breathingGain": 0,
+        "heartbeatGain": 0,
+        "automationWrites": 0,
+        "broadbandSources": 0
+      },
+      "damageFeedback": {
+        "prepared": true,
+        "sources": 1,
+        "pulses": 0
+      },
+      "grenadeFuse": {
+        "beeps": 0,
+        "startMs": 1450
+      },
+      "crossbowFuse": {
+        "beeps": 0,
+        "lastRemainingMs": 0,
+        "lastDistanceM": 0,
+        "startMs": 1250
+      },
+      "minigunDrive": {
+        "active": false,
+        "starts": 0,
+        "stops": 0,
+        "fraction": 0,
+        "phase": "idle"
+      },
+      "support": {
+        "cues": 0,
+        "chopperRotorActive": false,
+        "chopperRotorStarts": 0,
+        "chopperRotorStops": 0
+      },
+      "countdown": {
+        "cues": 4,
+        "lastCue": "engage",
+        "maximumVoicesPerCue": 2,
+        "maximumCueWindowSeconds": 0.36,
+        "buses": [
+          "announcements",
+          "ui"
+        ]
+      },
+      "railgun": {
+        "local": 0,
+        "replicated": 0,
+        "lastAttenuation": 0,
+        "lastDistanceM": 0,
+        "lastSpatial": false,
+        "lastEmitter": null,
+        "layerCount": 10,
+        "pressureDuration": 0.62
+      },
+      "flashbang": {
+        "plays": 0,
+        "lastAudioGain": 0,
+        "immediateOnsets": 0,
+        "scheduledBeeps": 0,
+        "maximumTailMs": 745
+      },
+      "outputProbe": {
+        "available": true,
+        "sampleRate": 96000,
+        "fftSize": 2048,
+        "rms": 0.00037281,
+        "peak": 0.000891,
+        "crestFactor": 2.389942,
+        "spectralFlatness": 0.03235432,
+        "highFrequencyEnergyRatio": 0.01895629,
+        "suspiciousBroadbandHiss": false
+      },
+      "runtime": {
+        "voices": 9,
+        "spatialChains": 2,
+        "spatialPoolSize": 0,
+        "stolen": 0,
+        "dropped": 0,
+        "globalCap": 48,
+        "spatialCap": 12
+      },
+      "buses": {
+        "master": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.3400000035762787
+        },
+        "sfx": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.7799999713897705
+        },
+        "movement": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.3400000035762787
+        },
+        "ui": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.41999998688697815
+        },
+        "announcements": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.5
+        },
+        "ambience": {
+          "configuredGain": 82,
+          "muted": false,
+          "effectiveGain": 0.09839999675750732
+        },
+        "menu-music": {
+          "configuredGain": 72,
+          "muted": false,
+          "effectiveGain": 0.12960000336170197
+        },
+        "game-music": {
+          "configuredGain": 50,
+          "muted": false,
+          "effectiveGain": 0.013500000350177288
+        }
+      },
+      "gameMusicRunning": true
+    },
+    "snapshot": {
+      "context": {
+        "source": "standard",
+        "state": "running"
+      },
+      "listener": {
+        "poseMode": "modern-audio-param"
+      },
+      "immersion": {
+        "space": "urban-yard",
+        "arenaSpace": "urban-yard",
+        "overridden": false,
+        "occlusionHook": false,
+        "occludedReports": 0
+      },
+      "explosionMix": {
+        "lastMixAt": null,
+        "requests": 0,
+        "mixes": 0,
+        "coalesced": 0,
+        "coalesceMs": 90
+      },
+      "ambience": {
+        "continuousSources": 2,
+        "busGain": 0.09839999675750732,
+        "arena": "nuketown2",
+        "nextEventInSeconds": 9.33,
+        "ambientEventsPlayed": 1
+      },
+      "combatPrewarm": {
+        "prepared": true,
+        "runs": 1,
+        "sources": 3,
+        "nodes": 5,
+        "broadbandLoopSources": 0
+      },
+      "glassImpactPrewarm": {
+        "prepared": true,
+        "runs": 1,
+        "retainedBroadbandLoops": 0
+      },
+      "grenadeEffectsPrewarm": {
+        "prepared": true,
+        "runs": 1,
+        "warmupSources": 9,
+        "warmupNodes": 14,
+        "retainedSources": 0,
+        "retainedBroadbandLoops": 0,
+        "liveRecipe": "layered-blast-brown-body-sub-and-crackle-debris-v2"
+      },
+      "destructionEffectsPrewarm": {
+        "prepared": false,
+        "runs": 0,
+        "warmupSources": 0,
+        "warmupNodes": 0,
+        "retainedSources": 0,
+        "retainedBroadbandLoops": 0
+      },
+      "lowHealth": {
+        "prepared": true,
+        "sources": 2,
+        "active": false,
+        "audible": false,
+        "breathingGain": 0,
+        "heartbeatGain": 0,
+        "automationWrites": 0,
+        "broadbandSources": 0
+      },
+      "damageFeedback": {
+        "prepared": true,
+        "sources": 1,
+        "pulses": 0
+      },
+      "grenadeFuse": {
+        "beeps": 0,
+        "startMs": 1450
+      },
+      "crossbowFuse": {
+        "beeps": 0,
+        "lastRemainingMs": 0,
+        "lastDistanceM": 0,
+        "startMs": 1250
+      },
+      "minigunDrive": {
+        "active": false,
+        "starts": 0,
+        "stops": 0,
+        "fraction": 0,
+        "phase": "idle"
+      },
+      "support": {
+        "cues": 0,
+        "chopperRotorActive": false,
+        "chopperRotorStarts": 0,
+        "chopperRotorStops": 0
+      },
+      "countdown": {
+        "cues": 4,
+        "lastCue": "engage",
+        "maximumVoicesPerCue": 2,
+        "maximumCueWindowSeconds": 0.36,
+        "buses": [
+          "announcements",
+          "ui"
+        ]
+      },
+      "railgun": {
+        "local": 0,
+        "replicated": 0,
+        "lastAttenuation": 0,
+        "lastDistanceM": 0,
+        "lastSpatial": false,
+        "lastEmitter": null,
+        "layerCount": 10,
+        "pressureDuration": 0.62
+      },
+      "flashbang": {
+        "plays": 0,
+        "lastAudioGain": 0,
+        "immediateOnsets": 0,
+        "scheduledBeeps": 0,
+        "maximumTailMs": 745
+      },
+      "outputProbe": {
+        "available": true,
+        "sampleRate": 96000,
+        "fftSize": 2048,
+        "rms": 0.00032128,
+        "peak": 0.00064673,
+        "crestFactor": 2.012957,
+        "spectralFlatness": 0.02988643,
+        "highFrequencyEnergyRatio": 0.01829192,
+        "suspiciousBroadbandHiss": false
+      },
+      "runtime": {
+        "voices": 9,
+        "spatialChains": 2,
+        "spatialPoolSize": 0,
+        "stolen": 0,
+        "dropped": 0,
+        "globalCap": 48,
+        "spatialCap": 12
+      },
+      "buses": {
+        "master": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.3400000035762787
+        },
+        "sfx": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.7799999713897705
+        },
+        "movement": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.3400000035762787
+        },
+        "ui": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.41999998688697815
+        },
+        "announcements": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.5
+        },
+        "ambience": {
+          "configuredGain": 82,
+          "muted": false,
+          "effectiveGain": 0.09839999675750732
+        },
+        "menu-music": {
+          "configuredGain": 72,
+          "muted": false,
+          "effectiveGain": 0.12960000336170197
+        },
+        "game-music": {
+          "configuredGain": 50,
+          "muted": false,
+          "effectiveGain": 0.013500000350177288
+        }
+      },
+      "occlusion": {
+        "frameId": -1,
+        "checks": 0,
+        "maximumPerFrame": 4,
+        "denied": 0
+      }
+    },
+    "webAudio": [
+      {
+        "sampleRate": 96000,
+        "stateAtCreate": "running",
+        "createBuffer": 5,
+        "createBufferSource": 13,
+        "createOscillator": 33,
+        "createGain": 54,
+        "createPanner": 5,
+        "createBiquadFilter": 28,
+        "createAnalyser": 1,
+        "starts": 33,
+        "stops": 30,
+        "decodeCalls": 0,
+        "decodeErrors": [],
+        "state": "running"
+      }
+    ]
+  },
+  "afterSteps": {
+    "telemetry": {
+      "context": {
+        "source": "standard",
+        "state": "running"
+      },
+      "listener": {
+        "poseMode": "modern-audio-param"
+      },
+      "immersion": {
+        "space": "urban-yard",
+        "arenaSpace": "urban-yard",
+        "overridden": false,
+        "occlusionHook": false,
+        "occludedReports": 0
+      },
+      "explosionMix": {
+        "lastMixAt": null,
+        "requests": 0,
+        "mixes": 0,
+        "coalesced": 0,
+        "coalesceMs": 90
+      },
+      "ambience": {
+        "continuousSources": 2,
+        "busGain": 0.09839999675750732,
+        "arena": "nuketown2",
+        "nextEventInSeconds": 6.22,
+        "ambientEventsPlayed": 1
+      },
+      "combatPrewarm": {
+        "prepared": true,
+        "runs": 1,
+        "sources": 3,
+        "nodes": 5,
+        "broadbandLoopSources": 0
+      },
+      "glassImpactPrewarm": {
+        "prepared": true,
+        "runs": 1,
+        "retainedBroadbandLoops": 0
+      },
+      "grenadeEffectsPrewarm": {
+        "prepared": true,
+        "runs": 1,
+        "warmupSources": 9,
+        "warmupNodes": 14,
+        "retainedSources": 0,
+        "retainedBroadbandLoops": 0,
+        "liveRecipe": "layered-blast-brown-body-sub-and-crackle-debris-v2"
+      },
+      "destructionEffectsPrewarm": {
+        "prepared": false,
+        "runs": 0,
+        "warmupSources": 0,
+        "warmupNodes": 0,
+        "retainedSources": 0,
+        "retainedBroadbandLoops": 0
+      },
+      "lowHealth": {
+        "prepared": true,
+        "sources": 2,
+        "active": false,
+        "audible": false,
+        "breathingGain": 0,
+        "heartbeatGain": 0,
+        "automationWrites": 0,
+        "broadbandSources": 0
+      },
+      "damageFeedback": {
+        "prepared": true,
+        "sources": 1,
+        "pulses": 0
+      },
+      "grenadeFuse": {
+        "beeps": 0,
+        "startMs": 1450
+      },
+      "crossbowFuse": {
+        "beeps": 0,
+        "lastRemainingMs": 0,
+        "lastDistanceM": 0,
+        "startMs": 1250
+      },
+      "minigunDrive": {
+        "active": false,
+        "starts": 0,
+        "stops": 0,
+        "fraction": 0,
+        "phase": "idle"
+      },
+      "support": {
+        "cues": 0,
+        "chopperRotorActive": false,
+        "chopperRotorStarts": 0,
+        "chopperRotorStops": 0
+      },
+      "countdown": {
+        "cues": 4,
+        "lastCue": "engage",
+        "maximumVoicesPerCue": 2,
+        "maximumCueWindowSeconds": 0.36,
+        "buses": [
+          "announcements",
+          "ui"
+        ]
+      },
+      "railgun": {
+        "local": 0,
+        "replicated": 0,
+        "lastAttenuation": 0,
+        "lastDistanceM": 0,
+        "lastSpatial": false,
+        "lastEmitter": null,
+        "layerCount": 10,
+        "pressureDuration": 0.62
+      },
+      "flashbang": {
+        "plays": 0,
+        "lastAudioGain": 0,
+        "immediateOnsets": 0,
+        "scheduledBeeps": 0,
+        "maximumTailMs": 745
+      },
+      "outputProbe": {
+        "available": true,
+        "sampleRate": 96000,
+        "fftSize": 2048,
+        "rms": 0.00059873,
+        "peak": 0.00118313,
+        "crestFactor": 1.976052,
+        "spectralFlatness": 0.01228409,
+        "highFrequencyEnergyRatio": 0.06296703,
+        "suspiciousBroadbandHiss": false
+      },
+      "runtime": {
+        "voices": 5,
+        "spatialChains": 2,
+        "spatialPoolSize": 1,
+        "stolen": 0,
+        "dropped": 0,
+        "globalCap": 48,
+        "spatialCap": 12
+      },
+      "buses": {
+        "master": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.3400000035762787
+        },
+        "sfx": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.7799999713897705
+        },
+        "movement": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.3400000035762787
+        },
+        "ui": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.41999998688697815
+        },
+        "announcements": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.5
+        },
+        "ambience": {
+          "configuredGain": 82,
+          "muted": false,
+          "effectiveGain": 0.09839999675750732
+        },
+        "menu-music": {
+          "configuredGain": 72,
+          "muted": false,
+          "effectiveGain": 0.12960000336170197
+        },
+        "game-music": {
+          "configuredGain": 50,
+          "muted": false,
+          "effectiveGain": 0.013500000350177288
+        }
+      },
+      "gameMusicRunning": true
+    },
+    "snapshot": {
+      "context": {
+        "source": "standard",
+        "state": "running"
+      },
+      "listener": {
+        "poseMode": "modern-audio-param"
+      },
+      "immersion": {
+        "space": "urban-yard",
+        "arenaSpace": "urban-yard",
+        "overridden": false,
+        "occlusionHook": false,
+        "occludedReports": 0
+      },
+      "explosionMix": {
+        "lastMixAt": null,
+        "requests": 0,
+        "mixes": 0,
+        "coalesced": 0,
+        "coalesceMs": 90
+      },
+      "ambience": {
+        "continuousSources": 2,
+        "busGain": 0.09839999675750732,
+        "arena": "nuketown2",
+        "nextEventInSeconds": 6.22,
+        "ambientEventsPlayed": 1
+      },
+      "combatPrewarm": {
+        "prepared": true,
+        "runs": 1,
+        "sources": 3,
+        "nodes": 5,
+        "broadbandLoopSources": 0
+      },
+      "glassImpactPrewarm": {
+        "prepared": true,
+        "runs": 1,
+        "retainedBroadbandLoops": 0
+      },
+      "grenadeEffectsPrewarm": {
+        "prepared": true,
+        "runs": 1,
+        "warmupSources": 9,
+        "warmupNodes": 14,
+        "retainedSources": 0,
+        "retainedBroadbandLoops": 0,
+        "liveRecipe": "layered-blast-brown-body-sub-and-crackle-debris-v2"
+      },
+      "destructionEffectsPrewarm": {
+        "prepared": false,
+        "runs": 0,
+        "warmupSources": 0,
+        "warmupNodes": 0,
+        "retainedSources": 0,
+        "retainedBroadbandLoops": 0
+      },
+      "lowHealth": {
+        "prepared": true,
+        "sources": 2,
+        "active": false,
+        "audible": false,
+        "breathingGain": 0,
+        "heartbeatGain": 0,
+        "automationWrites": 0,
+        "broadbandSources": 0
+      },
+      "damageFeedback": {
+        "prepared": true,
+        "sources": 1,
+        "pulses": 0
+      },
+      "grenadeFuse": {
+        "beeps": 0,
+        "startMs": 1450
+      },
+      "crossbowFuse": {
+        "beeps": 0,
+        "lastRemainingMs": 0,
+        "lastDistanceM": 0,
+        "startMs": 1250
+      },
+      "minigunDrive": {
+        "active": false,
+        "starts": 0,
+        "stops": 0,
+        "fraction": 0,
+        "phase": "idle"
+      },
+      "support": {
+        "cues": 0,
+        "chopperRotorActive": false,
+        "chopperRotorStarts": 0,
+        "chopperRotorStops": 0
+      },
+      "countdown": {
+        "cues": 4,
+        "lastCue": "engage",
+        "maximumVoicesPerCue": 2,
+        "maximumCueWindowSeconds": 0.36,
+        "buses": [
+          "announcements",
+          "ui"
+        ]
+      },
+      "railgun": {
+        "local": 0,
+        "replicated": 0,
+        "lastAttenuation": 0,
+        "lastDistanceM": 0,
+        "lastSpatial": false,
+        "lastEmitter": null,
+        "layerCount": 10,
+        "pressureDuration": 0.62
+      },
+      "flashbang": {
+        "plays": 0,
+        "lastAudioGain": 0,
+        "immediateOnsets": 0,
+        "scheduledBeeps": 0,
+        "maximumTailMs": 745
+      },
+      "outputProbe": {
+        "available": true,
+        "sampleRate": 96000,
+        "fftSize": 2048,
+        "rms": 0.00059873,
+        "peak": 0.00118313,
+        "crestFactor": 1.976052,
+        "spectralFlatness": 0.01228409,
+        "highFrequencyEnergyRatio": 0.06296703,
+        "suspiciousBroadbandHiss": false
+      },
+      "runtime": {
+        "voices": 5,
+        "spatialChains": 2,
+        "spatialPoolSize": 1,
+        "stolen": 0,
+        "dropped": 0,
+        "globalCap": 48,
+        "spatialCap": 12
+      },
+      "buses": {
+        "master": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.3400000035762787
+        },
+        "sfx": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.7799999713897705
+        },
+        "movement": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.3400000035762787
+        },
+        "ui": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.41999998688697815
+        },
+        "announcements": {
+          "configuredGain": 100,
+          "muted": false,
+          "effectiveGain": 0.5
+        },
+        "ambience": {
+          "configuredGain": 82,
+          "muted": false,
+          "effectiveGain": 0.09839999675750732
+        },
+        "menu-music": {
+          "configuredGain": 72,
+          "muted": false,
+          "effectiveGain": 0.12960000336170197
+        },
+        "game-music": {
+          "configuredGain": 50,
+          "muted": false,
+          "effectiveGain": 0.013500000350177288
+        }
+      },
+      "occlusion": {
+        "frameId": 159,
+        "checks": 1,
+        "maximumPerFrame": 4,
+        "denied": 0
+      }
+    },
+    "webAudio": [
+      {
+        "sampleRate": 96000,
+        "stateAtCreate": "running",
+        "createBuffer": 5,
+        "createBufferSource": 33,
+        "createOscillator": 41,
+        "createGain": 75,
+        "createPanner": 6,
+        "createBiquadFilter": 48,
+        "createAnalyser": 1,
+        "starts": 41,
+        "stops": 38,
+        "decodeCalls": 0,
+        "decodeErrors": [],
+        "state": "running"
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "pageErrors": [],
+  "failedAudioRequests": [],
+  "badAudioResponses": [],
+  "allFailedRequests": [],
+  "allBadResponses": [],
+  "stepTrace": [
+    {
+      "step": 1,
+      "pose": {
+        "alive": true,
+        "position": [
+          13.20779800415039,
+          1.7045238995552063,
+          -29.1163272857666
+        ],
+        "yaw": 2.7173982456860264,
+        "gameStarted": true,
+        "matchPhase": "active",
+        "awaitingCanonicalGuestAuthority": false,
+        "menuHidden": true
+      },
+      "audio": {
+        "telemetry": {
+          "context": {
+            "source": "standard",
+            "state": "running"
+          },
+          "listener": {
+            "poseMode": "modern-audio-param"
+          },
+          "immersion": {
+            "space": "urban-yard",
+            "arenaSpace": "urban-yard",
+            "overridden": false,
+            "occlusionHook": false,
+            "occludedReports": 0
+          },
+          "explosionMix": {
+            "lastMixAt": null,
+            "requests": 0,
+            "mixes": 0,
+            "coalesced": 0,
+            "coalesceMs": 90
+          },
+          "ambience": {
+            "continuousSources": 2,
+            "busGain": 0.09839999675750732,
+            "arena": "nuketown2",
+            "nextEventInSeconds": 8.72,
+            "ambientEventsPlayed": 1
+          },
+          "combatPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "sources": 3,
+            "nodes": 5,
+            "broadbandLoopSources": 0
+          },
+          "glassImpactPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "retainedBroadbandLoops": 0
+          },
+          "grenadeEffectsPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "warmupSources": 9,
+            "warmupNodes": 14,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0,
+            "liveRecipe": "layered-blast-brown-body-sub-and-crackle-debris-v2"
+          },
+          "destructionEffectsPrewarm": {
+            "prepared": false,
+            "runs": 0,
+            "warmupSources": 0,
+            "warmupNodes": 0,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0
+          },
+          "lowHealth": {
+            "prepared": true,
+            "sources": 2,
+            "active": false,
+            "audible": false,
+            "breathingGain": 0,
+            "heartbeatGain": 0,
+            "automationWrites": 0,
+            "broadbandSources": 0
+          },
+          "damageFeedback": {
+            "prepared": true,
+            "sources": 1,
+            "pulses": 0
+          },
+          "grenadeFuse": {
+            "beeps": 0,
+            "startMs": 1450
+          },
+          "crossbowFuse": {
+            "beeps": 0,
+            "lastRemainingMs": 0,
+            "lastDistanceM": 0,
+            "startMs": 1250
+          },
+          "minigunDrive": {
+            "active": false,
+            "starts": 0,
+            "stops": 0,
+            "fraction": 0,
+            "phase": "idle"
+          },
+          "support": {
+            "cues": 0,
+            "chopperRotorActive": false,
+            "chopperRotorStarts": 0,
+            "chopperRotorStops": 0
+          },
+          "countdown": {
+            "cues": 4,
+            "lastCue": "engage",
+            "maximumVoicesPerCue": 2,
+            "maximumCueWindowSeconds": 0.36,
+            "buses": [
+              "announcements",
+              "ui"
+            ]
+          },
+          "railgun": {
+            "local": 0,
+            "replicated": 0,
+            "lastAttenuation": 0,
+            "lastDistanceM": 0,
+            "lastSpatial": false,
+            "lastEmitter": null,
+            "layerCount": 10,
+            "pressureDuration": 0.62
+          },
+          "flashbang": {
+            "plays": 0,
+            "lastAudioGain": 0,
+            "immediateOnsets": 0,
+            "scheduledBeeps": 0,
+            "maximumTailMs": 745
+          },
+          "outputProbe": {
+            "available": true,
+            "sampleRate": 96000,
+            "fftSize": 2048,
+            "rms": 0.00051434,
+            "peak": 0.00099454,
+            "crestFactor": 1.933623,
+            "spectralFlatness": 0.0148839,
+            "highFrequencyEnergyRatio": 0.05490416,
+            "suspiciousBroadbandHiss": false
+          },
+          "runtime": {
+            "voices": 5,
+            "spatialChains": 2,
+            "spatialPoolSize": 1,
+            "stolen": 0,
+            "dropped": 0,
+            "globalCap": 48,
+            "spatialCap": 12
+          },
+          "buses": {
+            "master": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "sfx": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.7799999713897705
+            },
+            "movement": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "ui": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.41999998688697815
+            },
+            "announcements": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.5
+            },
+            "ambience": {
+              "configuredGain": 82,
+              "muted": false,
+              "effectiveGain": 0.09839999675750732
+            },
+            "menu-music": {
+              "configuredGain": 72,
+              "muted": false,
+              "effectiveGain": 0.12960000336170197
+            },
+            "game-music": {
+              "configuredGain": 50,
+              "muted": false,
+              "effectiveGain": 0.013500000350177288
+            }
+          },
+          "gameMusicRunning": true
+        },
+        "snapshot": {
+          "context": {
+            "source": "standard",
+            "state": "running"
+          },
+          "listener": {
+            "poseMode": "modern-audio-param"
+          },
+          "immersion": {
+            "space": "urban-yard",
+            "arenaSpace": "urban-yard",
+            "overridden": false,
+            "occlusionHook": false,
+            "occludedReports": 0
+          },
+          "explosionMix": {
+            "lastMixAt": null,
+            "requests": 0,
+            "mixes": 0,
+            "coalesced": 0,
+            "coalesceMs": 90
+          },
+          "ambience": {
+            "continuousSources": 2,
+            "busGain": 0.09839999675750732,
+            "arena": "nuketown2",
+            "nextEventInSeconds": 8.72,
+            "ambientEventsPlayed": 1
+          },
+          "combatPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "sources": 3,
+            "nodes": 5,
+            "broadbandLoopSources": 0
+          },
+          "glassImpactPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "retainedBroadbandLoops": 0
+          },
+          "grenadeEffectsPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "warmupSources": 9,
+            "warmupNodes": 14,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0,
+            "liveRecipe": "layered-blast-brown-body-sub-and-crackle-debris-v2"
+          },
+          "destructionEffectsPrewarm": {
+            "prepared": false,
+            "runs": 0,
+            "warmupSources": 0,
+            "warmupNodes": 0,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0
+          },
+          "lowHealth": {
+            "prepared": true,
+            "sources": 2,
+            "active": false,
+            "audible": false,
+            "breathingGain": 0,
+            "heartbeatGain": 0,
+            "automationWrites": 0,
+            "broadbandSources": 0
+          },
+          "damageFeedback": {
+            "prepared": true,
+            "sources": 1,
+            "pulses": 0
+          },
+          "grenadeFuse": {
+            "beeps": 0,
+            "startMs": 1450
+          },
+          "crossbowFuse": {
+            "beeps": 0,
+            "lastRemainingMs": 0,
+            "lastDistanceM": 0,
+            "startMs": 1250
+          },
+          "minigunDrive": {
+            "active": false,
+            "starts": 0,
+            "stops": 0,
+            "fraction": 0,
+            "phase": "idle"
+          },
+          "support": {
+            "cues": 0,
+            "chopperRotorActive": false,
+            "chopperRotorStarts": 0,
+            "chopperRotorStops": 0
+          },
+          "countdown": {
+            "cues": 4,
+            "lastCue": "engage",
+            "maximumVoicesPerCue": 2,
+            "maximumCueWindowSeconds": 0.36,
+            "buses": [
+              "announcements",
+              "ui"
+            ]
+          },
+          "railgun": {
+            "local": 0,
+            "replicated": 0,
+            "lastAttenuation": 0,
+            "lastDistanceM": 0,
+            "lastSpatial": false,
+            "lastEmitter": null,
+            "layerCount": 10,
+            "pressureDuration": 0.62
+          },
+          "flashbang": {
+            "plays": 0,
+            "lastAudioGain": 0,
+            "immediateOnsets": 0,
+            "scheduledBeeps": 0,
+            "maximumTailMs": 745
+          },
+          "outputProbe": {
+            "available": true,
+            "sampleRate": 96000,
+            "fftSize": 2048,
+            "rms": 0.00051434,
+            "peak": 0.00099454,
+            "crestFactor": 1.933623,
+            "spectralFlatness": 0.0148839,
+            "highFrequencyEnergyRatio": 0.05490416,
+            "suspiciousBroadbandHiss": false
+          },
+          "runtime": {
+            "voices": 5,
+            "spatialChains": 2,
+            "spatialPoolSize": 1,
+            "stolen": 0,
+            "dropped": 0,
+            "globalCap": 48,
+            "spatialCap": 12
+          },
+          "buses": {
+            "master": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "sfx": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.7799999713897705
+            },
+            "movement": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "ui": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.41999998688697815
+            },
+            "announcements": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.5
+            },
+            "ambience": {
+              "configuredGain": 82,
+              "muted": false,
+              "effectiveGain": 0.09839999675750732
+            },
+            "menu-music": {
+              "configuredGain": 72,
+              "muted": false,
+              "effectiveGain": 0.12960000336170197
+            },
+            "game-music": {
+              "configuredGain": 50,
+              "muted": false,
+              "effectiveGain": 0.013500000350177288
+            }
+          },
+          "occlusion": {
+            "frameId": 62,
+            "checks": 1,
+            "maximumPerFrame": 4,
+            "denied": 0
+          }
+        },
+        "webAudio": [
+          {
+            "sampleRate": 96000,
+            "stateAtCreate": "running",
+            "createBuffer": 5,
+            "createBufferSource": 17,
+            "createOscillator": 34,
+            "createGain": 58,
+            "createPanner": 6,
+            "createBiquadFilter": 33,
+            "createAnalyser": 1,
+            "starts": 34,
+            "stops": 31,
+            "decodeCalls": 0,
+            "decodeErrors": [],
+            "state": "running"
+          }
+        ]
+      }
+    },
+    {
+      "step": 2,
+      "pose": {
+        "alive": true,
+        "position": [
+          13.205060958862305,
+          1.7088451766967774,
+          -27.350351333618164
+        ],
+        "yaw": 2.7173982456860264,
+        "gameStarted": true,
+        "matchPhase": "active",
+        "awaitingCanonicalGuestAuthority": false,
+        "menuHidden": true
+      },
+      "audio": {
+        "telemetry": {
+          "context": {
+            "source": "standard",
+            "state": "running"
+          },
+          "listener": {
+            "poseMode": "modern-audio-param"
+          },
+          "immersion": {
+            "space": "urban-yard",
+            "arenaSpace": "urban-yard",
+            "overridden": false,
+            "occlusionHook": false,
+            "occludedReports": 0
+          },
+          "explosionMix": {
+            "lastMixAt": null,
+            "requests": 0,
+            "mixes": 0,
+            "coalesced": 0,
+            "coalesceMs": 90
+          },
+          "ambience": {
+            "continuousSources": 2,
+            "busGain": 0.09839999675750732,
+            "arena": "nuketown2",
+            "nextEventInSeconds": 8.14,
+            "ambientEventsPlayed": 1
+          },
+          "combatPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "sources": 3,
+            "nodes": 5,
+            "broadbandLoopSources": 0
+          },
+          "glassImpactPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "retainedBroadbandLoops": 0
+          },
+          "grenadeEffectsPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "warmupSources": 9,
+            "warmupNodes": 14,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0,
+            "liveRecipe": "layered-blast-brown-body-sub-and-crackle-debris-v2"
+          },
+          "destructionEffectsPrewarm": {
+            "prepared": false,
+            "runs": 0,
+            "warmupSources": 0,
+            "warmupNodes": 0,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0
+          },
+          "lowHealth": {
+            "prepared": true,
+            "sources": 2,
+            "active": false,
+            "audible": false,
+            "breathingGain": 0,
+            "heartbeatGain": 0,
+            "automationWrites": 0,
+            "broadbandSources": 0
+          },
+          "damageFeedback": {
+            "prepared": true,
+            "sources": 1,
+            "pulses": 0
+          },
+          "grenadeFuse": {
+            "beeps": 0,
+            "startMs": 1450
+          },
+          "crossbowFuse": {
+            "beeps": 0,
+            "lastRemainingMs": 0,
+            "lastDistanceM": 0,
+            "startMs": 1250
+          },
+          "minigunDrive": {
+            "active": false,
+            "starts": 0,
+            "stops": 0,
+            "fraction": 0,
+            "phase": "idle"
+          },
+          "support": {
+            "cues": 0,
+            "chopperRotorActive": false,
+            "chopperRotorStarts": 0,
+            "chopperRotorStops": 0
+          },
+          "countdown": {
+            "cues": 4,
+            "lastCue": "engage",
+            "maximumVoicesPerCue": 2,
+            "maximumCueWindowSeconds": 0.36,
+            "buses": [
+              "announcements",
+              "ui"
+            ]
+          },
+          "railgun": {
+            "local": 0,
+            "replicated": 0,
+            "lastAttenuation": 0,
+            "lastDistanceM": 0,
+            "lastSpatial": false,
+            "lastEmitter": null,
+            "layerCount": 10,
+            "pressureDuration": 0.62
+          },
+          "flashbang": {
+            "plays": 0,
+            "lastAudioGain": 0,
+            "immediateOnsets": 0,
+            "scheduledBeeps": 0,
+            "maximumTailMs": 745
+          },
+          "outputProbe": {
+            "available": true,
+            "sampleRate": 96000,
+            "fftSize": 2048,
+            "rms": 0.00033618,
+            "peak": 0.00057178,
+            "crestFactor": 1.700826,
+            "spectralFlatness": 0.02191356,
+            "highFrequencyEnergyRatio": 0.01459935,
+            "suspiciousBroadbandHiss": false
+          },
+          "runtime": {
+            "voices": 5,
+            "spatialChains": 2,
+            "spatialPoolSize": 1,
+            "stolen": 0,
+            "dropped": 0,
+            "globalCap": 48,
+            "spatialCap": 12
+          },
+          "buses": {
+            "master": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "sfx": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.7799999713897705
+            },
+            "movement": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "ui": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.41999998688697815
+            },
+            "announcements": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.5
+            },
+            "ambience": {
+              "configuredGain": 82,
+              "muted": false,
+              "effectiveGain": 0.09839999675750732
+            },
+            "menu-music": {
+              "configuredGain": 72,
+              "muted": false,
+              "effectiveGain": 0.12960000336170197
+            },
+            "game-music": {
+              "configuredGain": 50,
+              "muted": false,
+              "effectiveGain": 0.013500000350177288
+            }
+          },
+          "gameMusicRunning": true
+        },
+        "snapshot": {
+          "context": {
+            "source": "standard",
+            "state": "running"
+          },
+          "listener": {
+            "poseMode": "modern-audio-param"
+          },
+          "immersion": {
+            "space": "urban-yard",
+            "arenaSpace": "urban-yard",
+            "overridden": false,
+            "occlusionHook": false,
+            "occludedReports": 0
+          },
+          "explosionMix": {
+            "lastMixAt": null,
+            "requests": 0,
+            "mixes": 0,
+            "coalesced": 0,
+            "coalesceMs": 90
+          },
+          "ambience": {
+            "continuousSources": 2,
+            "busGain": 0.09839999675750732,
+            "arena": "nuketown2",
+            "nextEventInSeconds": 8.14,
+            "ambientEventsPlayed": 1
+          },
+          "combatPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "sources": 3,
+            "nodes": 5,
+            "broadbandLoopSources": 0
+          },
+          "glassImpactPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "retainedBroadbandLoops": 0
+          },
+          "grenadeEffectsPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "warmupSources": 9,
+            "warmupNodes": 14,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0,
+            "liveRecipe": "layered-blast-brown-body-sub-and-crackle-debris-v2"
+          },
+          "destructionEffectsPrewarm": {
+            "prepared": false,
+            "runs": 0,
+            "warmupSources": 0,
+            "warmupNodes": 0,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0
+          },
+          "lowHealth": {
+            "prepared": true,
+            "sources": 2,
+            "active": false,
+            "audible": false,
+            "breathingGain": 0,
+            "heartbeatGain": 0,
+            "automationWrites": 0,
+            "broadbandSources": 0
+          },
+          "damageFeedback": {
+            "prepared": true,
+            "sources": 1,
+            "pulses": 0
+          },
+          "grenadeFuse": {
+            "beeps": 0,
+            "startMs": 1450
+          },
+          "crossbowFuse": {
+            "beeps": 0,
+            "lastRemainingMs": 0,
+            "lastDistanceM": 0,
+            "startMs": 1250
+          },
+          "minigunDrive": {
+            "active": false,
+            "starts": 0,
+            "stops": 0,
+            "fraction": 0,
+            "phase": "idle"
+          },
+          "support": {
+            "cues": 0,
+            "chopperRotorActive": false,
+            "chopperRotorStarts": 0,
+            "chopperRotorStops": 0
+          },
+          "countdown": {
+            "cues": 4,
+            "lastCue": "engage",
+            "maximumVoicesPerCue": 2,
+            "maximumCueWindowSeconds": 0.36,
+            "buses": [
+              "announcements",
+              "ui"
+            ]
+          },
+          "railgun": {
+            "local": 0,
+            "replicated": 0,
+            "lastAttenuation": 0,
+            "lastDistanceM": 0,
+            "lastSpatial": false,
+            "lastEmitter": null,
+            "layerCount": 10,
+            "pressureDuration": 0.62
+          },
+          "flashbang": {
+            "plays": 0,
+            "lastAudioGain": 0,
+            "immediateOnsets": 0,
+            "scheduledBeeps": 0,
+            "maximumTailMs": 745
+          },
+          "outputProbe": {
+            "available": true,
+            "sampleRate": 96000,
+            "fftSize": 2048,
+            "rms": 0.00033618,
+            "peak": 0.00057178,
+            "crestFactor": 1.700826,
+            "spectralFlatness": 0.02191356,
+            "highFrequencyEnergyRatio": 0.01459935,
+            "suspiciousBroadbandHiss": false
+          },
+          "runtime": {
+            "voices": 5,
+            "spatialChains": 2,
+            "spatialPoolSize": 1,
+            "stolen": 0,
+            "dropped": 0,
+            "globalCap": 48,
+            "spatialCap": 12
+          },
+          "buses": {
+            "master": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "sfx": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.7799999713897705
+            },
+            "movement": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "ui": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.41999998688697815
+            },
+            "announcements": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.5
+            },
+            "ambience": {
+              "configuredGain": 82,
+              "muted": false,
+              "effectiveGain": 0.09839999675750732
+            },
+            "menu-music": {
+              "configuredGain": 72,
+              "muted": false,
+              "effectiveGain": 0.12960000336170197
+            },
+            "game-music": {
+              "configuredGain": 50,
+              "muted": false,
+              "effectiveGain": 0.013500000350177288
+            }
+          },
+          "occlusion": {
+            "frameId": 75,
+            "checks": 1,
+            "maximumPerFrame": 4,
+            "denied": 0
+          }
+        },
+        "webAudio": [
+          {
+            "sampleRate": 96000,
+            "stateAtCreate": "running",
+            "createBuffer": 5,
+            "createBufferSource": 20,
+            "createOscillator": 35,
+            "createGain": 61,
+            "createPanner": 6,
+            "createBiquadFilter": 36,
+            "createAnalyser": 1,
+            "starts": 35,
+            "stops": 32,
+            "decodeCalls": 0,
+            "decodeErrors": [],
+            "state": "running"
+          }
+        ]
+      }
+    },
+    {
+      "step": 3,
+      "pose": {
+        "alive": true,
+        "position": [
+          12.664334297180176,
+          1.7122102165222168,
+          -25.547216415405273
+        ],
+        "yaw": 2.7173982456860264,
+        "gameStarted": true,
+        "matchPhase": "active",
+        "awaitingCanonicalGuestAuthority": false,
+        "menuHidden": true
+      },
+      "audio": {
+        "telemetry": {
+          "context": {
+            "source": "standard",
+            "state": "running"
+          },
+          "listener": {
+            "poseMode": "modern-audio-param"
+          },
+          "immersion": {
+            "space": "urban-yard",
+            "arenaSpace": "urban-yard",
+            "overridden": false,
+            "occlusionHook": false,
+            "occludedReports": 0
+          },
+          "explosionMix": {
+            "lastMixAt": null,
+            "requests": 0,
+            "mixes": 0,
+            "coalesced": 0,
+            "coalesceMs": 90
+          },
+          "ambience": {
+            "continuousSources": 2,
+            "busGain": 0.09839999675750732,
+            "arena": "nuketown2",
+            "nextEventInSeconds": 7.56,
+            "ambientEventsPlayed": 1
+          },
+          "combatPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "sources": 3,
+            "nodes": 5,
+            "broadbandLoopSources": 0
+          },
+          "glassImpactPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "retainedBroadbandLoops": 0
+          },
+          "grenadeEffectsPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "warmupSources": 9,
+            "warmupNodes": 14,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0,
+            "liveRecipe": "layered-blast-brown-body-sub-and-crackle-debris-v2"
+          },
+          "destructionEffectsPrewarm": {
+            "prepared": false,
+            "runs": 0,
+            "warmupSources": 0,
+            "warmupNodes": 0,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0
+          },
+          "lowHealth": {
+            "prepared": true,
+            "sources": 2,
+            "active": false,
+            "audible": false,
+            "breathingGain": 0,
+            "heartbeatGain": 0,
+            "automationWrites": 0,
+            "broadbandSources": 0
+          },
+          "damageFeedback": {
+            "prepared": true,
+            "sources": 1,
+            "pulses": 0
+          },
+          "grenadeFuse": {
+            "beeps": 0,
+            "startMs": 1450
+          },
+          "crossbowFuse": {
+            "beeps": 0,
+            "lastRemainingMs": 0,
+            "lastDistanceM": 0,
+            "startMs": 1250
+          },
+          "minigunDrive": {
+            "active": false,
+            "starts": 0,
+            "stops": 0,
+            "fraction": 0,
+            "phase": "idle"
+          },
+          "support": {
+            "cues": 0,
+            "chopperRotorActive": false,
+            "chopperRotorStarts": 0,
+            "chopperRotorStops": 0
+          },
+          "countdown": {
+            "cues": 4,
+            "lastCue": "engage",
+            "maximumVoicesPerCue": 2,
+            "maximumCueWindowSeconds": 0.36,
+            "buses": [
+              "announcements",
+              "ui"
+            ]
+          },
+          "railgun": {
+            "local": 0,
+            "replicated": 0,
+            "lastAttenuation": 0,
+            "lastDistanceM": 0,
+            "lastSpatial": false,
+            "lastEmitter": null,
+            "layerCount": 10,
+            "pressureDuration": 0.62
+          },
+          "flashbang": {
+            "plays": 0,
+            "lastAudioGain": 0,
+            "immediateOnsets": 0,
+            "scheduledBeeps": 0,
+            "maximumTailMs": 745
+          },
+          "outputProbe": {
+            "available": true,
+            "sampleRate": 96000,
+            "fftSize": 2048,
+            "rms": 0.0005819,
+            "peak": 0.00127409,
+            "crestFactor": 2.189524,
+            "spectralFlatness": 0.01463031,
+            "highFrequencyEnergyRatio": 0.00835491,
+            "suspiciousBroadbandHiss": false
+          },
+          "runtime": {
+            "voices": 5,
+            "spatialChains": 2,
+            "spatialPoolSize": 1,
+            "stolen": 0,
+            "dropped": 0,
+            "globalCap": 48,
+            "spatialCap": 12
+          },
+          "buses": {
+            "master": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "sfx": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.7799999713897705
+            },
+            "movement": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "ui": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.41999998688697815
+            },
+            "announcements": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.5
+            },
+            "ambience": {
+              "configuredGain": 82,
+              "muted": false,
+              "effectiveGain": 0.09839999675750732
+            },
+            "menu-music": {
+              "configuredGain": 72,
+              "muted": false,
+              "effectiveGain": 0.12960000336170197
+            },
+            "game-music": {
+              "configuredGain": 50,
+              "muted": false,
+              "effectiveGain": 0.013500000350177288
+            }
+          },
+          "gameMusicRunning": true
+        },
+        "snapshot": {
+          "context": {
+            "source": "standard",
+            "state": "running"
+          },
+          "listener": {
+            "poseMode": "modern-audio-param"
+          },
+          "immersion": {
+            "space": "urban-yard",
+            "arenaSpace": "urban-yard",
+            "overridden": false,
+            "occlusionHook": false,
+            "occludedReports": 0
+          },
+          "explosionMix": {
+            "lastMixAt": null,
+            "requests": 0,
+            "mixes": 0,
+            "coalesced": 0,
+            "coalesceMs": 90
+          },
+          "ambience": {
+            "continuousSources": 2,
+            "busGain": 0.09839999675750732,
+            "arena": "nuketown2",
+            "nextEventInSeconds": 7.55,
+            "ambientEventsPlayed": 1
+          },
+          "combatPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "sources": 3,
+            "nodes": 5,
+            "broadbandLoopSources": 0
+          },
+          "glassImpactPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "retainedBroadbandLoops": 0
+          },
+          "grenadeEffectsPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "warmupSources": 9,
+            "warmupNodes": 14,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0,
+            "liveRecipe": "layered-blast-brown-body-sub-and-crackle-debris-v2"
+          },
+          "destructionEffectsPrewarm": {
+            "prepared": false,
+            "runs": 0,
+            "warmupSources": 0,
+            "warmupNodes": 0,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0
+          },
+          "lowHealth": {
+            "prepared": true,
+            "sources": 2,
+            "active": false,
+            "audible": false,
+            "breathingGain": 0,
+            "heartbeatGain": 0,
+            "automationWrites": 0,
+            "broadbandSources": 0
+          },
+          "damageFeedback": {
+            "prepared": true,
+            "sources": 1,
+            "pulses": 0
+          },
+          "grenadeFuse": {
+            "beeps": 0,
+            "startMs": 1450
+          },
+          "crossbowFuse": {
+            "beeps": 0,
+            "lastRemainingMs": 0,
+            "lastDistanceM": 0,
+            "startMs": 1250
+          },
+          "minigunDrive": {
+            "active": false,
+            "starts": 0,
+            "stops": 0,
+            "fraction": 0,
+            "phase": "idle"
+          },
+          "support": {
+            "cues": 0,
+            "chopperRotorActive": false,
+            "chopperRotorStarts": 0,
+            "chopperRotorStops": 0
+          },
+          "countdown": {
+            "cues": 4,
+            "lastCue": "engage",
+            "maximumVoicesPerCue": 2,
+            "maximumCueWindowSeconds": 0.36,
+            "buses": [
+              "announcements",
+              "ui"
+            ]
+          },
+          "railgun": {
+            "local": 0,
+            "replicated": 0,
+            "lastAttenuation": 0,
+            "lastDistanceM": 0,
+            "lastSpatial": false,
+            "lastEmitter": null,
+            "layerCount": 10,
+            "pressureDuration": 0.62
+          },
+          "flashbang": {
+            "plays": 0,
+            "lastAudioGain": 0,
+            "immediateOnsets": 0,
+            "scheduledBeeps": 0,
+            "maximumTailMs": 745
+          },
+          "outputProbe": {
+            "available": true,
+            "sampleRate": 96000,
+            "fftSize": 2048,
+            "rms": 0.00054922,
+            "peak": 0.00115493,
+            "crestFactor": 2.102872,
+            "spectralFlatness": 0.02875514,
+            "highFrequencyEnergyRatio": 0.01483578,
+            "suspiciousBroadbandHiss": false
+          },
+          "runtime": {
+            "voices": 5,
+            "spatialChains": 2,
+            "spatialPoolSize": 1,
+            "stolen": 0,
+            "dropped": 0,
+            "globalCap": 48,
+            "spatialCap": 12
+          },
+          "buses": {
+            "master": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "sfx": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.7799999713897705
+            },
+            "movement": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "ui": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.41999998688697815
+            },
+            "announcements": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.5
+            },
+            "ambience": {
+              "configuredGain": 82,
+              "muted": false,
+              "effectiveGain": 0.09839999675750732
+            },
+            "menu-music": {
+              "configuredGain": 72,
+              "muted": false,
+              "effectiveGain": 0.12960000336170197
+            },
+            "game-music": {
+              "configuredGain": 50,
+              "muted": false,
+              "effectiveGain": 0.013500000350177288
+            }
+          },
+          "occlusion": {
+            "frameId": 108,
+            "checks": 1,
+            "maximumPerFrame": 4,
+            "denied": 0
+          }
+        },
+        "webAudio": [
+          {
+            "sampleRate": 96000,
+            "stateAtCreate": "running",
+            "createBuffer": 5,
+            "createBufferSource": 24,
+            "createOscillator": 36,
+            "createGain": 64,
+            "createPanner": 6,
+            "createBiquadFilter": 39,
+            "createAnalyser": 1,
+            "starts": 36,
+            "stops": 33,
+            "decodeCalls": 0,
+            "decodeErrors": [],
+            "state": "running"
+          }
+        ]
+      }
+    },
+    {
+      "step": 4,
+      "pose": {
+        "alive": true,
+        "position": [
+          11.815105438232422,
+          1.714758493900299,
+          -23.66677474975586
+        ],
+        "yaw": 2.7173982456860264,
+        "gameStarted": true,
+        "matchPhase": "active",
+        "awaitingCanonicalGuestAuthority": false,
+        "menuHidden": true
+      },
+      "audio": {
+        "telemetry": {
+          "context": {
+            "source": "standard",
+            "state": "running"
+          },
+          "listener": {
+            "poseMode": "modern-audio-param"
+          },
+          "immersion": {
+            "space": "urban-yard",
+            "arenaSpace": "urban-yard",
+            "overridden": false,
+            "occlusionHook": false,
+            "occludedReports": 0
+          },
+          "explosionMix": {
+            "lastMixAt": null,
+            "requests": 0,
+            "mixes": 0,
+            "coalesced": 0,
+            "coalesceMs": 90
+          },
+          "ambience": {
+            "continuousSources": 2,
+            "busGain": 0.09839999675750732,
+            "arena": "nuketown2",
+            "nextEventInSeconds": 6.92,
+            "ambientEventsPlayed": 1
+          },
+          "combatPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "sources": 3,
+            "nodes": 5,
+            "broadbandLoopSources": 0
+          },
+          "glassImpactPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "retainedBroadbandLoops": 0
+          },
+          "grenadeEffectsPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "warmupSources": 9,
+            "warmupNodes": 14,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0,
+            "liveRecipe": "layered-blast-brown-body-sub-and-crackle-debris-v2"
+          },
+          "destructionEffectsPrewarm": {
+            "prepared": false,
+            "runs": 0,
+            "warmupSources": 0,
+            "warmupNodes": 0,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0
+          },
+          "lowHealth": {
+            "prepared": true,
+            "sources": 2,
+            "active": false,
+            "audible": false,
+            "breathingGain": 0,
+            "heartbeatGain": 0,
+            "automationWrites": 0,
+            "broadbandSources": 0
+          },
+          "damageFeedback": {
+            "prepared": true,
+            "sources": 1,
+            "pulses": 0
+          },
+          "grenadeFuse": {
+            "beeps": 0,
+            "startMs": 1450
+          },
+          "crossbowFuse": {
+            "beeps": 0,
+            "lastRemainingMs": 0,
+            "lastDistanceM": 0,
+            "startMs": 1250
+          },
+          "minigunDrive": {
+            "active": false,
+            "starts": 0,
+            "stops": 0,
+            "fraction": 0,
+            "phase": "idle"
+          },
+          "support": {
+            "cues": 0,
+            "chopperRotorActive": false,
+            "chopperRotorStarts": 0,
+            "chopperRotorStops": 0
+          },
+          "countdown": {
+            "cues": 4,
+            "lastCue": "engage",
+            "maximumVoicesPerCue": 2,
+            "maximumCueWindowSeconds": 0.36,
+            "buses": [
+              "announcements",
+              "ui"
+            ]
+          },
+          "railgun": {
+            "local": 0,
+            "replicated": 0,
+            "lastAttenuation": 0,
+            "lastDistanceM": 0,
+            "lastSpatial": false,
+            "lastEmitter": null,
+            "layerCount": 10,
+            "pressureDuration": 0.62
+          },
+          "flashbang": {
+            "plays": 0,
+            "lastAudioGain": 0,
+            "immediateOnsets": 0,
+            "scheduledBeeps": 0,
+            "maximumTailMs": 745
+          },
+          "outputProbe": {
+            "available": true,
+            "sampleRate": 96000,
+            "fftSize": 2048,
+            "rms": 0.00105042,
+            "peak": 0.00165879,
+            "crestFactor": 1.57917,
+            "spectralFlatness": 0.01007981,
+            "highFrequencyEnergyRatio": 0.00847461,
+            "suspiciousBroadbandHiss": false
+          },
+          "runtime": {
+            "voices": 6,
+            "spatialChains": 3,
+            "spatialPoolSize": 1,
+            "stolen": 0,
+            "dropped": 0,
+            "globalCap": 48,
+            "spatialCap": 12
+          },
+          "buses": {
+            "master": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "sfx": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.7799999713897705
+            },
+            "movement": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "ui": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.41999998688697815
+            },
+            "announcements": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.5
+            },
+            "ambience": {
+              "configuredGain": 82,
+              "muted": false,
+              "effectiveGain": 0.09839999675750732
+            },
+            "menu-music": {
+              "configuredGain": 72,
+              "muted": false,
+              "effectiveGain": 0.12960000336170197
+            },
+            "game-music": {
+              "configuredGain": 50,
+              "muted": false,
+              "effectiveGain": 0.013500000350177288
+            }
+          },
+          "gameMusicRunning": true
+        },
+        "snapshot": {
+          "context": {
+            "source": "standard",
+            "state": "running"
+          },
+          "listener": {
+            "poseMode": "modern-audio-param"
+          },
+          "immersion": {
+            "space": "urban-yard",
+            "arenaSpace": "urban-yard",
+            "overridden": false,
+            "occlusionHook": false,
+            "occludedReports": 0
+          },
+          "explosionMix": {
+            "lastMixAt": null,
+            "requests": 0,
+            "mixes": 0,
+            "coalesced": 0,
+            "coalesceMs": 90
+          },
+          "ambience": {
+            "continuousSources": 2,
+            "busGain": 0.09839999675750732,
+            "arena": "nuketown2",
+            "nextEventInSeconds": 6.92,
+            "ambientEventsPlayed": 1
+          },
+          "combatPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "sources": 3,
+            "nodes": 5,
+            "broadbandLoopSources": 0
+          },
+          "glassImpactPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "retainedBroadbandLoops": 0
+          },
+          "grenadeEffectsPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "warmupSources": 9,
+            "warmupNodes": 14,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0,
+            "liveRecipe": "layered-blast-brown-body-sub-and-crackle-debris-v2"
+          },
+          "destructionEffectsPrewarm": {
+            "prepared": false,
+            "runs": 0,
+            "warmupSources": 0,
+            "warmupNodes": 0,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0
+          },
+          "lowHealth": {
+            "prepared": true,
+            "sources": 2,
+            "active": false,
+            "audible": false,
+            "breathingGain": 0,
+            "heartbeatGain": 0,
+            "automationWrites": 0,
+            "broadbandSources": 0
+          },
+          "damageFeedback": {
+            "prepared": true,
+            "sources": 1,
+            "pulses": 0
+          },
+          "grenadeFuse": {
+            "beeps": 0,
+            "startMs": 1450
+          },
+          "crossbowFuse": {
+            "beeps": 0,
+            "lastRemainingMs": 0,
+            "lastDistanceM": 0,
+            "startMs": 1250
+          },
+          "minigunDrive": {
+            "active": false,
+            "starts": 0,
+            "stops": 0,
+            "fraction": 0,
+            "phase": "idle"
+          },
+          "support": {
+            "cues": 0,
+            "chopperRotorActive": false,
+            "chopperRotorStarts": 0,
+            "chopperRotorStops": 0
+          },
+          "countdown": {
+            "cues": 4,
+            "lastCue": "engage",
+            "maximumVoicesPerCue": 2,
+            "maximumCueWindowSeconds": 0.36,
+            "buses": [
+              "announcements",
+              "ui"
+            ]
+          },
+          "railgun": {
+            "local": 0,
+            "replicated": 0,
+            "lastAttenuation": 0,
+            "lastDistanceM": 0,
+            "lastSpatial": false,
+            "lastEmitter": null,
+            "layerCount": 10,
+            "pressureDuration": 0.62
+          },
+          "flashbang": {
+            "plays": 0,
+            "lastAudioGain": 0,
+            "immediateOnsets": 0,
+            "scheduledBeeps": 0,
+            "maximumTailMs": 745
+          },
+          "outputProbe": {
+            "available": true,
+            "sampleRate": 96000,
+            "fftSize": 2048,
+            "rms": 0.00111935,
+            "peak": 0.00165879,
+            "crestFactor": 1.481918,
+            "spectralFlatness": 0.01520533,
+            "highFrequencyEnergyRatio": 0.01283141,
+            "suspiciousBroadbandHiss": false
+          },
+          "runtime": {
+            "voices": 6,
+            "spatialChains": 3,
+            "spatialPoolSize": 1,
+            "stolen": 0,
+            "dropped": 0,
+            "globalCap": 48,
+            "spatialCap": 12
+          },
+          "buses": {
+            "master": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "sfx": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.7799999713897705
+            },
+            "movement": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "ui": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.41999998688697815
+            },
+            "announcements": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.5
+            },
+            "ambience": {
+              "configuredGain": 82,
+              "muted": false,
+              "effectiveGain": 0.09839999675750732
+            },
+            "menu-music": {
+              "configuredGain": 72,
+              "muted": false,
+              "effectiveGain": 0.12960000336170197
+            },
+            "game-music": {
+              "configuredGain": 50,
+              "muted": false,
+              "effectiveGain": 0.013500000350177288
+            }
+          },
+          "occlusion": {
+            "frameId": 141,
+            "checks": 1,
+            "maximumPerFrame": 4,
+            "denied": 0
+          }
+        },
+        "webAudio": [
+          {
+            "sampleRate": 96000,
+            "stateAtCreate": "running",
+            "createBuffer": 5,
+            "createBufferSource": 28,
+            "createOscillator": 39,
+            "createGain": 69,
+            "createPanner": 6,
+            "createBiquadFilter": 42,
+            "createAnalyser": 1,
+            "starts": 39,
+            "stops": 36,
+            "decodeCalls": 0,
+            "decodeErrors": [],
+            "state": "running"
+          }
+        ]
+      }
+    },
+    {
+      "step": 5,
+      "pose": {
+        "alive": true,
+        "position": [
+          10.881502151489258,
+          1.7179848337173462,
+          -21.599502563476562
+        ],
+        "yaw": 2.7173982456860264,
+        "gameStarted": true,
+        "matchPhase": "active",
+        "awaitingCanonicalGuestAuthority": false,
+        "menuHidden": true
+      },
+      "audio": {
+        "telemetry": {
+          "context": {
+            "source": "standard",
+            "state": "running"
+          },
+          "listener": {
+            "poseMode": "modern-audio-param"
+          },
+          "immersion": {
+            "space": "urban-yard",
+            "arenaSpace": "urban-yard",
+            "overridden": false,
+            "occlusionHook": false,
+            "occludedReports": 0
+          },
+          "explosionMix": {
+            "lastMixAt": null,
+            "requests": 0,
+            "mixes": 0,
+            "coalesced": 0,
+            "coalesceMs": 90
+          },
+          "ambience": {
+            "continuousSources": 2,
+            "busGain": 0.09839999675750732,
+            "arena": "nuketown2",
+            "nextEventInSeconds": 6.31,
+            "ambientEventsPlayed": 1
+          },
+          "combatPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "sources": 3,
+            "nodes": 5,
+            "broadbandLoopSources": 0
+          },
+          "glassImpactPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "retainedBroadbandLoops": 0
+          },
+          "grenadeEffectsPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "warmupSources": 9,
+            "warmupNodes": 14,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0,
+            "liveRecipe": "layered-blast-brown-body-sub-and-crackle-debris-v2"
+          },
+          "destructionEffectsPrewarm": {
+            "prepared": false,
+            "runs": 0,
+            "warmupSources": 0,
+            "warmupNodes": 0,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0
+          },
+          "lowHealth": {
+            "prepared": true,
+            "sources": 2,
+            "active": false,
+            "audible": false,
+            "breathingGain": 0,
+            "heartbeatGain": 0,
+            "automationWrites": 0,
+            "broadbandSources": 0
+          },
+          "damageFeedback": {
+            "prepared": true,
+            "sources": 1,
+            "pulses": 0
+          },
+          "grenadeFuse": {
+            "beeps": 0,
+            "startMs": 1450
+          },
+          "crossbowFuse": {
+            "beeps": 0,
+            "lastRemainingMs": 0,
+            "lastDistanceM": 0,
+            "startMs": 1250
+          },
+          "minigunDrive": {
+            "active": false,
+            "starts": 0,
+            "stops": 0,
+            "fraction": 0,
+            "phase": "idle"
+          },
+          "support": {
+            "cues": 0,
+            "chopperRotorActive": false,
+            "chopperRotorStarts": 0,
+            "chopperRotorStops": 0
+          },
+          "countdown": {
+            "cues": 4,
+            "lastCue": "engage",
+            "maximumVoicesPerCue": 2,
+            "maximumCueWindowSeconds": 0.36,
+            "buses": [
+              "announcements",
+              "ui"
+            ]
+          },
+          "railgun": {
+            "local": 0,
+            "replicated": 0,
+            "lastAttenuation": 0,
+            "lastDistanceM": 0,
+            "lastSpatial": false,
+            "lastEmitter": null,
+            "layerCount": 10,
+            "pressureDuration": 0.62
+          },
+          "flashbang": {
+            "plays": 0,
+            "lastAudioGain": 0,
+            "immediateOnsets": 0,
+            "scheduledBeeps": 0,
+            "maximumTailMs": 745
+          },
+          "outputProbe": {
+            "available": true,
+            "sampleRate": 96000,
+            "fftSize": 2048,
+            "rms": 0.00135259,
+            "peak": 0.00230816,
+            "crestFactor": 1.706471,
+            "spectralFlatness": 0.01900602,
+            "highFrequencyEnergyRatio": 0.0214703,
+            "suspiciousBroadbandHiss": false
+          },
+          "runtime": {
+            "voices": 5,
+            "spatialChains": 2,
+            "spatialPoolSize": 1,
+            "stolen": 0,
+            "dropped": 0,
+            "globalCap": 48,
+            "spatialCap": 12
+          },
+          "buses": {
+            "master": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "sfx": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.7799999713897705
+            },
+            "movement": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "ui": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.41999998688697815
+            },
+            "announcements": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.5
+            },
+            "ambience": {
+              "configuredGain": 82,
+              "muted": false,
+              "effectiveGain": 0.09839999675750732
+            },
+            "menu-music": {
+              "configuredGain": 72,
+              "muted": false,
+              "effectiveGain": 0.12960000336170197
+            },
+            "game-music": {
+              "configuredGain": 50,
+              "muted": false,
+              "effectiveGain": 0.013500000350177288
+            }
+          },
+          "gameMusicRunning": true
+        },
+        "snapshot": {
+          "context": {
+            "source": "standard",
+            "state": "running"
+          },
+          "listener": {
+            "poseMode": "modern-audio-param"
+          },
+          "immersion": {
+            "space": "urban-yard",
+            "arenaSpace": "urban-yard",
+            "overridden": false,
+            "occlusionHook": false,
+            "occludedReports": 0
+          },
+          "explosionMix": {
+            "lastMixAt": null,
+            "requests": 0,
+            "mixes": 0,
+            "coalesced": 0,
+            "coalesceMs": 90
+          },
+          "ambience": {
+            "continuousSources": 2,
+            "busGain": 0.09839999675750732,
+            "arena": "nuketown2",
+            "nextEventInSeconds": 6.3,
+            "ambientEventsPlayed": 1
+          },
+          "combatPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "sources": 3,
+            "nodes": 5,
+            "broadbandLoopSources": 0
+          },
+          "glassImpactPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "retainedBroadbandLoops": 0
+          },
+          "grenadeEffectsPrewarm": {
+            "prepared": true,
+            "runs": 1,
+            "warmupSources": 9,
+            "warmupNodes": 14,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0,
+            "liveRecipe": "layered-blast-brown-body-sub-and-crackle-debris-v2"
+          },
+          "destructionEffectsPrewarm": {
+            "prepared": false,
+            "runs": 0,
+            "warmupSources": 0,
+            "warmupNodes": 0,
+            "retainedSources": 0,
+            "retainedBroadbandLoops": 0
+          },
+          "lowHealth": {
+            "prepared": true,
+            "sources": 2,
+            "active": false,
+            "audible": false,
+            "breathingGain": 0,
+            "heartbeatGain": 0,
+            "automationWrites": 0,
+            "broadbandSources": 0
+          },
+          "damageFeedback": {
+            "prepared": true,
+            "sources": 1,
+            "pulses": 0
+          },
+          "grenadeFuse": {
+            "beeps": 0,
+            "startMs": 1450
+          },
+          "crossbowFuse": {
+            "beeps": 0,
+            "lastRemainingMs": 0,
+            "lastDistanceM": 0,
+            "startMs": 1250
+          },
+          "minigunDrive": {
+            "active": false,
+            "starts": 0,
+            "stops": 0,
+            "fraction": 0,
+            "phase": "idle"
+          },
+          "support": {
+            "cues": 0,
+            "chopperRotorActive": false,
+            "chopperRotorStarts": 0,
+            "chopperRotorStops": 0
+          },
+          "countdown": {
+            "cues": 4,
+            "lastCue": "engage",
+            "maximumVoicesPerCue": 2,
+            "maximumCueWindowSeconds": 0.36,
+            "buses": [
+              "announcements",
+              "ui"
+            ]
+          },
+          "railgun": {
+            "local": 0,
+            "replicated": 0,
+            "lastAttenuation": 0,
+            "lastDistanceM": 0,
+            "lastSpatial": false,
+            "lastEmitter": null,
+            "layerCount": 10,
+            "pressureDuration": 0.62
+          },
+          "flashbang": {
+            "plays": 0,
+            "lastAudioGain": 0,
+            "immediateOnsets": 0,
+            "scheduledBeeps": 0,
+            "maximumTailMs": 745
+          },
+          "outputProbe": {
+            "available": true,
+            "sampleRate": 96000,
+            "fftSize": 2048,
+            "rms": 0.00125867,
+            "peak": 0.00230816,
+            "crestFactor": 1.83381,
+            "spectralFlatness": 0.00998142,
+            "highFrequencyEnergyRatio": 0.01561309,
+            "suspiciousBroadbandHiss": false
+          },
+          "runtime": {
+            "voices": 5,
+            "spatialChains": 2,
+            "spatialPoolSize": 1,
+            "stolen": 0,
+            "dropped": 0,
+            "globalCap": 48,
+            "spatialCap": 12
+          },
+          "buses": {
+            "master": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "sfx": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.7799999713897705
+            },
+            "movement": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.3400000035762787
+            },
+            "ui": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.41999998688697815
+            },
+            "announcements": {
+              "configuredGain": 100,
+              "muted": false,
+              "effectiveGain": 0.5
+            },
+            "ambience": {
+              "configuredGain": 82,
+              "muted": false,
+              "effectiveGain": 0.09839999675750732
+            },
+            "menu-music": {
+              "configuredGain": 72,
+              "muted": false,
+              "effectiveGain": 0.12960000336170197
+            },
+            "game-music": {
+              "configuredGain": 50,
+              "muted": false,
+              "effectiveGain": 0.013500000350177288
+            }
+          },
+          "occlusion": {
+            "frameId": 159,
+            "checks": 1,
+            "maximumPerFrame": 4,
+            "denied": 0
+          }
+        },
+        "webAudio": [
+          {
+            "sampleRate": 96000,
+            "stateAtCreate": "running",
+            "createBuffer": 5,
+            "createBufferSource": 33,
+            "createOscillator": 41,
+            "createGain": 75,
+            "createPanner": 6,
+            "createBiquadFilter": 48,
+            "createAnalyser": 1,
+            "starts": 41,
+            "stops": 38,
+            "decodeCalls": 0,
+            "decodeErrors": [],
+            "state": "running"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,7938 @@
+{
+  "generatedAt": "2026-09-02T16:18:59.276Z",
+  "arena": "test1",
+  "roofLevelMinY": 2.4,
+  "summary": {
+    "colliders": 240,
+    "walkableCensus": 48,
+    "walkableSupported": 46,
+    "geometricFindings": 2,
+    "roofSurfaces": 22,
+    "dropSamples": 396,
+    "dropFallThroughs": 32,
+    "walkSamples": 88,
+    "walkFallThroughs": 8,
+    "minRoofClearanceM": 0.02,
+    "surfacesWithFallThrough": [
+      "test1-camo-net-tarp"
+    ]
+  },
+  "geometricFindings": [
+    {
+      "name": "test1-camo-net-tarp",
+      "path": "Test1 arena/test1-dressing/test1-camo-net-tarp",
+      "centre": [
+        21,
+        3.14,
+        -8
+      ],
+      "span": [
+        8.99,
+        6.4
+      ],
+      "area": 57.56,
+      "topY": 3.14,
+      "slopeDeg": 2.01,
+      "unsupportedShare": 0.97,
+      "samples": 999,
+      "unsupportedSamples": 971,
+      "hole": [
+        16.52,
+        25.48,
+        -11.18,
+        -4.82
+      ],
+      "bestColliderTopUnderHole": -0.02,
+      "dropM": 3
+    },
+    {
+      "name": "test1-camo-net-tarp",
+      "path": "Test1 arena/test1-dressing/test1-camo-net-tarp",
+      "centre": [
+        21,
+        3.14,
+        8
+      ],
+      "span": [
+        8.99,
+        6.4
+      ],
+      "area": 57.56,
+      "topY": 3.14,
+      "slopeDeg": 2.01,
+      "unsupportedShare": 0.97,
+      "samples": 999,
+      "unsupportedSamples": 971,
+      "hole": [
+        16.52,
+        25.48,
+        4.82,
+        11.18
+      ],
+      "bestColliderTopUnderHole": -0.02,
+      "dropM": 3
+    }
+  ],
+  "roofSurfaces": [
+    {
+      "name": "test1 container stack -1",
+      "centre": [
+        27.5,
+        5.2,
+        -11
+      ],
+      "span": [
+        6,
+        2.6
+      ],
+      "area": 15.6,
+      "topY": 5.2,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          24.5,
+          5.2,
+          -12.3
+        ],
+        [
+          30.5,
+          5.2,
+          -12.3
+        ],
+        [
+          30.5,
+          5.2,
+          -9.7
+        ],
+        [
+          24.5,
+          5.2,
+          -9.7
+        ]
+      ]
+    },
+    {
+      "name": "test1 container stack 1",
+      "centre": [
+        27.5,
+        5.2,
+        11
+      ],
+      "span": [
+        6,
+        2.6
+      ],
+      "area": 15.6,
+      "topY": 5.2,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          24.5,
+          5.2,
+          9.7
+        ],
+        [
+          30.5,
+          5.2,
+          9.7
+        ],
+        [
+          30.5,
+          5.2,
+          12.3
+        ],
+        [
+          24.5,
+          5.2,
+          12.3
+        ]
+      ]
+    },
+    {
+      "name": "test1 stores roof -1",
+      "centre": [
+        22,
+        3.5,
+        -16.7
+      ],
+      "span": [
+        11.4,
+        5.6
+      ],
+      "area": 63.84,
+      "topY": 3.5,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          16.3,
+          3.5,
+          -19.5
+        ],
+        [
+          27.7,
+          3.5,
+          -19.5
+        ],
+        [
+          27.7,
+          3.5,
+          -13.9
+        ],
+        [
+          16.3,
+          3.5,
+          -13.9
+        ]
+      ]
+    },
+    {
+      "name": "test1 stores roof 1",
+      "centre": [
+        22,
+        3.5,
+        16.7
+      ],
+      "span": [
+        11.4,
+        5.6
+      ],
+      "area": 63.84,
+      "topY": 3.5,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          16.3,
+          3.5,
+          13.9
+        ],
+        [
+          27.7,
+          3.5,
+          13.9
+        ],
+        [
+          27.7,
+          3.5,
+          19.5
+        ],
+        [
+          16.3,
+          3.5,
+          19.5
+        ]
+      ]
+    },
+    {
+      "name": "test1 firing line roof",
+      "centre": [
+        -13.8,
+        3.46,
+        0
+      ],
+      "span": [
+        6.4,
+        34
+      ],
+      "area": 217.6,
+      "topY": 3.46,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          -17,
+          3.46,
+          -17
+        ],
+        [
+          -10.6,
+          3.46,
+          -17
+        ],
+        [
+          -10.6,
+          3.46,
+          17
+        ],
+        [
+          -17,
+          3.46,
+          17
+        ]
+      ]
+    },
+    {
+      "name": "test1 spawn shed roof -1",
+      "centre": [
+        0,
+        3.3,
+        -20
+      ],
+      "span": [
+        10.6,
+        4.8
+      ],
+      "area": 50.88,
+      "topY": 3.3,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          -5.3,
+          3.3,
+          -22.4
+        ],
+        [
+          5.3,
+          3.3,
+          -22.4
+        ],
+        [
+          5.3,
+          3.3,
+          -17.6
+        ],
+        [
+          -5.3,
+          3.3,
+          -17.6
+        ]
+      ]
+    },
+    {
+      "name": "test1 spawn shed roof 1",
+      "centre": [
+        0,
+        3.3,
+        20
+      ],
+      "span": [
+        10.6,
+        4.8
+      ],
+      "area": 50.88,
+      "topY": 3.3,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          -5.3,
+          3.3,
+          17.6
+        ],
+        [
+          5.3,
+          3.3,
+          17.6
+        ],
+        [
+          5.3,
+          3.3,
+          22.4
+        ],
+        [
+          -5.3,
+          3.3,
+          22.4
+        ]
+      ]
+    },
+    {
+      "name": "test1-camo-net-tarp",
+      "centre": [
+        21,
+        3.14,
+        -8
+      ],
+      "span": [
+        8.99,
+        6.4
+      ],
+      "area": 57.56,
+      "topY": 3.14,
+      "slopeDeg": 2.01,
+      "unsupportedShare": 0.97,
+      "quad": [
+        [
+          16.5,
+          2.82,
+          -11.2
+        ],
+        [
+          25.5,
+          3.14,
+          -11.2
+        ],
+        [
+          25.5,
+          3.14,
+          -4.8
+        ],
+        [
+          16.5,
+          2.82,
+          -4.8
+        ]
+      ]
+    },
+    {
+      "name": "test1-camo-net-tarp",
+      "centre": [
+        21,
+        3.14,
+        8
+      ],
+      "span": [
+        8.99,
+        6.4
+      ],
+      "area": 57.56,
+      "topY": 3.14,
+      "slopeDeg": 2.01,
+      "unsupportedShare": 0.97,
+      "quad": [
+        [
+          16.5,
+          2.82,
+          4.8
+        ],
+        [
+          25.5,
+          3.14,
+          4.8
+        ],
+        [
+          25.5,
+          3.14,
+          11.2
+        ],
+        [
+          16.5,
+          2.82,
+          11.2
+        ]
+      ]
+    },
+    {
+      "name": "test1 tower deck",
+      "centre": [
+        0,
+        2.9,
+        0
+      ],
+      "span": [
+        9.2,
+        9.2
+      ],
+      "area": 84.64,
+      "topY": 2.9,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          -4.6,
+          2.9,
+          -4.6
+        ],
+        [
+          4.6,
+          2.9,
+          -4.6
+        ],
+        [
+          4.6,
+          2.9,
+          4.6
+        ],
+        [
+          -4.6,
+          2.9,
+          4.6
+        ]
+      ]
+    },
+    {
+      "name": "test1 tower stair -1 3",
+      "centre": [
+        0,
+        2.9,
+        -5.15
+      ],
+      "span": [
+        1.8,
+        1.1
+      ],
+      "area": 1.98,
+      "topY": 2.9,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          -0.9,
+          2.9,
+          -5.7
+        ],
+        [
+          0.9,
+          2.9,
+          -5.7
+        ],
+        [
+          0.9,
+          2.9,
+          -4.6
+        ],
+        [
+          -0.9,
+          2.9,
+          -4.6
+        ]
+      ]
+    },
+    {
+      "name": "test1 tower stair 1 3",
+      "centre": [
+        0,
+        2.9,
+        5.15
+      ],
+      "span": [
+        1.8,
+        1.1
+      ],
+      "area": 1.98,
+      "topY": 2.9,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          -0.9,
+          2.9,
+          4.6
+        ],
+        [
+          0.9,
+          2.9,
+          4.6
+        ],
+        [
+          0.9,
+          2.9,
+          5.7
+        ],
+        [
+          -0.9,
+          2.9,
+          5.7
+        ]
+      ]
+    },
+    {
+      "name": "test1 annex roof -1",
+      "centre": [
+        -7.2,
+        2.64,
+        0
+      ],
+      "span": [
+        6.3,
+        7.5
+      ],
+      "area": 47.25,
+      "topY": 2.64,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          -10.35,
+          2.64,
+          -3.75
+        ],
+        [
+          -4.05,
+          2.64,
+          -3.75
+        ],
+        [
+          -4.05,
+          2.64,
+          3.75
+        ],
+        [
+          -10.35,
+          2.64,
+          3.75
+        ]
+      ]
+    },
+    {
+      "name": "test1 annex roof 1",
+      "centre": [
+        7.2,
+        2.64,
+        0
+      ],
+      "span": [
+        6.3,
+        7.5
+      ],
+      "area": 47.25,
+      "topY": 2.64,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          4.05,
+          2.64,
+          -3.75
+        ],
+        [
+          10.35,
+          2.64,
+          -3.75
+        ],
+        [
+          10.35,
+          2.64,
+          3.75
+        ],
+        [
+          4.05,
+          2.64,
+          3.75
+        ]
+      ]
+    },
+    {
+      "name": "test1 backstop berm",
+      "centre": [
+        -29.75,
+        2.6,
+        0
+      ],
+      "span": [
+        4.5,
+        44
+      ],
+      "area": 198,
+      "topY": 2.6,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          -32,
+          2.6,
+          -22
+        ],
+        [
+          -27.5,
+          2.6,
+          -22
+        ],
+        [
+          -27.5,
+          2.6,
+          22
+        ],
+        [
+          -32,
+          2.6,
+          22
+        ]
+      ]
+    },
+    {
+      "name": "test1 container a -1",
+      "centre": [
+        15,
+        2.6,
+        -7.5
+      ],
+      "span": [
+        6,
+        2.6
+      ],
+      "area": 15.6,
+      "topY": 2.6,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          12,
+          2.6,
+          -8.8
+        ],
+        [
+          18,
+          2.6,
+          -8.8
+        ],
+        [
+          18,
+          2.6,
+          -6.2
+        ],
+        [
+          12,
+          2.6,
+          -6.2
+        ]
+      ]
+    },
+    {
+      "name": "test1 container a 1",
+      "centre": [
+        15,
+        2.6,
+        7.5
+      ],
+      "span": [
+        6,
+        2.6
+      ],
+      "area": 15.6,
+      "topY": 2.6,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          12,
+          2.6,
+          6.2
+        ],
+        [
+          18,
+          2.6,
+          6.2
+        ],
+        [
+          18,
+          2.6,
+          8.8
+        ],
+        [
+          12,
+          2.6,
+          8.8
+        ]
+      ]
+    },
+    {
+      "name": "test1 container b -1",
+      "centre": [
+        22,
+        2.6,
+        -3
+      ],
+      "span": [
+        6.39,
+        3.72
+      ],
+      "area": 15.6,
+      "topY": 2.6,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          19.31,
+          2.6,
+          -4.86
+        ],
+        [
+          25.2,
+          2.6,
+          -3.69
+        ],
+        [
+          24.69,
+          2.6,
+          -1.14
+        ],
+        [
+          18.8,
+          2.6,
+          -2.31
+        ]
+      ]
+    },
+    {
+      "name": "test1 container b 1",
+      "centre": [
+        22,
+        2.6,
+        3
+      ],
+      "span": [
+        6.39,
+        3.72
+      ],
+      "area": 15.6,
+      "topY": 2.6,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          18.8,
+          2.6,
+          2.31
+        ],
+        [
+          24.69,
+          2.6,
+          1.14
+        ],
+        [
+          25.2,
+          2.6,
+          3.69
+        ],
+        [
+          19.31,
+          2.6,
+          4.86
+        ]
+      ]
+    },
+    {
+      "name": "test1 container d -1",
+      "centre": [
+        13,
+        2.6,
+        -15
+      ],
+      "span": [
+        6.36,
+        3.6
+      ],
+      "area": 15.6,
+      "topY": 2.6,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          9.82,
+          2.6,
+          -15.76
+        ],
+        [
+          15.73,
+          2.6,
+          -16.8
+        ],
+        [
+          16.18,
+          2.6,
+          -14.24
+        ],
+        [
+          10.27,
+          2.6,
+          -13.2
+        ]
+      ]
+    },
+    {
+      "name": "test1 container d 1",
+      "centre": [
+        13,
+        2.6,
+        15
+      ],
+      "span": [
+        6.36,
+        3.6
+      ],
+      "area": 15.6,
+      "topY": 2.6,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          10.27,
+          2.6,
+          13.2
+        ],
+        [
+          16.18,
+          2.6,
+          14.24
+        ],
+        [
+          15.73,
+          2.6,
+          16.8
+        ],
+        [
+          9.82,
+          2.6,
+          15.76
+        ]
+      ]
+    },
+    {
+      "name": "test1 container e",
+      "centre": [
+        28.5,
+        2.6,
+        0
+      ],
+      "span": [
+        2.6,
+        6
+      ],
+      "area": 15.6,
+      "topY": 2.6,
+      "slopeDeg": 0,
+      "unsupportedShare": 0,
+      "quad": [
+        [
+          27.2,
+          2.6,
+          3
+        ],
+        [
+          27.2,
+          2.6,
+          -3
+        ],
+        [
+          29.8,
+          2.6,
+          -3
+        ],
+        [
+          29.8,
+          2.6,
+          3
+        ]
+      ]
+    }
+  ],
+  "clearance": [
+    {
+      "name": "test1 container stack -1",
+      "centre": [
+        27.5,
+        5.2,
+        -11
+      ],
+      "minClearanceM": 3,
+      "worstPoint": [
+        27.5,
+        -11
+      ]
+    },
+    {
+      "name": "test1 container stack 1",
+      "centre": [
+        27.5,
+        5.2,
+        11
+      ],
+      "minClearanceM": 3,
+      "worstPoint": [
+        27.5,
+        11
+      ]
+    },
+    {
+      "name": "test1 stores roof -1",
+      "centre": [
+        22,
+        3.5,
+        -16.7
+      ],
+      "minClearanceM": 3,
+      "worstPoint": [
+        22,
+        -16.7
+      ]
+    },
+    {
+      "name": "test1 stores roof 1",
+      "centre": [
+        22,
+        3.5,
+        16.7
+      ],
+      "minClearanceM": 3,
+      "worstPoint": [
+        22,
+        16.7
+      ]
+    },
+    {
+      "name": "test1 firing line roof",
+      "centre": [
+        -13.8,
+        3.46,
+        0
+      ],
+      "minClearanceM": 3,
+      "worstPoint": [
+        -13.8,
+        0
+      ]
+    },
+    {
+      "name": "test1 spawn shed roof -1",
+      "centre": [
+        0,
+        3.3,
+        -20
+      ],
+      "minClearanceM": 3,
+      "worstPoint": [
+        0,
+        -20
+      ]
+    },
+    {
+      "name": "test1 spawn shed roof 1",
+      "centre": [
+        0,
+        3.3,
+        20
+      ],
+      "minClearanceM": 3,
+      "worstPoint": [
+        0,
+        20
+      ]
+    },
+    {
+      "name": "test1-camo-net-tarp",
+      "centre": [
+        21,
+        3.14,
+        -8
+      ],
+      "minClearanceM": 0.02,
+      "worstPoint": [
+        25.1,
+        -10.8
+      ]
+    },
+    {
+      "name": "test1-camo-net-tarp",
+      "centre": [
+        21,
+        3.14,
+        8
+      ],
+      "minClearanceM": 0.02,
+      "worstPoint": [
+        25.1,
+        10.1
+      ]
+    },
+    {
+      "name": "test1 tower deck",
+      "centre": [
+        0,
+        2.9,
+        0
+      ],
+      "minClearanceM": 3,
+      "worstPoint": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "test1 tower stair -1 3",
+      "centre": [
+        0,
+        2.9,
+        -5.15
+      ],
+      "minClearanceM": 3,
+      "worstPoint": [
+        0,
+        -5.15
+      ]
+    },
+    {
+      "name": "test1 tower stair 1 3",
+      "centre": [
+        0,
+        2.9,
+        5.15
+      ],
+      "minClearanceM": 3,
+      "worstPoint": [
+        0,
+        5.15
+      ]
+    },
+    {
+      "name": "test1 annex roof -1",
+      "centre": [
+        -7.2,
+        2.64,
+        0
+      ],
+      "minClearanceM": 0.1,
+      "worstPoint": [
+        -4.45,
+        -3.35
+      ]
+    },
+    {
+      "name": "test1 annex roof 1",
+      "centre": [
+        7.2,
+        2.64,
+        0
+      ],
+      "minClearanceM": 0.1,
+      "worstPoint": [
+        4.45,
+        -3.35
+      ]
+    },
+    {
+      "name": "test1 backstop berm",
+      "centre": [
+        -29.75,
+        2.6,
+        0
+      ],
+      "minClearanceM": 3,
+      "worstPoint": [
+        -29.75,
+        0
+      ]
+    },
+    {
+      "name": "test1 container a -1",
+      "centre": [
+        15,
+        2.6,
+        -7.5
+      ],
+      "minClearanceM": 3,
+      "worstPoint": [
+        15,
+        -7.5
+      ]
+    },
+    {
+      "name": "test1 container a 1",
+      "centre": [
+        15,
+        2.6,
+        7.5
+      ],
+      "minClearanceM": 3,
+      "worstPoint": [
+        15,
+        7.5
+      ]
+    },
+    {
+      "name": "test1 container b -1",
+      "centre": [
+        22,
+        2.6,
+        -3
+      ],
+      "minClearanceM": 3,
+      "worstPoint": [
+        22,
+        -3
+      ]
+    },
+    {
+      "name": "test1 container b 1",
+      "centre": [
+        22,
+        2.6,
+        3
+      ],
+      "minClearanceM": 3,
+      "worstPoint": [
+        22,
+        3
+      ]
+    },
+    {
+      "name": "test1 container d -1",
+      "centre": [
+        13,
+        2.6,
+        -15
+      ],
+      "minClearanceM": 3,
+      "worstPoint": [
+        13,
+        -15
+      ]
+    },
+    {
+      "name": "test1 container d 1",
+      "centre": [
+        13,
+        2.6,
+        15
+      ],
+      "minClearanceM": 3,
+      "worstPoint": [
+        13,
+        15
+      ]
+    },
+    {
+      "name": "test1 container e",
+      "centre": [
+        28.5,
+        2.6,
+        0
+      ],
+      "minClearanceM": 3,
+      "worstPoint": [
+        28.5,
+        0
+      ]
+    }
+  ],
+  "drops": [
+    {
+      "surface": "test1 container stack -1",
+      "point": "centre",
+      "stance": "stand",
+      "x": 27.5,
+      "z": -11,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.22,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack -1",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": 24.95,
+      "z": -11,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack -1",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 30.05,
+      "z": -11,
+      "startFeetY": 5.25,
+      "endFeetY": 5.22,
+      "minFeetY": 5.22,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack -1",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 27.5,
+      "z": -11.85,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack -1",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 27.5,
+      "z": -10.15,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack -1",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": 24.95,
+      "z": -11.85,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack -1",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 30.05,
+      "z": -11.85,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack -1",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 30.05,
+      "z": -10.15,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack -1",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": 24.95,
+      "z": -10.15,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack 1",
+      "point": "centre",
+      "stance": "stand",
+      "x": 27.5,
+      "z": 11,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.22,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack 1",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": 24.95,
+      "z": 11,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack 1",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 30.05,
+      "z": 11,
+      "startFeetY": 5.25,
+      "endFeetY": 5.22,
+      "minFeetY": 5.22,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack 1",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 27.5,
+      "z": 10.15,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack 1",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 27.5,
+      "z": 11.85,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack 1",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": 24.95,
+      "z": 10.15,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack 1",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 30.05,
+      "z": 10.15,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack 1",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 30.05,
+      "z": 11.85,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack 1",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": 24.95,
+      "z": 11.85,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "point": "centre",
+      "stance": "stand",
+      "x": 22,
+      "z": -16.7,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.52,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": 16.75,
+      "z": -16.7,
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 27.25,
+      "z": -16.7,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.52,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 22,
+      "z": -19.05,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.52,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 22,
+      "z": -14.35,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.53,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": 16.75,
+      "z": -19.05,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.52,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 27.25,
+      "z": -19.05,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.52,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 27.25,
+      "z": -14.35,
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": 16.75,
+      "z": -14.35,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.53,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "point": "centre",
+      "stance": "stand",
+      "x": 22,
+      "z": 16.7,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.52,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": 16.75,
+      "z": 16.7,
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 27.25,
+      "z": 16.7,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.52,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 22,
+      "z": 14.35,
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 22,
+      "z": 19.05,
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": 16.75,
+      "z": 14.35,
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 27.25,
+      "z": 14.35,
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 27.25,
+      "z": 19.05,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.53,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": 16.75,
+      "z": 19.05,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.52,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 firing line roof",
+      "point": "centre",
+      "stance": "stand",
+      "x": -13.8,
+      "z": 0,
+      "startFeetY": 3.51,
+      "endFeetY": 3.48,
+      "minFeetY": 3.48,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 firing line roof",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": -16.55,
+      "z": 0,
+      "startFeetY": 3.51,
+      "endFeetY": 3.48,
+      "minFeetY": 3.48,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 firing line roof",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": -11.05,
+      "z": 0,
+      "startFeetY": 3.51,
+      "endFeetY": 3.48,
+      "minFeetY": 3.48,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 firing line roof",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": -13.8,
+      "z": -16.55,
+      "startFeetY": 3.51,
+      "endFeetY": 3.49,
+      "minFeetY": 3.48,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 firing line roof",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": -13.8,
+      "z": 16.55,
+      "startFeetY": 3.51,
+      "endFeetY": 3.48,
+      "minFeetY": 3.48,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 firing line roof",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": -16.55,
+      "z": -16.55,
+      "startFeetY": 3.51,
+      "endFeetY": 3.49,
+      "minFeetY": 3.48,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 firing line roof",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": -11.05,
+      "z": -16.55,
+      "startFeetY": 3.51,
+      "endFeetY": 3.48,
+      "minFeetY": 3.48,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 firing line roof",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": -11.05,
+      "z": 16.55,
+      "startFeetY": 3.51,
+      "endFeetY": 3.49,
+      "minFeetY": 3.48,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 firing line roof",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": -16.55,
+      "z": 16.55,
+      "startFeetY": 3.51,
+      "endFeetY": 3.48,
+      "minFeetY": 3.48,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "point": "centre",
+      "stance": "stand",
+      "x": 0,
+      "z": -20,
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": -4.85,
+      "z": -20,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.33,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 4.85,
+      "z": -20,
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 0,
+      "z": -21.95,
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 0,
+      "z": -18.05,
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": -4.85,
+      "z": -21.95,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.32,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 4.85,
+      "z": -21.95,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.32,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 4.85,
+      "z": -18.05,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.33,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": -4.85,
+      "z": -18.05,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.33,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "point": "centre",
+      "stance": "stand",
+      "x": 0,
+      "z": 20,
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": -4.85,
+      "z": 20,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.33,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 4.85,
+      "z": 20,
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 0,
+      "z": 18.05,
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 0,
+      "z": 21.95,
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": -4.85,
+      "z": 18.05,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.32,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 4.85,
+      "z": 18.05,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.32,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 4.85,
+      "z": 21.95,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.33,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": -4.85,
+      "z": 21.95,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.33,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "centre",
+      "stance": "stand",
+      "x": 21,
+      "z": -8,
+      "startFeetY": 3.03,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 3,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": 16.95,
+      "z": -8,
+      "startFeetY": 2.89,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.26,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 25.05,
+      "z": -8,
+      "startFeetY": 3.17,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 3.15,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 21,
+      "z": -10.75,
+      "startFeetY": 3.03,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 3,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 21,
+      "z": -5.25,
+      "startFeetY": 3.03,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 3,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": 16.95,
+      "z": -10.75,
+      "startFeetY": 2.89,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 2.86,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 25.05,
+      "z": -10.75,
+      "startFeetY": 3.17,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.55,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 25.05,
+      "z": -5.25,
+      "startFeetY": 3.17,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 3.15,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": 16.95,
+      "z": -5.25,
+      "startFeetY": 2.89,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 2.86,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "centre",
+      "stance": "stand",
+      "x": 21,
+      "z": 8,
+      "startFeetY": 3.03,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 3,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": 16.95,
+      "z": 8,
+      "startFeetY": 2.89,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.26,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 25.05,
+      "z": 8,
+      "startFeetY": 3.17,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 3.15,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 21,
+      "z": 5.25,
+      "startFeetY": 3.03,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 3,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 21,
+      "z": 10.75,
+      "startFeetY": 3.03,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 3,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": 16.95,
+      "z": 5.25,
+      "startFeetY": 2.89,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 2.86,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 25.05,
+      "z": 5.25,
+      "startFeetY": 3.17,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 3.15,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 25.05,
+      "z": 10.75,
+      "startFeetY": 3.17,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.55,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": 16.95,
+      "z": 10.75,
+      "startFeetY": 2.89,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 2.86,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1 tower deck",
+      "point": "centre",
+      "stance": "stand",
+      "x": 0,
+      "z": 0,
+      "startFeetY": 2.95,
+      "endFeetY": 2.92,
+      "minFeetY": 2.92,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower deck",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": -4.15,
+      "z": 0,
+      "startFeetY": 2.95,
+      "endFeetY": 2.92,
+      "minFeetY": 2.92,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower deck",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 4.15,
+      "z": 0,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower deck",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 0,
+      "z": -4.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.92,
+      "minFeetY": 2.92,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower deck",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 0,
+      "z": 4.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower deck",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": -4.15,
+      "z": -4.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.93,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower deck",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 4.15,
+      "z": -4.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.93,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower deck",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 4.15,
+      "z": 4.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.93,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower deck",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": -4.15,
+      "z": 4.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.93,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "point": "centre",
+      "stance": "stand",
+      "x": 0,
+      "z": -5.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": -0.45,
+      "z": -5.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.93,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 0.45,
+      "z": -5.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 0,
+      "z": -5.25,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 0,
+      "z": -5.05,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": -0.45,
+      "z": -5.25,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 0.45,
+      "z": -5.25,
+      "startFeetY": 2.95,
+      "endFeetY": 2.92,
+      "minFeetY": 2.92,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 0.45,
+      "z": -5.05,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": -0.45,
+      "z": -5.05,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "point": "centre",
+      "stance": "stand",
+      "x": 0,
+      "z": 5.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": -0.45,
+      "z": 5.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.93,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 0.45,
+      "z": 5.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 0,
+      "z": 5.05,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 0,
+      "z": 5.25,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": -0.45,
+      "z": 5.05,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 0.45,
+      "z": 5.05,
+      "startFeetY": 2.95,
+      "endFeetY": 2.92,
+      "minFeetY": 2.92,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 0.45,
+      "z": 5.25,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": -0.45,
+      "z": 5.25,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "point": "centre",
+      "stance": "stand",
+      "x": -7.2,
+      "z": 0,
+      "startFeetY": 2.69,
+      "endFeetY": 2.67,
+      "minFeetY": 2.66,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": -9.9,
+      "z": 0,
+      "startFeetY": 2.69,
+      "endFeetY": 2.66,
+      "minFeetY": 2.66,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": -4.5,
+      "z": 0,
+      "startFeetY": 2.69,
+      "endFeetY": 2.71,
+      "minFeetY": 2.69,
+      "dropM": -0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": -7.2,
+      "z": -3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.66,
+      "minFeetY": 2.66,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": -7.2,
+      "z": 3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.66,
+      "minFeetY": 2.66,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": -9.9,
+      "z": -3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.67,
+      "minFeetY": 2.67,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": -4.5,
+      "z": -3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.71,
+      "minFeetY": 2.69,
+      "dropM": -0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": -4.5,
+      "z": 3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.71,
+      "minFeetY": 2.69,
+      "dropM": -0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": -9.9,
+      "z": 3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.67,
+      "minFeetY": 2.66,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "point": "centre",
+      "stance": "stand",
+      "x": 7.2,
+      "z": 0,
+      "startFeetY": 2.69,
+      "endFeetY": 2.67,
+      "minFeetY": 2.66,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": 4.5,
+      "z": 0,
+      "startFeetY": 2.69,
+      "endFeetY": 2.71,
+      "minFeetY": 2.69,
+      "dropM": -0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 9.9,
+      "z": 0,
+      "startFeetY": 2.69,
+      "endFeetY": 2.67,
+      "minFeetY": 2.66,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 7.2,
+      "z": -3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.66,
+      "minFeetY": 2.66,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 7.2,
+      "z": 3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.66,
+      "minFeetY": 2.66,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": 4.5,
+      "z": -3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.71,
+      "minFeetY": 2.69,
+      "dropM": -0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 9.9,
+      "z": -3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.67,
+      "minFeetY": 2.67,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 9.9,
+      "z": 3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.67,
+      "minFeetY": 2.67,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": 4.5,
+      "z": 3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.71,
+      "minFeetY": 2.69,
+      "dropM": -0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 backstop berm",
+      "point": "centre",
+      "stance": "stand",
+      "x": -29.75,
+      "z": 0,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 backstop berm",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": -31.55,
+      "z": 0,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 backstop berm",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": -27.95,
+      "z": 0,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 backstop berm",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": -29.75,
+      "z": -21.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 backstop berm",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": -29.75,
+      "z": 21.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 backstop berm",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": -31.55,
+      "z": -21.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 backstop berm",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": -27.95,
+      "z": -21.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 backstop berm",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": -27.95,
+      "z": 21.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 backstop berm",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": -31.55,
+      "z": 21.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a -1",
+      "point": "centre",
+      "stance": "stand",
+      "x": 15,
+      "z": -7.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a -1",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": 12.45,
+      "z": -7.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a -1",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 17.55,
+      "z": -7.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a -1",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 15,
+      "z": -8.35,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a -1",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 15,
+      "z": -6.65,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a -1",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": 12.45,
+      "z": -8.35,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a -1",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 17.55,
+      "z": -8.35,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a -1",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 17.55,
+      "z": -6.65,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a -1",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": 12.45,
+      "z": -6.65,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a 1",
+      "point": "centre",
+      "stance": "stand",
+      "x": 15,
+      "z": 7.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a 1",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": 12.45,
+      "z": 7.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a 1",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 17.55,
+      "z": 7.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a 1",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 15,
+      "z": 6.65,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a 1",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 15,
+      "z": 8.35,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a 1",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": 12.45,
+      "z": 6.65,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a 1",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 17.55,
+      "z": 6.65,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a 1",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 17.55,
+      "z": 8.35,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a 1",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": 12.45,
+      "z": 8.35,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b -1",
+      "point": "centre",
+      "stance": "stand",
+      "x": 22,
+      "z": -3,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b -1",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": 19.5,
+      "z": -3.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b -1",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 24.5,
+      "z": -2.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b -1",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 22.17,
+      "z": -3.83,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b -1",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 21.83,
+      "z": -2.17,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b -1",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": 19.66,
+      "z": -4.33,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b -1",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 24.67,
+      "z": -3.34,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b -1",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 24.34,
+      "z": -1.67,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b -1",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": 19.33,
+      "z": -2.66,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b 1",
+      "point": "centre",
+      "stance": "stand",
+      "x": 22,
+      "z": 3,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b 1",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": 19.5,
+      "z": 3.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b 1",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 24.5,
+      "z": 2.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b 1",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 21.83,
+      "z": 2.17,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b 1",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 22.17,
+      "z": 3.83,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b 1",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": 19.33,
+      "z": 2.66,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b 1",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 24.34,
+      "z": 1.67,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b 1",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 24.67,
+      "z": 3.34,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b 1",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": 19.66,
+      "z": 4.33,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d -1",
+      "point": "centre",
+      "stance": "stand",
+      "x": 13,
+      "z": -15,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d -1",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": 10.49,
+      "z": -14.56,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d -1",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 15.51,
+      "z": -15.44,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d -1",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 12.85,
+      "z": -15.84,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d -1",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 13.15,
+      "z": -14.16,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d -1",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": 10.34,
+      "z": -15.39,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d -1",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 15.36,
+      "z": -16.28,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d -1",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 15.66,
+      "z": -14.61,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d -1",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": 10.64,
+      "z": -13.72,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d 1",
+      "point": "centre",
+      "stance": "stand",
+      "x": 13,
+      "z": 15,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d 1",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": 10.49,
+      "z": 14.56,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d 1",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 15.51,
+      "z": 15.44,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d 1",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 13.15,
+      "z": 14.16,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d 1",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 12.85,
+      "z": 15.84,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d 1",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": 10.64,
+      "z": 13.72,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d 1",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 15.66,
+      "z": 14.61,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d 1",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 15.36,
+      "z": 16.28,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d 1",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": 10.34,
+      "z": 15.39,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container e",
+      "point": "centre",
+      "stance": "stand",
+      "x": 28.5,
+      "z": 0,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container e",
+      "point": "edge-u0",
+      "stance": "stand",
+      "x": 28.5,
+      "z": 2.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container e",
+      "point": "edge-u1",
+      "stance": "stand",
+      "x": 28.5,
+      "z": -2.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container e",
+      "point": "edge-v0",
+      "stance": "stand",
+      "x": 27.65,
+      "z": 0,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container e",
+      "point": "edge-v1",
+      "stance": "stand",
+      "x": 29.35,
+      "z": 0,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container e",
+      "point": "corner-00",
+      "stance": "stand",
+      "x": 27.65,
+      "z": 2.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container e",
+      "point": "corner-10",
+      "stance": "stand",
+      "x": 27.65,
+      "z": -2.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container e",
+      "point": "corner-11",
+      "stance": "stand",
+      "x": 29.35,
+      "z": -2.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container e",
+      "point": "corner-01",
+      "stance": "stand",
+      "x": 29.35,
+      "z": 2.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack -1",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 27.5,
+      "z": -11,
+      "startFeetY": 5.25,
+      "endFeetY": 5.22,
+      "minFeetY": 5.22,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack -1",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": 24.95,
+      "z": -11,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack -1",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 30.05,
+      "z": -11,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack -1",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 27.5,
+      "z": -11.85,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack -1",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 27.5,
+      "z": -10.15,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.22,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack -1",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": 24.95,
+      "z": -11.85,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack -1",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 30.05,
+      "z": -11.85,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack -1",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 30.05,
+      "z": -10.15,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.22,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack -1",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": 24.95,
+      "z": -10.15,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack 1",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 27.5,
+      "z": 11,
+      "startFeetY": 5.25,
+      "endFeetY": 5.22,
+      "minFeetY": 5.22,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack 1",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": 24.95,
+      "z": 11,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack 1",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 30.05,
+      "z": 11,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack 1",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 27.5,
+      "z": 10.15,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack 1",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 27.5,
+      "z": 11.85,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.22,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack 1",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": 24.95,
+      "z": 10.15,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack 1",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 30.05,
+      "z": 10.15,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack 1",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 30.05,
+      "z": 11.85,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.22,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container stack 1",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": 24.95,
+      "z": 11.85,
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.23,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 22,
+      "z": -16.7,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.53,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": 16.75,
+      "z": -16.7,
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 27.25,
+      "z": -16.7,
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 22,
+      "z": -19.05,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.53,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 22,
+      "z": -14.35,
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": 16.75,
+      "z": -19.05,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.53,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 27.25,
+      "z": -19.05,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.53,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 27.25,
+      "z": -14.35,
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": 16.75,
+      "z": -14.35,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.53,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 22,
+      "z": 16.7,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.53,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": 16.75,
+      "z": 16.7,
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 27.25,
+      "z": 16.7,
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 22,
+      "z": 14.35,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.53,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 22,
+      "z": 19.05,
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": 16.75,
+      "z": 14.35,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.52,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 27.25,
+      "z": 14.35,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.53,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 27.25,
+      "z": 19.05,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.53,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": 16.75,
+      "z": 19.05,
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.53,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 firing line roof",
+      "point": "centre",
+      "stance": "crouch",
+      "x": -13.8,
+      "z": 0,
+      "startFeetY": 3.51,
+      "endFeetY": 3.49,
+      "minFeetY": 3.49,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 firing line roof",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": -16.55,
+      "z": 0,
+      "startFeetY": 3.51,
+      "endFeetY": 3.48,
+      "minFeetY": 3.48,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 firing line roof",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": -11.05,
+      "z": 0,
+      "startFeetY": 3.51,
+      "endFeetY": 3.48,
+      "minFeetY": 3.48,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 firing line roof",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": -13.8,
+      "z": -16.55,
+      "startFeetY": 3.51,
+      "endFeetY": 3.48,
+      "minFeetY": 3.48,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 firing line roof",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": -13.8,
+      "z": 16.55,
+      "startFeetY": 3.51,
+      "endFeetY": 3.49,
+      "minFeetY": 3.48,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 firing line roof",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": -16.55,
+      "z": -16.55,
+      "startFeetY": 3.51,
+      "endFeetY": 3.49,
+      "minFeetY": 3.49,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 firing line roof",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": -11.05,
+      "z": -16.55,
+      "startFeetY": 3.51,
+      "endFeetY": 3.48,
+      "minFeetY": 3.48,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 firing line roof",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": -11.05,
+      "z": 16.55,
+      "startFeetY": 3.51,
+      "endFeetY": 3.49,
+      "minFeetY": 3.48,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 firing line roof",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": -16.55,
+      "z": 16.55,
+      "startFeetY": 3.51,
+      "endFeetY": 3.48,
+      "minFeetY": 3.48,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 0,
+      "z": -20,
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": -4.85,
+      "z": -20,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.33,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 4.85,
+      "z": -20,
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 0,
+      "z": -21.95,
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 0,
+      "z": -18.05,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.32,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": -4.85,
+      "z": -21.95,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.32,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 4.85,
+      "z": -21.95,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.33,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 4.85,
+      "z": -18.05,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.33,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": -4.85,
+      "z": -18.05,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.33,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 0,
+      "z": 20,
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": -4.85,
+      "z": 20,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.33,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 4.85,
+      "z": 20,
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 0,
+      "z": 18.05,
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 0,
+      "z": 21.95,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.32,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": -4.85,
+      "z": 18.05,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.32,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 4.85,
+      "z": 18.05,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.33,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 4.85,
+      "z": 21.95,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.33,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": -4.85,
+      "z": 21.95,
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.33,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 21,
+      "z": -8,
+      "startFeetY": 3.03,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 3,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": 16.95,
+      "z": -8,
+      "startFeetY": 2.89,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.26,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 25.05,
+      "z": -8,
+      "startFeetY": 3.17,
+      "endFeetY": 0.03,
+      "minFeetY": 0.03,
+      "dropM": 3.15,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 21,
+      "z": -10.75,
+      "startFeetY": 3.03,
+      "endFeetY": 0.03,
+      "minFeetY": 0.03,
+      "dropM": 3,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 21,
+      "z": -5.25,
+      "startFeetY": 3.03,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 3,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": 16.95,
+      "z": -10.75,
+      "startFeetY": 2.89,
+      "endFeetY": 0.03,
+      "minFeetY": 0.03,
+      "dropM": 2.86,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 25.05,
+      "z": -10.75,
+      "startFeetY": 3.17,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.55,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 25.05,
+      "z": -5.25,
+      "startFeetY": 3.17,
+      "endFeetY": 0.03,
+      "minFeetY": 0.03,
+      "dropM": 3.15,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": 16.95,
+      "z": -5.25,
+      "startFeetY": 2.89,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 2.86,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 21,
+      "z": 8,
+      "startFeetY": 3.03,
+      "endFeetY": 0.03,
+      "minFeetY": 0.03,
+      "dropM": 3,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": 16.95,
+      "z": 8,
+      "startFeetY": 2.89,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.26,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 25.05,
+      "z": 8,
+      "startFeetY": 3.17,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 3.15,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 21,
+      "z": 5.25,
+      "startFeetY": 3.03,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 3,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 21,
+      "z": 10.75,
+      "startFeetY": 3.03,
+      "endFeetY": 0.03,
+      "minFeetY": 0.03,
+      "dropM": 3,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": 16.95,
+      "z": 5.25,
+      "startFeetY": 2.89,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 2.86,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 25.05,
+      "z": 5.25,
+      "startFeetY": 3.17,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 3.15,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 25.05,
+      "z": 10.75,
+      "startFeetY": 3.17,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.55,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": 16.95,
+      "z": 10.75,
+      "startFeetY": 2.89,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "dropM": 2.86,
+      "grounded": true,
+      "fellThrough": true
+    },
+    {
+      "surface": "test1 tower deck",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 0,
+      "z": 0,
+      "startFeetY": 2.95,
+      "endFeetY": 2.92,
+      "minFeetY": 2.92,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower deck",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": -4.15,
+      "z": 0,
+      "startFeetY": 2.95,
+      "endFeetY": 2.92,
+      "minFeetY": 2.92,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower deck",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 4.15,
+      "z": 0,
+      "startFeetY": 2.95,
+      "endFeetY": 2.92,
+      "minFeetY": 2.92,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower deck",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 0,
+      "z": -4.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.92,
+      "minFeetY": 2.92,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower deck",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 0,
+      "z": 4.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.92,
+      "minFeetY": 2.92,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower deck",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": -4.15,
+      "z": -4.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower deck",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 4.15,
+      "z": -4.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.92,
+      "minFeetY": 2.92,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower deck",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 4.15,
+      "z": 4.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.93,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower deck",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": -4.15,
+      "z": 4.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.92,
+      "minFeetY": 2.92,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 0,
+      "z": -5.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.93,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": -0.45,
+      "z": -5.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 0.45,
+      "z": -5.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 0,
+      "z": -5.25,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 0,
+      "z": -5.05,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": -0.45,
+      "z": -5.25,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 0.45,
+      "z": -5.25,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.93,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 0.45,
+      "z": -5.05,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": -0.45,
+      "z": -5.05,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.93,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 0,
+      "z": 5.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.93,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": -0.45,
+      "z": 5.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 0.45,
+      "z": 5.15,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 0,
+      "z": 5.05,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 0,
+      "z": 5.25,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": -0.45,
+      "z": 5.05,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 0.45,
+      "z": 5.05,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.93,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 0.45,
+      "z": 5.25,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": -0.45,
+      "z": 5.25,
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.93,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "point": "centre",
+      "stance": "crouch",
+      "x": -7.2,
+      "z": 0,
+      "startFeetY": 2.69,
+      "endFeetY": 2.66,
+      "minFeetY": 2.66,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": -9.9,
+      "z": 0,
+      "startFeetY": 2.69,
+      "endFeetY": 2.66,
+      "minFeetY": 2.66,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": -4.5,
+      "z": 0,
+      "startFeetY": 2.69,
+      "endFeetY": 2.71,
+      "minFeetY": 2.69,
+      "dropM": -0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": -7.2,
+      "z": -3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.66,
+      "minFeetY": 2.66,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": -7.2,
+      "z": 3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.66,
+      "minFeetY": 2.66,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": -9.9,
+      "z": -3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.67,
+      "minFeetY": 2.66,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": -4.5,
+      "z": -3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.71,
+      "minFeetY": 2.69,
+      "dropM": -0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": -4.5,
+      "z": 3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.71,
+      "minFeetY": 2.69,
+      "dropM": -0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": -9.9,
+      "z": 3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.67,
+      "minFeetY": 2.66,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 7.2,
+      "z": 0,
+      "startFeetY": 2.69,
+      "endFeetY": 2.66,
+      "minFeetY": 2.66,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": 4.5,
+      "z": 0,
+      "startFeetY": 2.69,
+      "endFeetY": 2.71,
+      "minFeetY": 2.69,
+      "dropM": -0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 9.9,
+      "z": 0,
+      "startFeetY": 2.69,
+      "endFeetY": 2.66,
+      "minFeetY": 2.66,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 7.2,
+      "z": -3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.66,
+      "minFeetY": 2.66,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 7.2,
+      "z": 3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.66,
+      "minFeetY": 2.66,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": 4.5,
+      "z": -3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.71,
+      "minFeetY": 2.69,
+      "dropM": -0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 9.9,
+      "z": -3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.67,
+      "minFeetY": 2.66,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 9.9,
+      "z": 3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.67,
+      "minFeetY": 2.67,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": 4.5,
+      "z": 3.3,
+      "startFeetY": 2.69,
+      "endFeetY": 2.71,
+      "minFeetY": 2.69,
+      "dropM": -0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 backstop berm",
+      "point": "centre",
+      "stance": "crouch",
+      "x": -29.75,
+      "z": 0,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 backstop berm",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": -31.55,
+      "z": 0,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 backstop berm",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": -27.95,
+      "z": 0,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 backstop berm",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": -29.75,
+      "z": -21.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 backstop berm",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": -29.75,
+      "z": 21.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 backstop berm",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": -31.55,
+      "z": -21.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 backstop berm",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": -27.95,
+      "z": -21.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 backstop berm",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": -27.95,
+      "z": 21.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 backstop berm",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": -31.55,
+      "z": 21.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a -1",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 15,
+      "z": -7.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a -1",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": 12.45,
+      "z": -7.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a -1",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 17.55,
+      "z": -7.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a -1",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 15,
+      "z": -8.35,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a -1",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 15,
+      "z": -6.65,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a -1",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": 12.45,
+      "z": -8.35,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a -1",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 17.55,
+      "z": -8.35,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a -1",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 17.55,
+      "z": -6.65,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a -1",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": 12.45,
+      "z": -6.65,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a 1",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 15,
+      "z": 7.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a 1",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": 12.45,
+      "z": 7.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a 1",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 17.55,
+      "z": 7.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a 1",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 15,
+      "z": 6.65,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a 1",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 15,
+      "z": 8.35,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a 1",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": 12.45,
+      "z": 6.65,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a 1",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 17.55,
+      "z": 6.65,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a 1",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 17.55,
+      "z": 8.35,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container a 1",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": 12.45,
+      "z": 8.35,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b -1",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 22,
+      "z": -3,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b -1",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": 19.5,
+      "z": -3.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b -1",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 24.5,
+      "z": -2.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b -1",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 22.17,
+      "z": -3.83,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b -1",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 21.83,
+      "z": -2.17,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b -1",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": 19.66,
+      "z": -4.33,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b -1",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 24.67,
+      "z": -3.34,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b -1",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 24.34,
+      "z": -1.67,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b -1",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": 19.33,
+      "z": -2.66,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b 1",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 22,
+      "z": 3,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b 1",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": 19.5,
+      "z": 3.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b 1",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 24.5,
+      "z": 2.5,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b 1",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 21.83,
+      "z": 2.17,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b 1",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 22.17,
+      "z": 3.83,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b 1",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": 19.33,
+      "z": 2.66,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b 1",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 24.34,
+      "z": 1.67,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b 1",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 24.67,
+      "z": 3.34,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container b 1",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": 19.66,
+      "z": 4.33,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d -1",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 13,
+      "z": -15,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d -1",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": 10.49,
+      "z": -14.56,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d -1",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 15.51,
+      "z": -15.44,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d -1",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 12.85,
+      "z": -15.84,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d -1",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 13.15,
+      "z": -14.16,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d -1",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": 10.34,
+      "z": -15.39,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d -1",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 15.36,
+      "z": -16.28,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d -1",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 15.66,
+      "z": -14.61,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d -1",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": 10.64,
+      "z": -13.72,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d 1",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 13,
+      "z": 15,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d 1",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": 10.49,
+      "z": 14.56,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d 1",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 15.51,
+      "z": 15.44,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d 1",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 13.15,
+      "z": 14.16,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d 1",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 12.85,
+      "z": 15.84,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d 1",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": 10.64,
+      "z": 13.72,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d 1",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 15.66,
+      "z": 14.61,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d 1",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 15.36,
+      "z": 16.28,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container d 1",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": 10.34,
+      "z": 15.39,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container e",
+      "point": "centre",
+      "stance": "crouch",
+      "x": 28.5,
+      "z": 0,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container e",
+      "point": "edge-u0",
+      "stance": "crouch",
+      "x": 28.5,
+      "z": 2.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container e",
+      "point": "edge-u1",
+      "stance": "crouch",
+      "x": 28.5,
+      "z": -2.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container e",
+      "point": "edge-v0",
+      "stance": "crouch",
+      "x": 27.65,
+      "z": 0,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container e",
+      "point": "edge-v1",
+      "stance": "crouch",
+      "x": 29.35,
+      "z": 0,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container e",
+      "point": "corner-00",
+      "stance": "crouch",
+      "x": 27.65,
+      "z": 2.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container e",
+      "point": "corner-10",
+      "stance": "crouch",
+      "x": 27.65,
+      "z": -2.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "dropM": 0.03,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container e",
+      "point": "corner-11",
+      "stance": "crouch",
+      "x": 29.35,
+      "z": -2.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    },
+    {
+      "surface": "test1 container e",
+      "point": "corner-01",
+      "stance": "crouch",
+      "x": 29.35,
+      "z": 2.55,
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.63,
+      "dropM": 0.02,
+      "grounded": true,
+      "fellThrough": false
+    }
+  ],
+  "walks": [
+    {
+      "surface": "test1 container stack -1",
+      "stance": "stand",
+      "from": [
+        24.95,
+        -11
+      ],
+      "to": [
+        30.05,
+        -11
+      ],
+      "startFeetY": 5.25,
+      "endFeetY": 5.22,
+      "minFeetY": 5.22,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container stack -1",
+      "stance": "stand",
+      "from": [
+        27.5,
+        -11.85
+      ],
+      "to": [
+        27.5,
+        -10.15
+      ],
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.22,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container stack 1",
+      "stance": "stand",
+      "from": [
+        24.95,
+        11
+      ],
+      "to": [
+        30.05,
+        11
+      ],
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.22,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container stack 1",
+      "stance": "stand",
+      "from": [
+        27.5,
+        10.15
+      ],
+      "to": [
+        27.5,
+        11.85
+      ],
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.22,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "stance": "stand",
+      "from": [
+        16.75,
+        -16.7
+      ],
+      "to": [
+        27.25,
+        -16.7
+      ],
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 2.35
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "stance": "stand",
+      "from": [
+        22,
+        -19.05
+      ],
+      "to": [
+        22,
+        -14.35
+      ],
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.52,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "stance": "stand",
+      "from": [
+        16.75,
+        16.7
+      ],
+      "to": [
+        27.25,
+        16.7
+      ],
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 2.38
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "stance": "stand",
+      "from": [
+        22,
+        14.35
+      ],
+      "to": [
+        22,
+        19.05
+      ],
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 firing line roof",
+      "stance": "stand",
+      "from": [
+        -16.55,
+        0
+      ],
+      "to": [
+        -11.05,
+        0
+      ],
+      "startFeetY": 3.51,
+      "endFeetY": 3.48,
+      "minFeetY": 3.48,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 firing line roof",
+      "stance": "stand",
+      "from": [
+        -13.8,
+        -16.55
+      ],
+      "to": [
+        -13.8,
+        16.55
+      ],
+      "startFeetY": 3.51,
+      "endFeetY": 3.49,
+      "minFeetY": 3.48,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 24.94
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "stance": "stand",
+      "from": [
+        -4.85,
+        -20
+      ],
+      "to": [
+        4.85,
+        -20
+      ],
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 1.54
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "stance": "stand",
+      "from": [
+        0,
+        -21.95
+      ],
+      "to": [
+        0,
+        -18.05
+      ],
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.32,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "stance": "stand",
+      "from": [
+        -4.85,
+        20
+      ],
+      "to": [
+        4.85,
+        20
+      ],
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 1.57
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "stance": "stand",
+      "from": [
+        0,
+        18.05
+      ],
+      "to": [
+        0,
+        21.95
+      ],
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.32,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "stance": "stand",
+      "from": [
+        16.95,
+        -8
+      ],
+      "to": [
+        25.05,
+        -8
+      ],
+      "startFeetY": 2.89,
+      "endFeetY": 0.02,
+      "minFeetY": 0.02,
+      "maxDropM": 2.86,
+      "fellThrough": true,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "stance": "stand",
+      "from": [
+        21,
+        -10.75
+      ],
+      "to": [
+        21,
+        -5.25
+      ],
+      "startFeetY": 3.03,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "maxDropM": 3.01,
+      "fellThrough": true,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "stance": "stand",
+      "from": [
+        16.95,
+        8
+      ],
+      "to": [
+        25.05,
+        8
+      ],
+      "startFeetY": 2.89,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "maxDropM": 2.86,
+      "fellThrough": true,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "stance": "stand",
+      "from": [
+        21,
+        5.25
+      ],
+      "to": [
+        21,
+        10.75
+      ],
+      "startFeetY": 3.03,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "maxDropM": 3.01,
+      "fellThrough": true,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 tower deck",
+      "stance": "stand",
+      "from": [
+        -4.15,
+        0
+      ],
+      "to": [
+        4.15,
+        0
+      ],
+      "startFeetY": 2.95,
+      "endFeetY": 2.92,
+      "minFeetY": 2.92,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0.14
+    },
+    {
+      "surface": "test1 tower deck",
+      "stance": "stand",
+      "from": [
+        0,
+        -4.15
+      ],
+      "to": [
+        0,
+        4.15
+      ],
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0.14
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "stance": "stand",
+      "from": [
+        -0.45,
+        -5.15
+      ],
+      "to": [
+        0.45,
+        -5.15
+      ],
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "stance": "stand",
+      "from": [
+        0,
+        -5.25
+      ],
+      "to": [
+        0,
+        -5.05
+      ],
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "stance": "stand",
+      "from": [
+        -0.45,
+        5.15
+      ],
+      "to": [
+        0.45,
+        5.15
+      ],
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "stance": "stand",
+      "from": [
+        0,
+        5.05
+      ],
+      "to": [
+        0,
+        5.25
+      ],
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "stance": "stand",
+      "from": [
+        -9.9,
+        0
+      ],
+      "to": [
+        -4.5,
+        0
+      ],
+      "startFeetY": 2.69,
+      "endFeetY": 2.92,
+      "minFeetY": 2.66,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "stance": "stand",
+      "from": [
+        -7.2,
+        -3.3
+      ],
+      "to": [
+        -7.2,
+        3.3
+      ],
+      "startFeetY": 2.69,
+      "endFeetY": 2.66,
+      "minFeetY": 2.66,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "stance": "stand",
+      "from": [
+        4.5,
+        0
+      ],
+      "to": [
+        9.9,
+        0
+      ],
+      "startFeetY": 2.69,
+      "endFeetY": 2.66,
+      "minFeetY": 2.66,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "stance": "stand",
+      "from": [
+        7.2,
+        -3.3
+      ],
+      "to": [
+        7.2,
+        3.3
+      ],
+      "startFeetY": 2.69,
+      "endFeetY": 2.66,
+      "minFeetY": 2.66,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 backstop berm",
+      "stance": "stand",
+      "from": [
+        -31.55,
+        0
+      ],
+      "to": [
+        -27.95,
+        0
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 backstop berm",
+      "stance": "stand",
+      "from": [
+        -29.75,
+        -21.55
+      ],
+      "to": [
+        -29.75,
+        21.55
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 34.97
+    },
+    {
+      "surface": "test1 container a -1",
+      "stance": "stand",
+      "from": [
+        12.45,
+        -7.5
+      ],
+      "to": [
+        17.55,
+        -7.5
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container a -1",
+      "stance": "stand",
+      "from": [
+        15,
+        -8.35
+      ],
+      "to": [
+        15,
+        -6.65
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container a 1",
+      "stance": "stand",
+      "from": [
+        12.45,
+        7.5
+      ],
+      "to": [
+        17.55,
+        7.5
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container a 1",
+      "stance": "stand",
+      "from": [
+        15,
+        6.65
+      ],
+      "to": [
+        15,
+        8.35
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container b -1",
+      "stance": "stand",
+      "from": [
+        19.5,
+        -3.5
+      ],
+      "to": [
+        24.5,
+        -2.5
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container b -1",
+      "stance": "stand",
+      "from": [
+        22.17,
+        -3.83
+      ],
+      "to": [
+        21.83,
+        -2.17
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container b 1",
+      "stance": "stand",
+      "from": [
+        19.5,
+        3.5
+      ],
+      "to": [
+        24.5,
+        2.5
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container b 1",
+      "stance": "stand",
+      "from": [
+        21.83,
+        2.17
+      ],
+      "to": [
+        22.17,
+        3.83
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container d -1",
+      "stance": "stand",
+      "from": [
+        10.49,
+        -14.56
+      ],
+      "to": [
+        15.51,
+        -15.44
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container d -1",
+      "stance": "stand",
+      "from": [
+        12.85,
+        -15.84
+      ],
+      "to": [
+        13.15,
+        -14.16
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container d 1",
+      "stance": "stand",
+      "from": [
+        10.49,
+        14.56
+      ],
+      "to": [
+        15.51,
+        15.44
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container d 1",
+      "stance": "stand",
+      "from": [
+        13.15,
+        14.16
+      ],
+      "to": [
+        12.85,
+        15.84
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container e",
+      "stance": "stand",
+      "from": [
+        28.5,
+        2.55
+      ],
+      "to": [
+        28.5,
+        -2.55
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container e",
+      "stance": "stand",
+      "from": [
+        27.65,
+        0
+      ],
+      "to": [
+        29.35,
+        0
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container stack -1",
+      "stance": "crouch",
+      "from": [
+        24.95,
+        -11
+      ],
+      "to": [
+        30.05,
+        -11
+      ],
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.22,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container stack -1",
+      "stance": "crouch",
+      "from": [
+        27.5,
+        -11.85
+      ],
+      "to": [
+        27.5,
+        -10.15
+      ],
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.22,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container stack 1",
+      "stance": "crouch",
+      "from": [
+        24.95,
+        11
+      ],
+      "to": [
+        30.05,
+        11
+      ],
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.22,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container stack 1",
+      "stance": "crouch",
+      "from": [
+        27.5,
+        10.15
+      ],
+      "to": [
+        27.5,
+        11.85
+      ],
+      "startFeetY": 5.25,
+      "endFeetY": 5.23,
+      "minFeetY": 5.22,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "stance": "crouch",
+      "from": [
+        16.75,
+        -16.7
+      ],
+      "to": [
+        27.25,
+        -16.7
+      ],
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 2.34
+    },
+    {
+      "surface": "test1 stores roof -1",
+      "stance": "crouch",
+      "from": [
+        22,
+        -19.05
+      ],
+      "to": [
+        22,
+        -14.35
+      ],
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "stance": "crouch",
+      "from": [
+        16.75,
+        16.7
+      ],
+      "to": [
+        27.25,
+        16.7
+      ],
+      "startFeetY": 3.55,
+      "endFeetY": 3.53,
+      "minFeetY": 3.52,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 2.4
+    },
+    {
+      "surface": "test1 stores roof 1",
+      "stance": "crouch",
+      "from": [
+        22,
+        14.35
+      ],
+      "to": [
+        22,
+        19.05
+      ],
+      "startFeetY": 3.55,
+      "endFeetY": 3.52,
+      "minFeetY": 3.52,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 firing line roof",
+      "stance": "crouch",
+      "from": [
+        -16.55,
+        0
+      ],
+      "to": [
+        -11.05,
+        0
+      ],
+      "startFeetY": 3.51,
+      "endFeetY": 3.48,
+      "minFeetY": 3.48,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 firing line roof",
+      "stance": "crouch",
+      "from": [
+        -13.8,
+        -16.55
+      ],
+      "to": [
+        -13.8,
+        16.55
+      ],
+      "startFeetY": 3.51,
+      "endFeetY": 3.48,
+      "minFeetY": 3.48,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 24.97
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "stance": "crouch",
+      "from": [
+        -4.85,
+        -20
+      ],
+      "to": [
+        4.85,
+        -20
+      ],
+      "startFeetY": 3.35,
+      "endFeetY": 3.33,
+      "minFeetY": 3.32,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 1.57
+    },
+    {
+      "surface": "test1 spawn shed roof -1",
+      "stance": "crouch",
+      "from": [
+        0,
+        -21.95
+      ],
+      "to": [
+        0,
+        -18.05
+      ],
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "stance": "crouch",
+      "from": [
+        -4.85,
+        20
+      ],
+      "to": [
+        4.85,
+        20
+      ],
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 1.54
+    },
+    {
+      "surface": "test1 spawn shed roof 1",
+      "stance": "crouch",
+      "from": [
+        0,
+        18.05
+      ],
+      "to": [
+        0,
+        21.95
+      ],
+      "startFeetY": 3.35,
+      "endFeetY": 3.32,
+      "minFeetY": 3.32,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "stance": "crouch",
+      "from": [
+        16.95,
+        -8
+      ],
+      "to": [
+        25.05,
+        -8
+      ],
+      "startFeetY": 2.89,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "maxDropM": 2.86,
+      "fellThrough": true,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "stance": "crouch",
+      "from": [
+        21,
+        -10.75
+      ],
+      "to": [
+        21,
+        -5.25
+      ],
+      "startFeetY": 3.03,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "maxDropM": 3.01,
+      "fellThrough": true,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "stance": "crouch",
+      "from": [
+        16.95,
+        8
+      ],
+      "to": [
+        25.05,
+        8
+      ],
+      "startFeetY": 2.89,
+      "endFeetY": 0.02,
+      "minFeetY": 0.02,
+      "maxDropM": 2.86,
+      "fellThrough": true,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1-camo-net-tarp",
+      "stance": "crouch",
+      "from": [
+        21,
+        5.25
+      ],
+      "to": [
+        21,
+        10.75
+      ],
+      "startFeetY": 3.03,
+      "endFeetY": 0.03,
+      "minFeetY": 0.02,
+      "maxDropM": 3.01,
+      "fellThrough": true,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 tower deck",
+      "stance": "crouch",
+      "from": [
+        -4.15,
+        0
+      ],
+      "to": [
+        4.15,
+        0
+      ],
+      "startFeetY": 2.95,
+      "endFeetY": 2.92,
+      "minFeetY": 2.92,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0.14
+    },
+    {
+      "surface": "test1 tower deck",
+      "stance": "crouch",
+      "from": [
+        0,
+        -4.15
+      ],
+      "to": [
+        0,
+        4.15
+      ],
+      "startFeetY": 2.95,
+      "endFeetY": 2.92,
+      "minFeetY": 2.92,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0.14
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "stance": "crouch",
+      "from": [
+        -0.45,
+        -5.15
+      ],
+      "to": [
+        0.45,
+        -5.15
+      ],
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 tower stair -1 3",
+      "stance": "crouch",
+      "from": [
+        0,
+        -5.25
+      ],
+      "to": [
+        0,
+        -5.05
+      ],
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "stance": "crouch",
+      "from": [
+        -0.45,
+        5.15
+      ],
+      "to": [
+        0.45,
+        5.15
+      ],
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 tower stair 1 3",
+      "stance": "crouch",
+      "from": [
+        0,
+        5.05
+      ],
+      "to": [
+        0,
+        5.25
+      ],
+      "startFeetY": 2.95,
+      "endFeetY": 2.93,
+      "minFeetY": 2.92,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "stance": "crouch",
+      "from": [
+        -9.9,
+        0
+      ],
+      "to": [
+        -4.5,
+        0
+      ],
+      "startFeetY": 2.69,
+      "endFeetY": 2.92,
+      "minFeetY": 2.66,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 annex roof -1",
+      "stance": "crouch",
+      "from": [
+        -7.2,
+        -3.3
+      ],
+      "to": [
+        -7.2,
+        3.3
+      ],
+      "startFeetY": 2.69,
+      "endFeetY": 2.67,
+      "minFeetY": 2.66,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "stance": "crouch",
+      "from": [
+        4.5,
+        0
+      ],
+      "to": [
+        9.9,
+        0
+      ],
+      "startFeetY": 2.69,
+      "endFeetY": 2.66,
+      "minFeetY": 2.66,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 annex roof 1",
+      "stance": "crouch",
+      "from": [
+        7.2,
+        -3.3
+      ],
+      "to": [
+        7.2,
+        3.3
+      ],
+      "startFeetY": 2.69,
+      "endFeetY": 2.67,
+      "minFeetY": 2.66,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 backstop berm",
+      "stance": "crouch",
+      "from": [
+        -31.55,
+        0
+      ],
+      "to": [
+        -27.95,
+        0
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 backstop berm",
+      "stance": "crouch",
+      "from": [
+        -29.75,
+        -21.55
+      ],
+      "to": [
+        -29.75,
+        21.55
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 34.94
+    },
+    {
+      "surface": "test1 container a -1",
+      "stance": "crouch",
+      "from": [
+        12.45,
+        -7.5
+      ],
+      "to": [
+        17.55,
+        -7.5
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container a -1",
+      "stance": "crouch",
+      "from": [
+        15,
+        -8.35
+      ],
+      "to": [
+        15,
+        -6.65
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container a 1",
+      "stance": "crouch",
+      "from": [
+        12.45,
+        7.5
+      ],
+      "to": [
+        17.55,
+        7.5
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container a 1",
+      "stance": "crouch",
+      "from": [
+        15,
+        6.65
+      ],
+      "to": [
+        15,
+        8.35
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container b -1",
+      "stance": "crouch",
+      "from": [
+        19.5,
+        -3.5
+      ],
+      "to": [
+        24.5,
+        -2.5
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container b -1",
+      "stance": "crouch",
+      "from": [
+        22.17,
+        -3.83
+      ],
+      "to": [
+        21.83,
+        -2.17
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container b 1",
+      "stance": "crouch",
+      "from": [
+        19.5,
+        3.5
+      ],
+      "to": [
+        24.5,
+        2.5
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.62,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container b 1",
+      "stance": "crouch",
+      "from": [
+        21.83,
+        2.17
+      ],
+      "to": [
+        22.17,
+        3.83
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container d -1",
+      "stance": "crouch",
+      "from": [
+        10.49,
+        -14.56
+      ],
+      "to": [
+        15.51,
+        -15.44
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container d -1",
+      "stance": "crouch",
+      "from": [
+        12.85,
+        -15.84
+      ],
+      "to": [
+        13.15,
+        -14.16
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container d 1",
+      "stance": "crouch",
+      "from": [
+        10.49,
+        14.56
+      ],
+      "to": [
+        15.51,
+        15.44
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container d 1",
+      "stance": "crouch",
+      "from": [
+        13.15,
+        14.16
+      ],
+      "to": [
+        12.85,
+        15.84
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container e",
+      "stance": "crouch",
+      "from": [
+        28.5,
+        2.55
+      ],
+      "to": [
+        28.5,
+        -2.55
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    },
+    {
+      "surface": "test1 container e",
+      "stance": "crouch",
+      "from": [
+        27.65,
+        0
+      ],
+      "to": [
+        29.35,
+        0
+      ],
+      "startFeetY": 2.65,
+      "endFeetY": 2.63,
+      "minFeetY": 2.62,
+      "maxDropM": 0.03,
+      "fellThrough": false,
+      "remainingM": 0
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import type { HitMessage, WeaponId } from './protocol';
 import type { Pass65KillstreakId } from './killstreak-catalog';
 
+export type EliminationSource = 'weapon' | 'ordnance' | 'killstreak';
 export type KillCause =
   | Readonly<{ kind: 'gun'; weapon: WeaponId }>
   | Readonly<{ kind: 'grenade' }>
@@ -28,6 +29,18 @@ export function killAttributionId(ownerId: string, cause: KillCause): string {
   return cause.kind === 'environment' ? MAP_CARPET_BOMBER_KILLER_ID : ownerId;
 }
 
+/**
+ * HF-379: frag and semtex kills advance the killstreak counter exactly like gun
+ * kills. Melee, environment and killstreak-chain kills stay ineligible, so a
+ * streak can never feed itself.
+ */
 export function isKillstreakEligible(cause: KillCause): boolean {
-  return cause.kind === 'gun';
+  return cause.kind === 'gun' || cause.kind === 'grenade';
+}
+
+/** Runtime elimination source for `HostKillstreakRuntime.recordEligibleElimination`. */
+export function killstreakEliminationSource(cause: KillCause): EliminationSource {
+  if (cause.kind === 'grenade') return 'ordnance';
+  if (cause.kind === 'killstreak') return 'killstreak';
+  return 'weapon';
 }

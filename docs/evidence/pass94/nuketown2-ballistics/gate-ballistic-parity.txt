@@ -1,0 +1,8 @@
+
+=== nuketown2: census 205 | direct 198 | footprint 6 | targets 0 | excluded 1 | accepted 0 | UNRATED 0 (ceiling 0) | completion 100%
+  surfaces: {"total":274,"byMaterial":{"earth":78,"concrete":21,"interior-wall":82,"wood":36,"glass":11,"structural-metal":16,"thin-metal":6,"fence":6,"vehicle":18},"byClassification":{"rule":203,"explicit":71}}
+
+=== gun-range: census 97 | direct 39 | footprint 6 | targets 21 | excluded 30 | accepted 1 | UNRATED 0 (ceiling 0) | completion 100%
+  surfaces: {"total":45,"byMaterial":{"concrete":4,"interior-wall":7,"structural-metal":23,"glass":2,"wood":7,"thin-metal":1,"brick":1},"byClassification":{"explicit":27,"rule":18}}
+
+Ledgers written to C:\Users\david\projects\aa-claude-i1\docs\ballistic-parity

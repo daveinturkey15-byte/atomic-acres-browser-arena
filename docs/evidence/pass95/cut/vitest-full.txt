@@ -1,0 +1,1015 @@
+[lock] acquired 10:26:57
+
+ RUN  v4.1.9 C:/Users/david/projects/aa-claude-release84
+
+ ✓ src/presentation-prewarm-contract.test.ts (23 tests) 122ms
+ ✓ src/killstreak-main-integration.test.ts (26 tests) 40ms
+ ✓ src/killstreak-runtime.test.ts (48 tests) 155ms
+ ✓ src/rendering/filmic-grade-chain.test.ts (37 tests) 372ms
+ ✓ src/killstreak-presentation.test.ts (37 tests) 583ms
+ ✓ src/loadout-preset-schema.test.ts (79 tests) 586ms
+     ✓ is idempotent, bounded, and always produces parser-safe text  509ms
+ ✓ src/ui/pass77-visual-language.test.ts (55 tests) 67ms
+ ✓ src/operator-model.test.ts (22 tests) 153ms
+ ✓ src/release-pipeline.test.ts (20 tests) 17ms
+ ✓ src/rigged-evidence-occlusion.test.ts (45 tests) 263ms
+ ✓ src/protocol.test.ts (28 tests) 40ms
+ ✓ src/network-lifecycle.test.ts (47 tests) 28ms
+ ✓ src/host-authority-mirror.test.ts (80 tests) 81ms
+ ✓ src/high-seas.test.ts (23 tests) 4943ms
+     ✓ freezes the arena identity, bounds, elevations, yacht zones, and shared-water boundary  456ms
+     ✓ walks the complete engine shortcut in both directions with Rapier-backed collision  525ms
+     ✓ seals both engine corridor ends with solid bulkheads flush to the deck underside  557ms
+ ✓ src/host-succession-wire.test.ts (37 tests) 74ms
+ ✓ src/flare-projectile-system.test.ts (24 tests) 38ms
+stderr | src/pass65-weapon-runtime-behavior.test.ts > Pass 65 managed weapon runtime behavior > never commits stale or failed GPU prewarm generations
+Pass 65 authored weapon load failed for m4a1 Error: synthetic GPU prewarm failure
+    at C:/Users/david/projects/aa-claude-release84/src/pass65-weapon-runtime-behavior.test.ts:1043:31
+    at file:///C:/Users/david/projects/aa-claude-release84/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+ ✓ src/pass65-weapon-runtime-behavior.test.ts (30 tests) 578ms
+ ✓ src/release-topology.test.ts (22 tests) 22ms
+ ✓ src/pass69-3-rigged-bot-live-runner.test.ts (6 tests) 3501ms
+     ✓ executes adversarial zero-weight, elbow, grip, full-body and fixed-hand mutations  3481ms
+ ✓ src/pass70-chopper-gunner-contract.test.ts (17 tests) 42ms
+ ✓ src/host-migration.test.ts (57 tests) 17ms
+ ✓ src/weather/rain-presentation.test.ts (53 tests) 1903ms
+     ✓ wraps every drop inside the camera-riding volume, however far the player walks  429ms
+ ✓ src/particles/index.test.ts (39 tests) 1058ms
+ ✓ src/ui/pass77-hud-sway.test.ts (30 tests) 49ms
+ ✓ src/thermal-ghost-presentation.test.ts (15 tests) 216ms
+ ✓ src/rendering/lighting-conditions.test.ts (46 tests) 868ms
+     ✓ stays inside the arena band for every seed, every clock and every choice  404ms
+stdout | src/nuketown-traversal.test.ts > Nuke Town traversal (HF-383) > measures corner-to-corner traversal through real colliders and the real controller
+[hf383] corner-to-corner waypoints=312 sprint=10.68s (91.9 m) walk=15.04s (91.8 m)
+
+ ✓ src/graphics-settings-registry.test.ts (14 tests) 212ms
+ ✓ src/additional-maps.test.ts (37 tests) 3131ms
+     ✓ uses four playable shipping-container clusters instead of an outer container wall  638ms
+     ✓ walks tower climbs, both undercroft tunnels, and the west trench bidirectionally  553ms
+     ✓ walks every Skyline route in both directions with Rapier-backed collision  436ms
+ ✓ src/combat/weapon-schema.test.ts (95 tests) 131ms
+ ✓ src/rendering/render-runtime.test.ts (49 tests) 115ms
+ ✓ src/railgun-authority.test.ts (17 tests) 15ms
+ ✓ src/host-match-checkpoint.test.ts (13 tests) 61ms
+ ✓ src/rendering/lighting/baked-indirect.test.ts (30 tests) 503ms
+ ✓ src/viewmodel-contact-applied-transform.test.ts (25 tests) 5005ms
+     ✓ carbine keeps its whole silhouette out of a wall 0.40 m from the eye  549ms
+     ✓ sniper keeps its whole silhouette out of a wall 0.40 m from the eye  441ms
+     ✓ lmg keeps its whole silhouette out of a wall 0.40 m from the eye  516ms
+     ✓ railgun keeps its whole silhouette out of a wall 0.40 m from the eye  337ms
+     ✓ the fit does the work, and the fold stays a live last resort  760ms
+     ✓ does not move the open-space pose at all - the fold is contact-only  320ms
+     ✓ leaves fire admission byte-identical while the fold is at full stretch  654ms
+     ✓ leaves a weapon on the screen when the surface is 0.40 m away  310ms
+ ✓ src/weather/weather-state.test.ts (39 tests) 4650ms
+     ✓ NEVER rains on the gun range - it is indoors  367ms
+     ✓ keeps every sample inside its bounds for every arena and seed  742ms
+     ✓ never shows MORE weather than the match rolled, at any setting  970ms
+     ✓ never exceeds the flash ceiling, at any rain rate or distance  700ms
+     ✓ exposes thunder timing an audio consumer can act on  329ms
+ ✓ src/operator-skin-appearance.test.ts (33 tests) 263ms
+ ✓ src/destructible-world.test.ts (12 tests) 32ms
+ ✓ src/prone-transition.test.ts (39 tests) 36ms
+stderr | src/rendering/arena-visual-definition.test.ts > Pass 64 arena visual streaming transaction > leaves the exact prior gameplay transaction active when module loading fails
+[retry-load] arena module skyline-terminal attempt 1/3 failed; retrying Error: module unavailable
+    at Object.skyline-terminal (C:/Users/david/projects/aa-claude-release84/src/rendering/arena-visual-definition.test.ts:379:47)
+    at C:/Users/david/projects/aa-claude-release84/src/rendering/arena-visual-stream.ts:56:84
+    at retryLoad (C:/Users/david/projects/aa-claude-release84/src/retry-load.ts:20:20)
+    at loadArenaVisualModule (C:/Users/david/projects/aa-claude-release84/src/rendering/arena-visual-stream.ts:56:24)
+    at ArenaVisualStreamController.adoptGameplayRoot (C:/Users/david/projects/aa-claude-release84/src/rendering/arena-visual-stream.ts:251:28)
+    at C:/Users/david/projects/aa-claude-release84/src/rendering/arena-visual-definition.test.ts:384:25
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at file:///C:/Users/david/projects/aa-claude-release84/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+ ✓ src/map-selection.test.ts (17 tests) 14ms
+ ✓ src/audio-source-synthesis-runtime.test.ts (16 tests) 352ms
+ ✓ src/rendering/environment-kit.test.ts (23 tests) 624ms
+     ✓ honours self-spacing and inter-layer clearance (nothing interpenetrates)  322ms
+stderr | src/rendering/arena-visual-definition.test.ts > Pass 64 arena visual streaming transaction > leaves the exact prior gameplay transaction active when module loading fails
+[retry-load] arena module skyline-terminal attempt 2/3 failed; retrying Error: module unavailable
+    at Object.skyline-terminal (C:/Users/david/projects/aa-claude-release84/src/rendering/arena-visual-definition.test.ts:379:47)
+    at C:/Users/david/projects/aa-claude-release84/src/rendering/arena-visual-stream.ts:56:84
+    at retryLoad (C:/Users/david/projects/aa-claude-release84/src/retry-load.ts:20:20)
+    at loadArenaVisualModule (C:/Users/david/projects/aa-claude-release84/src/rendering/arena-visual-stream.ts:56:18)
+    at ArenaVisualStreamController.adoptGameplayRoot (C:/Users/david/projects/aa-claude-release84/src/rendering/arena-visual-stream.ts:251:22)
+    at C:/Users/david/projects/aa-claude-release84/src/rendering/arena-visual-definition.test.ts:384:5
+    at file:///C:/Users/david/projects/aa-claude-release84/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+ ✓ src/interactive-world-runtime.test.ts (13 tests) 147ms
+ ✓ src/gameplay.test.ts (38 tests) 37ms
+ ✓ src/carpet-ground-fire-multiplayer.test.ts (9 tests) 128ms
+ ✓ src/thin-metal-perforation.test.ts (18 tests) 892ms
+     ✓ dispose returns the nuketown2 presentation GPU inventory to baseline (F-06)  732ms
+ ✓ src/destructible-shed-presentation.test.ts (14 tests) 89ms
+ ✓ src/rendering/screen-space-post.test.ts (16 tests) 2859ms
+     ✓ builds every screen-space pass without a GPU and declares the matching MRT  1126ms
+ ✓ src/rendering/arena-visual-definition.test.ts (18 tests) 2429ms
+     ✓ defines exactly one dynamically imported contract for every stable arena ID  843ms
+     ✓ leaves the exact prior gameplay transaction active when module loading fails  1380ms
+ ✓ src/house-navigation.test.ts (20 tests) 1079ms
+ ✓ src/killstreak-protocol.test.ts (10 tests) 18ms
+ ✓ src/host-match-recovery-main-integration.test.ts (16 tests) 25ms
+ ✓ src/care-package-grant-once.test.ts (26 tests) 34ms
+ ✓ src/weapon-presentation-anatomy.test.ts (29 tests) 7908ms
+     ✓ returns to the resolution-stable dynamically centred sight picture in ADS  484ms
+     ✓ keeps every visible arm mesh opaque throughout ADS  415ms
+     ✓ folds the connected weapon-and-hands root away from contact for the complete catalog  900ms
+     ✓ keeps the shipped arm rig fixed-length, connected and reachable across the action catalog  1471ms
+     ✓ keeps the complete long-gun geometry camera-side of the calibrated wall and prone floor planes  875ms
+     ✓ preserves Carbine and Mini Uzi centre apertures during contact ADS  684ms
+     ✓ rotates the authored minigun barrel cluster before the first legal shot  307ms
+     ✓ is immune to the wall clock: settling across half a breath period drifts nothing  1977ms
+ ✓ src/systems/viewmodel-surface-clip.test.ts (31 tests) 35ms
+ ✓ src/additional-maps-rigged-dummy.test.ts (2 tests) 106ms
+ ✓ src/operator-skin-silhouette.test.ts (17 tests) 219ms
+ ✓ src/rendering/pass64-tsl-scene.test.ts (11 tests) 4533ms
+     ✓ builds node-material equivalents and proves the traversal contains no legacy shader material  2565ms
+     ✓ builds registry-driven ocean-tsl water with CPU/GPU parity metadata (HF-358)  354ms
+     ✓ tints the atmosphere particles per arena (rust haze is not farm haze)  307ms
+ ✓ src/pr-preview-provenance.test.ts (33 tests) 418ms
+ ✓ src/gun-range-carpet-bomber-collision.test.ts (7 tests) 206ms
+ ✓ src/browser-preparation-scheduler.test.ts (18 tests) 37ms
+ ✓ src/rendering/instanced-grass-field.test.ts (7 tests) 894ms
+     ✓ flattens only blades inside the radius and leaves every other matrix byte-exact  499ms
+ ✓ src/vehicle-forge/vehicle-forge.test.ts (18 tests) 952ms
+     ✓ never emits NaN, and carries position AND normal AND uv everywhere  390ms
+ ✓ src/legacy-main-size-ratchet.test.ts (5 tests) 32ms
+stdout | src/nuketown-traversal.test.ts > Nuke Town traversal (HF-383) > keeps BOTH team-corner diagonals routed through the live collider set
+[hf383] diagonal -29,-27->30,25.5: 312 cells (78.0 m)
+[hf383] diagonal 30,25.5->-29,-27: 312 cells (78.0 m)
+[hf383] diagonal 29,-27->-30,25.5: 245 cells (61.3 m)
+[hf383] diagonal -30,25.5->29,-27: 245 cells (61.3 m)
+
+ ✓ src/farcrysis-terrain-authority.test.ts (11 tests) 4602ms
+     ✓ keeps the physics ground within +/-0.15 m of the authority across the arena  1113ms
+     ✓ seats seeded instanced dressing on the authority surface  1730ms
+     ✓ seats every solid collider base within 0.5 m of the authority surface  909ms
+     ✓ publishes bot ground platforms and the catwalk route through verticalNavigation  709ms
+ ✓ src/hf504-multiplayer-audit-fixes.test.ts (31 tests) 15ms
+ ✓ src/rendering/sky-backdrop.test.ts (17 tests) 1198ms
+     ✓ keeps the new production panoramas detailed, continuous and non-mirrored after WebP delivery  1006ms
+ ✓ src/ui/hud-impact-response.test.ts (33 tests) 26ms
+ ✓ src/systems/viewmodel-contact-probe.test.ts (28 tests) 12ms
+ ✓ src/audio-combat-prewarm.test.ts (19 tests) 27ms
+ ✓ src/rigged-operator-animation-runtime.test.ts (19 tests) 68ms
+ ✓ src/arena-layout.test.ts (15 tests) 207ms
+ ✓ src/pass70-support-static-batch-geometry.test.ts (3 tests) 701ms
+     ✓ preserves exact decoded world bounds for Chopper, Care, Carpet, Crate and Palantir-marked Hunter assets  302ms
+     ✓ reduces every real Chopper LOD through the production batcher without losing rear-tail span  327ms
+ ✓ src/release-shell-chooser.test.ts (18 tests) 29ms
+ ✓ src/graphics-profile-contract.test.ts (14 tests) 45ms
+ ✓ src/ui/menu-preview-video.test.ts (9 tests) 24ms
+ ✓ src/pass65-settings.test.ts (22 tests) 16ms
+ ✓ src/killstreak-drone-deployment.test.ts (10 tests) 217ms
+ ✓ src/rendering/webgpu-adapter-diagnostics.test.ts (23 tests) 59ms
+ ✓ src/killstreak-awareness.test.ts (13 tests) 34ms
+stdout | src/nuketown-traversal.test.ts > Nuke Town traversal (HF-383) > measures a full perimeter lap through the real controller
+[hf383] perimeter lap sprint=26.65s (228.7 m)
+
+stdout | src/nuketown-traversal.test.ts > Nuke Town traversal (HF-383) > proves whether the mid-street vehicle roofs are mountable with live jump parameters
+[hf383] jump apex vs roofs: reached 0.87 m; van roof 2.3 m; bus roof 3 m
+
+stdout | src/nuketown-traversal.test.ts > Nuke Town traversal (HF-383) > keeps every gameplay collider 180-degree rotationally symmetric except reviewed lane identity
+[hf383] colliders=205 without a rotated partner:
+authored-house-0-dining-collider sig=2.8000x1.2400x1.4500 @(-22.00, -20.10)
+authored-house-0-chair-collider-0 sig=0.7200x1.2000x0.7200 @(-23.72, -20.10)
+authored-house-0-chair-collider-1 sig=0.7200x1.2000x0.7200 @(-20.28, -20.10)
+authored-house-0-chair-collider-2 sig=0.7200x1.2000x0.7200 @(-22.00, -21.15)
+authored-house-0-chair-collider-3 sig=0.7200x1.2000x0.7200 @(-22.00, -19.05)
+authored-house-0-sofa-collider sig=3.2500x1.7000x1.3000 @(-15.30, -14.70)
+authored-house-0-kitchen-collider sig=6.5000x2.3000x0.8500 @(-22.75, -22.65)
+authored-house-0-coffee-table-collider sig=1.9000x0.7200x0.9000 @(-15.60, -16.20)
+authored-house-0-media-collider sig=2.6000x2.2000x0.8200 @(-15.30, -20.50)
+authored-house-0-upper-bed-collider sig=3.2000x1.0500x2.2000 @(-12.90, -19.90)
+authored-house-0-upper-desk-collider sig=2.7000x1.6500x0.9200 @(-22.20, -14.60)
+authored-house-1-dining-collider sig=2.8000x1.2400x1.4500 @(16.00, 20.10)
+authored-house-1-chair-collider-0 sig=0.7200x1.2000x0.7200 @(14.28, 20.10)
+authored-house-1-chair-collider-1 sig=0.7200x1.2000x0.7200 @(17.72, 20.10)
+authored-house-1-chair-collider-2 sig=0.7200x1.2000x0.7200 @(16.00, 19.05)
+authored-house-1-chair-collider-3 sig=0.7200x1.2000x0.7200 @(16.00, 21.15)
+authored-house-1-sofa-collider sig=3.2500x1.7000x1.3000 @(22.70, 14.70)
+authored-house-1-kitchen-collider sig=6.5000x2.3000x0.8500 @(15.25, 22.65)
+authored-house-1-coffee-table-collider sig=1.9000x0.7200x0.9000 @(22.40, 16.20)
+authored-house-1-media-collider sig=2.6000x2.2000x0.8200 @(22.70, 20.50)
+authored-house-1-upper-bed-collider sig=3.2000x1.0500x2.2000 @(25.10, 19.90)
+authored-house-1-upper-desk-collider sig=2.7000x1.6500x0.9200 @(15.80, 14.60)
+
+ ✓ src/match-admission-main-integration.test.ts (13 tests) 11ms
+ ✓ src/weapon-presentation-state.test.ts (18 tests) 24ms
+stdout | src/nuketown-traversal.test.ts > Nuke Town traversal (HF-383) > leaves no sealed pocket anywhere on the map: both vehicles stay trap-free
+[hf383] walkable cells=58149 connected-from-seeds=58149 unreachable=0
+[hf383] sealed nw-strip=0 (cap 380)
+[hf383] sealed gh-interior=0 (cap 140)
+
+ ✓ src/nuketown-traversal.test.ts (8 tests) 11068ms
+     ✓ measures corner-to-corner traversal through real colliders and the real controller  2973ms
+     ✓ keeps BOTH team-corner diagonals routed through the live collider set  6096ms
+     ✓ measures a full perimeter lap through the real controller  1624ms
+     ✓ leaves no sealed pocket anywhere on the map: both vehicles stay trap-free  321ms
+ ✓ src/ballistics.test.ts (35 tests) 10814ms
+     ✓ classifies every REGISTERED arena shot blocker with unique authority  8554ms
+     ✓ gives every registered arena an explicit fallback ceiling that only shrinks  2233ms
+ ✓ src/regression-support-blast-solid-combatant.test.ts (19 tests) 490ms
+stderr | worker/src/index.test.ts > global leaderboard worker policy > rolls back the claim when the leaderboard write fails
+Atomic Acres service request failed {
+  incidentId: 'e756195c-f693-4431-856d-e416d8f13009',
+  name: 'Error',
+  message: 'leaderboard write failed',
+  stack: 'Error: leaderboard write failed\n' +
+    '    at Object.run (C:/Users/david/projects/aa-claude-release84/worker/src/index.test.ts:77:43)\n' +
+    '    at submitStreak (C:/Users/david/projects/aa-claude-release84/worker/src/index.ts:231:152)\n' +
+    '    at Object.fetch (C:/Users/david/projects/aa-claude-release84/worker/src/index.ts:303:70)\n' +
+    '    at C:/Users/david/projects/aa-claude-release84/worker/src/index.test.ts:280:22\n' +
+    '    at file:///C:/Users/david/projects/aa-claude-release84/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20'
+}
+
+ ✓ worker/src/index.test.ts (17 tests) 67ms
+ ✓ src/rigged-bot-visual-evidence-contract.test.ts (10 tests) 477ms
+ ✓ src/raid2-fidelity.test.ts (24 tests) 8ms
+ ✓ src/particles/particle-field.test.ts (24 tests) 150ms
+ ✓ src/nuketown-fidelity.test.ts (10 tests) 1176ms
+     ✓ cannot be escaped: sprinting hard at every boundary stays inside the fence  1017ms
+ ✓ src/rendering/raytracing/raytracing-profile.test.ts (16 tests) 14ms
+ ✓ src/hf413-arms-handedness.test.ts (11 tests) 720ms
+     ✓ runs the standing corpus gate over the shipped GLBs  630ms
+ ✓ src/rendering/raytracing/whitted-tracer.test.ts (26 tests) 15ms
+ ✓ src/acceptance-gate.test.ts (15 tests) 16ms
+ ✓ src/input/gamepad/gamepad-pass95.test.ts (13 tests) 132ms
+ ✓ src/rendering/surface-forge.test.ts (22 tests) 2600ms
+     ✓ builds the two shared maps deterministically and only once  2150ms
+ ✓ src/art-kit.test.ts (14 tests) 133ms
+ ✓ src/killstreak-blockers.test.ts (6 tests) 59ms
+ ✓ src/blender-environment.test.ts (8 tests) 147ms
+ ✓ src/chopper-gunner-fire-ray.test.ts (6 tests) 19ms
+ ✓ src/railgun-presentation.test.ts (5 tests) 27ms
+ ✓ src/farcrysis-tree-materials.test.ts (9 tests) 4487ms
+ ✓ src/weather/wind-field.test.ts (18 tests) 1999ms
+     ✓ stays inside the authored speed envelope and reaches both ends of it  1037ms
+     ✓ builds faster than it dies, on every arena, measured off the samples  425ms
+ ✓ src/hf405-compact-optic-bore.test.ts (9 tests) 152ms
+ ✓ src/nuketown2-fidelity.test.ts (40 tests) 12022ms
+     ✓ puts the moving truck in the cul-de-sac and shortens the street with it  961ms
+     ✓ lands a circular paved turning head with a closed low kerb ring  540ms
+     ✓ gets the OPEN and CLOSED vehicles the right way round: truck open, coach closed, cars solid  565ms
+     ✓ stands both back-yard review cameras on an authored spawn, looking at their own house  559ms
+     ✓ lands every forged vehicle skin on the collider body it dresses, mirrored with it  338ms
+     ✓ puts each garage on the RIGHT of its own house, seen from that house own back-yard spawn  307ms
+     ✓ agrees with NUKETOWN2_HANDEDNESS on every handed feature, and the minimap agrees with the world  356ms
+     ✓ builds two two-storey houses facing each other over the road, each with a garage it opens into  318ms
+     ✓ pins the reference ORANGE-over-cream and WHITE/CREAM houses, their glazing and their colour-coded lawn anchors  409ms
+     ✓ walks a STANDING player up each stair, onto the landing and into both upper rooms  476ms
+     ✓ needs a crouch nowhere on the ground except under the two letterbox lids  368ms
+     ✓ keeps every standing eye-line inside the derived ceiling, and still has a lane  592ms
+     ✓ lets a player actually climb onto the truck roof  610ms
+     ✓ cannot be escaped: sprinting hard at every boundary stays inside the fence  1369ms
+     ✓ dresses the street vehicles with lofted skins WITHOUT moving any authority  321ms
+     ✓ lands a roadside bay on both sides of the stem, each an exact z-mirror of its partner  316ms
+     ✓ pins the HF-497 SAME-MATERIAL-VISIBLE coplanar class at zero  337ms
+ ✓ src/farcrysis-midmap-landmarks.test.ts (11 tests) 5317ms
+     ✓ blocks both spawn-to-spawn diagonals with grove trunk colliders  1076ms
+     ✓ never intersects a landmark collider with an unrelated collider  753ms
+     ✓ seats every landmark wall and crate on the terrain authority  698ms
+     ✓ anchors each wordmark plaque on its landmark crate cover in the built arena  682ms
+     ✓ admits no unauthored prop inside a landmark footprint  697ms
+     ✓ routes every mid-ring interactable through the shared landmark frames  759ms
+     ✓ gives every quadrant one frame-derived boulder  640ms
+ ✓ src/camera-shake-trauma.test.ts (18 tests) 23ms
+ ✓ src/timed-map-weapon-main-integration.test.ts (9 tests) 13ms
+ ✓ src/nuketown2-interiors.test.ts (5 tests) 1550ms
+     ✓ gives every room its furniture, in BOTH houses, through pair()  614ms
+     ✓ leaves every doorway a standing-wide clear run through it  308ms
+ ✓ src/client-world-repair-admission.test.ts (14 tests) 7ms
+ ✓ src/match-diagnostics.test.ts (9 tests) 69ms
+ ✓ src/sound-event-inventory.test.ts (113 tests) 2231ms
+     ✓ matches every semantic runtime audio call across all non-test TypeScript sources  2170ms
+ ✓ src/rendering/arena-environment-ibl.test.ts (16 tests) 14ms
+ ✓ src/private-match.test.ts (21 tests) 40ms
+ ✓ src/smoke-volume-presentation.test.ts (12 tests) 307ms
+ ✓ src/physics.test.ts (15 tests) 415ms
+ ✓ src/farcrysis-water-surface.test.ts (12 tests) 15ms
+ ✓ src/flamethrower-stream-system.test.ts (13 tests) 25ms
+ ✓ src/farcrysis-water-fx.test.ts (9 tests) 114ms
+ ✓ src/hf509-chopper-gunner-damage.test.ts (4 tests) 6ms
+ ✓ src/rendering/lighting/baked-indirect-runtime.test.ts (15 tests) 6134ms
+     ✓ does not bake before the debounce, and produces a real volume after it  664ms
+     ✓ takes a cached volume without baking when the digest matches  544ms
+     ✓ restarts the bake when the tier changes, rather than relabelling the old volume  706ms
+     ✓ RE-BAKES when the arena is swapped under a live session (B1)  690ms
+     ✓ RE-BAKES when the sun leaves its quantisation cell under a live session (B1)  643ms
+     ✓ does NOT re-extract while nothing the digest covers has moved  713ms
+     ✓ is the same one the offline bake produces for the same inputs  2130ms
+ ✓ src/killstreak-demo-capture-contract.test.ts (7 tests) 41ms
+ ✓ src/glass-collider-bounds.test.ts (11 tests) 225ms
+ ✓ src/test1-roof-traversal.test.ts (6 tests) 6791ms
+ ✓ src/water-system.test.ts (9 tests) 709ms
+     ✓ samples physics from the shared ocean-spectrum authority  616ms
+ ✓ src/nuketown2-pipeline-budget.test.ts (9 tests) 2043ms
+     ✓ shares the registry into eight family graphs  571ms
+     ✓ keeps the complete built arena below the measured 40-graph ceiling  1064ms
+     ✓ keeps forge paint colours in one uniform-carried graph  375ms
+ ✓ src/operator-leg-pose.test.ts (21 tests) 33ms
+ ✓ src/arena-contrast-lighting.test.ts (6 tests) 99ms
+ ✓ src/bot-stance.test.ts (25 tests) 19ms
+ ✓ src/player-profile.test.ts (7 tests) 61ms
+ ✓ src/rendering/raytracing/arena-proxy-coverage.test.ts (5 tests) 12516ms
+ ✓ src/killstreak-catalog.test.ts (7 tests) 22ms
+ ✓ src/nuketown2-materials/nuketown2-materials.test.ts (49 tests) 379ms
+     ✓ drops a scale only where the frame provably cannot resolve it  341ms
+ ✓ src/killstreak-demo-media-finalizer.test.ts (7 tests) 447ms
+ ✓ src/netcode-diagnostics.test.ts (22 tests) 12ms
+ ✓ src/impact-presentation.test.ts (6 tests) 41ms
+ ✓ src/rigged-operator-animation-director.test.ts (18 tests) 93ms
+ ✓ src/farcrysis-square-shore.test.ts (15 tests) 8798ms
+     ✓ enhanced palms: every placement in its shore-edge band  900ms
+     ✓ enhanced palms: beach palms reach the CORNER beaches (red proof vs circular rings)  616ms
+     ✓ enhanced palms stay deterministic across builds  603ms
+     ✓ detail reeds straddle the actual waterline on every azimuth  593ms
+     ✓ detail rocks reach the near-corner jungle interior  663ms
+     ✓ jungle floor litter spans the whole interior including corners  731ms
+     ✓ art shore boulders hug the waterline on every azimuth  569ms
+     ✓ cliff rocks track the transition band including the corner diagonals  483ms
+     ✓ beach litter sits on dry sand on every azimuth  479ms
+     ✓ driftwood sits on the strand line on every azimuth  528ms
+     ✓ lagoon sparkles float OVER WATER everywhere, corners included  635ms
+     ✓ wet-sand band STRADDLES the waterline (old band lay wholly offshore)  506ms
+     ✓ shallow lens reaches past the square waterline (old lens stopped mid-lagoon)  514ms
+     ✓ jungle undergrowth cards span the FULL interior (old scatter stayed within circular 32 m)  502ms
+     ✓ sand depth gradient hugs the square shore (old ring was circular)  474ms
+ ✓ src/local-reload-authority.test.ts (24 tests) 10ms
+ ✓ src/walkable-surface-parity-gate.test.ts (10 tests) 11177ms
+     ✓ constructs every arena without audit errors  11172ms
+ ✓ src/operator-stance-presentation.test.ts (14 tests) 23ms
+ ✓ src/nuketown2-lighting/writes.test.ts (23 tests) 87ms
+ ✓ src/adaptive-quality.test.ts (21 tests) 13ms
+ ✓ src/rendering/atmosphere/aerial-perspective.test.ts (21 tests) 68ms
+ ✓ src/ui/pass64-shell.test.ts (10 tests) 95ms
+ ✓ src/rendering/screen-space-post-profile.test.ts (18 tests) 32ms
+ ✓ src/gun-range-rack-presentation.test.ts (6 tests) 198ms
+ ✓ src/rendering/art-direction.test.ts (14 tests) 32ms
+ ✓ src/pass70-optic-material-contract.test.ts (5 tests) 39ms
+ ✓ src/pass64-diagnostics-analyzer.test.ts (7 tests) 77ms
+ ✓ src/gun-range-test-bay-world.test.ts (7 tests) 288ms
+ ✓ src/netcode-evidence-recorder.test.ts (14 tests) 150ms
+ ✓ src/regression-weapon-id-literal-gates.test.ts (6 tests) 7ms
+ ✓ src/input/gamepad/gamepad-input.test.ts (11 tests) 12ms
+ ✓ src/regression-thermal-ghost-operator-corpus.test.ts (14 tests) 1175ms
+     ✓ ships every operator asset the runtime asks for  1132ms
+ ✓ src/systems/support-flight-world.test.ts (14 tests) 401ms
+ ✓ src/operator-skin-catalog.test.ts (26 tests) 8ms
+ ✓ src/gun-range-test-bay-main-integration.test.ts (6 tests) 9ms
+ ✓ src/bot-ai.test.ts (21 tests) 10ms
+ ✓ src/pass69-3-authored-near-plane-catalog-runner.test.ts (7 tests) 18ms
+ ✓ src/input/gamepad/aim-assist.test.ts (14 tests) 8ms
+ ✓ src/changelog.test.ts (7 tests) 12ms
+ ✓ src/prone-clearance.test.ts (24 tests) 16ms
+ ✓ src/nuketown2-roofs.test.ts (5 tests) 2642ms
+     ✓ derives the House A butterfly rakes from the house footprint  1114ms
+     ✓ keeps the roof exception identity-only and above the existing deck  345ms
+     ✓ rebuilds both exterior flights at the fixed 4.2 m envelope  332ms
+     ✓ reconciles the merged lanes: paved cuts are disjoint, roofs stay ghosts, the standoff holds  649ms
+ ✓ src/rendering/arena-environment-load-parity.test.ts (5 tests) 2358ms
+     ✓ lights the first arena of a page load exactly like the same arena reached by a map switch  1472ms
+     ✓ holds for an arena whose environment scale is not the default, on both paths  426ms
+     ✓ FAILS when the first-load bootstrap is skipped - the defect this gate exists for  428ms
+ ✓ src/atomic-signal.test.ts (12 tests) 9ms
+ ✓ src/weapon-asset-production-contract.test.ts (3 tests) 16ms
+ ✓ src/chiptune-music.test.ts (75 tests) 522ms
+ ✓ src/killstreak-activation-gate.test.ts (12 tests) 15ms
+ ✓ src/input/gamepad/settings-panel.test.ts (6 tests) 12ms
+ ✓ src/network-lobby-closed.test.ts (7 tests) 14ms
+ ✓ src/crimson-flamethrower.test.ts (17 tests) 13ms
+ ✓ src/rendering/lighting-conditions-light-set.test.ts (19 tests) 18ms
+ ✓ src/regression-viewmodel-part-attachment.test.ts (5 tests) 2717ms
+     ✓ unfreezes exactly the mounted weapon and freezes the rest, every frame  919ms
+     ✓ repairs a model revealed by a path that bypassed the freeze  301ms
+     ✓ mounts every model directly under the viewmodel root and shares no part  362ms
+     ✓ never migrates a part between weapons across a full equip sweep  852ms
+ ✓ src/gun-range-test-bay.test.ts (8 tests) 14ms
+ ✓ src/farcrysis-tsl-foliage.test.ts (8 tests) 31ms
+ ✓ src/window-glass-debris-presentation.test.ts (6 tests) 35ms
+ ✓ src/stair-traversal-feel.test.ts (2 tests) 1377ms
+     ✓ walks and sprints both Nuke Town Rebuild flights, both directions, without a stall run  1374ms
+ ✓ src/audio-immersion.test.ts (15 tests) 171ms
+ ✓ src/chopper-gunner-missile.test.ts (4 tests) 16ms
+ ✓ src/farcrysis-terrain-proxy.test.ts (7 tests) 1864ms
+     ✓ winds its triangles so the face normals point UP  804ms
+     ✓ never puts a standing player INSIDE the ground shot box  368ms
+     ✓ still blocks a real share of the shots the ground itself blocks  380ms
+ ✓ src/authoritative-shot.test.ts (13 tests) 14ms
+ ✓ src/operator-posture-layer.test.ts (24 tests) 23ms
+ ✓ src/weapon-runtime-corpus.test.ts (4 tests) 1344ms
+     ✓ proves every variant embeds byte-identical PBR images before runtime texture sharing  975ms
+ ✓ src/audio-music-rotation-runtime.test.ts (9 tests) 21665ms
+     ✓ plays four ~90 s tracks across five minutes, swapping on exact bar boundaries  2438ms
+     ✓ never lets the committed schedule fall behind the clock, so a swap has no gap  2354ms
+     ✓ changes the oscillator timbre AT the boundary, never a lookahead early  2405ms
+     ✓ plays all ten tracks before repeating any of them, in the runtime  9419ms
+     ✓ holds the two-voice budget: exactly one oscillator per channel for the session  4971ms
+ ✓ src/water/swim-state.test.ts (11 tests) 10ms
+ ✓ src/systems/thermal-reveal-selection.test.ts (16 tests) 10ms
+ ✓ src/spawn-layout-quality.test.ts (153 tests) 226ms
+ ✓ src/weapon-rail-alignment-contract.test.ts (18 tests) 438ms
+ ✓ src/network-connection-attempt.test.ts (9 tests) 19ms
+ ✓ src/farcrysis-jungle-layers.test.ts (7 tests) 5910ms
+     ✓ builds all three jungle tiers with meaningful density  906ms
+     ✓ seats every tier on the terrain authority and honours slope/water constraints  907ms
+     ✓ clusters midstorey clumps relationally under the emergent crowns  683ms
+     ✓ keeps undergrowth carpet clear of every spawn point  874ms
+     ✓ adds no colliders, physical cover or raycast surfaces for the tiers  868ms
+     ✓ places every tier deterministically across builds  1668ms
+ ✓ src/animation-additive-pose.test.ts (22 tests) 100ms
+ ✓ src/collider-visual-parity-gate.test.ts (6 tests) 7414ms
+     ✓ constructs every arena without audit errors  7385ms
+ ✓ src/nuketown2-yard-props.test.ts (9 tests) 1061ms
+     ✓ binds the red hob to the authored north house side and blue to south  861ms
+ ✓ src/weapon-model.test.ts (27 tests) 1284ms
+     ✓ never parents a weapon part outside the weapon it belongs to  526ms
+ ✓ src/rustworks-blender.test.ts (3 tests) 59ms
+ ✓ src/farcrysis-atmosphere.test.ts (14 tests) 49ms
+ ✓ src/particles/particle-catalog.test.ts (18 tests) 9ms
+ ✓ src/first-person-arms-authored-motion.test.ts (12 tests) 58ms
+ ✓ src/netcode-diagnostics-runtime.test.ts (12 tests) 18ms
+ ✓ src/combat/weapon-catalog.test.ts (9 tests) 14ms
+ ✓ src/nuketown2-lighting/presets.test.ts (17 tests) 9ms
+ ✓ src/death-drop-presentation.test.ts (7 tests) 355ms
+ ✓ src/hosted-bot-main-integration.test.ts (8 tests) 9ms
+ ✓ src/animation-locomotion.test.ts (19 tests) 32ms
+ ✓ src/rendering/lighting/baked-indirect-profile.test.ts (15 tests) 11ms
+ ✓ src/pass73-collision-route-authority.test.ts (6 tests) 1983ms
+     ✓ fails every owner when removed, shifted on Y, or resized on any profile  1059ms
+     ✓ retains capsule support and wall clearance for both teams in every stance  533ms
+ ✓ src/death-drops.test.ts (11 tests) 7ms
+ ✓ src/taser-stun.test.ts (11 tests) 11ms
+ ✓ src/hf388-viewmodel-motion-curves.test.ts (11 tests) 133ms
+ ✓ src/farcrysis-vegetation-shoreline.test.ts (6 tests) 5855ms
+     ✓ keeps every shoreline species inside its shore-edge band, on dry sand  1246ms
+     ✓ follows the SQUARE shoreline: beach species reach the corner diagonals  750ms
+     ✓ straddles the waterline with mangroves  764ms
+     ✓ clusters cave-adjacent ferns at the CURRENT cave entrance [52, 32]  886ms
+     ✓ places coconut palms across the beach-to-jungle edge band  667ms
+     ✓ seats shoreline species on the terrain authority and stays deterministic  1541ms
+ ✓ src/nuketown2-breakable-windows.test.ts (5 tests) 1193ms
+     ✓ rates every house pane upstairs and downstairs as shatter glass through pair()  736ms
+ ✓ src/pass69-3-frame-hitch-runner.test.ts (5 tests) 8ms
+ ✓ src/animation/motionbricks-g1-retarget.test.ts (14 tests) 14ms
+ ✓ src/nuketown2-vegetation.test.ts (10 tests) 1376ms
+     ✓ dresses only footprints the arena already emits as solid colliders  954ms
+ ✓ src/nuketown2-grime-decals.test.ts (8 tests) 710ms
+     ✓ adds no collider, no shot surface and no raycast mesh to the arena  696ms
+ ✓ src/gun-range-dummy-replication.test.ts (14 tests) 11ms
+ ✓ src/camera-shake.test.ts (10 tests) 6ms
+ ✓ src/animation-hit-reaction.test.ts (14 tests) 26ms
+ ✓ src/audio-browser-compatibility.test.ts (9 tests) 13ms
+ ✓ src/ui/surface-registry.test.ts (10 tests) 86ms
+ ✓ src/netcode-diagnostics-overlay.test.ts (10 tests) 22ms
+ ✓ src/farcrysis.test.ts (12 tests) 9548ms
+     ✓ registers under the farcrysis id with a label  1131ms
+     ✓ matches the documented FARCRYSIS_BOUNDS  707ms
+     ✓ balances the two spawn tables rotationally about the core  569ms
+     ✓ keeps every spawn inside bounds with at least a 2m margin  1031ms
+     ✓ does not place any spawn inside physical cover  724ms
+     ✓ exposes at least 14 pieces of physical cover  895ms
+     ✓ backs every physical cover entry with collision for movement and shots  796ms
+     ✓ exposes a consistent collider set  664ms
+     ✓ provides at least 8 shot surfaces  711ms
+     ✓ gives every team-0 spawn at least 2 patrol points within 40m (two-route reachability)  790ms
+     ✓ documents the two-entrance core design (2 core-door covers + core pieces)  817ms
+     ✓ passes farcrysisHITL sanity checks  710ms
+ ✓ src/killstreak-taser-runtime.test.ts (6 tests) 27ms
+ ✓ src/ui/hud-mode-banner.test.ts (11 tests) 8ms
+ ✓ src/gun-range-match-clock-authority.test.ts (9 tests) 8ms
+ ✓ src/collision.test.ts (14 tests) 10ms
+ ✓ src/crossbolt-main-integration.test.ts (3 tests) 10ms
+ ✓ src/pass65-renderer-feature-inventory.test.ts (6 tests) 780ms
+     ✓ probes real owners and symbols for every inventory row  762ms
+ ✓ src/audio-railgun.test.ts (3 tests) 16ms
+ ✓ src/bot-arsenal.test.ts (6 tests) 26ms
+ ✓ src/guest-combat-inventory-authority.test.ts (6 tests) 6ms
+ ✓ src/pass65-weapon-family-runtime-contract.test.ts (5 tests) 26ms
+ ✓ src/nuketown2-pool-water.test.ts (9 tests) 1306ms
+     ✓ describes the mesh the arena actually builds  804ms
+ ✓ src/team-prescription.test.ts (12 tests) 18ms
+ ✓ src/match-admission-transaction.test.ts (10 tests) 11ms
+ ✓ src/authoritative-death-outcome.test.ts (7 tests) 6ms
+ ✓ src/flash-authority.test.ts (7 tests) 63ms
+ ✓ src/farcrysis-grass-field.test.ts (10 tests) 21966ms
+     ✓ builds a dense field that never breaks the concealment bound  4589ms
+     ✓ is deterministic — two builds produce identical instance matrices  15103ms
+     ✓ keeps the WebGL2 compat route on plain standard materials  308ms
+     ✓ distance LOD toggles chunk visibility with zero state churn  351ms
+     ✓ keeps most of the field drawn from every authored spawn  1096ms
+ ✓ src/farcrysis-visual-dressing.test.ts (6 tests) 3802ms
+     ✓ keeps every farcrysis instanced vegetation layer out of batches  1060ms
+     ✓ authors gameplay palm colliders with the enhanced-palm proxy idiom  698ms
+     ✓ sizes every fuel-drum collider to the 0.6 m x 0.9 m drum  707ms
+     ✓ keeps every collision proxy invisible but raycastable  754ms
+     ✓ keeps near vegetation visible at corner-spawn camera distances  578ms
+ ✓ src/killstreak-support-catalog.test.ts (6 tests) 6ms
+ ✓ src/audio-synthesis.test.ts (15 tests) 37ms
+ ✓ src/zero-hit-feedback.test.ts (8 tests) 41ms
+ ✓ src/remote-support-authority.test.ts (8 tests) 9ms
+ ✓ src/remote-grenade-admission.test.ts (8 tests) 7ms
+ ✓ src/animation-blend-graph.test.ts (14 tests) 11ms
+ ✓ src/pass66-owned-browser-verifier-runner.test.ts (6 tests) 5ms
+ ✓ src/operator-skin-look-registry.test.ts (24 tests) 9ms
+ ✓ src/particles/combat-readability.test.ts (21 tests) 7ms
+ ✓ src/input/gamepad/glyphs.test.ts (8 tests) 6ms
+ ✓ src/pass73-crossbow-multiplayer-authority.test.ts (2 tests) 8ms
+ ✓ src/nuketown-lawn-field.test.ts (9 tests) 2326ms
+     ✓ roots every blade inside the lawn bands - never on asphalt, kerb, pavement or beyond bounds  1251ms
+     ✓ hard-caps blade height under the 0.25 m art-only ceiling by construction  344ms
+ ✓ src/quality-composition-parity.test.ts (1 test) 254ms
+ ✓ src/rendering/raytracing/analytic-proxy-scene.test.ts (7 tests) 9ms
+ ✓ src/operator-skin-tsl-materials.test.ts (16 tests) 31ms
+ ✓ src/arena-selectability.test.ts (10 tests) 6ms
+ ✓ src/bot-spawn-presence.test.ts (54 tests) 11649ms
+     ✓ nuketown2 deploys its configured solo bot count with no escalation owed at match start  709ms
+     ✓ farcrysis deploys its configured solo bot count with no escalation owed at match start  900ms
+     ✓ high-seas deploys its configured solo bot count with no escalation owed at match start  706ms
+     ✓ nuketown2: no authored spawn point intersects a collider  527ms
+     ✓ farcrysis: no authored spawn point intersects a collider  885ms
+     ✓ nuketown2: a solo bot facing a live player covers at least half of its own authored points  481ms
+     ✓ farcrysis: a solo bot facing a live player covers at least half of its own authored points  710ms
+     ✓ high-seas: a solo bot facing a live player covers at least half of its own authored points  584ms
+     ✓ nuketown2: a solo bot is not parked at the far extreme of the map  509ms
+     ✓ farcrysis: a solo bot is not parked at the far extreme of the map  832ms
+     ✓ high-seas: a solo bot is not parked at the far extreme of the map  370ms
+     ✓ nuketown2: seats its opening solo squad (4) on distinct authored points  357ms
+     ✓ nuketown2: seats its fully escalated solo squad (6) on distinct authored points  389ms
+     ✓ farcrysis: seats its opening solo squad (2) on distinct authored points  671ms
+     ✓ farcrysis: seats its fully escalated solo squad (2) on distinct authored points  479ms
+ ✓ src/grenade-explosion-presentation.test.ts (4 tests) 15ms
+ ✓ src/remote-hit-admission.test.ts (10 tests) 40ms
+ ✓ src/ui/menu-preview-camera.test.ts (5 tests) 309ms
+ ✓ src/viewmodel-penetration-ratchet.test.ts (11 tests) 6ms
+ ✓ src/host-succession-protocol.test.ts (13 tests) 11ms
+ ✓ src/weather/weather-settings.test.ts (13 tests) 9ms
+ ✓ src/input/gamepad/mapping.test.ts (9 tests) 7ms
+ ✓ src/grenade-presentation.test.ts (8 tests) 25ms
+ ✓ src/house-destruction.test.ts (4 tests) 21ms
+ ✓ src/overdrive-line-of-sight.test.ts (6 tests) 1089ms
+     ✓ nuke-town rebuild (nuketown2): a roof-slab claim from inside the bus is rejected at every height  686ms
+     ✓ nuke-town rebuild (nuketown2): a player standing on the bus roof still claims it  309ms
+ ✓ src/admission-debug-contract.test.ts (4 tests) 21ms
+ ✓ src/vertical-navigation.test.ts (9 tests) 7ms
+ ✓ src/ui/killstreak-loadout-menu.test.ts (8 tests) 9ms
+ ✓ src/weapon-first-fire-prewarm.test.ts (3 tests) 885ms
+     ✓ stages the imported flare reload pose and restores model/action state when submission throws  368ms
+ ✓ src/arena-special-weapon-reach.test.ts (6 tests) 32ms
+stdout | src/farcrysis-ground-pbr.test.ts > farcrysis ground material fidelity > reports the live terrain/ground material state
+GROUND_MATERIAL_REPORT [{"mesh":"farcrysis-terrain-elevation","materialType":"MeshStandardMaterial","vertexColors":true,"colorHex":"#ffffff","map":{"resolution":[256,256],"repeat":[32,32],"anisotropy":8,"wrapS":1000,"wrapT":1000,"colorSpace":"srgb"},"normalMap":{"resolution":[256,256],"repeat":[32,32],"anisotropy":8,"wrapS":1000,"wrapT":1000,"colorSpace":""},"normalScale":[1,1],"roughnessMap":{"resolution":[256,256],"repeat":[32,32],"anisotropy":8,"wrapS":1000,"wrapT":1000,"colorSpace":""},"roughness":0.88,"metalness":0.03},{"mesh":"farcrysis-water-wetsand","materialType":"MeshStandardMaterial","vertexColors":false,"colorHex":"#8a7a58","map":{"resolution":[256,256],"repeat":[32,32],"anisotropy":8,"wrapS":1000,"wrapT":1000,"colorSpace":"srgb"},"normalMap":{"resolution":[256,256],"repeat":[32,32],"anisotropy":8,"wrapS":1000,"wrapT":1000,"colorSpace":""},"normalScale":[0.55,0.55],"roughnessMap":{"resolution":[256,256],"repeat":[32,32],"anisotropy":8,"wrapS":1000,"wrapT":1000,"colorSpace":""},"roughness":0.34,"metalness":0}]
+
+ ✓ src/nuketown2-glass-authority.test.ts (5 tests) 1976ms
+     ✓ registers every pane on BOTH floors, north and south, with unique ids  645ms
+     ✓ gives every pane a glass-class ballistic surface bound to its window id  404ms
+     ✓ lets the weakest firearm in the catalogue cross a pane  512ms
+ ✓ src/rendering/render-runtime-device-features.test.ts (4 tests) 1489ms
+     ✓ hands the allowlist to requestDevice, so the created device actually HOLDS them  949ms
+     ✓ falls back to a bare device when a driver rejects a feature it advertised  419ms
+ ✓ src/pass69-3-support-aircraft-live-runner.test.ts (4 tests) 7ms
+ ✓ src/pass70-crossbow-loaded-bolt-clearance.test.ts (3 tests) 158ms
+ ✓ src/ui/release-identity-surfaces.test.ts (5 tests) 11ms
+ ✓ src/animation/kimodo-operator-retarget.test.ts (17 tests) 16ms
+ ✓ src/rendering/lighting/baked-indirect-node.test.ts (7 tests) 158ms
+ ✓ src/farcrysis-spawns.test.ts (10 tests) 5473ms
+     ✓ passes every HF-402 rule the shared instrument can see on this arena  5427ms
+ ✓ src/killstreak-loadout.test.ts (10 tests) 9ms
+ ✓ src/chopper-exterior-review-camera-main-integration.test.ts (6 tests) 8ms
+ ✓ src/remote-sticky-attachment-authority.test.ts (5 tests) 6ms
+ ✓ src/assets-manifest.test.ts (5 tests) 130ms
+ ✓ src/bot-weapon-gpu-vocabulary.test.ts (5 tests) 1702ms
+     ✓ projects the exact canonical bot pool into one retained world presentation per ID  512ms
+     ✓ compiles the exact attached root with culling disabled, then retains it hidden after the fence  369ms
+     ✓ invalidates prior readiness for a new scene generation and stays not-ready after failure  399ms
+     ✓ rejects a detached root without publishing GPU readiness  398ms
+ ✓ src/rendering/screen-space-topology-contract.test.ts (4 tests) 19ms
+ ✓ src/combat/ordnance.test.ts (9 tests) 7ms
+ ✓ src/character-presentation-contract.test.ts (8 tests) 14ms
+ ✓ src/timed-map-weapon-authority.test.ts (8 tests) 195ms
+ ✓ src/rendering/lighting-conditions-replication.test.ts (12 tests) 23ms
+ ✓ src/farcrysis-mountains.test.ts (6 tests) 1248ms
+     ✓ is wired into the built arena as tagged presentation-only geometry  1110ms
+ ✓ src/killstreak-tuning.test.ts (6 tests) 8ms
+ ✓ src/farcrysis-ground-pbr.test.ts (4 tests) 3247ms
+     ✓ reports the live terrain/ground material state  994ms
+     ✓ gives every live terrain mesh a full PBR response (map + normal + roughness)  806ms
+     ✓ keeps wet sand optically smoother than dry sand (roughness ordering)  724ms
+     ✓ does not overwrite the legacy plates when they are absent (Pass 69 layout)  720ms
+ ✓ src/blender-arena-surface-binding.test.ts (7 tests) 7ms
+ ✓ src/grass-placement.test.ts (3 tests) 22ms
+ ✓ src/ui/menu-lifecycle.test.ts (7 tests) 7ms
+ ✓ src/hf399-viewmodel-socket-cache.test.ts (2 tests) 2625ms
+     ✓ performs no repeat name search for any node the mounted rig actually has  2406ms
+ ✓ src/farcrysis-frame-loop-hygiene.test.ts (3 tests) 3529ms
+     ✓ does not accumulate animation registries across arena rebuilds  2496ms
+     ✓ never re-uploads the time-invariant wave colour buffer  578ms
+     ✓ drives wave displacement identically through the cached depth path  454ms
+ ✓ src/audio-offline-render-browser.test.ts (1 test) 1817ms
+     ✓ renders five asset-free category buses without NaN or clipping  1815ms
+ ✓ src/farcrysis-boot-cost.test.ts (2 tests) 4191ms
+     ✓ generates byte-identical procedural fallback textures  3709ms
+     ✓ asks for no shadow map larger than the engine profile cap  480ms
+ ✓ src/field-support.test.ts (12 tests) 15ms
+ ✓ src/pass65-frame-pacing-gate.test.ts (9 tests) 10ms
+ ✓ src/particles/ambient-visibility.test.ts (7 tests) 6ms
+ ✓ src/pass70-weapon-contact-scope-integration.test.ts (4 tests) 38ms
+ ✓ src/match-diagnostics-upload.test.ts (6 tests) 32ms
+ ✓ src/smoke-authority.test.ts (8 tests) 18ms
+ ✓ src/chopper-autopilot-rockets.test.ts (4 tests) 19ms
+ ✓ src/hidden-cpu-preparation-contract.test.ts (2 tests) 18ms
+ ✓ src/pass73-thermal-reveal-lifecycle.test.ts (2 tests) 10ms
+ ✓ src/high-scores.test.ts (12 tests) 16ms
+ ✓ src/house-destruction-runtime.test.ts (4 tests) 68ms
+ ✓ src/combat/legacy-weapon-adapter.test.ts (6 tests) 8ms
+ ✓ src/pass65-raytraced-capability.test.ts (9 tests) 8ms
+ ✓ src/arena-frame-animation.test.ts (7 tests) 7ms
+ ✓ src/webgpu-adaptive-epoch.integration.test.ts (1 test) 55ms
+ ✓ src/first-person-authored-arm-layer.test.ts (6 tests) 10ms
+ ✓ src/rigged-operator-skin-animation.test.ts (18 tests) 8ms
+ ✓ src/guest-resume-authority.test.ts (6 tests) 10ms
+ ✓ src/network-sync.test.ts (11 tests) 7ms
+ ✓ src/regression-fatal-error-preinit.test.ts (5 tests) 5ms
+ ✓ src/minimap.test.ts (13 tests) 7ms
+ ✓ src/legacy-pure-helpers-2.test.ts (25 tests) 7ms
+ ✓ src/atomic-authored-cover.test.ts (6 tests) 9ms
+ ✓ src/nuke-event/nuke-event.test.ts (10 tests) 17ms
+ ✓ src/nuketown-mountain-backdrop.test.ts (4 tests) 130ms
+ ✓ src/world-identity.test.ts (7 tests) 6ms
+ ✓ src/glass-authority.test.ts (6 tests) 6ms
+ ✓ src/frame-pacing.test.ts (15 tests) 7ms
+ ✓ src/persistent-window-debris-integration.test.ts (6 tests) 8ms
+ ✓ src/railgun-result-delivery-contract.test.ts (6 tests) 9ms
+ ✓ src/house-destruction-presentation.test.ts (4 tests) 29ms
+ ✓ src/rendering/arenas/high-seas.test.ts (5 tests) 9ms
+ ✓ src/spatial-audio.test.ts (8 tests) 19ms
+ ✓ src/map3-explore-capture-contract.test.ts (10 tests) 17ms
+ ✓ src/rendering/arena-render-watchdog.test.ts (8 tests) 463ms
+     ✓ keeps the real Quality Terminal world drawable after static batching and profile application  442ms
+ ✓ src/art-gen-prompt-originality.test.ts (4 tests) 11ms
+ ✓ src/test-bay-dummy-colliders.test.ts (13 tests) 20ms
+ ✓ src/rare-weapon-announcement.test.ts (6 tests) 6ms
+ ✓ src/flare-authority-checkpoint.test.ts (3 tests) 6ms
+ ✓ src/spawn-safety.test.ts (41 tests) 17ms
+ ✓ src/flame-damage-authority-main-integration.test.ts (4 tests) 6ms
+ ✓ src/webgpu-tint-swizzle-shim.test.ts (7 tests) 14ms
+ ✓ src/tracer-pool.test.ts (4 tests) 25ms
+ ✓ src/atmosphere-system.test.ts (8 tests) 15ms
+ ✓ src/movement-feel.test.ts (6 tests) 5ms
+ ✓ src/support-explosion-presentation.test.ts (4 tests) 17ms
+ ✓ src/operator-posture-director-integration.test.ts (9 tests) 47ms
+ ✓ src/house-destruction-map-parity.test.ts (2 tests) 85ms
+ ✓ src/audio-continuous-ownership.test.ts (1 test) 9ms
+ ✓ src/interaction-press-lifecycle.test.ts (7 tests) 7ms
+ ✓ src/world-identity-presentation.test.ts (3 tests) 16ms
+ ✓ src/pass69-3-ads-physical-clearance-runner.test.ts (3 tests) 9ms
+ ✓ src/rendering/tsl-node-build-diagnostics.test.ts (5 tests) 7ms
+ ✓ src/legacy-pure-helpers.test.ts (25 tests) 82ms
+ ✓ src/farcrysis-webgpu-pipeline-budget.test.ts (2 tests) 2561ms
+     ✓ builds many foliage node materials but only a bounded number of programs  1630ms
+     ✓ leaves the WebGL2 compatibility route on plain standard materials  928ms
+ ✓ src/hf343-fire-admission-repro.test.ts (2 tests) 48ms
+ ✓ src/hf499-mp-soak-red.test.ts (6 tests) 6ms
+ ✓ src/remote-sticky-main-integration.test.ts (6 tests) 10ms
+ ✓ src/operator-appearance-catalog.test.ts (9 tests) 8ms
+ ✓ src/pass70-cross-browser-audio-evidence.test.ts (4 tests) 6ms
+ ✓ src/gun-range-test-bay-world-main-integration.test.ts (3 tests) 6ms
+ ✓ src/ads-sight-profile.test.ts (9 tests) 12ms
+ ✓ src/killstreak-reconnect-checkpoint.test.ts (3 tests) 19ms
+ ✓ src/ui/pass65-hud-layout.test.ts (8 tests) 5ms
+ ✓ src/nuketown-sightline-fidelity.test.ts (1 test) 76ms
+ ✓ src/environment-assets.test.ts (5 tests) 338ms
+     ✓ keeps exterior bins outside both house footprints and removes the low-quality bicycles  303ms
+ ✓ src/killstreak-replacement-authority-main-integration.test.ts (4 tests) 5ms
+ ✓ src/ui/pass66-overhaul.test.ts (5 tests) 11ms
+ ✓ src/local-health-regen.test.ts (13 tests) 5ms
+ ✓ src/pass72-crossbow-glass-contract.test.ts (5 tests) 5ms
+ ✓ src/destructible-shed-map-parity.test.ts (4 tests) 27ms
+stdout | src/nuketown-overdrive-core.test.ts > Nuke Town 2x Damage Core seat (HF-385) > derives claimability from the live collider set: a standable point exists inside the pickup radius
+[hf385] core (0, 0) nearest standable 0.00 m vs pickup radius 1.65 m
+
+ ✓ src/minimap-render-cadence.test.ts (4 tests) 7ms
+ ✓ src/nuketown-overdrive-core.test.ts (2 tests) 143ms
+ ✓ src/farcrysis-instance-capacity.test.ts (2 tests) 4288ms
+     ✓ allocates every arena instanced mesh above the uniform-array path  4283ms
+ ✓ src/combat-first-damage-prewarm.test.ts (11 tests) 8ms
+ ✓ src/dmr-thermal-presentation.test.ts (6 tests) 7ms
+ ✓ src/minimap-player-view-transform.test.ts (3 tests) 18ms
+ ✓ src/overdrive.test.ts (6 tests) 5ms
+ ✓ src/test-bay-teleport-killstreak-main-integration.test.ts (3 tests) 21ms
+ ✓ src/grass-system.test.ts (4 tests) 22ms
+ ✓ src/arena-ambient-events.test.ts (9 tests) 22ms
+ ✓ src/client-runtime-log.test.ts (5 tests) 26ms
+ ✓ src/global-leaderboard.test.ts (8 tests) 27ms
+ ✓ src/surface-impact-registry.test.ts (6 tests) 2185ms
+     ✓ maps every shot-authority surface and raycast mesh on every arena  2148ms
+ ✓ src/rustworks-quality.test.ts (3 tests) 92ms
+ ✓ src/blender-lighting.test.ts (4 tests) 5ms
+ ✓ src/pass65-settings-inventory.test.ts (2 tests) 6ms
+ ✓ src/smoke-main-integration.test.ts (5 tests) 7ms
+ ✓ src/arena-factory-registry.test.ts (6 tests) 6ms
+ ✓ src/map.test.ts (4 tests) 426ms
+ ✓ src/operator-skin-integration.test.ts (9 tests) 8ms
+ ✓ src/killstreak-drone-input.test.ts (6 tests) 7ms
+ ✓ src/key-bindings.test.ts (10 tests) 8ms
+ ✓ src/atomic-profile-authority-parity.test.ts (4 tests) 86ms
+ ✓ src/mobile-touch-controls.test.ts (7 tests) 8ms
+ ✓ src/banner-arbiter.test.ts (7 tests) 14ms
+ ✓ src/nuketown2-materials/noise-lut.test.ts (5 tests) 487ms
+     ✓ is generated on the CPU, never loaded: one shared DataTexture with in-memory bytes  405ms
+ ✓ src/combat/explosive-bolt-target-buffer.test.ts (4 tests) 6ms
+ ✓ src/shed-structural-authority.test.ts (4 tests) 38ms
+ ✓ src/chopper-exterior-review-camera.test.ts (6 tests) 7ms
+ ✓ src/map3-lane-layout.test.ts (4 tests) 5093ms
+     ✓ places every lane on a world axis, so no box is ever yawed off one  1209ms
+     ✓ never lets two corridors occupy the same ground  1453ms
+     ✓ fits every walkable corridor length inside the playfield  2428ms
+ ✓ src/support-vehicle-presentation-contract.test.ts (2 tests) 11ms
+ ✓ src/input/gamepad/curves.test.ts (7 tests) 6ms
+ ✓ src/guest-reload-authority.test.ts (3 tests) 4ms
+ ✓ src/static-matrix-freeze.test.ts (2 tests) 8ms
+ ✓ src/bot-weapon-presentation.test.ts (5 tests) 8ms
+ ✓ src/gun-range-rules.test.ts (8 tests) 9ms
+ ✓ src/graphics-refinement.test.ts (6 tests) 8ms
+ ✓ src/remote-player-readability.test.ts (4 tests) 14ms
+ ✓ src/remote-health-authority.test.ts (9 tests) 7ms
+ ✓ src/semtex-main-integration.test.ts (3 tests) 7ms
+ ✓ src/killstreak-demo-capture-runner.test.ts (3 tests) 15ms
+ ✓ src/pass70-drone-swarm-logo.test.ts (4 tests) 9ms
+stderr | src/webgpu-pipeline-repair.test.ts > Tint pipeline repair > schedules exactly one debounced sweep per burst of Tint errors
+THREE.WebGPURenderer: Render pipeline creation failed (renderPipeline_MeshStandardMaterial_6346): An error occurred while generating Tint IR
+error: swizzle view instruction still has usages after lowering
+THREE.WebGPURenderer: Render pipeline creation failed (renderPipeline_MeshStandardMaterial_6346): An error occurred while generating Tint IR
+error: swizzle view instruction still has usages after lowering
+THREE.WebGPURenderer: Render pipeline creation failed (renderPipeline_MeshStandardMaterial_6346): An error occurred while generating Tint IR
+error: swizzle view instruction still has usages after lowering
+
+stderr | src/webgpu-pipeline-repair.test.ts > Tint pipeline repair > schedules exactly one debounced sweep per burst of Tint errors
+ordinary log
+
+ ✓ src/webgpu-pipeline-repair.test.ts (5 tests) 19ms
+ ✓ src/flare-presentation-protocol.test.ts (4 tests) 7ms
+ ✓ src/last-multiplayer-diagnostic.test.ts (3 tests) 7ms
+ ✓ src/arena-switch-matrix-roster.test.ts (5 tests) 8ms
+ ✓ src/rendering/clustered-lights.test.ts (5 tests) 29ms
+ ✓ src/timed-map-weapon-protocol.test.ts (5 tests) 9ms
+ ✓ src/ui/pass66-readability.test.ts (5 tests) 5ms
+ ✓ src/ui/field-kit-weapon-presentation.test.ts (3 tests) 35ms
+ ✓ src/pass65-hardware-webgl2-admission-gate.test.ts (4 tests) 5ms
+(node:25804) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/match-diagnostics-migration.test.ts (1 test) 9ms
+ ✓ src/destructible-shed-registry.test.ts (2 tests) 816ms
+     ✓ keeps every authored footprint in-bounds, off static collision, apart from spawns, and disjoint  811ms
+ ✓ src/farcrysis-geometry-integrity.test.ts (2 tests) 1679ms
+     ✓ every position attribute in the built arena is finite (no NaN)  943ms
+     ✓ every index buffer references only existing vertices  734ms
+ ✓ src/carpet-corridor-targeting.test.ts (9 tests) 7ms
+ ✓ src/build-identity-handshake.test.ts (6 tests) 29ms
+ ✓ src/bot-perception-authority.test.ts (4 tests) 6ms
+ ✓ src/killstreak-host-checkpoint-integration.test.ts (2 tests) 7ms
+ ✓ src/viewmodel-muzzle-effect-anchor.test.ts (1 test) 684ms
+     ✓ emits world effects outside the particle near-lens cull, on the muzzle pixel, for every weapon  682ms
+ ✓ src/domination-mode.test.ts (7 tests) 5ms
+ ✓ src/host-time.test.ts (6 tests) 6ms
+ ✓ src/project-map.test.ts (6 tests) 16ms
+ ✓ src/input/gamepad/rumble.test.ts (5 tests) 6ms
+ ✓ src/domination-capture-prompt.test.ts (9 tests) 4ms
+ ✓ src/host-lobby-admission-generation.test.ts (3 tests) 11ms
+ ✓ src/flamethrower-residual-authority.test.ts (10 tests) 6ms
+ ✓ src/sensory-feedback.test.ts (5 tests) 6ms
+ ✓ src/carpet-death-main-integration.test.ts (4 tests) 5ms
+ ✓ shared/match-diagnostics-schema.test.ts (3 tests) 5ms
+ ✓ src/webgl-shadow-compatibility.test.ts (13 tests) 4ms
+ ✓ src/interaction-arbitration.test.ts (7 tests) 14ms
+ ✓ src/care-capture-client.test.ts (4 tests) 5ms
+ ✓ src/room-rejoin-identity.test.ts (5 tests) 4ms
+ ✓ src/host-checkpoint-snapshot-projection.test.ts (3 tests) 11ms
+ ✓ src/release-change-impact.test.ts (8 tests) 7ms
+ ✓ src/kill-confirm-pulse.test.ts (6 tests) 6ms
+ ✓ src/combat/pass65-ordnance-contract.test.ts (6 tests) 12ms
+ ✓ src/world-perception-main-integration.test.ts (4 tests) 11ms
+ ✓ src/support-combat-presentation.test.ts (6 tests) 5ms
+ ✓ src/support-damage-feedback.test.ts (3 tests) 7ms
+ ✓ src/network-chaos.test.ts (4 tests) 10ms
+ ✓ src/crossbow-glass-authority.test.ts (6 tests) 4ms
+ ✓ src/sticky-victim-feedback.test.ts (4 tests) 7ms
+ ✓ src/ads-physical-aperture.test.ts (4 tests) 8ms
+ ✓ src/minimap-semantic-layer.test.ts (4 tests) 5951ms
+     ✓ reduces Nuketown2 to the authored house/garage/perimeter/road/vehicle set  2765ms
+     ✓ does not increase any other arena minimap element count  3173ms
+ ✓ src/water/ocean-tsl.test.ts (3 tests) 4ms
+ ✓ src/squad-presentation.test.ts (5 tests) 7ms
+ ✓ src/killstreak-flight-navigation.test.ts (3 tests) 8ms
+ ✓ src/pass73-grenade-native-gate-contract.test.ts (3 tests) 5ms
+ ✓ src/match-countdown-continuity.test.ts (7 tests) 6ms
+ ✓ src/pass65-crossbow-arms-runtime-contract.test.ts (3 tests) 21ms
+ ✓ src/host-trigger-authority.test.ts (3 tests) 6ms
+ ✓ src/farcrysis-shore-audit.test.ts (1 test) 462ms
+     ✓ reports per-layer edge-distance placement  461ms
+ ✓ src/ui/hud-impact-main-integration.test.ts (5 tests) 7ms
+ ✓ src/rendering/resident-memory.test.ts (3 tests) 10ms
+ ✓ src/nuketown-forest-surround.test.ts (3 tests) 347ms
+ ✓ src/input/gamepad/hotplug.test.ts (5 tests) 6ms
+ ✓ src/destructible-shed-definition.test.ts (3 tests) 14ms
+ ✓ src/grade-grain-wiring-main-integration.test.ts (4 tests) 6ms
+ ✓ src/spawn-selection.test.ts (15 tests) 3739ms
+     ✓ nuketown2 covers at least 80% of every authored point over 200 seeded deployments  805ms
+     ✓ farcrysis covers at least 80% of every authored point over 200 seeded deployments  813ms
+     ✓ high-seas covers at least 80% of every authored point over 200 seeded deployments  582ms
+     ✓ map3 covers at least 80% of every authored point over 200 seeded deployments  1340ms
+ ✓ src/ui/killstreak-demo-presentation.test.ts (4 tests) 9ms
+ ✓ src/text-chat-ui.test.ts (4 tests) 6ms
+ ✓ src/camera-eye-clearance.test.ts (7 tests) 6ms
+ ✓ src/rigged-hand-evidence.test.ts (9 tests) 6ms
+ ✓ src/multiplayer-damage-matrix.test.ts (27 tests) 6ms
+ ✓ src/support-aircraft-collision.test.ts (3 tests) 6ms
+ ✓ src/water/water-authoring.test.ts (3 tests) 6ms
+ ✓ src/ui/hud-sway-release-wiring.test.ts (4 tests) 6ms
+ ✓ src/pass64-diagnostics-collector.test.ts (1 test) 75ms
+ ✓ src/host-killstreak-loadout-ack.test.ts (4 tests) 5ms
+ ✓ src/solo-renderer-autoretry.test.ts (5 tests) 5ms
+ ✓ src/remote-snapshot-reconciliation.test.ts (4 tests) 5ms
+ ✓ src/radar-fire-reveal-main-integration.test.ts (3 tests) 5ms
+ ✓ src/killstreak-drone-formation.test.ts (3 tests) 7ms
+ ✓ src/house-destruction-live-integration.test.ts (3 tests) 8ms
+ ✓ src/weapon-presentation-symmetry-probe.test.ts (1 test) 5ms
+ ✓ src/hosted-bots.test.ts (4 tests) 6ms
+ ✓ src/player-profile-main-integration.test.ts (4 tests) 659ms
+     ✓ fails if another runtime source reintroduces a superseded preference consumer  651ms
+ ✓ src/renderer-fallback-copy.test.ts (3 tests) 11ms
+ ✓ src/map3-prepare-then-build.test.ts (3 tests) 2104ms
+     ✓ builds all eight corridors once prepared, and is then idempotent  2099ms
+ ✓ src/pass66-standalone-browser-source-binding.test.ts (2 tests) 8ms
+ ✓ src/match-countdown-presentation.test.ts (2 tests) 16ms
+ ✓ src/support-presentation-cadence-contract.test.ts (4 tests) 7ms
+ ✓ src/ui/pass70-field-kit-runtime-integration.test.ts (3 tests) 5ms
+ ✓ src/support-placement-ground.test.ts (4 tests) 9ms
+ ✓ src/gameplay-replay.test.ts (3 tests) 436ms
+ ✓ src/particles/ambient-life-settings.test.ts (5 tests) 6ms
+ ✓ src/interactive-world-protocol.test.ts (3 tests) 22ms
+ ✓ src/ui/advanced-graphics-controls.test.ts (4 tests) 10ms
+ ✓ src/glass-main-integration.test.ts (4 tests) 4ms
+ ✓ src/pass70-multiplayer-regressions.test.ts (3 tests) 17ms
+ ✓ src/combat-feedback.test.ts (5 tests) 4ms
+ ✓ src/window-breaks.test.ts (4 tests) 6ms
+ ✓ src/weapon-audio-profiles.test.ts (4 tests) 9ms
+ ✓ src/particles/light-shaft-registry.test.ts (5 tests) 5ms
+ ✓ src/authored-shot-resolution.test.ts (5 tests) 6ms
+ ✓ src/pass72-lobby-reset-contract.test.ts (3 tests) 4ms
+ ✓ src/text-chat.test.ts (6 tests) 6ms
+ ✓ src/railgun-scope-state.test.ts (3 tests) 4ms
+ ✓ src/release-channel.test.ts (8 tests) 7ms
+ ✓ src/sticky-victim-receipts.test.ts (3 tests) 4ms
+ ✓ src/farcrysis-grass-tint.test.ts (1 test) 3626ms
+     ✓ gives every grass chunk real colour variance, not one flat green  3624ms
+ ✓ src/audio-test-bay-door.test.ts (2 tests) 5ms
+ ✓ src/smoke-protocol.test.ts (2 tests) 7ms
+ ✓ src/pass65-gameplay-hotpaths.test.ts (2 tests) 4ms
+ ✓ src/flame-damage-contract.test.ts (5 tests) 5ms
+ ✓ src/pass66-pass63-multiplayer-comparator-contract.test.ts (2 tests) 583ms
+     ✓ derives the stable capability boundary from the byte-exact pinned Pages bundle  581ms
+ ✓ src/max-admission-full-scene-prewarm.test.ts (2 tests) 4ms
+ ✓ src/killstreak-awareness-fix-round.test.ts (5 tests) 4ms
+ ✓ src/weapon-actions.test.ts (4 tests) 7ms
+ ✓ src/social-ping.test.ts (4 tests) 6ms
+ ✓ src/hud-motion-contract.test.ts (2 tests) 5ms
+ ✓ src/shot-timing-telemetry.test.ts (3 tests) 4ms
+ ✓ src/smoke-authority.integration.test.ts (1 test) 6ms
+stdout | src/audio-offline-render.test.ts > procedural audio offline render acceptance > renders every category deterministically inside its fixed peak/RMS band
+OFFLINE_AUDIO_METRICS {"weapons":{"peak":0.471067,"rms":0.031537},"movement":{"peak":0.192342,"rms":0.007996},"impacts":{"peak":0.200942,"rms":0.006848},"ui":{"peak":0.185746,"rms":0.007853},"music":{"peak":0.083768,"rms":0.020005}}
+OFFLINE_AUDIO_BASELINE {"weapons":{"peak":0.224843,"rms":0.017515},"movement":{"peak":0.083773,"rms":0.005672},"impacts":{"peak":0.158712,"rms":0.005623},"ui":{"peak":0.152542,"rms":0.010173},"music":{"peak":0.01504,"rms":0.007144}}
+
+ ✓ src/audio-offline-render.test.ts (2 tests) 1830ms
+     ✓ renders every category deterministically inside its fixed peak/RMS band  1825ms
+ ✓ src/presentation-scheduling-lifecycle.test.ts (3 tests) 4ms
+ ✓ src/lag-compensation.test.ts (5 tests) 5ms
+ ✓ shared/leaderboard-policy.test.ts (3 tests) 4ms
+ ✓ src/ik.test.ts (4 tests) 4ms
+ ✓ src/dmr-thermal-prewarm-lifecycle.test.ts (1 test) 5ms
+ ✓ src/remote-shot-admission.test.ts (3 tests) 4ms
+ ✓ src/invisible-wall-runtime-gap.test.ts (6 tests) 4ms
+ ✓ src/material-compatibility.test.ts (2 tests) 6ms
+ ✓ src/hud-chat-layout.test.ts (5 tests) 5ms
+ ✓ src/special-weapon-effects.test.ts (4 tests) 4ms
+ ✓ src/killstreak-ordnance-main-integration.test.ts (4 tests) 5ms
+ ✓ src/rendering/light-occlusion.test.ts (3 tests) 6ms
+ ✓ src/gun-range-cat-choreography.test.ts (2 tests) 132ms
+ ✓ src/weapon-finish.test.ts (22 tests) 283ms
+ ✓ src/cold-visitor-deploy.test.ts (4 tests) 4ms
+ ✓ src/ui/project-map-dialog.test.ts (3 tests) 9ms
+ ✓ src/render-profile.test.ts (3 tests) 4ms
+ ✓ src/kill-provenance.test.ts (4 tests) 4ms
+ ✓ src/audio-explosion-gate.test.ts (4 tests) 5ms
+ ✓ src/loadout.test.ts (5 tests) 4ms
+ ✓ src/retry-load.test.ts (4 tests) 5ms
+ ✓ src/async-serial-queue.test.ts (2 tests) 5ms
+ ✓ src/gpu-resource-ownership.test.ts (2 tests) 9ms
+ ✓ src/ui/pass74-killstreak-selector.test.ts (4 tests) 4ms
+ ✓ src/flash-protocol.test.ts (2 tests) 5ms
+ ✓ src/rendering/cold-session-precompile-reach.test.ts (3 tests) 9ms
+ ✓ src/pass70-start-benchmark.test.ts (2 tests) 5ms
+ ✓ src/presentation-animation-reset.test.ts (2 tests) 7ms
+ ✓ src/host-match-recovery-pose.test.ts (3 tests) 5ms
+ ✓ src/pass74-selector-ci-wiring.test.ts (2 tests) 4ms
+ ✓ src/weapon-prewarm-catalog.test.ts (4 tests) 5ms
+ ✓ src/gun-range-leaderboard.test.ts (3 tests) 5ms
+ ✓ src/pass65-release-foundation-evidence.test.ts (3 tests) 528ms
+     ✓ keeps the current candidate descended from the exact released Pass 64 source  524ms
+ ✓ src/stable-bone-orientation.test.ts (3 tests) 4ms
+ ✓ src/host-room-recovery.test.ts (3 tests) 3ms
+ ✓ src/deterministic-rng.test.ts (4 tests) 27ms
+ ✓ src/viewmodel-framing.test.ts (5 tests) 4ms
+ ✓ src/corpse-presentation-contract.test.ts (4 tests) 17ms
+ ✓ src/hf498-multiplayer-bugs.test.ts (3 tests) 6ms
+ ✓ src/killstreak-slot-possession.test.ts (3 tests) 12ms
+ ✓ src/combat/weapon-role-distance.test.ts (3 tests) 6ms
+ ✓ src/clipboard.test.ts (5 tests) 27ms
+ ✓ src/flash-authority.integration.test.ts (1 test) 7ms
+ ✓ src/host-canonical-hit-admission.test.ts (2 tests) 4ms
+ ✓ src/network-fairness.test.ts (3 tests) 4ms
+ ✓ src/arena-transition-profile.test.ts (3 tests) 5ms
+ ✓ src/pass66-audio-long-run-runner.test.ts (1 test) 6ms
+ ✓ src/handicap.test.ts (4 tests) 5ms
+ ✓ src/pass73-ads-reveal-readback.test.ts (3 tests) 5ms
+ ✓ src/blender-authoring-fail-closed.test.ts (14 tests) 3621ms
+     ✓ tower fails closed on an unhandled Python error  361ms
+     ✓ semtex fails closed on an unhandled Python error  317ms
+     ✓ crossbow fails closed on an unhandled Python error  361ms
+     ✓ operator-body fails closed on an unhandled Python error  305ms
+     ✓ weapon-families fails closed on an unhandled Python error  353ms
+     ✓ weapon-preview-reconcile fails closed on an unhandled Python error  366ms
+     ✓ field-knife fails closed on an unhandled Python error  378ms
+     ✓ support-aircraft-visibility fails closed on an unhandled Python error  344ms
+ ✓ src/match-report.test.ts (1 test) 4ms
+ ✓ src/pass65-endurance-verifier-contract.test.ts (3 tests) 5ms
+ ✓ src/match-presentation.test.ts (4 tests) 4ms
+ ✓ src/debug-capture-main-integration.test.ts (2 tests) 7ms
+ ✓ src/gameplay-state-property.test.ts (2 tests) 14368ms
+     ✓ preserves combat, movement and inventory invariants under conflicting actions  915ms
+     ✓ replays every generated sequence to the same canonical hash  13452ms
+ ✓ src/player-feedback.test.ts (3 tests) 5ms
+ ✓ src/pass73-start-benchmark.test.ts (2 tests) 5ms
+ ✓ src/farcrysis-elev-probe.test.ts (1 test) 58ms
+ ✓ src/audio-output-probe.test.ts (3 tests) 8ms
+ ✓ src/minigun-spool.test.ts (2 tests) 5ms
+ ✓ src/match-countdown-audio.test.ts (3 tests) 7ms
+ ✓ src/pass70-cross-browser-runner-contract.test.ts (2 tests) 3ms
+ ✓ src/priority-preparation-coordinator.test.ts (2 tests) 5ms
+ ✓ src/hit-proxies.test.ts (3 tests) 4ms
+ ✓ src/remote-melee-admission.test.ts (3 tests) 4ms
+ ✓ src/deployment-loading-progress.test.ts (3 tests) 3ms
+ ✓ src/rendering/arena-coverage-prewarm.test.ts (2 tests) 7ms
+ ↓ src/killstreak-demo-published-media.test.ts (2 tests | 2 skipped)
+ ✓ src/remote-movement-admission.test.ts (4 tests) 4ms
+ ✓ src/hosted-bot-damage-admission.test.ts (3 tests) 3ms
+ ✓ src/release-benchmark.test.ts (3 tests) 5ms
+ ✓ src/rustworks-flag.test.ts (1 test) 7ms
+ ✓ src/major-debris-budget.test.ts (2 tests) 4ms
+ ✓ src/chopper-exterior-review-hold.test.ts (10 tests) 4ms
+ ✓ src/weapon-display-name-contract.test.ts (1 test) 453ms
+     ✓ does not emit retired fictional labels outside explicit historical fixtures  451ms
+ ✓ src/arena-generation-cache.test.ts (2 tests) 6ms
+ ✓ src/footsteps.test.ts (3 tests) 3ms
+ ✓ src/room-chat-presentation.test.ts (4 tests) 4ms
+ ✓ src/gun-range-armory.test.ts (2 tests) 4ms
+ ✓ src/rejoin-replication.test.ts (1 test) 6ms
+ ✓ src/pass65-weapon-lifecycle.test.ts (2 tests) 3ms
+ ✓ src/pass69-3-menu-preview-authoring-integration.test.ts (1 test) 3ms
+ ✓ src/arena-storytelling.test.ts (2 tests) 4ms
+ ✓ src/directional-hud.test.ts (3 tests) 3ms
+ ✓ src/pipeline-metrics.test.ts (1 test) 4ms
+ ✓ src/hud-layout.test.ts (2 tests) 4ms
+ ✓ src/external-services-qa-contract.test.ts (5 tests) 10ms
+ ✓ src/production-receipt.test.ts (1 test) 3ms
+ ✓ src/weapon-family-presentation.test.ts (2 tests) 3ms
+ ✓ src/menu-weapon-asset-preparation-contract.test.ts (1 test) 8ms
+ ✓ src/support-forward-axis.test.ts (2 tests) 4ms
+ ✓ src/hud-feed.test.ts (2 tests) 3ms
+ ✓ src/audio-flashbang.test.ts (3 tests) 73ms
+ ✓ src/canonical-sha256.test.ts (6 tests) 5ms
+ ✓ src/timed-map-weapon-presentation.test.ts (1 test) 120ms
+ ✓ src/frag-grenade-audio.test.ts (2 tests) 10ms
+ ✓ src/crossbow-minigun-audio.test.ts (3 tests) 42ms
+ ✓ src/pass25a-baseline-immutability.test.ts (2 tests) 7ms
+ ✓ src/nuketown2-review-camera.test.ts (1 test) 85ms
+ ✓ src/participant-identity.test.ts (8 tests) 4ms
+ ✓ src/guest-rejoin-affordance.test.ts (2 tests) 4ms
+ ✓ src/combat-timing.test.ts (2 tests) 2ms
+ ✓ src/pass65-browser-console-contract.test.ts (2 tests) 4ms
+stdout | src/_hf392-budget-probe.test.ts > HF-392 budget probe > reports draws and triangles
+[hf392-budget] {"draws":260,"triangles":5716}
+
+ ✓ src/_hf392-budget-probe.test.ts (1 test) 515ms
+     ✓ reports draws and triangles  513ms
+ ✓ src/bootstrap-preload-contract.test.ts (1 test) 9ms
+ ✓ src/rendering/runtime-shadow-budget.test.ts (2 tests) 4ms
+ ✓ src/gameplay-contract.test.ts (1 test) 13ms
+
+ Test Files  631 passed | 1 skipped (632)
+      Tests  6359 passed | 2 skipped (6361)
+   Start at  10:27:00
+   Duration  91.61s (transform 203.84s, setup 0ms, import 579.78s, tests 379.25s, environment 73ms)
+
+[exit] 0 at 10:28:33
+[lock] released

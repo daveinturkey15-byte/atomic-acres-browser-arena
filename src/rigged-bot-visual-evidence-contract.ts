@@ -428,9 +428,9 @@ const lookAtCamera = (
   });
 };
 
-const ATOMIC_COMMANDED_PLAYER_POSITION = Object.freeze([-3, 1.7, 40] as const);
-const ATOMIC_BOT_POSITION = Object.freeze([2.2, 0, 40] as const);
-const ATOMIC_TARGET = Object.freeze([2.2, 1.08, 40] as const);
+const ATOMIC_COMMANDED_PLAYER_POSITION = Object.freeze([-3, 1.7, 27] as const);
+const ATOMIC_BOT_POSITION = Object.freeze([2.2, 0, 27] as const);
+const ATOMIC_TARGET = Object.freeze([2.2, 1.08, 27] as const);
 
 const fixedDummyActors = Object.freeze(GUN_RANGE_TEST_BAY_CONTRACT.dummies.map((definition, index) => {
   const pose = gunRangeTestBayRenderedDummyPose(definition, index, 0);
@@ -546,8 +546,8 @@ export const RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT = Object.freeze({
       arithmeticEpsilonM: 1e-9,
       nominalPositionEnvelopeM: Object.freeze([0.0005, 0, 0.0005] as const),
     }),
-    mediumCamera: lookAtCamera('atomic-south-road-crosslane-medium-v2', [-2.2, 1.08, 40], ATOMIC_TARGET, 58),
-    closeCamera: lookAtCamera('atomic-south-road-crosslane-close-v2', [0.2, 1.08, 40], ATOMIC_TARGET, 58),
+    mediumCamera: lookAtCamera('atomic-south-road-crosslane-medium-v2', [-2.2, 1.08, 27], ATOMIC_TARGET, 58),
+    closeCamera: lookAtCamera('atomic-south-road-crosslane-close-v2', [0.2, 1.08, 27], ATOMIC_TARGET, 58),
   }),
   gunRange: Object.freeze({
     id: 'gun-range-open-bay-fixed-v1',

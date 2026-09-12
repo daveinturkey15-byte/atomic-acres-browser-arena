@@ -35,4 +35,16 @@ describe('glass authority runtime integration', () => {
     expect(paneReset).toBeGreaterThan(runtimeReset);
     expect(killstreakRuntime).toBeGreaterThan(paneReset);
   });
+
+  it('HF-344: derives dynamic glass colliders from authored solid bounds rather than mesh AABB', () => {
+    expect(source).toContain("import {\n  deriveGlassColliderBounds,\n} from './glass-collider-bounds';");
+    const glassColliders = block(
+      'function activeGlassDynamicColliders(',
+      '\nfunction activeWorldColliders(',
+    );
+    expect(glassColliders).toContain('const colliderBounds = deriveGlassColliderBounds(pane, activeArena);');
+    expect(glassColliders).toContain('activeGlassColliderWindowIds.set(colliderBounds, pane.id);');
+    expect(glassColliders).not.toContain('setFromObject');
+    expect(glassColliders).not.toContain('new THREE.Box3()');
+  });
 });

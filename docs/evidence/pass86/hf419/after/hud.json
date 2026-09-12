@@ -1,0 +1,95 @@
+{
+  "hub-overview": {
+    "pose": {
+      "x": 0,
+      "y": 1.7,
+      "z": -4,
+      "yaw": 0,
+      "pitch": -0.05
+    },
+    "samples": [
+      "180 fps · 160 draws · 521k tris · WebGPU · shim 43/139 · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D"
+    ],
+    "fpsMin": 180,
+    "fpsMax": 180,
+    "frameStats": {
+      "n": 560,
+      "dtP50": 5.599999904632568,
+      "dtP95": 6.300000071525574,
+      "encodeP50": 2.700000047683716,
+      "encodeP95": 4,
+      "draws": 160,
+      "tris": 522470
+    }
+  },
+  "corridor-3-grammar": {
+    "pose": {
+      "x": -20,
+      "y": 1.7,
+      "z": -1.2246467991473533e-15,
+      "yaw": 1.5707963267948966,
+      "pitch": -0.05
+    },
+    "samples": [
+      "180 fps · 150 draws · 277k tris · WebGPU · shim 49/154 · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D"
+    ],
+    "fpsMin": 180,
+    "fpsMax": 180,
+    "frameStats": {
+      "n": 542,
+      "dtP50": 5.599999904632568,
+      "dtP95": 6.100000023841858,
+      "encodeP50": 2.8000000715255737,
+      "encodeP95": 4.199999928474426,
+      "draws": 150,
+      "tris": 276412
+    }
+  },
+  "corridor-3-street-cell": {
+    "pose": {
+      "x": -71.5,
+      "y": 1.87,
+      "z": 5.199999999999996,
+      "yaw": 1.5707963267948966,
+      "pitch": -0.045
+    },
+    "samples": [
+      "176 fps · 124 draws · 242k tris · WebGPU · shim 49/154 · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D"
+    ],
+    "fpsMin": 176,
+    "fpsMax": 176,
+    "frameStats": {
+      "n": 542,
+      "dtP50": 5.599999904632568,
+      "dtP95": 6.399999976158142,
+      "encodeP50": 2.600000023841858,
+      "encodeP95": 4.100000023841858,
+      "draws": 124,
+      "tris": 242424
+    }
+  },
+  "corridor-3-street-kerbside": {
+    "pose": {
+      "x": -80,
+      "y": 1.42,
+      "z": 2.399999999999995,
+      "yaw": 0.9507963267948966,
+      "pitch": -0.1
+    },
+    "samples": [
+      "177 fps · 132 draws · 245k tris · WebGPU · shim 49/154 · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D"
+    ],
+    "fpsMin": 177,
+    "fpsMax": 177,
+    "frameStats": {
+      "n": 520,
+      "dtP50": 5.599999904632568,
+      "dtP95": 8.399999976158142,
+      "encodeP50": 2.5,
+      "encodeP95": 5.899999976158142,
+      "draws": 132,
+      "tris": 245308
+    }
+  },
+  "__pageErrors": []
+}

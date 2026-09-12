@@ -27,10 +27,11 @@ describe('combat feedback helpers', () => {
 
   it('classifies authored walkable surfaces for procedural footsteps', () => {
     expect(classifyFootstepSurface({ x: 0, y: 1.7, z: 0 })).toBe('asphalt');
-    expect(classifyFootstepSurface({ x: 12.2, y: 1.7, z: 0 })).toBe('concrete');
-    expect(classifyFootstepSurface({ x: -9, y: 5, z: -28 })).toBe('wood');
-    expect(classifyFootstepSurface({ x: -9, y: 0.6, z: -37.2 })).toBe('wood');
-    expect(classifyFootstepSurface({ x: 24, y: 1.7, z: 0 })).toBe('soil');
+    expect(classifyFootstepSurface({ x: 0, y: 1.7, z: 7 })).toBe('concrete');
+    // v3: the aqua house moved to its team end (x -19).
+    expect(classifyFootstepSurface({ x: -19, y: 5, z: -17.4 })).toBe('wood');
+    expect(classifyFootstepSurface({ x: -19, y: 0.6, z: -27.6 })).toBe('wood');
+    expect(classifyFootstepSurface({ x: 0, y: 1.7, z: 20 })).toBe('soil');
     expect(classifyFootstepSurface({ x: Number.NaN, y: 0, z: 0 })).toBe('soil');
   });
 

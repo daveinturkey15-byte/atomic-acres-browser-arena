@@ -5,7 +5,7 @@ const peerPort = Number(process.env.QA_PEER_PORT ?? 0);
 const forceArenaSyncGate = ['127.0.0.1', 'localhost'].includes(new URL(baseUrl).hostname);
 const browser = await chromium.launch({
   headless: true,
-  args: [
+  args: ['--mute-audio', 
     '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
     '--disable-backgrounding-occluded-windows', '--allow-loopback-in-peer-connection',
     '--disable-features=WebRtcHideLocalIpsWithMdns',

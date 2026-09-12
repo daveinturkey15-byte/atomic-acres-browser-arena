@@ -13,7 +13,7 @@ describe('WaterSystem', () => {
   it('builds deep ocean under a raised Rustworks oil-rig deck', () => {
     const scene = new THREE.Scene();
     const water = new WaterSystem(scene);
-    water.configure('rustworks-1v1', 'blender', { halfX: 27, halfZ: 29 }, { night: true, waterLevel: -19.5 });
+    water.configure('rustworks-1v1', 'blender');
     expect(water.telemetry()).toMatchObject({
       enabled: true,
       arenaId: 'rustworks-1v1',
@@ -30,6 +30,8 @@ describe('WaterSystem', () => {
     expect(water.root.getObjectByName('arena-ocean-horizon')).toBeTruthy();
     const horizon = water.root.getObjectByName('arena-ocean-horizon') as THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
     expect(horizon.material.fog).toBe(false);
+    const surface = water.root.getObjectByName('arena-ocean-surface') as THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
+    expect(surface.material.uniforms.uDeep.value.getHex()).toBe(0x020814);
     water.update(1.25);
     const onDeck = water.samplePhysics(new THREE.Vector3(0, 1.5, 0));
     expect(onDeck.inWater).toBe(false);
@@ -76,7 +78,7 @@ describe('WaterSystem', () => {
     const time = 7.25;
     const samples = (['compat', 'performance', 'blender'] as const).map((profile) => {
       const water = new WaterSystem(new THREE.Scene());
-      water.configure('rustworks-1v1', profile, { halfX: 27, halfZ: 29 });
+      water.configure('rustworks-1v1', profile);
       return water.samplePhysics(point, time);
     });
     expect(samples[1]).toEqual(samples[0]);
@@ -85,8 +87,182 @@ describe('WaterSystem', () => {
 
   it('stays off for gun range', () => {
     const water = new WaterSystem(new THREE.Scene());
-    water.configure('gun-range', 'performance', { halfX: 15, halfZ: 42 });
+    water.configure('gun-range', 'performance');
     expect(water.telemetry().enabled).toBe(false);
     expect(water.root.visible).toBe(false);
+  });
+
+  // HF-358: the water-authoring registry - not a hard-coded rustworks gate - is
+  // the single source of which arenas have water, and presentation OWNERSHIP,
+  // not de-registration, is what keeps Farcrysis from getting a second sea.
+  it('drives configuration and CPU authority from the per-arena water body registry (HF-358)', () => {
+    // HF-358 audit correction (Pass 74), now enforced rather than worked around.
+    // Farcrysis authors its own three water layers, so a shared surface here is a
+    // SECOND ocean 20mm below the real one; and because the runtime always supplies
+    // oceanWaveAmplitude, the authored amplitudeScale of 0.2 used to never apply, so
+    // the arena inherited RustRig's storm and crested ~2m above a play space with a
+    // ~1.6m eye height. Both root causes are fixed rather than avoided - the body
+    // carries presentationOwner 'arena-builder' so the shared runtime draws nothing,
+    // and configure() multiplies the profile amplitude by amplitudeScale - so the
+    // body stays REGISTERED for CPU/physics authority and the two failure modes the
+    // audit found are asserted directly below instead of being dodged.
+    const farcrysis = new WaterSystem(new THREE.Scene());
+    farcrysis.configure('farcrysis', 'blender');
+    expect(farcrysis.telemetry()).toMatchObject({
+      enabled: true,
+      physicsActive: true,
+      // HF-360: the registry level was corrected to the live authored lagoon
+      // surface (-0.25); -0.3 came from a deleted terrain module.
+      waterLevel: -0.25,
+      swimmable: true,
+    });
+    expect(farcrysis.body?.arenaId).toBe('farcrysis');
+    // Audit guard 1 - no duplicate sea. The arena builder owns presentation, so the
+    // shared system contributes no surface of its own at any level.
+    expect(farcrysis.body?.presentationOwner).toBe('arena-builder');
+    expect(farcrysis.root.visible).toBe(false);
+    expect(farcrysis.root.children.length).toBe(0);
+    expect(farcrysis.root.getObjectByName('arena-ocean-surface')).toBeFalsy();
+    expect(farcrysis.root.getObjectByName('arena-ocean-horizon')).toBeFalsy();
+    // Audit guard 2 - the authored amplitudeScale actually reaches the surface, so
+    // Farcrysis never inherits the RustRig storm spectrum, and the full theoretical
+    // wave envelope stays well under the island's ~1.6m eye height.
+    expect(farcrysis.telemetry().waveAmp).toBe(RUSTWORKS_OCEAN_AMPLITUDE.blender * 0.2);
+    expect(farcrysis.telemetry().waveAmp).not.toBe(RUSTWORKS_OCEAN_AMPLITUDE.blender);
+    const farcrysisEnvelope = farcrysis.telemetry().waveAmp
+      * OCEAN_WAVES.reduce((sum, wave) => sum + wave.weight, 0);
+    expect(farcrysisEnvelope).toBeLessThan(1.6);
+
+    // RustRig regression guard: exact pre-HF-358 behaviour preserved.
+    const rustworks = new WaterSystem(new THREE.Scene());
+    rustworks.configure('rustworks-1v1', 'compat');
+    expect(rustworks.telemetry()).toMatchObject({ enabled: true, waterLevel: -19.5 });
+    expect(rustworks.swimmable).toBe(false);
+
+    // Arenas absent from the registry have no water at all.
+    const none = new WaterSystem(new THREE.Scene());
+    none.configure('skyline-terminal', 'performance');
+    expect(none.telemetry()).toMatchObject({ enabled: false, physicsActive: false });
+    expect(none.root.visible).toBe(false);
+  });
+
+  // CPU buoyancy must sample the SAME frozen band table the WebGPU TSL factory
+  // displaces with, rather than a second hand-synchronised copy.
+  it('samples physics from the shared ocean-spectrum authority', async () => {
+    const { sampleOcean, oceanSpectrumFingerprint, OCEAN_SPECTRUM_AUTHORITY_ID } = await import('./water/ocean-spectrum');
+    const water = new WaterSystem(new THREE.Scene());
+    water.configure('rustworks-1v1', 'performance');
+    const position = new THREE.Vector3(40, -21, 0);
+    const time = 12.5;
+    const physics = water.samplePhysics(position, time);
+    const reference = sampleOcean(position.x, position.z, time, RUSTWORKS_OCEAN_AMPLITUDE.performance);
+    expect(physics.surfaceY).toBeCloseTo(-19.5 + reference.height, 12);
+    expect(physics.surfaceVelocityY).toBeCloseTo(reference.verticalVelocity, 12);
+    const { createOceanTslWater } = await import('./water/ocean-tsl');
+    const tsl = createOceanTslWater(water.body!);
+    expect(tsl.mesh.userData.oceanSpectrumFingerprint).toBe(oceanSpectrumFingerprint());
+    expect(tsl.mesh.userData.waveAuthority).toBe(OCEAN_SPECTRUM_AUTHORITY_ID);
+    const { OCEAN_REFERENCE_AMPLITUDE } = await import('./water/ocean-spectrum');
+    expect(tsl.mesh.userData.waveAmplitudeUniform.value)
+      .toBe(OCEAN_REFERENCE_AMPLITUDE * water.body!.amplitudeScale);
+  });
+
+  it('drives the High Seas ocean entirely from shared authoring', () => {
+    const water = new WaterSystem(new THREE.Scene());
+    water.configure('high-seas', 'blender');
+    expect(water.telemetry()).toMatchObject({
+      enabled: true,
+      arenaId: 'high-seas',
+      waterLevel: -2.2,
+      nearSize: 960,
+      horizonRadius: 3_200,
+      physicsActive: true,
+      swimmable: false,
+      waveAmp: RUSTWORKS_OCEAN_AMPLITUDE.blender * 0.15,
+    });
+    const surface = water.root.getObjectByName('arena-ocean-surface') as THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
+    expect(surface.position.y).toBe(-2.2);
+    expect(surface.material.uniforms.uExcludeDryFootprint.value).toBe(0);
+    expect(surface.material.fragmentShader).toContain('float edge = uExcludeDryFootprint *');
+    const theoreticalEnvelope = water.telemetry().waveAmp
+      * OCEAN_WAVES.reduce((sum, wave) => sum + wave.weight, 0);
+    expect(theoreticalEnvelope).toBeCloseTo(0.3545625, 7);
+    expect(water.samplePhysics(new THREE.Vector3(0, -3, 0), 0).inWater).toBe(true);
+  });
+
+  it('clears shared presentation when switching to retained Farcrysis water', () => {
+    const water = new WaterSystem(new THREE.Scene());
+    water.configure('high-seas', 'blender');
+    water.configure('farcrysis', 'blender');
+    expect(water.telemetry()).toMatchObject({
+      enabled: true,
+      arenaId: 'farcrysis',
+      physicsActive: true,
+      swimmable: true,
+      waterLevel: -0.25, // HF-360: corrected to the live authored lagoon surface
+      waveAmp: RUSTWORKS_OCEAN_AMPLITUDE.blender * 0.2,
+      nearSize: 76,
+      horizonRadius: 1_400,
+    });
+    expect(water.root.visible).toBe(false);
+    // Re-pinned after commit 4af5cd01 (HF-396 island rescale): farcrysis'
+    // dry-footprint half extent grew 32 -> 55.5 m (pinned against the live
+    // terrain authority in water/water-authoring.test.ts), so x=40 is now DRY
+    // LAND and must stay out of the ocean sampler — asserting inWater here
+    // would re-pin the pre-rescale bug where prone players on dry sand took
+    // ocean buoyancy. Strictness increased: pins BOTH sides of the dry gate
+    // and real buoyancy beyond it, not one open-ocean point.
+    expect(water.samplePhysics(new THREE.Vector3(40, -1, 0), 0).inWater).toBe(false);
+    const openWater = water.samplePhysics(new THREE.Vector3(60, -1, 0), 0);
+    expect(openWater.inWater).toBe(true);
+    expect(openWater.buoyancy).toBeGreaterThan(0);
+  });
+
+  // HF-358 fix: the WebGL2 GLSL presentation must displace with the SAME
+  // Gerstner band table the CPU buoyancy sampler reads — previously it used
+  // the legacy warped-sine field and drifted ~1m from the drawn surface.
+  // This parses the band constants injected into the built vertex shader and
+  // re-evaluates them against sampleOcean() so the two cannot silently drift.
+  it('builds the WebGL2 surface from the buoyancy spectrum, not the legacy warped sine (HF-358)', async () => {
+    const { sampleOcean } = await import('./water/ocean-spectrum');
+    const scene = new THREE.Scene();
+    const water = new WaterSystem(scene);
+    water.configure('rustworks-1v1', 'compat');
+    const mesh = scene.getObjectByName('arena-ocean-surface') as THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
+    const vertexShader = mesh.material.vertexShader;
+    // The legacy warp terms must be gone from the presentation path.
+    expect(vertexShader).not.toContain('warpPhase');
+    expect(vertexShader).toContain('sampleBand');
+    // Re-evaluate every injected band call exactly as GLSL would.
+    const calls = [...vertexShader.matchAll(/sampleBand\(p,\s*vec2\(([-\d.]+), ([-\d.]+)\),\s*([-\d.]+),\s*([-\d.]+),\s*([-\d.]+),\s*([-\d.]+),\s*vec2\(([-\d.]+), ([-\d.]+)\)\)/g)].map((m) => m.slice(1).map(Number));
+    expect(calls).toHaveLength(5);
+    const amp = mesh.material.uniforms.uAmp.value;
+    const time = 12.5;
+    for (const [x, z] of [[40, 0], [-120, 80], [7, -333], [210, 210]] as const) {
+      let height = 0;
+      let slopeX = 0;
+      let slopeZ = 0;
+      for (const [dx, dz, k, omega, weight, phase] of calls) {
+        const ph = (x * dx + z * dz) * k - time * omega + phase;
+        height += Math.sin(ph) * weight * amp;
+        slopeX += Math.cos(ph) * weight * amp * k * dx;
+        slopeZ += Math.cos(ph) * weight * amp * k * dz;
+      }
+      const cpu = sampleOcean(x, z, time, amp);
+      expect(height).toBeCloseTo(cpu.height, 9);
+      expect(slopeX).toBeCloseTo(cpu.slopeX, 9);
+      expect(slopeZ).toBeCloseTo(cpu.slopeZ, 9);
+    }
+    // Gameplay contract: identical gameplay surface height for the same input
+    // regardless of render profile (WebGL2 compat vs any other profile).
+    const point = new THREE.Vector3(64, -20, -48);
+    const profiles = (['compat', 'performance', 'blender'] as const).map((profile) => {
+      const w = new WaterSystem(new THREE.Scene());
+      w.configure('rustworks-1v1', profile);
+      return w.samplePhysics(point, time);
+    });
+    expect(profiles[1].surfaceY).toBe(profiles[0].surfaceY);
+    expect(profiles[2].surfaceY).toBe(profiles[0].surfaceY);
+    expect(profiles[1].buoyancy).toBe(profiles[0].buoyancy);
   });
 });

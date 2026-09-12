@@ -1,0 +1,355 @@
+{
+ "capturedAt": "2026-09-02",
+ "stage": "3 (runtime verifier) BEFORE Lane J",
+ "probeM": 0.15,
+ "summary": [
+  {
+   "arena": "atomic-acres",
+   "sweep": 15,
+   "remaining": 2
+  },
+  {
+   "arena": "skyline-terminal",
+   "sweep": 6,
+   "remaining": 2
+  },
+  {
+   "arena": "rustworks-1v1",
+   "sweep": 0,
+   "remaining": 0
+  },
+  {
+   "arena": "gun-range",
+   "sweep": 55,
+   "remaining": 5
+  },
+  {
+   "arena": "high-seas",
+   "sweep": 0,
+   "remaining": 0
+  },
+  {
+   "arena": "test1",
+   "sweep": 0,
+   "remaining": 0
+  },
+  {
+   "arena": "test2",
+   "sweep": 0,
+   "remaining": 0
+  },
+  {
+   "arena": "map3",
+   "sweep": 0,
+   "remaining": 0
+  }
+ ],
+ "remaining": [
+  {
+   "x": -11.48,
+   "z": -11.68,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    0,
+    0,
+    1
+   ],
+   "distance": 0.081,
+   "surface": "interior-access-ramp",
+   "runtime": {
+    "distance": 0.143,
+    "surface": "interior-access-ramp",
+    "dir": [
+     0,
+     0.6,
+     0.8
+    ]
+   },
+   "seat": [
+    -11.48,
+    0.505,
+    -11.68
+   ],
+   "resolve": {
+    "x": -11.48009967803955,
+    "y": 0.5052363481585729,
+    "z": -11.679986953735352,
+    "pushedM": 0.2448627993996394
+   }
+  },
+  {
+   "x": -9.82,
+   "z": -11.68,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    0,
+    0,
+    1
+   ],
+   "distance": 0.081,
+   "surface": "interior-access-ramp",
+   "runtime": {
+    "distance": 0.143,
+    "surface": "interior-access-ramp",
+    "dir": [
+     0,
+     0.6,
+     0.8
+    ]
+   },
+   "seat": [
+    -9.82,
+    0.505,
+    -11.68
+   ],
+   "resolve": {
+    "x": -9.819968223571777,
+    "y": 0.5052438421928787,
+    "z": -11.680000305175781,
+    "pushedM": 0.2448858825481034
+   }
+  },
+  {
+   "x": -0.63,
+   "z": 13.72,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    0,
+    0.6,
+    0.8
+   ],
+   "distance": 0.067,
+   "surface": "skyline-jetliner-engine-1",
+   "runtime": {
+    "distance": 0.035,
+    "surface": "skyline-jetliner-engine-1",
+    "dir": [
+     0.5646424733950354,
+     0,
+     0.8253356149096783
+    ]
+   },
+   "seat": [
+    -0.97,
+    1.661,
+    13.72
+   ],
+   "resolve": {
+    "x": -0.9699999952316285,
+    "y": 1.6613541793823243,
+    "z": 13.720000267028809,
+    "pushedM": 0.34
+   }
+  },
+  {
+   "x": -0.63,
+   "z": -9.72,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    0,
+    0.6,
+    -0.8
+   ],
+   "distance": 0.067,
+   "surface": "skyline-jetliner-engine-2",
+   "runtime": {
+    "distance": 0.035,
+    "surface": "skyline-jetliner-engine-2",
+    "dir": [
+     0.5646424733950355,
+     0,
+     -0.8253356149096782
+    ]
+   },
+   "seat": [
+    -0.97,
+    1.58,
+    -9.72
+   ],
+   "resolve": {
+    "x": -0.9699999952316285,
+    "y": 1.5796874713897706,
+    "z": -9.720000267028809,
+    "pushedM": 0.34
+   }
+  },
+  {
+   "x": 51.1,
+   "z": 8.64,
+   "eyeY": 1.7,
+   "stance": "stand",
+   "kind": "face",
+   "dir": [
+    1,
+    0,
+    0
+   ],
+   "distance": 0.05,
+   "surface": "gun-range-test-bay-secure-door-leaf",
+   "runtime": {
+    "distance": 0.15,
+    "surface": "gun-range-test-bay-secure-door-leaf",
+    "dir": [
+     1,
+     0,
+     0
+    ]
+   },
+   "seat": [
+    51,
+    1.84,
+    8.64
+   ],
+   "resolve": {
+    "x": 51,
+    "y": 1.8401240634918214,
+    "z": 8.639982223510742,
+    "pushedM": 0.09994125366210938
+   }
+  },
+  {
+   "x": -17.96,
+   "z": -7.67,
+   "eyeY": 1.7,
+   "stance": "stand",
+   "kind": "face",
+   "dir": [
+    -0.83,
+    0,
+    0.56
+   ],
+   "distance": 0.052,
+   "surface": "gun-range-wallbang-panel-glass",
+   "runtime": {
+    "distance": 0.032,
+    "surface": "gun-range-wallbang-panel-glass",
+    "dir": [
+     -0.36836860195017185,
+     0,
+     0.9296798228945683
+    ]
+   },
+   "seat": [
+    -17.96,
+    1.84,
+    -7.67
+   ],
+   "resolve": {
+    "x": -17.959997177124023,
+    "y": 1.840088896751404,
+    "z": -7.669954299926758,
+    "pushedM": 0
+   }
+  },
+  {
+   "x": -17.98,
+   "z": -7.67,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    -0.83,
+    0,
+    0.56
+   ],
+   "distance": 0.052,
+   "surface": "gun-range-wallbang-panel-glass",
+   "runtime": {
+    "distance": 0.032,
+    "surface": "gun-range-wallbang-panel-glass",
+    "dir": [
+     -0.36836860195017185,
+     0,
+     0.9296798228945683
+    ]
+   },
+   "seat": [
+    -17.98,
+    0.75,
+    -7.67
+   ],
+   "resolve": {
+    "x": -17.979997634887695,
+    "y": 0.7501000416278839,
+    "z": -7.670000076293945,
+    "pushedM": 0
+   }
+  },
+  {
+   "x": -9.04,
+   "z": -7.67,
+   "eyeY": 1.7,
+   "stance": "stand",
+   "kind": "face",
+   "dir": [
+    1,
+    0,
+    0
+   ],
+   "distance": 0,
+   "surface": "gun-range-wallbang-panel-brick",
+   "runtime": {
+    "distance": 0,
+    "surface": "gun-range-wallbang-panel-brick",
+    "dir": [
+     1,
+     0,
+     6.123233995736766e-17
+    ]
+   },
+   "seat": [
+    -9.04,
+    1.84,
+    -7.67
+   ],
+   "resolve": {
+    "x": -9.04010009765625,
+    "y": 1.8400939631462099,
+    "z": -7.670000076293945,
+    "pushedM": 0
+   }
+  },
+  {
+   "x": -9.02,
+   "z": -7.67,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    1,
+    0,
+    0
+   ],
+   "distance": 0,
+   "surface": "gun-range-wallbang-panel-brick",
+   "runtime": {
+    "distance": 0,
+    "surface": "gun-range-wallbang-panel-brick",
+    "dir": [
+     1,
+     0,
+     6.123233995736766e-17
+    ]
+   },
+   "seat": [
+    -9.02,
+    0.75,
+    -7.67
+   ],
+   "resolve": {
+    "x": -9.020079612731934,
+    "y": 0.7501160156726837,
+    "z": -7.670000076293945,
+    "pushedM": 0
+   }
+  }
+ ]
+}

@@ -1,0 +1,380 @@
+{
+  "label": "after",
+  "arena": "atomic-acres",
+  "renderer": "webgpu",
+  "stations": [
+    {
+      "name": "stand-idle",
+      "stance": "stand",
+      "speed": 0,
+      "staged": {
+        "id": "bot-0",
+        "logicalPosition": [
+          30.192989214230312,
+          0,
+          7.210266081010223
+        ],
+        "rootPosition": [
+          30.192989214230312,
+          0,
+          7.210266081010223
+        ],
+        "rootYaw": -1.8052120025187075,
+        "alive": true,
+        "weapon": "carbine"
+      },
+      "sample": {
+        "botId": "bot-0",
+        "stance": null,
+        "activeClip": "Idle_Gun",
+        "pivotHeight": 0.8400000000000001,
+        "pivotPitch": -3.4755742793598385e-7,
+        "posture": null,
+        "pass77": {
+          "contract": "director-composed-operator-animation-v1",
+          "archetype": "explorer",
+          "state": "idle",
+          "layers": [
+            {
+              "clip": "Idle_Gun",
+              "weight": 1,
+              "timeScale": 1
+            }
+          ],
+          "baseWeightSum": 1,
+          "additiveLayers": [],
+          "mixedClips": [
+            "Idle_Gun"
+          ],
+          "mixedActions": [
+            {
+              "name": "Idle_Gun",
+              "weight": 1,
+              "paused": false
+            }
+          ],
+          "boundActions": 16,
+          "playbackRate": 1,
+          "footSlideMps": 0,
+          "footSlideRatio": 0,
+          "directional": true,
+          "directionMismatch": 0,
+          "aimPitchRadians": 0,
+          "aimJointRadians": {
+            "spine": 4.978431666831319e-26,
+            "chest": 5.310327111286741e-26,
+            "neck": 2.9870590000987917e-26,
+            "head": 3.3189544445542134e-26
+          },
+          "postureSpineRadians": 0.05,
+          "turning": 0,
+          "visualYawLagRadians": 0,
+          "hitReactionWeight": 0,
+          "lazilyBoundDirectionalClips": 3
+        }
+      },
+      "screenshot": "C:\\Users\\david\\projects\\aa-v-bot-anim-prone-crouch\\docs\\evidence\\pass95\\bot-anim-prone-crouch\\after\\after-stand-idle.png"
+    },
+    {
+      "name": "crouch-idle",
+      "stance": "crouch",
+      "speed": 0,
+      "staged": {
+        "id": "bot-0",
+        "logicalPosition": [
+          30.192989214230312,
+          0,
+          7.210266081010223
+        ],
+        "rootPosition": [
+          30.192989214230312,
+          0,
+          7.210266081010223
+        ],
+        "rootYaw": -1.8052120025187075,
+        "alive": true,
+        "weapon": "carbine"
+      },
+      "sample": {
+        "botId": "bot-0",
+        "stance": null,
+        "activeClip": "Idle_Gun",
+        "pivotHeight": 0.8399999999999999,
+        "pivotPitch": -1.625215577157133e-15,
+        "posture": null,
+        "pass77": {
+          "contract": "director-composed-operator-animation-v1",
+          "archetype": "explorer",
+          "state": "idle",
+          "layers": [
+            {
+              "clip": "Idle_Gun",
+              "weight": 1,
+              "timeScale": 1.8519
+            }
+          ],
+          "baseWeightSum": 1,
+          "additiveLayers": [],
+          "mixedClips": [
+            "Idle_Gun"
+          ],
+          "mixedActions": [
+            {
+              "name": "Idle_Gun",
+              "weight": 1,
+              "paused": false
+            }
+          ],
+          "boundActions": 16,
+          "playbackRate": 1,
+          "footSlideMps": 0,
+          "footSlideRatio": 0,
+          "directional": true,
+          "directionMismatch": 0,
+          "aimPitchRadians": 0,
+          "aimJointRadians": {
+            "spine": 1.4642804201229703e-56,
+            "chest": 1.5618991147978353e-56,
+            "neck": 8.785682520737822e-57,
+            "head": 9.76186946748647e-57
+          },
+          "postureSpineRadians": 0.05,
+          "turning": 0,
+          "visualYawLagRadians": 0,
+          "hitReactionWeight": 0,
+          "lazilyBoundDirectionalClips": 3
+        }
+      },
+      "screenshot": "C:\\Users\\david\\projects\\aa-v-bot-anim-prone-crouch\\docs\\evidence\\pass95\\bot-anim-prone-crouch\\after\\after-crouch-idle.png"
+    },
+    {
+      "name": "crouch-walk",
+      "stance": "crouch",
+      "speed": 2.4,
+      "staged": {
+        "id": "bot-0",
+        "logicalPosition": [
+          30.192989214230312,
+          0,
+          7.210266081010223
+        ],
+        "rootPosition": [
+          30.192989214230312,
+          0,
+          7.210266081010223
+        ],
+        "rootYaw": -1.8052120025187075,
+        "alive": true,
+        "weapon": "carbine"
+      },
+      "sample": {
+        "botId": "bot-0",
+        "stance": null,
+        "activeClip": "Run_Shoot",
+        "pivotHeight": 0.84,
+        "pivotPitch": -2.4073012486945134e-24,
+        "posture": null,
+        "pass77": {
+          "contract": "director-composed-operator-animation-v1",
+          "archetype": "explorer",
+          "state": "locomotion",
+          "layers": [
+            {
+              "clip": "Run_Shoot",
+              "weight": 0.6591,
+              "timeScale": 1.5571
+            },
+            {
+              "clip": "Walk",
+              "weight": 0.3409,
+              "timeScale": 1.9
+            }
+          ],
+          "baseWeightSum": 1,
+          "additiveLayers": [],
+          "mixedClips": [
+            "Run_Shoot",
+            "Walk"
+          ],
+          "mixedActions": [
+            {
+              "name": "Walk",
+              "weight": 0.3409,
+              "paused": false
+            },
+            {
+              "name": "Run_Shoot",
+              "weight": 0.6591,
+              "paused": false
+            }
+          ],
+          "boundActions": 16,
+          "playbackRate": 0.964069697212482,
+          "footSlideMps": 0,
+          "footSlideRatio": 0,
+          "directional": true,
+          "directionMismatch": 0,
+          "aimPitchRadians": 0,
+          "aimJointRadians": {
+            "spine": 6.37168640138773e-89,
+            "chest": 6.796465494813579e-89,
+            "neck": 3.823011840832638e-89,
+            "head": 4.247790934258486e-89
+          },
+          "postureSpineRadians": 0.05,
+          "turning": 0,
+          "visualYawLagRadians": 0,
+          "hitReactionWeight": 0,
+          "lazilyBoundDirectionalClips": 3
+        }
+      },
+      "screenshot": "C:\\Users\\david\\projects\\aa-v-bot-anim-prone-crouch\\docs\\evidence\\pass95\\bot-anim-prone-crouch\\after\\after-crouch-walk.png"
+    },
+    {
+      "name": "prone-idle",
+      "stance": "prone",
+      "speed": 0,
+      "staged": {
+        "id": "bot-0",
+        "logicalPosition": [
+          30.192989214230312,
+          0,
+          7.210266081010223
+        ],
+        "rootPosition": [
+          30.192989214230312,
+          0,
+          7.210266081010223
+        ],
+        "rootYaw": -1.8052120025187075,
+        "alive": true,
+        "weapon": "carbine"
+      },
+      "sample": {
+        "botId": "bot-0",
+        "stance": null,
+        "activeClip": "Idle_Gun",
+        "pivotHeight": 0.43,
+        "pivotPitch": -1.42,
+        "posture": null,
+        "pass77": {
+          "contract": "director-composed-operator-animation-v1",
+          "archetype": "explorer",
+          "state": "idle",
+          "layers": [
+            {
+              "clip": "Idle_Gun",
+              "weight": 1,
+              "timeScale": 1.9
+            }
+          ],
+          "baseWeightSum": 1,
+          "additiveLayers": [],
+          "mixedClips": [
+            "Idle_Gun"
+          ],
+          "mixedActions": [
+            {
+              "name": "Idle_Gun",
+              "weight": 1,
+              "paused": false
+            }
+          ],
+          "boundActions": 16,
+          "playbackRate": 1,
+          "footSlideMps": 0,
+          "footSlideRatio": 0,
+          "directional": true,
+          "directionMismatch": 0,
+          "aimPitchRadians": 0,
+          "aimJointRadians": {
+            "spine": 5.5911507407257195e-120,
+            "chest": 5.963894123440768e-120,
+            "neck": 3.3546904444354314e-120,
+            "head": 3.72743382715048e-120
+          },
+          "postureSpineRadians": 0.05,
+          "turning": 0,
+          "visualYawLagRadians": 0,
+          "hitReactionWeight": 0,
+          "lazilyBoundDirectionalClips": 3
+        }
+      },
+      "screenshot": "C:\\Users\\david\\projects\\aa-v-bot-anim-prone-crouch\\docs\\evidence\\pass95\\bot-anim-prone-crouch\\after\\after-prone-idle.png"
+    },
+    {
+      "name": "prone-crawl",
+      "stance": "prone",
+      "speed": 1,
+      "staged": {
+        "id": "bot-0",
+        "logicalPosition": [
+          30.192989214230312,
+          0,
+          7.210266081010223
+        ],
+        "rootPosition": [
+          30.192989214230312,
+          0,
+          7.210266081010223
+        ],
+        "rootYaw": -1.8052120025187075,
+        "alive": true,
+        "weapon": "carbine"
+      },
+      "sample": {
+        "botId": "bot-0",
+        "stance": null,
+        "activeClip": "Walk",
+        "pivotHeight": 0.43,
+        "pivotPitch": -1.42,
+        "posture": null,
+        "pass77": {
+          "contract": "director-composed-operator-animation-v1",
+          "archetype": "explorer",
+          "state": "locomotion",
+          "layers": [
+            {
+              "clip": "Walk",
+              "weight": 1,
+              "timeScale": 1.9
+            }
+          ],
+          "baseWeightSum": 1,
+          "additiveLayers": [],
+          "mixedClips": [
+            "Walk"
+          ],
+          "mixedActions": [
+            {
+              "name": "Walk",
+              "weight": 1,
+              "paused": false
+            }
+          ],
+          "boundActions": 16,
+          "playbackRate": 0.7453786523553966,
+          "footSlideMps": 0,
+          "footSlideRatio": 0,
+          "directional": true,
+          "directionMismatch": 0,
+          "aimPitchRadians": 0,
+          "aimJointRadians": {
+            "spine": 8.482233762497021e-150,
+            "chest": 9.047716013330156e-150,
+            "neck": 5.089340257498212e-150,
+            "head": 5.654822508331348e-150
+          },
+          "postureSpineRadians": 0.05,
+          "turning": 0,
+          "visualYawLagRadians": 0,
+          "hitReactionWeight": 0,
+          "lazilyBoundDirectionalClips": 3
+        }
+      },
+      "screenshot": "C:\\Users\\david\\projects\\aa-v-bot-anim-prone-crouch\\docs\\evidence\\pass95\\bot-anim-prone-crouch\\after\\after-prone-crawl.png"
+    }
+  ],
+  "errors": [],
+  "backend": "webgpu"
+}

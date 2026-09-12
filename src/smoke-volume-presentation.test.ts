@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
+import { SMOKE_VOLUME_RADIUS_M } from './smoke-authority';
 import {
   SMOKE_PRESENTATION_CARD_COUNT,
   SMOKE_PRESENTATION_LIFETIME_MS,
@@ -56,7 +57,7 @@ describe('smoke grenade volume presentation', () => {
       const alphaTextures = new Set<THREE.Texture>();
       for (const presentationRoot of pool.root.children) {
         expect(presentationRoot.visible).toBe(true);
-        expect(presentationRoot.scale.toArray()).toEqual([4.2, 4.2, 4.2]);
+        expect(presentationRoot.scale.toArray()).toEqual([SMOKE_VOLUME_RADIUS_M, SMOKE_VOLUME_RADIUS_M, SMOKE_VOLUME_RADIUS_M]);
         presentationRoot.traverse((node) => {
           expect(node.visible).toBe(true);
           expect(node.frustumCulled).toBe(false);
@@ -150,7 +151,7 @@ describe('smoke grenade volume presentation', () => {
       compileAndRender: vi.fn(() => new Promise<void>((resolve) => { releasePrewarm = resolve; })),
     };
     const inFlight = pool.prewarm(runtime, camera);
-    expect(presentationRoot.scale.toArray()).toEqual([4.2, 4.2, 4.2]);
+    expect(presentationRoot.scale.toArray()).toEqual([SMOKE_VOLUME_RADIUS_M, SMOKE_VOLUME_RADIUS_M, SMOKE_VOLUME_RADIUS_M]);
     pool.terminalDispose();
     expect(pool.root.parent).toBe(scene);
     releasePrewarm();

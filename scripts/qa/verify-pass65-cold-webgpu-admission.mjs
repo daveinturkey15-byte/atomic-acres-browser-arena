@@ -6,6 +6,43 @@ import { createServer } from 'vite';
 import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.mjs';
 
 const port = Number(process.env.PASS65_COLD_ADMISSION_PORT ?? '44175');
+const COLD_ARENA_ID = 'nuketown2';
+const SECOND_ARENA_ID = 'raid2';
+/**
+ * ARENAS WHOSE REAL ART THIS SMOKE CAN SEE (gate audit F3).
+ *
+ * `f74f25bf` moved this smoke's subject from atomic-acres to nuketown2 and
+ * dropped three assertions with it: `originalArtLoaded`,
+ * `atomicQualityStreaming === 'ready'` and `blenderEnvironment.qualityArtRootVisible`.
+ * The audit read the first as arena-neutral and simply dropped. It is not.
+ * All three bottom out in the SAME atomic-acres art path:
+ *
+ *   src/legacy-main.ts:34851  originalArtLoaded = gameplayArenaPrepared
+ *       ? blenderArenaActive || scene.getObjectByName('original-arena-art')
+ *       : <menu preview poster/video>
+ *   src/environment-assets.ts:1021  root.name = 'original-arena-art', set by
+ *       loadArenaArt(), documented "original Atomic Acres hero vehicles and
+ *       environmental props"
+ *   src/legacy-main.ts:35118  qualityArtRootVisible = blenderArenaActive && ...
+ *       and blenderArenaActive is only ever set by
+ *       ensureAtomicQualityPresentation() / ensureAtomicAuthoredPresentation(),
+ *       both of which hard-code selectedArenaAuthority('atomic-acres')
+ *   src/legacy-main.ts:5029  qualityAssetStreaming has exactly two per-arena
+ *       keys, atomicAcres and rustworks
+ *
+ * So on a nuketown2 cold run all four read false/'idle' by construction, and
+ * restoring `originalArtLoaded` against this subject would red the smoke for a
+ * reason that has nothing to do with nuketown2's art. Asserting it is therefore
+ * gated on the subject actually having the signal, and an ungated subject is
+ * REFUSED OUT LOUD below rather than passing silently - which is the part of
+ * F3 that was a real loss: the smoke stopped checking that ANY arena's real art
+ * loaded, and said nothing.
+ *
+ * [OPEN, for the arena owner] nuketown2 exposes no cold-session art-ready
+ * signal of its own. Closing this properly is a runtime change - a nuketown2
+ * equivalent of `originalArtLoaded` in the debug snapshot - not an edit here.
+ */
+const ARENAS_WITH_ART_LOADED_SIGNAL = new Set(['atomic-acres']);
 const requestedTrials = Number(process.env.PASS65_COLD_ADMISSION_TRIALS ?? '3');
 const trials = Math.min(5, Math.max(3, Math.floor(requestedTrials)));
 const maximumPreparedSwitchFrameMs = 50;
@@ -111,7 +148,7 @@ try {
       browser = await chromium.launch({
         headless: true,
         executablePath,
-        args: [
+        args: ['--mute-audio', 
           '--enable-unsafe-webgpu',
           '--disable-background-timer-throttling',
           '--disable-renderer-backgrounding',
@@ -152,7 +189,7 @@ try {
       });
       await stubExternalServices(page);
 
-      await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&externalServices=off&render=blender&map=atomic-acres&seed=${65_100 + trial}${traceNodeBuilds ? '&traceNodeBuilds=1' : ''}`);
+      await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&externalServices=off&render=blender&map=${COLD_ARENA_ID}&seed=${65_100 + trial}${traceNodeBuilds ? '&traceNodeBuilds=1' : ''}`);
       await page.waitForFunction(() => {
         const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
         return state?.bootstrap.stage === 'ready'
@@ -183,19 +220,19 @@ try {
           .every((button) => !(button instanceof HTMLButtonElement) || !button.disabled),
         soloEnabled: !(document.querySelector('#solo')?.disabled ?? true),
       }));
-      await page.locator('.map-card[data-arena-id="skyline-terminal"]').click();
+      await page.locator(`.map-card[data-arena-id="${SECOND_ARENA_ID}"]`).click();
       await page.waitForFunction(() => {
         const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-        return state.arenaSelection.id === 'skyline-terminal'
+        return state.arenaSelection.id === 'raid2'
           && state.arenaSelection.streaming.constructionCount === 0;
       });
-      await page.locator('.map-card[data-arena-id="atomic-acres"]').click();
+      await page.locator(`.map-card[data-arena-id="${COLD_ARENA_ID}"]`).click();
       await page.waitForFunction(() => {
         const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-        return state.arenaSelection.id === 'atomic-acres'
+        return state.arenaSelection.id === 'nuketown2'
           && state.arenaSelection.streaming.constructionCount === 0;
       });
-      await page.locator('#player-name').fill(`Cold Atomic QA ${trial}`);
+      await page.locator('#player-name').fill(`Cold Nuke QA ${trial}`);
       await page.evaluate(() => {
         window.__PASS65_COLD_TASK_AUDIT__.deploymentStartedAt = performance.now();
       });
@@ -288,9 +325,11 @@ try {
           runtime: state.render.runtime,
           localLightOcclusion: state.render.worldLocalLightOcclusion,
           renderProfile: state.render.profile,
+          playableScene: state.render.playableScene,
           atomicQualityStreaming: state.render.qualityAssetStreaming.atomicAcres,
           blenderEnvironment: state.render.blenderEnvironment,
           originalArtLoaded: state.originalArtLoaded,
+          arenaStoryReady: state.arenaStoryReady,
           arenaId: state.arenaSelection.id,
           streaming: state.arenaSelection.streaming,
           weaponAssetCache: api.sampleWeaponAssetCache(),
@@ -299,6 +338,10 @@ try {
       const fatalErrors = uniqueFatalErrors(errors);
       const transition = after.streaming.transition;
       const failures = [];
+      // Not failures: assertions this subject cannot carry. Recorded in the
+      // receipt and printed, so a coverage hole is visible in the evidence
+      // rather than only in the absence of a line (gate audit F3).
+      const coverageNotes = [];
       if (before.gameStarted || before.streaming.constructionCount !== 0) failures.push('gameplay was not cold before the physical menu start');
       if (before.runtime.actualBackend !== 'webgpu' || before.runtime.softwareAdapter) failures.push('hardware WebGPU was not active');
       if (before.localLightOcclusion.violations.length > 0) failures.push(`pre-start local-light violations: ${before.localLightOcclusion.violations.join(', ')}`);
@@ -307,7 +350,7 @@ try {
       const decodedAllVariantBytes = after.weaponAssetCache.runtimeCorpus.allVariantsResidency.estimatedDecodedBytes;
       const menuPrewarmProfile = after.bootstrap.menuDeploymentAssetsProfile;
       if (!menuPrewarmProfile?.completed || menuPrewarmProfile.error !== null
-        || menuPrewarmProfile.phases.length !== 3) {
+        || menuPrewarmProfile.phases.length !== 4) {
         failures.push(`menu deployment prewarm did not complete: ${JSON.stringify(menuPrewarmProfile)}`);
       } else if (menuPrewarmProfile.durationMs > maximumMenuDeploymentPrewarmMs) {
         failures.push(`menu deployment prewarm ${menuPrewarmProfile.durationMs}ms exceeded ${maximumMenuDeploymentPrewarmMs}ms`);
@@ -340,7 +383,32 @@ try {
         || after.weaponAssetCache.resident.drop.assets !== expectedResidentAssetsPerVariant) {
         failures.push(`runtime weapon corpus residency was incomplete: ${JSON.stringify(after.weaponAssetCache.resident)}`);
       }
-      if (!after.gameStarted || after.arenaId !== 'atomic-acres' || !after.originalArtLoaded) failures.push('Atomic Acres did not become the playable arena');
+      if (!after.gameStarted || after.arenaId !== COLD_ARENA_ID) failures.push('Nuke Town Rebuild did not become the playable arena');
+      // RESTORED (gate audit F3). Asserted where the signal is defined, and
+      // loudly absent where it is not, so "no arena's real art is checked by
+      // this smoke" can never again be an invisible property of the file.
+      if (ARENAS_WITH_ART_LOADED_SIGNAL.has(COLD_ARENA_ID)) {
+        if (!after.originalArtLoaded) {
+          failures.push(`${COLD_ARENA_ID} became playable without its authored art loaded (originalArtLoaded=false)`);
+        }
+        if (after.atomicQualityStreaming !== 'ready') {
+          failures.push(`${COLD_ARENA_ID} Quality art did not stream to ready: ${after.atomicQualityStreaming}`);
+        }
+        if (!after.blenderEnvironment.qualityArtRootVisible) {
+          failures.push(`${COLD_ARENA_ID} Quality art root was not visible: ${JSON.stringify(after.blenderEnvironment)}`);
+        }
+      } else {
+        coverageNotes.push(
+          `cold subject '${COLD_ARENA_ID}' exposes no art-loaded signal, so this run asserts that no `
+          + "arena's real art loaded; originalArtLoaded/qualityArtRootVisible/qualityAssetStreaming are "
+          + 'atomic-acres-only (see ARENAS_WITH_ART_LOADED_SIGNAL). Gate audit F3 remains OPEN.',
+        );
+      }
+      if (after.playableScene?.authoritativeArenaRoots !== 1
+        || after.playableScene?.authoritativeArenaRootIsGameplayRoot !== true
+        || after.playableScene?.duplicateArenaRoots !== false) {
+        failures.push(`Nuke Town Rebuild playable-scene authority was incomplete: ${JSON.stringify(after.playableScene)}`);
+      }
       const admissionCadence = after.bootstrap.matchAdmissionCadence;
       if (!admissionCadence
         || admissionCadence.backend !== 'webgpu'
@@ -357,17 +425,15 @@ try {
         failures.push(`foreground match admission was degraded: ${JSON.stringify(after.bootstrap.matchAdmissionCadence)}`);
       }
       if (after.renderProfile !== 'blender'
-        || after.atomicQualityStreaming !== 'ready'
-        || !after.blenderEnvironment.qualityArtRootVisible
-        || after.blenderEnvironment.proceduralRootActuallyVisible
-        || after.blenderEnvironment.overlappingPrimaryArenaRoots) {
-        failures.push(`Atomic Acres did not retain its intended Quality presentation: ${JSON.stringify({
+        || after.blenderEnvironment.proceduralRootActuallyVisible !== false
+        || after.blenderEnvironment.overlappingPrimaryArenaRoots !== false) {
+        failures.push(`Nuke Town Rebuild did not retain its intended Quality presentation: ${JSON.stringify({
           renderProfile: after.renderProfile,
-          atomicQualityStreaming: after.atomicQualityStreaming,
+          playableScene: after.playableScene,
           blenderEnvironment: after.blenderEnvironment,
         })}`);
       }
-      if (after.streaming.constructionCount !== 1 || after.streaming.constructionHistory[0] !== 'atomic-acres') failures.push('cold deployment did not construct exactly one Atomic arena');
+      if (after.streaming.constructionCount !== 1 || after.streaming.constructionHistory[0] !== COLD_ARENA_ID) failures.push('cold deployment did not construct exactly one Nuke Town Rebuild arena');
       if (firstSwitchAudit.before.retainedCount !== firstSwitchAudit.before.available
         || firstSwitchAudit.before.loaded !== firstSwitchAudit.before.available
         || firstSwitchAudit.before.gpuReady !== firstSwitchAudit.before.available
@@ -405,8 +471,9 @@ try {
       }
       const effectPrewarmProfile = after.bootstrap.effectPrewarmProfile;
       const expectedEffectPrewarmGroups = [
-        'tracers-impacts', 'explosions', 'death-drops', 'world-ordnance',
-        'nuke-overdrive-bolts', 'smoke-volumes', 'bot-world-weapons', 'killstreak-vocabulary',
+        'tracers-impacts', 'explosions', 'death-drops-glass', 'world-ordnance',
+        'nuke-overdrive-bolts', 'smoke-volumes', 'bot-world-weapons',
+        'flare-first-shot', 'flamethrower-first-shot', 'killstreak-vocabulary',
       ];
       if (JSON.stringify(effectPrewarmProfile?.groups.map(({ name }) => name) ?? [])
         !== JSON.stringify(expectedEffectPrewarmGroups)) {
@@ -474,11 +541,14 @@ try {
         firstSwitchAudit,
         taskAudit: { ...taskAudit, menuPrewarmLongTasks, admissionLongTasks },
         errors: fatalErrors,
+        coverageNotes,
         pass: failures.length === 0,
       };
       receipts.push(receipt);
       if (trial === 1) await page.screenshot({ path: `${artifactRoot}/atomic-quality-active.png`, animations: 'disabled' });
       await context.close();
+      for (const note of coverageNotes) process.stdout.write(`[cold-admission][coverage] trial ${trial}: ${note}
+`);
       if (failures.length > 0) throw new Error(`cold Atomic trial ${trial} failed: ${failures.join('; ')}`);
     } finally {
       await browser?.close();

@@ -1,0 +1,97 @@
+{
+  "contract": "pass95-frame-hitch-attributor-v1",
+  "measuredAt": "2026-09-06T06:10:50.824Z",
+  "label": "host2-nuketown2",
+  "arena": "nuketown2",
+  "base": "http://127.0.0.1:4292/",
+  "requestedProfile": "high",
+  "viewport": {
+    "width": 2560,
+    "height": 1440
+  },
+  "sampleSeconds": 120,
+  "hitchThresholdMs": 50,
+  "mode": "host",
+  "hostBots": 2,
+  "peerPort": 4392,
+  "profileState": {
+    "graphicsPreset": "high",
+    "renderBackend": "webgpu",
+    "effective": "EFFECTIVE: HIGH",
+    "hardwareConcurrency": 16
+  },
+  "deployMs": 51679,
+  "consoleErrors": [],
+  "matchState": {
+    "matchPhase": "active",
+    "bots": 2,
+    "alive": true
+  },
+  "traceAligned": true,
+  "traceEventsKept": 25177,
+  "frameCount": 11125,
+  "sampledSeconds": 120,
+  "fps": 92.7,
+  "frameMs": {
+    "p50": 10.4,
+    "p95": 14.8,
+    "p99": 17.9,
+    "p999": 24,
+    "max": 39.4
+  },
+  "hitches": {
+    "thresholdMs": 50,
+    "count": 0,
+    "totalMs": 0,
+    "worstMs": 0,
+    "over100": 0,
+    "over33": 5
+  },
+  "causeTable": [],
+  "hitchFrames": [],
+  "totals": {
+    "pipelines": 281,
+    "pipelineMs": 8.799999237060547,
+    "shaderModules": 387,
+    "shaderMs": 14.899999141693115,
+    "gpuBuffers": 3205,
+    "gpuBufferBytes": 31950268,
+    "gpuBufferMs": 16.500000596046448,
+    "gpuTextures": 179,
+    "gpuTextureBytes": 0,
+    "gpuTextureMs": 1.899999976158142,
+    "writeBuffer": 2078821,
+    "writeBufferBytes": 4784954520,
+    "writeBufferMs": 2691.5000108480453,
+    "writeTexture": 25278,
+    "writeTextureBytes": 333214180,
+    "writeTextureMs": 169.7999987602234,
+    "externalImage": 123,
+    "externalImageMs": 11.90000033378601,
+    "draws": 1490316,
+    "triangles": 3169966889.9999986,
+    "submits": 280826,
+    "passes": 404640,
+    "canvas2d": 45244,
+    "canvas2dMs": 198.60000121593475,
+    "styleReads": 0,
+    "styleReadMs": 0,
+    "layoutReads": 2050,
+    "layoutReadMs": 22.099998831748962,
+    "audioDecode": 0,
+    "audioDecodeMs": 0,
+    "audioStarts": 488,
+    "geometryBuilds": 0,
+    "geometryBuildMs": 0
+  },
+  "longTasks": {
+    "count": 0,
+    "totalMs": 0,
+    "worstMs": 0
+  },
+  "attributionCoverage": {
+    "attributedMs": 0,
+    "hitchTotalMs": 0,
+    "pct": 100
+  }
+}

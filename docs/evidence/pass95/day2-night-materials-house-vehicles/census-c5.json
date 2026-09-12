@@ -1,0 +1,540 @@
+{
+  "totals": {
+    "nodeMaterials": 85,
+    "totalMaterials": 91,
+    "distinctGraphs": 49,
+    "withNormalNode": 44,
+    "withNormalNodeNames": [
+      "nuketown2-appliance-blue",
+      "nuketown2-appliance-red",
+      "nuketown2-asphalt-road",
+      "nuketown2-automotive-chrome",
+      "nuketown2-balcony-rail-cap",
+      "nuketown2-block",
+      "nuketown2-car-aqua",
+      "nuketown2-car-classic-jade",
+      "nuketown2-car-saloon-navy",
+      "nuketown2-coach-shell",
+      "nuketown2-coach-trim",
+      "nuketown2-drive",
+      "nuketown2-drive-decal",
+      "nuketown2-drywall-dbd1ba",
+      "nuketown2-exterior-stair-riser",
+      "nuketown2-forge-coach",
+      "nuketown2-forge-coach-accent",
+      "nuketown2-forge-coupe",
+      "nuketown2-forge-coupe-accent",
+      "nuketown2-forge-saloon",
+      "nuketown2-forge-saloon-accent",
+      "nuketown2-forge-truck",
+      "nuketown2-forge-truck-accent",
+      "nuketown2-garage-door",
+      "nuketown2-garage-floor-concrete",
+      "nuketown2-house-wood-floor",
+      "nuketown2-kerb",
+      "nuketown2-perimeter-wall-end",
+      "nuketown2-pool-water-material",
+      "nuketown2-roof-glazing",
+      "nuketown2-roof-shingles",
+      "nuketown2-siding-cream",
+      "nuketown2-siding-orange-upper",
+      "nuketown2-sign",
+      "nuketown2-timber-fence",
+      "nuketown2-tire-rubber",
+      "nuketown2-trim",
+      "nuketown2-trim-decal",
+      "nuketown2-truck-box-ribbed",
+      "nuketown2-truck-cab",
+      "nuketown2-yard-butt-pad",
+      "vehicle-forge-chrome",
+      "vehicle-forge-lining",
+      "vehicle-forge-tyre"
+    ]
+  },
+  "owned": [
+    {
+      "name": "nuketown2-drywall-dbd1ba",
+      "present": true,
+      "meshes": 202,
+      "hasNormalNode": true,
+      "metalness": 0.01,
+      "roughness": 0.94,
+      "type": "MeshStandardNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0008,
+        "scuffM": 0.045,
+        "trafficM": 1.2,
+        "soil": 0.075,
+        "readDistanceM": 0.5,
+        "albedoWearStep": 0.21999999999999997,
+        "maxDarkening": 0.21999999999999997
+      }
+    },
+    {
+      "name": "nuketown2-house-wood-floor",
+      "present": true,
+      "meshes": 72,
+      "hasNormalNode": true,
+      "metalness": 0.04,
+      "roughness": 0.54,
+      "type": "MeshStandardNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0011,
+        "scuffM": 0.06,
+        "trafficM": 1.5,
+        "soil": 0.08,
+        "readDistanceM": 0.5,
+        "albedoWearStep": 0.23500000000000004,
+        "maxDarkening": 0.23500000000000004
+      }
+    },
+    {
+      "name": "nuketown2-garage-floor-concrete",
+      "present": true,
+      "meshes": 2,
+      "hasNormalNode": true,
+      "metalness": 0.02,
+      "roughness": 0.92,
+      "type": "MeshStandardNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0015,
+        "scuffM": 0.055,
+        "trafficM": 2.5,
+        "soil": 0.095,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.25,
+        "maxDarkening": 0.25
+      }
+    },
+    {
+      "name": "nuketown2-automotive-chrome",
+      "present": true,
+      "meshes": 169,
+      "hasNormalNode": true,
+      "metalness": 0.94,
+      "roughness": 0.12,
+      "type": "MeshStandardNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0015,
+        "scuffM": 0.035,
+        "trafficM": 1.8,
+        "soil": 0.06,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.132,
+        "maxDarkening": 0.132
+      }
+    },
+    {
+      "name": "nuketown2-tire-rubber",
+      "present": true,
+      "meshes": 333,
+      "hasNormalNode": true,
+      "metalness": 0.04,
+      "roughness": 0.88,
+      "type": "MeshStandardNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0015,
+        "scuffM": 0.04,
+        "trafficM": 1.5,
+        "soil": 0.085,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.22500000000000003,
+        "maxDarkening": 0.22500000000000003
+      }
+    },
+    {
+      "name": "nuketown2-car-aqua",
+      "present": true,
+      "meshes": 17,
+      "hasNormalNode": true,
+      "metalness": 0,
+      "roughness": 0.2,
+      "type": "MeshPhysicalNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0014,
+        "scuffM": 0.05,
+        "trafficM": 1.5,
+        "soil": 0.055,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.155,
+        "maxDarkening": 0.155
+      }
+    },
+    {
+      "name": "nuketown2-car-saloon-navy",
+      "present": true,
+      "meshes": 5,
+      "hasNormalNode": true,
+      "metalness": 0,
+      "roughness": 0.2,
+      "type": "MeshPhysicalNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0014,
+        "scuffM": 0.05,
+        "trafficM": 1.5,
+        "soil": 0.055,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.155,
+        "maxDarkening": 0.155
+      }
+    },
+    {
+      "name": "nuketown2-car-classic-jade",
+      "present": true,
+      "meshes": 13,
+      "hasNormalNode": true,
+      "metalness": 0,
+      "roughness": 0.2,
+      "type": "MeshPhysicalNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0014,
+        "scuffM": 0.05,
+        "trafficM": 1.5,
+        "soil": 0.055,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.155,
+        "maxDarkening": 0.155
+      }
+    },
+    {
+      "name": "nuketown2-coach-shell",
+      "present": true,
+      "meshes": 6,
+      "hasNormalNode": true,
+      "metalness": 0.38,
+      "roughness": 0.32,
+      "type": "MeshStandardNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0014,
+        "scuffM": 0.05,
+        "trafficM": 1.5,
+        "soil": 0.055,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.155,
+        "maxDarkening": 0.155
+      }
+    },
+    {
+      "name": "nuketown2-truck-cab",
+      "present": true,
+      "meshes": 1,
+      "hasNormalNode": true,
+      "metalness": 0.45,
+      "roughness": 0.38,
+      "type": "MeshStandardNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0014,
+        "scuffM": 0.05,
+        "trafficM": 1.5,
+        "soil": 0.055,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.155,
+        "maxDarkening": 0.155
+      }
+    },
+    {
+      "name": "nuketown2-truck-box-ribbed",
+      "present": true,
+      "meshes": 6,
+      "hasNormalNode": true,
+      "metalness": 0.12,
+      "roughness": 0.68,
+      "type": "MeshStandardNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0013,
+        "scuffM": 0.06,
+        "trafficM": 2,
+        "soil": 0.07,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.18500000000000003,
+        "maxDarkening": 0.18500000000000003
+      }
+    },
+    {
+      "name": "vehicle-forge-chrome",
+      "present": true,
+      "meshes": 1,
+      "hasNormalNode": true,
+      "metalness": 1,
+      "roughness": 0.09,
+      "type": "MeshStandardNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0015,
+        "scuffM": 0.03,
+        "trafficM": 1.5,
+        "soil": 0.055,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.11699999999999999,
+        "maxDarkening": 0.11699999999999999
+      }
+    },
+    {
+      "name": "vehicle-forge-tyre",
+      "present": true,
+      "meshes": 1,
+      "hasNormalNode": true,
+      "metalness": 0,
+      "roughness": 0.93,
+      "type": "MeshStandardNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0015,
+        "scuffM": 0.045,
+        "trafficM": 1.8,
+        "soil": 0.085,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.22500000000000003,
+        "maxDarkening": 0.22500000000000003
+      }
+    },
+    {
+      "name": "vehicle-forge-lining",
+      "present": true,
+      "meshes": 1,
+      "hasNormalNode": true,
+      "metalness": 0,
+      "roughness": 0.94,
+      "type": "MeshStandardNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.001,
+        "scuffM": 0.04,
+        "trafficM": 1,
+        "soil": 0.06,
+        "readDistanceM": 0.5,
+        "albedoWearStep": 0.15,
+        "maxDarkening": 0.15
+      }
+    },
+    {
+      "name": "nuketown2-forge-coach",
+      "present": true,
+      "meshes": 1,
+      "hasNormalNode": true,
+      "metalness": 0,
+      "roughness": 0.2,
+      "type": "MeshPhysicalNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0014,
+        "scuffM": 0.05,
+        "trafficM": 1.5,
+        "soil": 0.055,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.155,
+        "maxDarkening": 0.155
+      }
+    },
+    {
+      "name": "nuketown2-forge-coach-accent",
+      "present": true,
+      "meshes": 1,
+      "hasNormalNode": true,
+      "metalness": 0,
+      "roughness": 0.2,
+      "type": "MeshPhysicalNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0014,
+        "scuffM": 0.05,
+        "trafficM": 1.5,
+        "soil": 0.055,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.155,
+        "maxDarkening": 0.155
+      }
+    },
+    {
+      "name": "nuketown2-forge-truck",
+      "present": true,
+      "meshes": 15,
+      "hasNormalNode": true,
+      "metalness": 0,
+      "roughness": 0.2,
+      "type": "MeshPhysicalNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0014,
+        "scuffM": 0.05,
+        "trafficM": 1.5,
+        "soil": 0.055,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.155,
+        "maxDarkening": 0.155
+      }
+    },
+    {
+      "name": "nuketown2-forge-truck-accent",
+      "present": true,
+      "meshes": 1,
+      "hasNormalNode": true,
+      "metalness": 0,
+      "roughness": 0.2,
+      "type": "MeshPhysicalNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0014,
+        "scuffM": 0.05,
+        "trafficM": 1.5,
+        "soil": 0.055,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.155,
+        "maxDarkening": 0.155
+      }
+    },
+    {
+      "name": "nuketown2-forge-saloon",
+      "present": true,
+      "meshes": 1,
+      "hasNormalNode": true,
+      "metalness": 0,
+      "roughness": 0.2,
+      "type": "MeshPhysicalNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0014,
+        "scuffM": 0.05,
+        "trafficM": 1.5,
+        "soil": 0.055,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.155,
+        "maxDarkening": 0.155
+      }
+    },
+    {
+      "name": "nuketown2-forge-saloon-accent",
+      "present": true,
+      "meshes": 1,
+      "hasNormalNode": true,
+      "metalness": 0,
+      "roughness": 0.2,
+      "type": "MeshPhysicalNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0014,
+        "scuffM": 0.05,
+        "trafficM": 1.5,
+        "soil": 0.055,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.155,
+        "maxDarkening": 0.155
+      }
+    },
+    {
+      "name": "nuketown2-forge-coupe",
+      "present": true,
+      "meshes": 1,
+      "hasNormalNode": true,
+      "metalness": 0,
+      "roughness": 0.2,
+      "type": "MeshPhysicalNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0014,
+        "scuffM": 0.05,
+        "trafficM": 1.5,
+        "soil": 0.055,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.155,
+        "maxDarkening": 0.155
+      }
+    },
+    {
+      "name": "nuketown2-forge-coupe-accent",
+      "present": true,
+      "meshes": 1,
+      "hasNormalNode": true,
+      "metalness": 0,
+      "roughness": 0.2,
+      "type": "MeshPhysicalNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": 0.0014,
+        "scuffM": 0.05,
+        "trafficM": 1.5,
+        "soil": 0.055,
+        "readDistanceM": 1,
+        "albedoWearStep": 0.155,
+        "maxDarkening": 0.155
+      }
+    },
+    {
+      "name": "nuketown2-window-glass",
+      "present": true,
+      "meshes": 21,
+      "hasNormalNode": false,
+      "metalness": 0,
+      "roughness": 0.08,
+      "type": "MeshStandardNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": null,
+        "scuffM": null,
+        "trafficM": null,
+        "soil": null,
+        "readDistanceM": null,
+        "albedoWearStep": null,
+        "maxDarkening": null
+      }
+    },
+    {
+      "name": "nuketown2-vehicle-glass",
+      "present": true,
+      "meshes": 17,
+      "hasNormalNode": false,
+      "metalness": 0,
+      "roughness": 0.1,
+      "type": "MeshStandardNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": null,
+        "scuffM": null,
+        "trafficM": null,
+        "soil": null,
+        "readDistanceM": null,
+        "albedoWearStep": null,
+        "maxDarkening": null
+      }
+    },
+    {
+      "name": "vehicle-forge-glass",
+      "present": true,
+      "meshes": 1,
+      "hasNormalNode": false,
+      "metalness": 0,
+      "roughness": 0.06,
+      "type": "MeshPhysicalNodeMaterial",
+      "isNodeMaterial": true,
+      "declared": {
+        "grainM": null,
+        "scuffM": null,
+        "trafficM": null,
+        "soil": null,
+        "readDistanceM": null,
+        "albedoWearStep": null,
+        "maxDarkening": null
+      }
+    }
+  ],
+  "gates": {
+    "A1_ownedOpaqueWithRelief": "22/22",
+    "A2_arenaWithRelief": "44/85",
+    "A3_specsInBand": "22/22",
+    "A4_wearBounds": "22/22",
+    "A5_glassMetalness": "pass",
+    "A6_carPaintPhysical": "pass",
+    "N16_carPaintOneGraph": "pass"
+  }
+}

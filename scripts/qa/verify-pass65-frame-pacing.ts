@@ -19,6 +19,7 @@ import {
 } from '../../src/pass65-frame-pacing-gate.ts';
 import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.mjs';
 import { GRAPHICS_PRESET_VALUES } from '../../src/graphics-settings-registry.ts';
+import { OFFSCREEN_ARGS, SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const ARTIFACT_ROOT = 'artifacts/pass65/frame-pacing';
 const VIEWPORT = Object.freeze({ width: 2_560, height: 1_440 });
@@ -669,7 +670,8 @@ try {
     headless: !headed,
     executablePath: chromeExecutablePath,
     args: [
-      '--enable-unsafe-webgpu',
+    ...OFFSCREEN_ARGS,...SILENT_ARGS,
+    '--enable-unsafe-webgpu',
       '--disable-background-timer-throttling',
       '--disable-renderer-backgrounding',
       '--disable-backgrounding-occluded-windows',

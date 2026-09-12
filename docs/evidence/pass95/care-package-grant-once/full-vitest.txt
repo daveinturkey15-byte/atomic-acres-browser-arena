@@ -1,0 +1,11 @@
+
+ RUN  v4.1.9 C:/Users/david/projects/aa-v-care-package-grant-once
+
+(node:189904) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  622 passed | 1 skipped (623)
+      Tests  6269 passed | 2 skipped (6271)
+   Start at  07:30:47
+   Duration  219.82s (transform 280.96s, setup 0ms, import 650.78s, tests 845.08s, environment 262ms)
+

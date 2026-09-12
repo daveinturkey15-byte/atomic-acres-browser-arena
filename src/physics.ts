@@ -1,10 +1,11 @@
 import type * as RapierTypes from '@dimforge/rapier3d-compat';
+import { retryLoad } from './retry-load';
 import type { Box2, Point3 } from './collision';
 import type { Stance } from './gameplay';
 import { SIMULATION_HZ } from './gameplay';
-import { MAX_MAJOR_DEBRIS_BODIES } from './major-debris-budget';
+import { MAX_MAJOR_DEBRIS_BODIES, MAX_PREWARMED_MAJOR_DEBRIS_BODIES } from './major-debris-budget';
 
-export { MAX_MAJOR_DEBRIS_BODIES } from './major-debris-budget';
+export { MAX_MAJOR_DEBRIS_BODIES, MAX_PREWARMED_MAJOR_DEBRIS_BODIES } from './major-debris-budget';
 
 export const CHARACTER_PHYSICS_CONFIG = Object.freeze({
   controllerOffset: 0.025,
@@ -16,7 +17,63 @@ export const CHARACTER_PHYSICS_CONFIG = Object.freeze({
   gravity: -22,
   playerRadius: 0.38,
   playerHalfHeight: 0.53,
+  /**
+   * HF-497 GROUND STICK - the fix for "the stairs are still sticky to
+   * navigate" on the way DOWN, and the reason it is a controller number and
+   * not an arena number.
+   *
+   * MEASURED, on the real built Nuke Town Rebuild colliders through this exact
+   * class (see `src/stair-traversal-feel.test.ts`): descending the interior
+   * flight at sprint, the controller reported NOT GROUNDED on 74 of 125
+   * frames - 59 % of the descent. Every one of those frames pushed
+   * `movementProfile` onto its AIRBORNE branch: acceleration 48 -> 10.5,
+   * deceleration 62 -> 2.4, and `wantsSprint` false because it requires
+   * `playerGrounded`. That is the "sticky" the owner reports: the player is
+   * not being blocked, they are being put in the air two frames in three and
+   * handed air control on a staircase.
+   *
+   * WHY IT HAPPENS, and why `enableSnapToGround(0.24)` did not already cover
+   * it: the game clamps a grounded player's vertical velocity to
+   * `Math.max(0, v)`, so the desired vertical translation on a grounded frame
+   * is EXACTLY ZERO. Rapier runs its snap-to-ground pass only when the desired
+   * translation has a strictly negative vertical component; at exactly zero it
+   * is skipped, so walking off the nose of a descending surface leaves the
+   * capsule in free flight until gravity re-acquires the ground a frame or
+   * two later.
+   *
+   * THE FIX IS A POST-SOLVE RE-ACQUISITION, not a commanded downward push. A
+   * commanded push was measured first and REJECTED: it fixed the descent and
+   * cost the climb (interior walk-up 155 -> 207 frames) because a downward
+   * component projected onto an up-slope fights the climb. The re-acquisition
+   * only ever runs on a frame that STARTED grounded and ENDED ungrounded, so
+   * it cannot slow a climb - a climbing capsule never leaves the ground.
+   *
+   * The reach is the drop the steepest surface the controller will walk
+   * (`maximumSlopeClimbDegrees`) produces over this frame's horizontal step,
+   * plus a floor for the standing-still case, capped by `snapToGround` so the
+   * controller can never pull the player down a ledge Rapier would not have
+   * snapped to anyway.
+   */
+  groundStickFloor: 0.02,
 });
+
+/**
+ * Drop per metre of horizontal travel on the steepest surface the controller
+ * will walk. Derived from the configured slope ceiling so the two can never
+ * disagree.
+ */
+export const MAX_WALKABLE_SLOPE_TANGENT = Math.tan(
+  CHARACTER_PHYSICS_CONFIG.maximumSlopeClimbDegrees * Math.PI / 180,
+);
+
+/** The exact re-acquisition reach `CharacterPhysics.move` uses, exported so gates read the number the controller reads. */
+export function groundStickReach(horizontalDistance: number): number {
+  const horizontal = Number.isFinite(horizontalDistance) ? Math.abs(horizontalDistance) : 0;
+  return Math.min(
+    CHARACTER_PHYSICS_CONFIG.snapToGround,
+    horizontal * MAX_WALKABLE_SLOPE_TANGENT + CHARACTER_PHYSICS_CONFIG.groundStickFloor,
+  );
+}
 export const STANCE_SHAPES: Readonly<Record<Stance, { halfHeight: number; radius: number; eyeFromCenter: number }>> = {
   stand: { halfHeight: CHARACTER_PHYSICS_CONFIG.playerHalfHeight, radius: CHARACTER_PHYSICS_CONFIG.playerRadius, eyeFromCenter: 0.79 },
   crouch: { halfHeight: 0.22, radius: 0.36, eyeFromCenter: 0.58 },
@@ -28,12 +85,15 @@ export const WORLD_BOUNDARY_MIN_Y = -2;
 export const WORLD_BOUNDARY_MAX_Y = 14;
 
 /** Physics-only perimeter walls. Their inner faces exactly match playable bounds. */
-export function worldBoundaryColliders(bounds: Box2): readonly Box2[] {
+export function worldBoundaryColliders(
+  bounds: Box2,
+  minimumY = WORLD_BOUNDARY_MIN_Y,
+): readonly Box2[] {
   return [
-    { minX: bounds.minX - WORLD_BOUNDARY_THICKNESS, maxX: bounds.minX, minZ: bounds.minZ, maxZ: bounds.maxZ, minY: WORLD_BOUNDARY_MIN_Y, maxY: WORLD_BOUNDARY_MAX_Y },
-    { minX: bounds.maxX, maxX: bounds.maxX + WORLD_BOUNDARY_THICKNESS, minZ: bounds.minZ, maxZ: bounds.maxZ, minY: WORLD_BOUNDARY_MIN_Y, maxY: WORLD_BOUNDARY_MAX_Y },
-    { minX: bounds.minX, maxX: bounds.maxX, minZ: bounds.minZ - WORLD_BOUNDARY_THICKNESS, maxZ: bounds.minZ, minY: WORLD_BOUNDARY_MIN_Y, maxY: WORLD_BOUNDARY_MAX_Y },
-    { minX: bounds.minX, maxX: bounds.maxX, minZ: bounds.maxZ, maxZ: bounds.maxZ + WORLD_BOUNDARY_THICKNESS, minY: WORLD_BOUNDARY_MIN_Y, maxY: WORLD_BOUNDARY_MAX_Y },
+    { minX: bounds.minX - WORLD_BOUNDARY_THICKNESS, maxX: bounds.minX, minZ: bounds.minZ, maxZ: bounds.maxZ, minY: minimumY, maxY: WORLD_BOUNDARY_MAX_Y },
+    { minX: bounds.maxX, maxX: bounds.maxX + WORLD_BOUNDARY_THICKNESS, minZ: bounds.minZ, maxZ: bounds.maxZ, minY: minimumY, maxY: WORLD_BOUNDARY_MAX_Y },
+    { minX: bounds.minX, maxX: bounds.maxX, minZ: bounds.minZ - WORLD_BOUNDARY_THICKNESS, maxZ: bounds.minZ, minY: minimumY, maxY: WORLD_BOUNDARY_MAX_Y },
+    { minX: bounds.minX, maxX: bounds.maxX, minZ: bounds.maxZ, maxZ: bounds.maxZ + WORLD_BOUNDARY_THICKNESS, minY: minimumY, maxY: WORLD_BOUNDARY_MAX_Y },
   ];
 }
 
@@ -45,6 +105,8 @@ export type CharacterMoveResult = {
   blockedZ: boolean;
   slopeAdjusted: boolean;
   appliedDelta: Point3;
+  /** True when HF-497's post-solve ground re-acquisition rescued this frame's contact. */
+  groundStickApplied: boolean;
 };
 
 export type DynamicWorldCollider = Readonly<{
@@ -127,6 +189,8 @@ export class CharacterPhysics {
     active: boolean;
   }>();
   private stance: Stance = 'stand';
+  /** HF-497: ground contact at the END of the previous `move`, so the re-acquisition only fires on a frame that actually lost it. */
+  private groundedLastMove = true;
 
   private constructor(
     world: RapierTypes.World,
@@ -149,8 +213,12 @@ export class CharacterPhysics {
     this.controller.setMinSlopeSlideAngle(CHARACTER_PHYSICS_CONFIG.minimumSlopeSlideDegrees * Math.PI / 180);
   }
 
-  static async create(colliders: readonly Box2[], bounds: Box2): Promise<CharacterPhysics> {
-    const { default: RAPIER } = await import('@dimforge/rapier3d-compat');
+  static async create(
+    colliders: readonly Box2[],
+    bounds: Box2,
+    safetyFloorY = 0,
+  ): Promise<CharacterPhysics> {
+    const { default: RAPIER } = await retryLoad('rapier3d chunk', () => import('@dimforge/rapier3d-compat'));
     // Rapier 0.19.3's compatibility bundle calls its own wasm-bindgen loader with
     // the legacy positional form and emits a warning even though the public
     // RAPIER.init() API takes no arguments. Suppress only that upstream message
@@ -168,8 +236,10 @@ export class CharacterPhysics {
     const world = new RAPIER.World({ x: 0, y: CHARACTER_PHYSICS_CONFIG.gravity, z: 0 });
     world.timestep = 1 / SIMULATION_HZ;
 
-    // The world floor and four thin boundary walls make falling out impossible even if
-    // an authored visual mesh is missing or still loading.
+    // The fail-safe floor and four thin boundary walls make falling out impossible
+    // even if an authored visual mesh is missing or still loading. Water arenas can
+    // lower this floor beneath the waterline while retaining explicit playable floors.
+    const resolvedSafetyFloorY = Number.isFinite(safetyFloorY) ? safetyFloorY : 0;
     world.createCollider(
       RAPIER.ColliderDesc.cuboid(
         (bounds.maxX - bounds.minX) / 2,
@@ -177,12 +247,13 @@ export class CharacterPhysics {
         (bounds.maxZ - bounds.minZ) / 2,
       ).setTranslation(
         (bounds.minX + bounds.maxX) / 2,
-        -0.1,
+        resolvedSafetyFloorY - 0.1,
         (bounds.minZ + bounds.maxZ) / 2,
       ),
     );
 
-    for (const box of [...worldBoundaryColliders(bounds), ...colliders]) {
+    const boundaryMinimumY = Math.min(WORLD_BOUNDARY_MIN_Y, resolvedSafetyFloorY - 2);
+    for (const box of [...worldBoundaryColliders(bounds, boundaryMinimumY), ...colliders]) {
       const shape = boxShape(box);
       const descriptor = RAPIER.ColliderDesc.cuboid(shape.halfExtents.x, shape.halfExtents.y, shape.halfExtents.z)
         .setTranslation(shape.centre.x, shape.centre.y, shape.centre.z)
@@ -328,7 +399,7 @@ export class CharacterPhysics {
    */
   prewarmMajorDebrisBodies(entries: readonly MajorDebrisBodyPrewarmDefinition[]): void {
     const ids = entries.map((entry) => entry.id);
-    if (entries.length > MAX_MAJOR_DEBRIS_BODIES
+    if (entries.length > MAX_PREWARMED_MAJOR_DEBRIS_BODIES
       || new Set(ids).size !== ids.length
       || ids.some((id) => !/^[a-z0-9][a-z0-9:-]{0,127}$/.test(id))
       || entries.some((entry) => ![
@@ -510,29 +581,65 @@ export class CharacterPhysics {
 
   move(desiredDelta: Point3, dt: number): CharacterMoveResult {
     this.world.timestep = dt;
+    const groundedBefore = this.groundedLastMove;
     this.controller.computeColliderMovement(this.collider, desiredDelta);
-    const allowed = this.controller.computedMovement();
+    const solved = this.controller.computedMovement();
+    const allowed = { x: solved.x, y: solved.y, z: solved.z };
+    const epsilon = 0.0005;
+    // The blocked/slope flags describe the PRIMARY solve. The re-acquisition
+    // below adds vertical travel the caller never asked for, and reporting it
+    // as "blocked in Y" would change what every existing caller sees.
+    const solvedGrounded = this.controller.computedGrounded();
+    const blockedX = Math.abs(solved.x - desiredDelta.x) > epsilon;
+    const blockedY = Math.abs(solved.y - desiredDelta.y) > epsilon;
+    const blockedZ = Math.abs(solved.z - desiredDelta.z) > epsilon;
+    const slopeAdjusted = solvedGrounded
+      && Math.abs(solved.y - desiredDelta.y) > epsilon
+      && Math.hypot(solved.x, solved.z) > epsilon;
+
+    let grounded = solvedGrounded;
+    let groundStickApplied = false;
     const current = this.body.translation();
+    // HF-497: a frame that STARTED grounded, was not commanded upward and
+    // ENDED in the air gets one bounded downward re-acquisition - exactly the
+    // pass Rapier skips when the desired vertical translation is exactly zero.
+    if (groundedBefore && !solvedGrounded && desiredDelta.y <= 0) {
+      const reach = groundStickReach(Math.hypot(allowed.x, allowed.z));
+      if (reach > 1e-4) {
+        this.body.setTranslation(
+          { x: current.x + allowed.x, y: current.y + allowed.y, z: current.z + allowed.z },
+          false,
+        );
+        this.world.propagateModifiedBodyPositionsToColliders();
+        this.controller.computeColliderMovement(this.collider, { x: 0, y: -reach, z: 0 });
+        const snap = this.controller.computedMovement();
+        if (this.controller.computedGrounded()) {
+          allowed.y += snap.y;
+          grounded = true;
+          groundStickApplied = true;
+        }
+        this.body.setTranslation(current, false);
+        this.world.propagateModifiedBodyPositionsToColliders();
+      }
+    }
+
     this.body.setNextKinematicTranslation({
       x: current.x + allowed.x,
       y: current.y + allowed.y,
       z: current.z + allowed.z,
     });
     this.world.step();
+    this.groundedLastMove = grounded;
     const position = this.eyePosition();
-    const epsilon = 0.0005;
-    const grounded = this.controller.computedGrounded();
-    const slopeAdjusted = grounded
-      && Math.abs(allowed.y - desiredDelta.y) > epsilon
-      && Math.hypot(allowed.x, allowed.z) > epsilon;
     return {
       position,
       grounded,
-      blockedX: Math.abs(allowed.x - desiredDelta.x) > epsilon,
-      blockedY: Math.abs(allowed.y - desiredDelta.y) > epsilon,
-      blockedZ: Math.abs(allowed.z - desiredDelta.z) > epsilon,
+      blockedX,
+      blockedY,
+      blockedZ,
       slopeAdjusted,
       appliedDelta: { x: allowed.x, y: allowed.y, z: allowed.z },
+      groundStickApplied,
     };
   }
 

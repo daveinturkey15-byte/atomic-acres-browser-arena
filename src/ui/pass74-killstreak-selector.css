@@ -1,0 +1,154 @@
+/*
+ * Pass 74: killstreak selector readability slice.
+ *
+ * This is presentation-only. The existing labels, selects, ids, focus order,
+ * keyboard mapping, and loadout controller remain authoritative. Keep this
+ * slice after Pass 66 so it can repair the selector composition without
+ * reopening the older accepted stylesheets.
+ */
+#menu-panel-streaks {
+  min-width: 0;
+  overflow-x: hidden;
+  padding: clamp(20px, 2.4vw, 34px);
+  background:
+    radial-gradient(circle at 86% 4%, rgba(71, 209, 205, 0.12), transparent 34%),
+    linear-gradient(145deg, #07151a, #0b2227 58%, #061116);
+  color: #f2fbfa;
+}
+
+#menu-panel-streaks .kit-heading {
+  align-items: start;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+#menu-panel-streaks .kit-heading b {
+  color: #f5fffd;
+  font-size: clamp(26px, 2.5vw, 38px);
+  line-height: 1;
+}
+
+#menu-panel-streaks .kit-heading span,
+#menu-panel-streaks .kit-heading small {
+  color: #b9d2d0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+#menu-panel-streaks .kit-heading small {
+  max-width: 34ch;
+  text-align: right;
+}
+
+#menu-panel-streaks .killstreak-loadout-layout {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1.18fr) minmax(280px, 0.82fr);
+  gap: 20px;
+}
+
+#menu-panel-streaks .killstreak-equipped-chain,
+#menu-panel-streaks .killstreak-demo-rail {
+  min-width: 0;
+}
+
+#menu-panel-streaks .killstreak-slot-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+#menu-panel-streaks .killstreak-slot-card {
+  min-width: 0;
+  min-height: 156px;
+  padding: 16px;
+  gap: 10px;
+  border: 1px solid rgba(111, 231, 224, 0.28);
+  border-radius: 5px;
+  background: linear-gradient(145deg, #10272c, #08171c);
+  color: #f2fbfa;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24);
+}
+
+#menu-panel-streaks .killstreak-slot-card > span {
+  color: #79eee6;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+#menu-panel-streaks .killstreak-slot-card > strong {
+  min-height: 0;
+  color: #f5fffd;
+  font-size: 20px;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+#menu-panel-streaks .killstreak-slot-card select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 9px 10px;
+  border: 1px solid rgba(121, 238, 230, 0.46);
+  border-radius: 4px;
+  background: #061217;
+  color: #f5fffd;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+#menu-panel-streaks .killstreak-slot-card > small {
+  color: #b9d2d0;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+#menu-panel-streaks .killstreak-slot-card.is-previewed {
+  border-color: #79eee6;
+  box-shadow: inset 3px 0 #79eee6, 0 14px 30px rgba(0, 0, 0, 0.3);
+}
+
+#menu-panel-streaks .killstreak-slot-card select:focus-visible,
+#menu-panel-streaks .killstreak-slot-card:focus-within {
+  outline: 2px solid #ffbf63;
+  outline-offset: 2px;
+}
+
+#menu-panel-streaks .killstreak-slot-card:nth-child(5) {
+  grid-column: 1 / -1;
+}
+
+#menu-panel-streaks .killstreak-loadout-status {
+  min-height: 44px;
+  color: #ffcf84;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+@media (max-width: 900px) {
+  #menu-panel-streaks .killstreak-loadout-layout {
+    grid-template-columns: 1fr;
+  }
+
+  #menu-panel-streaks .killstreak-demo-rail {
+    position: relative;
+  }
+}
+
+@media (max-width: 620px) {
+  #menu-panel-streaks {
+    padding: 18px 14px;
+  }
+
+  #menu-panel-streaks .kit-heading small {
+    max-width: none;
+    text-align: left;
+  }
+
+  #menu-panel-streaks .killstreak-slot-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #menu-panel-streaks .killstreak-slot-card:nth-child(5) {
+    grid-column: auto;
+  }
+}

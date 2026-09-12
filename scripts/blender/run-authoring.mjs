@@ -226,6 +226,29 @@ if (target === 'arena') {
     'source-assets/blender/atomic-acres-arena-spec.json',
   ]);
   runBlenderPython('scripts/blender/create-atomic-acres-blender-arena.py');
+  // The raw Blender export ships ~7 MB of PNG textures and duplicate texture
+  // defs. The asset contract ("lossless WebP textures and Meshopt geometry,
+  // 33 deduplicated texture bindings") was previously restored by hand after
+  // every bake; wire the exact steps in so a bake is always contract-shaped.
+  run(process.execPath, [
+    gltfTransformCli,
+    'webp',
+    'public/assets/original/models/atomic-acres-blender-arena.glb',
+    'public/assets/original/models/atomic-acres-blender-arena.glb',
+    '--lossless', 'true',
+    '--formats', 'png',
+  ]);
+  run(process.execPath, [
+    gltfTransformCli,
+    'meshopt',
+    'public/assets/original/models/atomic-acres-blender-arena.glb',
+    'public/assets/original/models/atomic-acres-blender-arena.glb',
+    '--level', 'high',
+  ]);
+  run(process.execPath, [
+    'scripts/blender/dedupe-glb-texture-defs.mjs',
+    'public/assets/original/models/atomic-acres-blender-arena.glb',
+  ]);
 } else if (target === 'tower') {
   runBlenderPython('scripts/blender/create-rustworks-central-tower.py');
 } else if (target === 'drone') {

@@ -29,6 +29,40 @@ const SHADOW_VOLUMES: Readonly<Record<ArenaId, ArenaShadowVolume>> = Object.free
   'rustworks-1v1': Object.freeze({ halfWidth: 41, halfHeight: 48, near: 4, far: 180 }),
   'gun-range': Object.freeze({ halfWidth: 38, halfHeight: 66, near: 4, far: 188 }),
   'skyline-terminal': Object.freeze({ halfWidth: 49, halfHeight: 56, near: 4, far: 182 }),
+  // HF-359 (Pass 74): ported from the Pass 69 hidden lane (64x64 island).
+  'farcrysis': Object.freeze({ halfWidth: 44, halfHeight: 44, near: 4, far: 150 }),
+  'high-seas': Object.freeze({ halfWidth: 32, halfHeight: 58, near: 4, far: 190 }),
+  // Test1: 64x46 range ground.
+  'test1': Object.freeze({ halfWidth: 34, halfHeight: 27, near: 4, far: 176 }),
+  // Test2 RE-PINNED 2026-08-31: the arena was rebuilt from 76 x 58 m to
+  // 100 x 76 m (docs/TEST2_RAID_LAYOUT_SPEC_2026-08-31.md section 1.3), so the
+  // authored 80 x 64 volume no longer covered the playfield - a 10 m band down
+  // each long edge and a 6 m band at each end fell outside the cascade. 54 x 42
+  // half-extents cover 108 x 84, i.e. the new bounds plus a 4 m margin, the same
+  // margin the old pin carried. `far` follows the same rule it always did (the
+  // volume's own depth plus the sun's standoff) and rises 182 -> 196 with the
+  // longer diagonal (125.7 m against 95.6 m). The map's tallest authored mass
+  // is the 4.8 m house parapet, so nothing needs more depth than that.
+  'test2': Object.freeze({ halfWidth: 54, halfHeight: 42, near: 4, far: 196 }),
+  // MAP3 (PREVIEW): the gallery is 168 x 168 m of playfield, so the volume is
+  // square and large. 176 x 176 at mapSize 2048 is 86 mm per texel, which is
+  // where arenas/map3.ts derives its 0.085 normal bias from.
+  'map3': Object.freeze({ halfWidth: 88, halfHeight: 88, near: 4, far: 300 }),
+  // NUKETOWN2 (PREVIEW, HF-407; RE-PROPORTIONED HF-426): playable rectangle
+  // 36 x 84 m - the reference's own 2.36 : 1 with the long axis ACROSS the
+  // street, not the 58 x 52 the first cut assumed. 22 x 46 half-extents cover
+  // 44 x 92, i.e. the bounds plus the same 4 m margin Test2's pin uses. `far`
+  // follows the standing rule - the volume's own diagonal (102.0 m) plus the
+  // shared non-Atomic sun standoff (|[-62, 25, 38]| = 76.9 m) = 178.9 m,
+  // rounded up to 180. The tallest authored mass is still the 6.5 m house roof
+  // deck, so nothing needs more depth than that.
+  'nuketown2': Object.freeze({ halfWidth: 22, halfHeight: 46, near: 4, far: 180 }),
+  // RAID2 (PREVIEW, HF-408): RAID2_BOUNDS is 100 x 76 m, the same box test2
+  // was re-pinned to on 2026-08-31, so the volume is pinned by the same rule
+  // and for the same reason: 54 x 42 half-extents cover 108 x 84, the bounds
+  // plus the 4 m margin. The tallest authored mass here is the 5.3 m upper
+  // wall, below test2's parapet, so `far` needs no more depth than test2's.
+  'raid2': Object.freeze({ halfWidth: 54, halfHeight: 42, near: 4, far: 196 }),
 });
 
 // RoomEnvironment is deliberately only a reflection/indirect-light accent.
@@ -39,6 +73,39 @@ const ARENA_ENVIRONMENT_SCALES: Readonly<Record<ArenaId, number>> = Object.freez
   'rustworks-1v1': 0.14,
   'gun-range': 0.1,
   'skyline-terminal': 0.22,
+  // HF-359 (Pass 74): ported from the Pass 69 hidden lane.
+  'farcrysis': 0.18,
+  'high-seas': 0.2,
+  // Test1 dusty matte plywood/sandbag range; Test2 reflective travertine and pool.
+  // Test2 re-checked against the 2026-08-31 rebuild and HELD at 0.22: the
+  // rebuild changed the arena's extent and its verticality, not its surface
+  // mix - travertine paving, stucco walls, a stone kerb vocabulary and one
+  // pool, in the same proportions the 0.22 was fitted to.
+  'test1': 0.16,
+  'test2': 0.22,
+  // MAP3 (PREVIEW): matte paving and stone piers with one shallow water basin
+  // - between Test1's dry range (0.16) and Test2's travertine-and-pool (0.22).
+  'map3': 0.18,
+  // NUKETOWN2 (PREVIEW, HF-407): matte board siding, asphalt and painted
+  // vehicle panels - the same surface mix the shipped Nuke Town was fitted at,
+  // so it carries the same 0.24 rather than a value nobody measured.
+  //
+  // HF-536 night-lighting, 2026-09-06: 0.24 -> 0.32. The 0.24 was inherited
+  // from the shipped map's surface mix, but this rebuild added a DAMP asphalt
+  // read (roughness 0.95 -> 0.62 damp in the asphalt family) and three painted
+  // vehicles, and scene.environment is the ONLY reflection term any of them
+  // gets: the shadow-floor lane measured (2026-09-06, lane FINAL.json step 1)
+  // that `material.envMapIntensity` is a literal no-op on this route because
+  // the road binds no material envMap and `scene.environmentIntensity` is the
+  // single scalar. So a per-family reflection weight is not reachable without
+  // an envNode graph edit; this scalar is the whole lever.
+  // Sized against the exposure budget, not by feel: the same measurement puts
+  // 0.24 -> 1.0 at +7.6% sunlit luma, i.e. ~+1.6% at 0.32, inside the +-5%
+  // this pass is allowed to move the sunlit siding.
+  'nuketown2': 0.32,
+  // RAID2 (PREVIEW, HF-408): same volume and same map size as test2, so the
+  // texel footprint is the same and the bias that works there works here.
+  'raid2': 0.22,
 });
 
 export function arenaEnvironmentScale(arenaId: ArenaId): number {
@@ -50,13 +117,12 @@ export function arenaShadowVolume(arenaId: ArenaId): ArenaShadowVolume {
 }
 
 /**
- * Reflection quality must remain visible on WebGPU even when no environment
- * map is available. Raising PBR roughness attenuates direct-light specular
- * response without inventing SSR or changing authored base colour/metalness.
+ * Returns the authored roughness clamped to valid PBR range.
+ * reflectionQuality no longer raises roughness (that was backwards).
+ * Instead, reflectionQuality gates PMREM resolution in arena-environment-ibl.
  */
-export function effectivePbrRoughness(authoredRoughness: number, transparent: boolean, reflectionScale: number): number {
-  const authored = THREE.MathUtils.clamp(authoredRoughness, transparent ? 0.04 : 0.12, 1);
-  return THREE.MathUtils.lerp(1, authored, THREE.MathUtils.clamp(reflectionScale, 0, 1));
+export function effectivePbrRoughness(authoredRoughness: number, transparent: boolean): number {
+  return THREE.MathUtils.clamp(authoredRoughness, transparent ? 0.04 : 0.12, 1);
 }
 
 export function graphicsEffectsBudget(profile: RenderProfile, pixelRatioCap: number): GraphicsEffectsBudget {
@@ -160,6 +226,8 @@ export class GraphicsRefinementSystem {
   private arenaId: ArenaId = 'atomic-acres';
   private shadowVolume: ArenaShadowVolume = arenaShadowVolume('atomic-acres');
   private budget: GraphicsEffectsBudget;
+  private requestedAnisotropy = 4;
+  private reflectionScale = 1;
 
   constructor(
     renderer: THREE.WebGLRenderer | null,
@@ -167,11 +235,15 @@ export class GraphicsRefinementSystem {
     private profile: RenderProfile,
     softwareRenderer: boolean,
     initialPixelRatioCap: number,
-    private requestedAnisotropy = profile === 'blender' ? 8 : 4,
-    private reflectionScale = 1,
+    requestedAnisotropy = profile === 'blender' ? 8 : 4,
+    initialReflectionScale = 1,
   ) {
     this.budget = graphicsEffectsBudget(profile, initialPixelRatioCap);
+    this.requestedAnisotropy = requestedAnisotropy;
+    this.reflectionScale = initialReflectionScale;
     if (!renderer || profile === 'compat' || softwareRenderer) return;
+    // NOTE: PMREM environment map is now handled by arena-environment-ibl.ts on the WebGPU path.
+    // This WebGL path keeps the RoomEnvironment fallback for compatibility.
     try {
       const pmrem = new THREE.PMREMGenerator(renderer);
       pmrem.compileCubemapShader();
@@ -234,7 +306,8 @@ export class GraphicsRefinementSystem {
           this.refined.add(material);
           this.refinedMaterials += 1;
         }
-        material.roughness = effectivePbrRoughness(authored.roughness, material.transparent, this.reflectionScale);
+        // Use authored roughness clamped to PBR range (reflectionQuality gates PMREM resolution, not roughness)
+        material.roughness = effectivePbrRoughness(authored.roughness, material.transparent);
         material.metalness = THREE.MathUtils.clamp(material.metalness, 0, 1);
         const authoredEnvironmentIntensity = material.transparent
           ? Math.max(authored.environmentIntensity, 0.48)

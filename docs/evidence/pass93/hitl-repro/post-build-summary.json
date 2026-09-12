@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "runLabel": "post-build",
+  "generatedAt": "2026-09-04T06:19:36.336Z",
+  "summary": [
+    {
+      "profile": "default",
+      "ok": false,
+      "liveFrame": false,
+      "pageErrors": 0,
+      "consoleErrors": 0,
+      "consoleWarnings": 1,
+      "failedRequests": 0,
+      "badResponses": 0,
+      "fatalError": "page.waitForFunction: Timeout 60000ms exceeded."
+    },
+    {
+      "profile": "quality",
+      "ok": true,
+      "liveFrame": true,
+      "pageErrors": 0,
+      "consoleErrors": 12,
+      "consoleWarnings": 1,
+      "failedRequests": 0,
+      "badResponses": 0,
+      "fatalError": null
+    },
+    {
+      "profile": "max",
+      "ok": false,
+      "liveFrame": false,
+      "pageErrors": 0,
+      "consoleErrors": 1,
+      "consoleWarnings": 2,
+      "failedRequests": 0,
+      "badResponses": 0,
+      "fatalError": "page.waitForFunction: Timeout 60000ms exceeded."
+    }
+  ]
+}

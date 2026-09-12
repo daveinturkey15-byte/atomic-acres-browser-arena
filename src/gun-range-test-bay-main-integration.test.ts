@@ -70,7 +70,7 @@ describe('Gun Range test-bay match timer integration', () => {
     const rejoinEnd = source.indexOf('\nfunction acceptLobbyReady', rejoinStart);
     const rejoin = source.slice(rejoinStart, rejoinEnd);
     expect(rejoin).toContain('network.confirmPlayerAdmission(message.playerId');
-    expect(rejoin).toContain('broadcastHostLobby(currentPhase);');
+    expect(rejoin).toContain('broadcastHostLobby(phaseAtCommit);');
 
     const projectionStart = source.indexOf('function projectActiveGunRangeMatchClock');
     const projectionEnd = source.indexOf('\nfunction initializeGunRangeMatchClock', projectionStart);
@@ -146,5 +146,29 @@ describe('Gun Range test-bay match timer integration', () => {
     const frame = source.slice(frameStart, frameEnd);
     expect(frame).toContain('synchronizeGunRangeTestBayDoorWorld(doorState, true);');
     expect(frame).not.toContain('gunRangeTestBayDoorColliders = doorFrame.dynamicColliders;');
+  });
+});
+
+describe('HF-347 Gun Range multiplayer: dummies are posed on host time', () => {
+  // gunRangeTestBayRenderedDummyPose is a pure function of time with no replicated
+  // phase input. A peer that feeds it its OWN performance.now() renders every dummy
+  // somewhere the host does not think it is, so a guest aims at a dummy that has
+  // already moved host-side. This pins the clock choice at the call site, because
+  // there is no runtime assertion that can catch a silent revert to local time.
+  const frameStart = source.indexOf("} else if (selectedArena.id === 'gun-range') {");
+  const frame = source.slice(frameStart, source.indexOf('\n    waterSystem.update', frameStart));
+
+  it('poses dummies from currentHostTimeMs, not the local visual clock', () => {
+    expect(frameStart).toBeGreaterThanOrEqual(0);
+    expect(frame).toContain('const dummyNow = debugCaptureFixedVisualTimeMs ?? currentHostTimeMs();');
+    expect(frame).toContain('updateGunRangePresentation(arena.root, dummyNow);');
+    expect(frame).not.toContain('updateGunRangePresentation(arena.root, visualNow);');
+  });
+
+  it('derives the dummy colliders from the same clock that posed them', () => {
+    // HF-318 established that a collider on a different clock than the mesh lags the
+    // visible position. Two clocks would reintroduce that, so pin them together.
+    expect(frame).toContain('refreshGunRangeTestBayDummyColliders(dummyNow);');
+    expect(frame).not.toContain('refreshGunRangeTestBayDummyColliders(visualNow);');
   });
 });

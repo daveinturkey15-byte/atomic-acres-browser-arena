@@ -1,0 +1,11 @@
+
+ RUN  v4.1.9 C:/Users/david/projects/aa-claude-hitl
+
+(node:178436) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  631 passed | 1 skipped (632)
+      Tests  6359 passed | 2 skipped (6361)
+   Start at  09:17:05
+   Duration  104.02s (transform 161.07s, setup 0ms, import 485.84s, tests 519.37s, environment 79ms)
+

@@ -77,6 +77,97 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.f
       [-18, 16, 2.4, 4.2, 1.1], [18, 16, 2.4, 4.2, 3.5], [0, -22, 2.2, 3.8, 2.1],
     ] as SmokeCard[]),
   }),
+  // HF-359 (Pass 74): farcrysis layout ported from the Pass 69 hidden lane.
+  'farcrysis': Object.freeze({
+    mist: Object.freeze([
+      [-26, -26, 12, 4.0], [26, 26, 12, 4.0], [-18, 18, 11, 3.6],
+      [18, -18, 11, 3.6], [-8, -14, 10, 3.2], [8, 14, 10, 3.2],
+      [-4, 4, 9, 3.0], [4, -4, 9, 3.0], [0, -26, 12, 3.4], [0, 26, 12, 3.4],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-20, -20, 2.2, 4.0, 0.9], [20, 20, 2.2, 4.0, 3.1], [0, -18, 2.4, 4.4, 2.2],
+      [0, 0, 2.6, 5.0, 4.5], [-6, 20, 2.0, 3.6, 1.6],
+    ] as SmokeCard[]),
+  }),
+  'high-seas': Object.freeze({
+    mist: Object.freeze([
+      [-10, -31, 11, 3.2], [10, 24, 10, 3], [-9, 4, 8, 2.6],
+      [9, -9, 8, 2.6], [0, -18, 9, 2.8], [0, 15, 9, 2.8],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-7, -25, 2, 3.6, 0.8], [7, 20, 2, 3.6, 3.1], [0, 2, 1.8, 3.2, 4.7],
+    ] as SmokeCard[]),
+  }),
+  // Test1: dry outdoor range — sparse low mist over the lanes, a little
+  // smoke drifting off the container yard.
+  'test1': Object.freeze({
+    mist: Object.freeze([
+      [-18, -10, 10, 3.2], [18, 10, 10, 3.2], [-10, 12, 8, 2.6],
+      [10, -12, 8, 2.6], [0, -14, 9, 2.8], [0, 8, 8, 2.6],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-14, 8, 2, 3.6, 1.0], [14, -8, 2, 3.6, 3.4],
+    ] as SmokeCard[]),
+  }),
+  // Test2: hillside mansion — soft garden haze at the terraces and pool deck.
+  'test2': Object.freeze({
+    mist: Object.freeze([
+      [-22, -16, 12, 3.6], [22, 16, 12, 3.6], [-14, 10, 9, 2.8],
+      [14, -10, 9, 2.8], [0, -20, 10, 3.0], [0, 0, 9, 2.8],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-18, 14, 2.2, 3.8, 0.9], [18, -14, 2.2, 3.8, 3.2],
+    ] as SmokeCard[]),
+  }),
+  // RAID2 (PREVIEW, HF-408): cards sit on this arena's OWN zones, not test2's -
+  // the pool terrace at z -28, the courtyard at z -12, the drive at z +12 and
+  // the two spawn ends - because the rebuild's plan is a different plan.
+  'raid2': Object.freeze({
+    mist: Object.freeze([
+      [-27, -28, 13, 3.4], [8, -28, 13, 3.4], [0, -12, 11, 3.0],
+      [0, 12, 12, 3.2], [-42, -4, 10, 2.8], [42, -2, 10, 2.8],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-24, 20, 2.3, 3.9, 0.9], [24, 20, 2.3, 3.9, 3.2],
+    ] as SmokeCard[]),
+  }),
+  // MAP3 (PREVIEW): mist sits in the outdoor wedges between the bays, which is
+  // where the ground is open and the air is not walled in; the bays themselves
+  // stay clear so a 54 m lane reads to its end.
+  'map3': Object.freeze({
+    mist: Object.freeze([
+      [26, 26, 16, 4.4], [-26, -26, 16, 4.4], [-26, 26, 14, 4.0],
+      [26, -26, 14, 4.0], [0, 46, 15, 4.2], [0, -46, 15, 4.2],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-40, 12, 2.4, 4.2, 1.4], [40, -12, 2.4, 4.2, 3.9],
+    ] as SmokeCard[]),
+  }),
+  // NUKETOWN2 (PREVIEW, HF-407): mist sits in the two back yards and the two
+  // cul-de-sacs - the low, still, fenced-in corners - and never on the road.
+  // The road is the only lane whose full 58 m has to read from either end, and
+  // haze across it would soften exactly the sightline the bus exists to break.
+  'nuketown2': Object.freeze({
+    mist: Object.freeze([
+      [-14, -19, 11, 3.4], [14, 19, 11, 3.4], [-24, -2, 9, 3.0],
+      [24, 2, 9, 3.0], [-8, -22, 8, 2.8], [8, 22, 8, 2.8],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-20, -21, 2.2, 3.8, 1.1], [20, 21, 2.2, 3.8, 3.6],
+    ] as SmokeCard[]),
+  }),
+});
+/**
+ * DAY-VISUAL-A (HF-535): Nuke Town golden-hour haze palette. Warm amber
+ * light side keyed to the 0xfff1ce rig (numbers untouched), cool
+ * violet-grey shade side. The lane test pins warm-above-cool luminance and
+ * the amber hue so a future palette pass cannot silently re-grey it.
+ */
+export const NUKETOWN2_HAZE_PALETTE = Object.freeze({
+  shadow: 0x6f6a88,
+  light: 0xe6b47e,
+  smoke: 0x7d8489,
+  warm: 0xd9a06a,
 });
 
 const MAX_MIST_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
@@ -94,6 +185,29 @@ function atmosphereDustLayout(profile: RenderProfile, arenaId: ArenaId): DustLay
   if (arenaId === 'skyline-terminal') return {
     count: quality ? 80 : 48, minX: -34, maxX: 34, minZ: -34, maxZ: 34, color: 0xe2d6c3, opacity: quality ? 0.17 : 0.12,
   };
+  // HF-359 (Pass 74): warm golden pollen-dust across the whole 64x64 island
+  // (the Pass 69 branch fell through to the gun-range lane strip here).
+  if (arenaId === 'farcrysis') return {
+    count: quality ? 72 : 40, minX: -31, maxX: 31, minZ: -31, maxZ: 31, color: 0xe8d4a8, opacity: quality ? 0.13 : 0.09,
+  };
+  if (arenaId === 'high-seas') return {
+    count: quality ? 48 : 28, minX: -14, maxX: 14, minZ: -44, maxZ: 44, color: 0xd7eef2, opacity: quality ? 0.1 : 0.07,
+  };
+  // Test1/Test2 (owner 2026-08-30): the fallthrough below is the gun-range
+  // INDOOR lane strip (z -44..-3), which sits mostly outside both new arenas'
+  // bounds — dust would hang beyond the walls. Dry range dust / warm pollen.
+  if (arenaId === 'test1') return {
+    count: quality ? 56 : 32, minX: -26, maxX: 26, minZ: -19, maxZ: 19, color: 0xe0cf9e, opacity: quality ? 0.14 : 0.1,
+  };
+  if (arenaId === 'test2') return {
+    count: quality ? 48 : 28, minX: -32, maxX: 32, minZ: -24, maxZ: 24, color: 0xe8d0a0, opacity: quality ? 0.1 : 0.07,
+  };
+  // DAY-POLISH (HF-535): Nuke Town golden-hour dust hangs with the mist in
+  // the yards and cul-de-sacs, not on the road sightline, and reads lighter
+  // under the amber palette so mid-ground vehicles keep contrast.
+  if (arenaId === 'nuketown2') return {
+    count: quality ? 48 : 32, minX: -26, maxX: 26, minZ: -24, maxZ: 24, color: 0xe8d4a8, opacity: quality ? 0.08 : 0.06,
+  };
   return {
     count: quality ? 32 : 24, minX: -15, maxX: 15, minZ: -44, maxZ: -3, color: 0xc4cbc4, opacity: quality ? 0.12 : 0.09,
   };
@@ -104,6 +218,15 @@ export function atmosphereFogRange(profile: RenderProfile, arenaId: ArenaId): Re
   if (arenaId === 'atomic-acres') return profile === 'blender' ? { near: 52, far: 142 } : { near: 56, far: 148 };
   if (arenaId === 'rustworks-1v1') return profile === 'blender' ? { near: 26, far: 90 } : { near: 30, far: 94 };
   if (arenaId === 'skyline-terminal') return profile === 'blender' ? { near: 40, far: 122 } : { near: 44, far: 130 };
+  // HF-359 (Pass 74): dense tropical haze keeps farcrysis engagement
+  // short-range (COD feel) — you can hear the jungle but only see the next
+  // clearing. Ported from the Pass 69 hidden lane.
+  if (arenaId === 'farcrysis') return profile === 'blender' ? { near: 14, far: 46 } : { near: 18, far: 52 };
+  if (arenaId === 'high-seas') return profile === 'blender' ? { near: 42, far: 132 } : { near: 48, far: 142 };
+  // Test1/Test2 (owner 2026-08-30): open outdoor sightlines — the indoor
+  // fallthrough below would fog the far berms/terraces of both new arenas.
+  if (arenaId === 'test1') return profile === 'blender' ? { near: 44, far: 130 } : { near: 48, far: 140 };
+  if (arenaId === 'test2') return profile === 'blender' ? { near: 46, far: 136 } : { near: 50, far: 146 };
   return profile === 'blender' ? { near: 38, far: 96 } : { near: 42, far: 105 };
 }
 
@@ -112,6 +235,11 @@ function atmosphereOpacity(profile: RenderProfile, arenaId: ArenaId): Readonly<{
   if (arenaId === 'atomic-acres') return quality ? { mist: 0.11, smoke: 0.055 } : { mist: 0.08, smoke: 0.04 };
   if (arenaId === 'rustworks-1v1') return quality ? { mist: 0.22, smoke: 0.12 } : { mist: 0.14, smoke: 0.08 };
   if (arenaId === 'skyline-terminal') return quality ? { mist: 0.15, smoke: 0.08 } : { mist: 0.11, smoke: 0.06 };
+  if (arenaId === 'high-seas') return quality ? { mist: 0.1, smoke: 0.05 } : { mist: 0.07, smoke: 0.035 };
+  // DAY-POLISH (HF-535): the amber palette reads denser than the neutral
+  // fallthrough it replaced, so Nuke Town runs lighter cards: aerial
+  // perspective on the far treeline, not wash over mid-ground vehicles.
+  if (arenaId === 'nuketown2') return quality ? { mist: 0.09, smoke: 0.05 } : { mist: 0.07, smoke: 0.04 };
   return quality ? { mist: 0.14, smoke: 0.08 } : { mist: 0.1, smoke: 0.06 };
 }
 
@@ -432,6 +560,22 @@ export class AtmosphereSystem {
         ? { shadow: 0x665f5c, light: 0xc08b68, smoke: 0x756d66, warm: 0xb97d58 }
         : arenaId === 'skyline-terminal'
           ? { shadow: 0x485868, light: 0xe8ad86, smoke: 0x59666c, warm: 0xd49b6a }
+          : arenaId === 'high-seas'
+            ? { shadow: 0x4f7380, light: 0xd9f0eb, smoke: 0x718b91, warm: 0xe1b77e }
+          // Test1/Test2 (owner 2026-08-30): dry sun-bleached range dust and
+          // golden-hour garden haze — the neutral facility fallthrough would
+          // grey out both outdoor moods.
+          : arenaId === 'test1'
+            ? { shadow: 0x6e6a5c, light: 0xf0dfb4, smoke: 0x8a8172, warm: 0xd8bd8c }
+          : arenaId === 'test2'
+            ? { shadow: 0x5c6a72, light: 0xffe0a8, smoke: 0x87837a, warm: 0xe3b57e }
+          // DAY-VISUAL-A (HF-535): Nuke Town golden-hour haze. Warm low-sun
+          // light side (amber, keyed to the 0xfff1ce rig without touching its
+          // numbers), cool violet-grey shade side per the reference's violet
+          // shade. Back yards and cul-de-sacs only — the road stays clear by
+          // layout, not by palette.
+          : arenaId === 'nuketown2'
+            ? NUKETOWN2_HAZE_PALETTE
           : { shadow: 0x708083, light: 0xb8c6c4, smoke: 0x77868a, warm: 0xaebdbc };
     (this.material.uniforms.uShadowColor.value as THREE.Color).setHex(palette.shadow);
     (this.material.uniforms.uLightColor.value as THREE.Color).setHex(palette.light);

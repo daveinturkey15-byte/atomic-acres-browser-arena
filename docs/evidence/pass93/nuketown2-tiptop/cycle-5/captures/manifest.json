@@ -1,0 +1,83 @@
+{
+  "contract": "nuketown2-judgeset-manifest-v1",
+  "arena": "nuketown2",
+  "cycle": 5,
+  "renderer": "webgpu",
+  "backend": "webgpu",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "cameras": [
+    {
+      "id": "nuketown2-overhead",
+      "position": [-15, 46, -30],
+      "lookAt": [0, 2, 6],
+      "file": "nuketown2-overhead.png",
+      "purpose": "overview"
+    },
+    {
+      "id": "nuketown2-north-yard",
+      "position": [-12, 1.75, -30],
+      "lookAt": [-2, 1.5, -22],
+      "file": "nuketown2-north-yard.png",
+      "purpose": "geometry"
+    },
+    {
+      "id": "nuketown2-south-yard",
+      "position": [12, 1.75, 30],
+      "lookAt": [2, 1.5, 22],
+      "file": "nuketown2-south-yard.png",
+      "purpose": "geometry"
+    },
+    {
+      "id": "nuketown2-street-centre",
+      "position": [-15, 1.7, 0],
+      "lookAt": [17, 1.6, 0.4],
+      "file": "nuketown2-street-centre.png",
+      "purpose": "geometry"
+    },
+    {
+      "id": "nuketown2-north-upper-window",
+      "position": [-1.25, 4.5, -12.6],
+      "lookAt": [4, 2.6, 10],
+      "file": "nuketown2-north-upper-window.png",
+      "purpose": "light-occlusion"
+    },
+    {
+      "id": "nuketown2-south-upper-window",
+      "position": [1.25, 4.5, 12.6],
+      "lookAt": [-4, 2.6, -10],
+      "file": "nuketown2-south-upper-window.png",
+      "purpose": "geometry"
+    },
+    {
+      "id": "nuketown2-into-sun-street",
+      "position": [14, 1.85, -9],
+      "lookAt": [-11.6, 4.2, 6.7],
+      "file": "nuketown2-into-sun-street.png",
+      "purpose": "light-occlusion"
+    },
+    {
+      "id": "nuketown2-north-interior",
+      "position": [-1.25, 1.7, -19.5],
+      "lookAt": [-1.25, 1.6, -12.0],
+      "file": "nuketown2-north-interior.png",
+      "purpose": "geometry"
+    },
+    {
+      "id": "nuketown2-south-interior",
+      "position": [1.25, 1.7, 19.5],
+      "lookAt": [1.25, 1.6, 12.0],
+      "file": "nuketown2-south-interior.png",
+      "purpose": "geometry"
+    },
+    {
+      "id": "nuketown2-garage",
+      "position": [6.75, 1.7, -20.5],
+      "lookAt": [6.75, 1.5, -14.0],
+      "file": "nuketown2-garage.png",
+      "purpose": "geometry"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+[lock] acquired 10:59:29
+FINAL SNAPSHOT: {"failure":null}
+CONSOLE ERRORS (0):
+PAGE ERRORS (0):
+[exit] 0 at 11:01:32
+[lock] released

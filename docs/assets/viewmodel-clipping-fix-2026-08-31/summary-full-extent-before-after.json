@@ -1,0 +1,2255 @@
+{
+ "contract": "viewmodel-full-extent-penetration-2026-08-31",
+ "criterion": "max(furthest-forward vertex of every visible viewmodel mesh along cameraForward) - distanceToSurface <= 0",
+ "rows": 96,
+ "graded": 68,
+ "before": {
+  "rowsPastSurface": 60,
+  "worstPenetrationM": 0.5485835339579523,
+  "worstWeaponPenetrationM": 0.17424858800045406,
+  "worstArmsPenetrationM": 0.5485835339579523,
+  "worstMuzzlePenetrationM": -0.0486522115925041
+ },
+ "after": {
+  "rowsPastSurface": 0,
+  "worstPenetrationM": -0.019999999999999907,
+  "worstUncutWeaponPenetrationM": 0.16124701398411645,
+  "worstUncutArmsPenetrationM": 0.4690938232607209,
+  "rowsWhereTheCutDoesWork": 58
+ },
+ "openControl": {
+  "rows": 24,
+  "foldEngaged": 0,
+  "rootPitchValues": [
+   1.165718816790921e-21,
+   4.198099397161968e-46,
+   1.047780513457816e-70,
+   5.4446571502557773e-95,
+   3.3985323849529393e-119,
+   1.2239123664300678e-143,
+   8.282085571779512e-167,
+   1.1926014925165901e-191,
+   5.1591114963573295e-216,
+   3.2202959734810317e-240,
+   1.3930777449725645e-264,
+   3.476906039673019e-289,
+   9.704499719231466e-22,
+   3.494878338947767e-46,
+   2.1814885471395607e-70,
+   1.3616760927746287e-94,
+   5.890516512539758e-119,
+   4.623254831061401e-122
+  ]
+ },
+ "dressingBoxesAtomicAcres": 88,
+ "pairs": [
+  {
+   "arena": "atomic-acres",
+   "site": "flat-wall",
+   "weapon": "carbine",
+   "stance": "stand",
+   "surfaceDistanceM": 0.4001007080078125,
+   "before": {
+    "muzzleForwardM": 0.35124822480886314,
+    "weaponFwdMaxM": 0.5708458657282734,
+    "armsFwdMaxM": 0.860768913351322,
+    "visibleFwdMaxM": 0.860768913351322,
+    "penetrationM": 0.4606682053435095
+   },
+   "after": {
+    "muzzleForwardM": 0.34154996751655636,
+    "weaponFwdMaxM": 0.5611475940314891,
+    "armsFwdMaxM": 0.8526567478540913,
+    "clipPlaneDistanceM": 0.38010070800781237,
+    "visibleFwdMaxM": 0.38010070800781237,
+    "penetrationM": -0.02000000000000013
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "flat-wall",
+   "weapon": "carbine",
+   "stance": "crouch",
+   "surfaceDistanceM": 0.40000152587890625,
+   "before": {
+    "muzzleForwardM": 0.35124822480886314,
+    "weaponFwdMaxM": 0.5708458657282734,
+    "armsFwdMaxM": 0.8538299482342994,
+    "visibleFwdMaxM": 0.8538299482342994,
+    "penetrationM": 0.4538284223553931
+   },
+   "after": {
+    "muzzleForwardM": 0.34154980946607344,
+    "weaponFwdMaxM": 0.5611474503854837,
+    "armsFwdMaxM": 0.846562871597179,
+    "clipPlaneDistanceM": 0.3800015258789061,
+    "visibleFwdMaxM": 0.3800015258789061,
+    "penetrationM": -0.02000000000000013
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "flat-wall",
+   "weapon": "carbine",
+   "stance": "prone",
+   "surfaceDistanceM": 0.40000152587890625,
+   "before": {
+    "muzzleForwardM": 0.35124822480886314,
+    "weaponFwdMaxM": 0.5708458657282734,
+    "armsFwdMaxM": 0.8212128686828067,
+    "visibleFwdMaxM": 0.8212128686828067,
+    "penetrationM": 0.4212113428039005
+   },
+   "after": {
+    "muzzleForwardM": 0.34154980946607344,
+    "weaponFwdMaxM": 0.5611474503854837,
+    "armsFwdMaxM": 0.8418289053241282,
+    "clipPlaneDistanceM": 0.3800015258789061,
+    "visibleFwdMaxM": 0.3800015258789061,
+    "penetrationM": -0.02000000000000013
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "flat-wall",
+   "weapon": "sniper",
+   "stance": "stand",
+   "surfaceDistanceM": 0.4001007080078125,
+   "before": {
+    "muzzleForwardM": 0.34024309039865136,
+    "weaponFwdMaxM": 0.5743447082706227,
+    "armsFwdMaxM": 0.8525734204048804,
+    "visibleFwdMaxM": 0.8525734204048804,
+    "penetrationM": 0.4524727123970679
+   },
+   "after": {
+    "muzzleForwardM": 0.32016741911749597,
+    "weaponFwdMaxM": 0.5545088385396043,
+    "armsFwdMaxM": 0.8382368825064007,
+    "clipPlaneDistanceM": 0.38010070800781237,
+    "visibleFwdMaxM": 0.38010070800781237,
+    "penetrationM": -0.02000000000000013
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "flat-wall",
+   "weapon": "sniper",
+   "stance": "crouch",
+   "surfaceDistanceM": 0.40000152587890625,
+   "before": {
+    "muzzleForwardM": 0.34014403435964635,
+    "weaponFwdMaxM": 0.5742491974478129,
+    "armsFwdMaxM": 0.8498576239955115,
+    "visibleFwdMaxM": 0.8498576239955115,
+    "penetrationM": 0.4498560981166052
+   },
+   "after": {
+    "muzzleForwardM": 0.32016741911748886,
+    "weaponFwdMaxM": 0.5545088385396398,
+    "armsFwdMaxM": 0.8307021131205589,
+    "clipPlaneDistanceM": 0.3800015258789061,
+    "visibleFwdMaxM": 0.3800015258789061,
+    "penetrationM": -0.02000000000000013
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "flat-wall",
+   "weapon": "sniper",
+   "stance": "prone",
+   "surfaceDistanceM": 0.40000152587890625,
+   "before": {
+    "muzzleForwardM": 0.34014403435964635,
+    "weaponFwdMaxM": 0.5742491974478129,
+    "armsFwdMaxM": 0.8272045225600949,
+    "visibleFwdMaxM": 0.8272045225600949,
+    "penetrationM": 0.42720299668118866
+   },
+   "after": {
+    "muzzleForwardM": 0.32016741911748886,
+    "weaponFwdMaxM": 0.5545088385396398,
+    "armsFwdMaxM": 0.8055908346118984,
+    "clipPlaneDistanceM": 0.3800015258789061,
+    "visibleFwdMaxM": 0.3800015258789061,
+    "penetrationM": -0.02000000000000013
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "flat-wall",
+   "weapon": "explosive-crossbow",
+   "stance": "stand",
+   "surfaceDistanceM": 0.4001007080078125,
+   "before": {
+    "muzzleForwardM": 0.34044901560856294,
+    "weaponFwdMaxM": 0.4621958596150862,
+    "armsFwdMaxM": 0.9486842419657648,
+    "visibleFwdMaxM": 0.9486842419657648,
+    "penetrationM": 0.5485835339579523
+   },
+   "after": {
+    "muzzleForwardM": 0.23372785931302795,
+    "weaponFwdMaxM": 0.43297622469061997,
+    "armsFwdMaxM": 0.8691945312685334,
+    "clipPlaneDistanceM": 0.38010070800781254,
+    "visibleFwdMaxM": 0.38010070800781254,
+    "penetrationM": -0.019999999999999962
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "flat-wall",
+   "weapon": "explosive-crossbow",
+   "stance": "crouch",
+   "surfaceDistanceM": 0.40000152587890625,
+   "before": {
+    "muzzleForwardM": 0.34034982105830386,
+    "weaponFwdMaxM": 0.46214946037672183,
+    "armsFwdMaxM": 0.9013639008110347,
+    "visibleFwdMaxM": 0.9013639008110347,
+    "penetrationM": 0.5013623749321284
+   },
+   "after": {
+    "muzzleForwardM": 0.23372785931290005,
+    "weaponFwdMaxM": 0.43297622469044234,
+    "armsFwdMaxM": 0.8427222649178745,
+    "clipPlaneDistanceM": 0.3800015258789063,
+    "visibleFwdMaxM": 0.3800015258789063,
+    "penetrationM": -0.019999999999999962
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "flat-wall",
+   "weapon": "explosive-crossbow",
+   "stance": "prone",
+   "surfaceDistanceM": 0.40000152587890625,
+   "before": {
+    "muzzleForwardM": 0.34034982105830386,
+    "weaponFwdMaxM": 0.46214946037672183,
+    "armsFwdMaxM": 0.8406824840953747,
+    "visibleFwdMaxM": 0.8406824840953747,
+    "penetrationM": 0.44068095821646847
+   },
+   "after": {
+    "muzzleForwardM": 0.23372785931290005,
+    "weaponFwdMaxM": 0.43297622469044234,
+    "armsFwdMaxM": 0.7748589274489107,
+    "clipPlaneDistanceM": 0.3800015258789063,
+    "visibleFwdMaxM": 0.3800015258789063,
+    "penetrationM": -0.019999999999999962
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "flat-wall",
+   "weapon": "flamethrower",
+   "stance": "stand",
+   "surfaceDistanceM": 0.4001007080078125,
+   "before": {
+    "muzzleForwardM": 0.34006713324573223,
+    "weaponFwdMaxM": 0.4850661895623319,
+    "armsFwdMaxM": 0.8157156494415504,
+    "visibleFwdMaxM": 0.8157156494415504,
+    "penetrationM": 0.4156149414337379
+   },
+   "after": {
+    "muzzleForwardM": 0.2977076175827734,
+    "weaponFwdMaxM": 0.46353573906887396,
+    "armsFwdMaxM": 0.7818910670541969,
+    "clipPlaneDistanceM": 0.3801007080078125,
+    "visibleFwdMaxM": 0.3801007080078125,
+    "penetrationM": -0.020000000000000018
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "flat-wall",
+   "weapon": "flamethrower",
+   "stance": "crouch",
+   "surfaceDistanceM": 0.40000152587890625,
+   "before": {
+    "muzzleForwardM": 0.339967951116826,
+    "weaponFwdMaxM": 0.48496700743343274,
+    "armsFwdMaxM": 0.8080352766649669,
+    "visibleFwdMaxM": 0.8080352766649669,
+    "penetrationM": 0.40803375078606063
+   },
+   "after": {
+    "muzzleForwardM": 0.2977076175827734,
+    "weaponFwdMaxM": 0.46353573906887396,
+    "armsFwdMaxM": 0.7752735202058433,
+    "clipPlaneDistanceM": 0.3800015258789063,
+    "visibleFwdMaxM": 0.3800015258789063,
+    "penetrationM": -0.019999999999999962
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "flat-wall",
+   "weapon": "flamethrower",
+   "stance": "prone",
+   "surfaceDistanceM": 0.40000152587890625,
+   "before": {
+    "muzzleForwardM": 0.339967951116826,
+    "weaponFwdMaxM": 0.48496700743343274,
+    "armsFwdMaxM": 0.7603637271588185,
+    "visibleFwdMaxM": 0.7603637271588185,
+    "penetrationM": 0.36036220127991225
+   },
+   "after": {
+    "muzzleForwardM": 0.2977076175827734,
+    "weaponFwdMaxM": 0.46353573906887396,
+    "armsFwdMaxM": 0.7276161550040926,
+    "clipPlaneDistanceM": 0.3800015258789063,
+    "visibleFwdMaxM": 0.3800015258789063,
+    "penetrationM": -0.019999999999999962
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "post",
+   "weapon": "carbine",
+   "stance": "stand",
+   "surfaceDistanceM": 0.40010046386718656,
+   "before": {
+    "muzzleForwardM": 0.3512482248088613,
+    "weaponFwdMaxM": 0.5708458657282733,
+    "armsFwdMaxM": 0.8604067015126322,
+    "visibleFwdMaxM": 0.8604067015126322,
+    "penetrationM": 0.46030623764544565
+   },
+   "after": {
+    "muzzleForwardM": 0.3415498094660716,
+    "weaponFwdMaxM": 0.5611474503854836,
+    "armsFwdMaxM": 0.853212441517508,
+    "clipPlaneDistanceM": 0.3801004638671866,
+    "visibleFwdMaxM": 0.3801004638671866,
+    "penetrationM": -0.019999999999999962
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "post",
+   "weapon": "carbine",
+   "stance": "crouch",
+   "surfaceDistanceM": 0.399984115600585,
+   "before": {
+    "muzzleForwardM": 0.35124822480885953,
+    "weaponFwdMaxM": 0.5708458657282733,
+    "armsFwdMaxM": 0.8547713442641012,
+    "visibleFwdMaxM": 0.8547713442641012,
+    "penetrationM": 0.4547872286635162
+   },
+   "after": {
+    "muzzleForwardM": 0.34154980946606983,
+    "weaponFwdMaxM": 0.5611474503854836,
+    "armsFwdMaxM": 0.8449587516845707,
+    "clipPlaneDistanceM": 0.379984115600585,
+    "visibleFwdMaxM": 0.379984115600585,
+    "penetrationM": -0.020000000000000018
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "post",
+   "weapon": "carbine",
+   "stance": "prone",
+   "surfaceDistanceM": 0.39997934722900297,
+   "before": {
+    "muzzleForwardM": 0.35124822480885953,
+    "weaponFwdMaxM": 0.5708458657282733,
+    "armsFwdMaxM": 0.8550317279839845,
+    "visibleFwdMaxM": 0.8550317279839845,
+    "penetrationM": 0.45505238075498156
+   },
+   "after": {
+    "muzzleForwardM": 0.34154980946606983,
+    "weaponFwdMaxM": 0.5611474503854836,
+    "armsFwdMaxM": 0.8405643324028205,
+    "clipPlaneDistanceM": 0.37997934722900295,
+    "visibleFwdMaxM": 0.37997934722900295,
+    "penetrationM": -0.020000000000000018
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "post",
+   "weapon": "sniper",
+   "stance": "stand",
+   "surfaceDistanceM": 0.40010046386718656,
+   "before": {
+    "muzzleForwardM": 0.34024284625803247,
+    "weaponFwdMaxM": 0.574344464130002,
+    "armsFwdMaxM": 0.8545172534413634,
+    "visibleFwdMaxM": 0.8545172534413634,
+    "penetrationM": 0.45441678957417686
+   },
+   "after": {
+    "muzzleForwardM": 0.32016741911748525,
+    "weaponFwdMaxM": 0.5545088385396362,
+    "armsFwdMaxM": 0.8374071511091774,
+    "clipPlaneDistanceM": 0.38010046386718643,
+    "visibleFwdMaxM": 0.38010046386718643,
+    "penetrationM": -0.02000000000000013
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "post",
+   "weapon": "sniper",
+   "stance": "crouch",
+   "surfaceDistanceM": 0.399984115600585,
+   "before": {
+    "muzzleForwardM": 0.34012665559930255,
+    "weaponFwdMaxM": 0.5742327036010391,
+    "armsFwdMaxM": 0.8475597826468508,
+    "visibleFwdMaxM": 0.8475597826468508,
+    "penetrationM": 0.44757566704626583
+   },
+   "after": {
+    "muzzleForwardM": 0.32016741911748525,
+    "weaponFwdMaxM": 0.554508838539638,
+    "armsFwdMaxM": 0.8320301243668666,
+    "clipPlaneDistanceM": 0.37998411560058487,
+    "visibleFwdMaxM": 0.37998411560058487,
+    "penetrationM": -0.02000000000000013
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "post",
+   "weapon": "sniper",
+   "stance": "prone",
+   "surfaceDistanceM": 0.39997934722900297,
+   "before": {
+    "muzzleForwardM": 0.3401218872277205,
+    "weaponFwdMaxM": 0.574227935229457,
+    "armsFwdMaxM": 0.8224319712256953,
+    "visibleFwdMaxM": 0.8224319712256953,
+    "penetrationM": 0.42245262399669237
+   },
+   "after": {
+    "muzzleForwardM": 0.32016741911748525,
+    "weaponFwdMaxM": 0.554508838539638,
+    "armsFwdMaxM": 0.8085617641725946,
+    "clipPlaneDistanceM": 0.37997934722900284,
+    "visibleFwdMaxM": 0.37997934722900284,
+    "penetrationM": -0.02000000000000013
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "post",
+   "weapon": "explosive-crossbow",
+   "stance": "stand",
+   "surfaceDistanceM": 0.40010046386718656,
+   "before": {
+    "muzzleForwardM": 0.34044877146793695,
+    "weaponFwdMaxM": 0.46219561547445487,
+    "armsFwdMaxM": 0.9432577954019852,
+    "visibleFwdMaxM": 0.9432577954019852,
+    "penetrationM": 0.5431573315347986
+   },
+   "after": {
+    "muzzleForwardM": 0.23372785931289997,
+    "weaponFwdMaxM": 0.43297622469044406,
+    "armsFwdMaxM": 0.8691713173615021,
+    "clipPlaneDistanceM": 0.38010046386718666,
+    "visibleFwdMaxM": 0.38010046386718666,
+    "penetrationM": -0.019999999999999907
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "post",
+   "weapon": "explosive-crossbow",
+   "stance": "crouch",
+   "surfaceDistanceM": 0.399984115600585,
+   "before": {
+    "muzzleForwardM": 0.34033241077998255,
+    "weaponFwdMaxM": 0.4621320500984005,
+    "armsFwdMaxM": 0.9034123310571509,
+    "visibleFwdMaxM": 0.9034123310571509,
+    "penetrationM": 0.5034282154565659
+   },
+   "after": {
+    "muzzleForwardM": 0.23372785931289997,
+    "weaponFwdMaxM": 0.43297622469044406,
+    "armsFwdMaxM": 0.847175907696565,
+    "clipPlaneDistanceM": 0.37998411560058504,
+    "visibleFwdMaxM": 0.37998411560058504,
+    "penetrationM": -0.019999999999999962
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "post",
+   "weapon": "explosive-crossbow",
+   "stance": "prone",
+   "surfaceDistanceM": 0.39997934722900297,
+   "before": {
+    "muzzleForwardM": 0.3403276393009076,
+    "weaponFwdMaxM": 0.4621404751574705,
+    "armsFwdMaxM": 0.8414625873715131,
+    "visibleFwdMaxM": 0.8414625873715131,
+    "penetrationM": 0.44148324014251017
+   },
+   "after": {
+    "muzzleForwardM": 0.23372785931289997,
+    "weaponFwdMaxM": 0.43297622469044406,
+    "armsFwdMaxM": 0.7702589827296968,
+    "clipPlaneDistanceM": 0.379979347229003,
+    "visibleFwdMaxM": 0.379979347229003,
+    "penetrationM": -0.019999999999999962
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "post",
+   "weapon": "flamethrower",
+   "stance": "stand",
+   "surfaceDistanceM": 0.40010046386718656,
+   "before": {
+    "muzzleForwardM": 0.3400668891051044,
+    "weaponFwdMaxM": 0.48506594542170767,
+    "armsFwdMaxM": 0.8152061635765158,
+    "visibleFwdMaxM": 0.8152061635765158,
+    "penetrationM": 0.4151056997093292
+   },
+   "after": {
+    "muzzleForwardM": 0.29770761758276976,
+    "weaponFwdMaxM": 0.46353573906887213,
+    "armsFwdMaxM": 0.7813089317399573,
+    "clipPlaneDistanceM": 0.38010046386718654,
+    "visibleFwdMaxM": 0.38010046386718654,
+    "penetrationM": -0.020000000000000018
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "post",
+   "weapon": "flamethrower",
+   "stance": "crouch",
+   "surfaceDistanceM": 0.399984115600585,
+   "before": {
+    "muzzleForwardM": 0.33995054083850285,
+    "weaponFwdMaxM": 0.4849495971551061,
+    "armsFwdMaxM": 0.8092540982802365,
+    "visibleFwdMaxM": 0.8092540982802365,
+    "penetrationM": 0.40926998267965153
+   },
+   "after": {
+    "muzzleForwardM": 0.29770761758276976,
+    "weaponFwdMaxM": 0.46353573906887213,
+    "armsFwdMaxM": 0.7769966915478523,
+    "clipPlaneDistanceM": 0.379984115600585,
+    "visibleFwdMaxM": 0.379984115600585,
+    "penetrationM": -0.020000000000000018
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "post",
+   "weapon": "flamethrower",
+   "stance": "prone",
+   "surfaceDistanceM": 0.39997934722900297,
+   "before": {
+    "muzzleForwardM": 0.3399457724669208,
+    "weaponFwdMaxM": 0.4849448287835241,
+    "armsFwdMaxM": 0.7580252858563163,
+    "visibleFwdMaxM": 0.7580252858563163,
+    "penetrationM": 0.3580459386273134
+   },
+   "after": {
+    "muzzleForwardM": 0.29770761758276976,
+    "weaponFwdMaxM": 0.46353573906887213,
+    "armsFwdMaxM": 0.7271001042794634,
+    "clipPlaneDistanceM": 0.379979347229003,
+    "visibleFwdMaxM": 0.379979347229003,
+    "penetrationM": -0.019999999999999962
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "corner",
+   "weapon": "carbine",
+   "stance": "stand",
+   "surfaceDistanceM": 0.4000003279777484,
+   "before": {
+    "muzzleForwardM": 0.3512482248088624,
+    "weaponFwdMaxM": 0.5708458657282748,
+    "armsFwdMaxM": 0.861474571367912,
+    "visibleFwdMaxM": 0.861474571367912,
+    "penetrationM": 0.4614742433901635
+   },
+   "after": {
+    "muzzleForwardM": 0.3415498094660698,
+    "weaponFwdMaxM": 0.5611474503854796,
+    "armsFwdMaxM": 0.8524527529439221,
+    "clipPlaneDistanceM": 0.16948436926748636,
+    "visibleFwdMaxM": 0.16948436926748636,
+    "penetrationM": -0.23051595871026206
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "corner",
+   "weapon": "carbine",
+   "stance": "crouch",
+   "surfaceDistanceM": 0.4000003279777484,
+   "before": {
+    "muzzleForwardM": 0.35124822480886364,
+    "weaponFwdMaxM": 0.5708458657282736,
+    "armsFwdMaxM": 0.8541861426764032,
+    "visibleFwdMaxM": 0.8541861426764032,
+    "penetrationM": 0.4541858146986548
+   },
+   "after": {
+    "muzzleForwardM": 0.34154980946607205,
+    "weaponFwdMaxM": 0.5611474503854819,
+    "armsFwdMaxM": 0.847000568299503,
+    "clipPlaneDistanceM": 0.16948436926748636,
+    "visibleFwdMaxM": 0.16948436926748636,
+    "penetrationM": -0.23051595871026206
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "corner",
+   "weapon": "carbine",
+   "stance": "prone",
+   "surfaceDistanceM": 0.4001405654174386,
+   "before": {
+    "muzzleForwardM": 0.35124822480886364,
+    "weaponFwdMaxM": 0.5708458657282734,
+    "armsFwdMaxM": 0.8501245336280453,
+    "visibleFwdMaxM": 0.8501245336280453,
+    "penetrationM": 0.4499839682106067
+   },
+   "after": {
+    "muzzleForwardM": 0.34154980946607416,
+    "weaponFwdMaxM": 0.561147450385484,
+    "armsFwdMaxM": 0.8420596492036211,
+    "clipPlaneDistanceM": 0.16948436926748636,
+    "visibleFwdMaxM": 0.16948436926748636,
+    "penetrationM": -0.23065619614995223
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "corner",
+   "weapon": "sniper",
+   "stance": "prone",
+   "surfaceDistanceM": 0.4030855516509317,
+   "before": {
+    "muzzleForwardM": 0.33270936611524715,
+    "weaponFwdMaxM": 0.5670507855374024,
+    "armsFwdMaxM": 0.8205467653640207,
+    "visibleFwdMaxM": 0.8205467653640207,
+    "penetrationM": 0.4204061999465821
+   },
+   "after": {
+    "muzzleForwardM": 0.3201674191174861,
+    "weaponFwdMaxM": 0.5545088385396364,
+    "armsFwdMaxM": 0.8044150284757245,
+    "clipPlaneDistanceM": 0.20430025409341598,
+    "visibleFwdMaxM": 0.20430025409341598,
+    "penetrationM": -0.1987852975575157
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "corner",
+   "weapon": "sniper",
+   "stance": "prone",
+   "surfaceDistanceM": 0.4000003279777484,
+   "before": {
+    "muzzleForwardM": 0.33270936611524715,
+    "weaponFwdMaxM": 0.5670507855374024,
+    "armsFwdMaxM": 0.8205467653640207,
+    "visibleFwdMaxM": 0.8205467653640207,
+    "penetrationM": 0.4204061999465821
+   },
+   "after": {
+    "muzzleForwardM": 0.3201674191174839,
+    "weaponFwdMaxM": 0.5545088385396393,
+    "armsFwdMaxM": 0.8071461643466938,
+    "clipPlaneDistanceM": 0.20430025409341598,
+    "visibleFwdMaxM": 0.20430025409341598,
+    "penetrationM": -0.19570007388433244
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "corner",
+   "weapon": "sniper",
+   "stance": "prone",
+   "surfaceDistanceM": 0.4001405654174386,
+   "before": {
+    "muzzleForwardM": 0.33270936611524715,
+    "weaponFwdMaxM": 0.5670507855374024,
+    "armsFwdMaxM": 0.8205467653640207,
+    "visibleFwdMaxM": 0.8205467653640207,
+    "penetrationM": 0.4204061999465821
+   },
+   "after": {
+    "muzzleForwardM": 0.32016741911748164,
+    "weaponFwdMaxM": 0.554508838539637,
+    "armsFwdMaxM": 0.8040438162490655,
+    "clipPlaneDistanceM": 0.20430025409341598,
+    "visibleFwdMaxM": 0.20430025409341598,
+    "penetrationM": -0.1958403113240226
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "corner",
+   "weapon": "explosive-crossbow",
+   "stance": "prone",
+   "surfaceDistanceM": 0.4030855516509317,
+   "before": {
+    "muzzleForwardM": 0.26323041078405673,
+    "weaponFwdMaxM": 0.43490980086519593,
+    "armsFwdMaxM": 0.7940089302270011,
+    "visibleFwdMaxM": 0.7940089302270011,
+    "penetrationM": 0.39386836480956255
+   },
+   "after": {
+    "muzzleForwardM": 0.23372785931289933,
+    "weaponFwdMaxM": 0.4329762246904391,
+    "armsFwdMaxM": 0.774757307176228,
+    "clipPlaneDistanceM": 0.3028956665146885,
+    "visibleFwdMaxM": 0.3028956665146885,
+    "penetrationM": -0.10018988513624316
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "corner",
+   "weapon": "explosive-crossbow",
+   "stance": "prone",
+   "surfaceDistanceM": 0.4000003279777484,
+   "before": {
+    "muzzleForwardM": 0.26323041078405673,
+    "weaponFwdMaxM": 0.43490980086519593,
+    "armsFwdMaxM": 0.7940089302270011,
+    "visibleFwdMaxM": 0.7940089302270011,
+    "penetrationM": 0.39386836480956255
+   },
+   "after": {
+    "muzzleForwardM": 0.2337278593129021,
+    "weaponFwdMaxM": 0.4329762246904419,
+    "armsFwdMaxM": 0.7740896221339391,
+    "clipPlaneDistanceM": 0.3028956665146885,
+    "visibleFwdMaxM": 0.3028956665146885,
+    "penetrationM": -0.0971046614630599
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "corner",
+   "weapon": "explosive-crossbow",
+   "stance": "prone",
+   "surfaceDistanceM": 0.4001405654174386,
+   "before": {
+    "muzzleForwardM": 0.26323041078405673,
+    "weaponFwdMaxM": 0.43490980086519593,
+    "armsFwdMaxM": 0.7940089302270011,
+    "visibleFwdMaxM": 0.7940089302270011,
+    "penetrationM": 0.39386836480956255
+   },
+   "after": {
+    "muzzleForwardM": 0.23372785931289863,
+    "weaponFwdMaxM": 0.4329762246904384,
+    "armsFwdMaxM": 0.7749293850477159,
+    "clipPlaneDistanceM": 0.3028956665146885,
+    "visibleFwdMaxM": 0.3028956665146885,
+    "penetrationM": -0.09724489890275007
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "corner",
+   "weapon": "flamethrower",
+   "stance": "prone",
+   "surfaceDistanceM": 0.4030855516509317,
+   "before": {
+    "muzzleForwardM": 0.3024608586777382,
+    "weaponFwdMaxM": 0.46828898016384307,
+    "armsFwdMaxM": 0.7327471981370197,
+    "visibleFwdMaxM": 0.7327471981370197,
+    "penetrationM": 0.33260663271958113
+   },
+   "after": {
+    "muzzleForwardM": 0.29770761758276665,
+    "weaponFwdMaxM": 0.4635357390688739,
+    "armsFwdMaxM": 0.7233016467271243,
+    "clipPlaneDistanceM": 0.17481077536372006,
+    "visibleFwdMaxM": 0.17481077536372006,
+    "penetrationM": -0.22827477628721163
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "corner",
+   "weapon": "flamethrower",
+   "stance": "prone",
+   "surfaceDistanceM": 0.4000003279777484,
+   "before": {
+    "muzzleForwardM": 0.3024608586777382,
+    "weaponFwdMaxM": 0.46828898016384307,
+    "armsFwdMaxM": 0.7327471981370197,
+    "visibleFwdMaxM": 0.7327471981370197,
+    "penetrationM": 0.33260663271958113
+   },
+   "after": {
+    "muzzleForwardM": 0.297707617582769,
+    "weaponFwdMaxM": 0.46353573906887385,
+    "armsFwdMaxM": 0.731440115566559,
+    "clipPlaneDistanceM": 0.17481077536372006,
+    "visibleFwdMaxM": 0.17481077536372006,
+    "penetrationM": -0.22518955261402837
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "corner",
+   "weapon": "flamethrower",
+   "stance": "prone",
+   "surfaceDistanceM": 0.4001405654174386,
+   "before": {
+    "muzzleForwardM": 0.3024608586777382,
+    "weaponFwdMaxM": 0.46828898016384307,
+    "armsFwdMaxM": 0.7327471981370197,
+    "visibleFwdMaxM": 0.7327471981370197,
+    "penetrationM": 0.33260663271958113
+   },
+   "after": {
+    "muzzleForwardM": 0.29770761758276787,
+    "weaponFwdMaxM": 0.4635357390688727,
+    "armsFwdMaxM": 0.7242044056391091,
+    "clipPlaneDistanceM": 0.17481077536372006,
+    "visibleFwdMaxM": 0.17481077536372006,
+    "penetrationM": -0.22532979005371853
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "floor-down",
+   "weapon": "carbine",
+   "stance": "prone",
+   "surfaceDistanceM": 0.8046872832824228,
+   "before": {
+    "muzzleForwardM": 0.5942752502854237,
+    "weaponFwdMaxM": 0.6964775505686228,
+    "armsFwdMaxM": 1.0378237134681105,
+    "visibleFwdMaxM": 1.0378237134681105,
+    "penetrationM": 0.23313643018568775
+   },
+   "after": {
+    "muzzleForwardM": 0.6739052144548113,
+    "weaponFwdMaxM": 0.75866304448326,
+    "armsFwdMaxM": 1.0272645221042984,
+    "clipPlaneDistanceM": 0.6344789904030371,
+    "visibleFwdMaxM": 0.6344789904030371,
+    "penetrationM": -0.17020829287938566
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "floor-down",
+   "weapon": "carbine",
+   "stance": "crouch",
+   "surfaceDistanceM": 1.3947912910228661,
+   "before": {
+    "muzzleForwardM": 1.1816291292853052,
+    "weaponFwdMaxM": 1.1980284301173776,
+    "armsFwdMaxM": 1.5641550808433824,
+    "visibleFwdMaxM": 1.5641550808433824,
+    "penetrationM": 0.16936378982051625
+   },
+   "after": {
+    "muzzleForwardM": 1.165074048445631,
+    "weaponFwdMaxM": 1.1818363715517186,
+    "armsFwdMaxM": 1.5602323930736492,
+    "clipPlaneDistanceM": 1.2245829981434804,
+    "visibleFwdMaxM": 1.2245829981434804,
+    "penetrationM": -0.17020829287938577
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "floor-down",
+   "weapon": "carbine",
+   "stance": "prone",
+   "surfaceDistanceM": 0.8046872832824228,
+   "before": {
+    "muzzleForwardM": 0.5942752502854237,
+    "weaponFwdMaxM": 0.6964775505686228,
+    "armsFwdMaxM": 1.0378237134681105,
+    "visibleFwdMaxM": 1.0378237134681105,
+    "penetrationM": 0.23313643018568775
+   },
+   "after": {
+    "muzzleForwardM": 0.40739453132571724,
+    "weaponFwdMaxM": 0.5959196204236465,
+    "armsFwdMaxM": 0.9071339063259882,
+    "clipPlaneDistanceM": 0.6344789904030371,
+    "visibleFwdMaxM": 0.6344789904030371,
+    "penetrationM": -0.17020829287938566
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "floor-down",
+   "weapon": "sniper",
+   "stance": "stand",
+   "surfaceDistanceM": 1.9741661349862107,
+   "before": {
+    "muzzleForwardM": 1.7615748723629674,
+    "weaponFwdMaxM": 1.795506323973126,
+    "armsFwdMaxM": 1.7949578190818118,
+    "visibleFwdMaxM": 1.795506323973126,
+    "penetrationM": -0.1786598110130848
+   },
+   "after": {
+    "muzzleForwardM": 1.687859906199451,
+    "weaponFwdMaxM": 1.77120101474623,
+    "armsFwdMaxM": 1.7962255175672681,
+    "clipPlaneDistanceM": 1.803957842106825,
+    "visibleFwdMaxM": 1.7962255175672681,
+    "penetrationM": -0.17794061741894263
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "floor-down",
+   "weapon": "sniper",
+   "stance": "crouch",
+   "surfaceDistanceM": 1.3947912910228661,
+   "before": {
+    "muzzleForwardM": 1.1846484775094237,
+    "weaponFwdMaxM": 1.289987471921808,
+    "armsFwdMaxM": 1.403628418138076,
+    "visibleFwdMaxM": 1.403628418138076,
+    "penetrationM": 0.008837127115209897
+   },
+   "after": {
+    "muzzleForwardM": 1.0117804524667242,
+    "weaponFwdMaxM": 1.1911392982922615,
+    "armsFwdMaxM": 1.3847632345749437,
+    "clipPlaneDistanceM": 1.2245829981434804,
+    "visibleFwdMaxM": 1.2245829981434804,
+    "penetrationM": -0.17020829287938577
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "floor-down",
+   "weapon": "sniper",
+   "stance": "prone",
+   "surfaceDistanceM": 0.8046872832824228,
+   "before": {
+    "muzzleForwardM": 0.5942942927860112,
+    "weaponFwdMaxM": 0.80083494146812,
+    "armsFwdMaxM": 1.006160636461682,
+    "visibleFwdMaxM": 1.006160636461682,
+    "penetrationM": 0.20147335317925918
+   },
+   "after": {
+    "muzzleForwardM": 0.3730757882528106,
+    "weaponFwdMaxM": 0.60505246176583,
+    "armsFwdMaxM": 0.8481223980377102,
+    "clipPlaneDistanceM": 0.6344789904030371,
+    "visibleFwdMaxM": 0.6344789904030371,
+    "penetrationM": -0.17020829287938566
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "floor-down",
+   "weapon": "explosive-crossbow",
+   "stance": "stand",
+   "surfaceDistanceM": 1.9741661349862107,
+   "before": {
+    "muzzleForwardM": 1.7604277793501768,
+    "weaponFwdMaxM": 1.7546230860668484,
+    "armsFwdMaxM": 1.6047334935484723,
+    "visibleFwdMaxM": 1.7546230860668484,
+    "penetrationM": -0.21954304891936238
+   },
+   "after": {
+    "muzzleForwardM": 1.7604277793501768,
+    "weaponFwdMaxM": 1.7546230860668486,
+    "armsFwdMaxM": 1.6059451320252376,
+    "clipPlaneDistanceM": 1.803957842106825,
+    "visibleFwdMaxM": 1.7546230860668486,
+    "penetrationM": -0.21954304891936216
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "floor-down",
+   "weapon": "explosive-crossbow",
+   "stance": "crouch",
+   "surfaceDistanceM": 1.3947912910228661,
+   "before": {
+    "muzzleForwardM": 1.1840592949009456,
+    "weaponFwdMaxM": 1.1804693230659153,
+    "armsFwdMaxM": 1.4641699359677511,
+    "visibleFwdMaxM": 1.4641699359677511,
+    "penetrationM": 0.06937864494488499
+   },
+   "after": {
+    "muzzleForwardM": 1.184059294900948,
+    "weaponFwdMaxM": 1.1804693230659182,
+    "armsFwdMaxM": 1.4621182460279851,
+    "clipPlaneDistanceM": 1.2245829981434804,
+    "visibleFwdMaxM": 1.2245829981434804,
+    "penetrationM": -0.17020829287938577
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "floor-down",
+   "weapon": "explosive-crossbow",
+   "stance": "prone",
+   "surfaceDistanceM": 0.8046872832824228,
+   "before": {
+    "muzzleForwardM": 0.5948248359879853,
+    "weaponFwdMaxM": 0.6414650454467199,
+    "armsFwdMaxM": 0.9790926552088852,
+    "visibleFwdMaxM": 0.9790926552088852,
+    "penetrationM": 0.17440537192646244
+   },
+   "after": {
+    "muzzleForwardM": 0.5430862154396547,
+    "weaponFwdMaxM": 0.5963219791152922,
+    "armsFwdMaxM": 0.9505246955576719,
+    "clipPlaneDistanceM": 0.6344789904030371,
+    "visibleFwdMaxM": 0.6344789904030371,
+    "penetrationM": -0.17020829287938566
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "floor-down",
+   "weapon": "flamethrower",
+   "stance": "stand",
+   "surfaceDistanceM": 1.9741661349862107,
+   "before": {
+    "muzzleForwardM": 1.761195009935456,
+    "weaponFwdMaxM": 1.7840919747065822,
+    "armsFwdMaxM": 1.8367458679220088,
+    "visibleFwdMaxM": 1.8367458679220088,
+    "penetrationM": -0.13742026706420196
+   },
+   "after": {
+    "muzzleForwardM": 1.7326687917110268,
+    "weaponFwdMaxM": 1.761582079222927,
+    "armsFwdMaxM": 1.8854725411808646,
+    "clipPlaneDistanceM": 1.803957842106825,
+    "visibleFwdMaxM": 1.803957842106825,
+    "penetrationM": -0.17020829287938577
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "floor-down",
+   "weapon": "flamethrower",
+   "stance": "crouch",
+   "surfaceDistanceM": 1.3947912910228661,
+   "before": {
+    "muzzleForwardM": 1.1846174015854518,
+    "weaponFwdMaxM": 1.21153552019434,
+    "armsFwdMaxM": 1.2838784527381146,
+    "visibleFwdMaxM": 1.2838784527381146,
+    "penetrationM": -0.11091283828475151
+   },
+   "after": {
+    "muzzleForwardM": 1.1555349087627202,
+    "weaponFwdMaxM": 1.1845427395227899,
+    "armsFwdMaxM": 1.286126071973348,
+    "clipPlaneDistanceM": 1.2245829981434804,
+    "visibleFwdMaxM": 1.2245829981434804,
+    "penetrationM": -0.17020829287938577
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "floor-down",
+   "weapon": "flamethrower",
+   "stance": "prone",
+   "surfaceDistanceM": 0.8046872832824228,
+   "before": {
+    "muzzleForwardM": 0.5939012608795483,
+    "weaponFwdMaxM": 0.6359133494151976,
+    "armsFwdMaxM": 0.9613423552283796,
+    "visibleFwdMaxM": 0.9613423552283796,
+    "penetrationM": 0.15665507194595685
+   },
+   "after": {
+    "muzzleForwardM": 0.5511655933567914,
+    "weaponFwdMaxM": 0.5936117889134889,
+    "armsFwdMaxM": 0.9339147471963191,
+    "clipPlaneDistanceM": 0.6344789904030371,
+    "visibleFwdMaxM": 0.6344789904030371,
+    "penetrationM": -0.17020829287938566
+   },
+   "graded": true
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "open",
+   "weapon": "carbine",
+   "stance": "stand",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 1.9579854110769341,
+    "weaponFwdMaxM": 1.9594034817102541,
+    "armsFwdMaxM": 1.7194657543692462,
+    "visibleFwdMaxM": 1.9594034817102541,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 1.9579854110769328,
+    "weaponFwdMaxM": 1.959403481710253,
+    "armsFwdMaxM": 1.7220956838202819,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 1.959403481710253,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "open",
+   "weapon": "carbine",
+   "stance": "crouch",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 1.9579854110769175,
+    "weaponFwdMaxM": 1.9594034817102375,
+    "armsFwdMaxM": 1.7168163728403272,
+    "visibleFwdMaxM": 1.9594034817102375,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 1.957985411076917,
+    "weaponFwdMaxM": 1.9594034817102368,
+    "armsFwdMaxM": 1.7145763922654835,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 1.9594034817102368,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "open",
+   "weapon": "carbine",
+   "stance": "prone",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 1.8679854110769196,
+    "weaponFwdMaxM": 1.8694034817102394,
+    "armsFwdMaxM": 1.6288290853574736,
+    "visibleFwdMaxM": 1.8694034817102394,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 1.86798541107692,
+    "weaponFwdMaxM": 1.86940348171024,
+    "armsFwdMaxM": 1.630934198467066,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 1.86940348171024,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "open",
+   "weapon": "sniper",
+   "stance": "stand",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 2.156749629026641,
+    "weaponFwdMaxM": 2.14169378797225,
+    "armsFwdMaxM": 1.7330427858823088,
+    "visibleFwdMaxM": 2.14169378797225,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 2.15674962902664,
+    "weaponFwdMaxM": 2.1416937879722506,
+    "armsFwdMaxM": 1.7313731558673382,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 2.1416937879722506,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "open",
+   "weapon": "sniper",
+   "stance": "crouch",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 2.1567496290266446,
+    "weaponFwdMaxM": 2.1416937879722524,
+    "armsFwdMaxM": 1.7301058512037983,
+    "visibleFwdMaxM": 2.1416937879722524,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 2.156749629026645,
+    "weaponFwdMaxM": 2.1416937879722524,
+    "armsFwdMaxM": 1.7325748447417297,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 2.1416937879722524,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "open",
+   "weapon": "sniper",
+   "stance": "prone",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 2.111749629026647,
+    "weaponFwdMaxM": 2.0966937879722543,
+    "armsFwdMaxM": 1.6912888116125617,
+    "visibleFwdMaxM": 2.0966937879722543,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 2.1117496290266455,
+    "weaponFwdMaxM": 2.096693787972253,
+    "armsFwdMaxM": 1.688884963902936,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 2.096693787972253,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "open",
+   "weapon": "explosive-crossbow",
+   "stance": "stand",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 2.051377404963066,
+    "weaponFwdMaxM": 2.0421991503070087,
+    "armsFwdMaxM": 1.624831099216988,
+    "visibleFwdMaxM": 2.0421991503070087,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 2.0513774049630675,
+    "weaponFwdMaxM": 2.0421991503070105,
+    "armsFwdMaxM": 1.6285004874782516,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 2.0421991503070105,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "open",
+   "weapon": "explosive-crossbow",
+   "stance": "crouch",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 2.051377404963067,
+    "weaponFwdMaxM": 2.0421991503070096,
+    "armsFwdMaxM": 1.6324952898127623,
+    "visibleFwdMaxM": 2.0421991503070096,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 2.051377404963066,
+    "weaponFwdMaxM": 2.0421991503070087,
+    "armsFwdMaxM": 1.630842630239784,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 2.0421991503070087,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "open",
+   "weapon": "explosive-crossbow",
+   "stance": "prone",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 1.9613774049630655,
+    "weaponFwdMaxM": 1.952199150307012,
+    "armsFwdMaxM": 1.5432021516304257,
+    "visibleFwdMaxM": 1.952199150307012,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 1.9613774049630666,
+    "weaponFwdMaxM": 1.9521991503070129,
+    "armsFwdMaxM": 1.5407452518137124,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 1.9521991503070129,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "open",
+   "weapon": "flamethrower",
+   "stance": "stand",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 2.184479137317768,
+    "weaponFwdMaxM": 2.184024296017886,
+    "armsFwdMaxM": 1.6879518200314045,
+    "visibleFwdMaxM": 2.184024296017886,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 2.1844791373177683,
+    "weaponFwdMaxM": 2.1840242960178866,
+    "armsFwdMaxM": 1.6903529335569214,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 2.1840242960178866,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "open",
+   "weapon": "flamethrower",
+   "stance": "crouch",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 2.1844791373177705,
+    "weaponFwdMaxM": 2.184024296017889,
+    "armsFwdMaxM": 1.689296212031867,
+    "visibleFwdMaxM": 2.184024296017889,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 2.1844791373177697,
+    "weaponFwdMaxM": 2.1840242960178884,
+    "armsFwdMaxM": 1.6868914050577544,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 2.1840242960178884,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "atomic-acres",
+   "site": "open",
+   "weapon": "flamethrower",
+   "stance": "prone",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 2.094479137317773,
+    "weaponFwdMaxM": 2.0940242960178908,
+    "armsFwdMaxM": 1.5986906821646023,
+    "visibleFwdMaxM": 2.0940242960178908,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 2.0944791373177725,
+    "weaponFwdMaxM": 2.0940242960178908,
+    "armsFwdMaxM": 1.5989020300336954,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 2.0940242960178908,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "test2",
+   "site": "flat-wall",
+   "weapon": "carbine",
+   "stance": "stand",
+   "surfaceDistanceM": 0.39999961853027344,
+   "before": {
+    "muzzleForwardM": 0.3512482248088631,
+    "weaponFwdMaxM": 0.5708458657282733,
+    "armsFwdMaxM": 0.8473522019361681,
+    "visibleFwdMaxM": 0.8473522019361681,
+    "penetrationM": 0.4473525834058947
+   },
+   "after": {
+    "muzzleForwardM": 0.3415500259892532,
+    "weaponFwdMaxM": 0.5611476474295678,
+    "armsFwdMaxM": 0.8384532971251879,
+    "clipPlaneDistanceM": 0.16948436926748636,
+    "visibleFwdMaxM": 0.16948436926748636,
+    "penetrationM": -0.23051524926278708
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "flat-wall",
+   "weapon": "carbine",
+   "stance": "crouch",
+   "surfaceDistanceM": 0.3999004364013672,
+   "before": {
+    "muzzleForwardM": 0.3512482248088631,
+    "weaponFwdMaxM": 0.5708458657282733,
+    "armsFwdMaxM": 0.8446867608834658,
+    "visibleFwdMaxM": 0.8446867608834658,
+    "penetrationM": 0.44478632448209865
+   },
+   "after": {
+    "muzzleForwardM": 0.3415498094660734,
+    "weaponFwdMaxM": 0.5611474503854836,
+    "armsFwdMaxM": 0.8358196552376356,
+    "clipPlaneDistanceM": 0.16948436926748636,
+    "visibleFwdMaxM": 0.16948436926748636,
+    "penetrationM": -0.23041606713388083
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "flat-wall",
+   "weapon": "carbine",
+   "stance": "prone",
+   "surfaceDistanceM": 0,
+   "before": {
+    "muzzleForwardM": 0.3512482248088631,
+    "weaponFwdMaxM": 0.5708458657282733,
+    "armsFwdMaxM": 0.8542636775155401,
+    "visibleFwdMaxM": 0.8542636775155401,
+    "penetrationM": 0.8542636775155401
+   },
+   "after": {
+    "muzzleForwardM": 0.3415498094660734,
+    "weaponFwdMaxM": 0.5611474503854836,
+    "armsFwdMaxM": 0.8444935569919032,
+    "clipPlaneDistanceM": 0.16948436926748636,
+    "visibleFwdMaxM": 0.16948436926748636,
+    "penetrationM": 0.16948436926748636
+   },
+   "graded": false
+  },
+  {
+   "arena": "test2",
+   "site": "flat-wall",
+   "weapon": "sniper",
+   "stance": "prone",
+   "surfaceDistanceM": 0.39999961853027344,
+   "before": {
+    "muzzleForwardM": 0.3327093661152496,
+    "weaponFwdMaxM": 0.5670507855374005,
+    "armsFwdMaxM": 0.8199251595648249,
+    "visibleFwdMaxM": 0.8199251595648249,
+    "penetrationM": 0.8199251595648249
+   },
+   "after": {
+    "muzzleForwardM": 0.3201674191175705,
+    "weaponFwdMaxM": 0.5545088385391317,
+    "armsFwdMaxM": 0.8038164409241553,
+    "clipPlaneDistanceM": 0.20430025409341598,
+    "visibleFwdMaxM": 0.20430025409341598,
+    "penetrationM": -0.19569936443685745
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "flat-wall",
+   "weapon": "sniper",
+   "stance": "crouch",
+   "surfaceDistanceM": 0.3999004364013672,
+   "before": {
+    "muzzleForwardM": 0.3327093661152496,
+    "weaponFwdMaxM": 0.5670507855374005,
+    "armsFwdMaxM": 0.8067777522725947,
+    "visibleFwdMaxM": 0.8067777522725947,
+    "penetrationM": 0.40687731587122755
+   },
+   "after": {
+    "muzzleForwardM": 0.32016741911748525,
+    "weaponFwdMaxM": 0.5545088385396362,
+    "armsFwdMaxM": 0.7935911785632435,
+    "clipPlaneDistanceM": 0.20430025409341598,
+    "visibleFwdMaxM": 0.20430025409341598,
+    "penetrationM": -0.1956001823079512
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "flat-wall",
+   "weapon": "sniper",
+   "stance": "prone",
+   "surfaceDistanceM": 0,
+   "before": {
+    "muzzleForwardM": 0.3327093661152496,
+    "weaponFwdMaxM": 0.5670507855374005,
+    "armsFwdMaxM": 0.8199251595648249,
+    "visibleFwdMaxM": 0.8199251595648249,
+    "penetrationM": 0.8199251595648249
+   },
+   "after": {
+    "muzzleForwardM": 0.32016741911748525,
+    "weaponFwdMaxM": 0.5545088385396362,
+    "armsFwdMaxM": 0.8070683558363534,
+    "clipPlaneDistanceM": 0.20430025409341598,
+    "visibleFwdMaxM": 0.20430025409341598,
+    "penetrationM": 0.20430025409341598
+   },
+   "graded": false
+  },
+  {
+   "arena": "test2",
+   "site": "flat-wall",
+   "weapon": "explosive-crossbow",
+   "stance": "prone",
+   "surfaceDistanceM": 0.39999961853027344,
+   "before": {
+    "muzzleForwardM": 0.2632304107840575,
+    "weaponFwdMaxM": 0.4349098008651957,
+    "armsFwdMaxM": 0.7916105207131103,
+    "visibleFwdMaxM": 0.7916105207131103,
+    "penetrationM": 0.7916105207131103
+   },
+   "after": {
+    "muzzleForwardM": 0.2337278593129568,
+    "weaponFwdMaxM": 0.43297622469052044,
+    "armsFwdMaxM": 0.772113148954304,
+    "clipPlaneDistanceM": 0.3028956665146885,
+    "visibleFwdMaxM": 0.3028956665146885,
+    "penetrationM": -0.09710395201558492
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "flat-wall",
+   "weapon": "explosive-crossbow",
+   "stance": "crouch",
+   "surfaceDistanceM": 0.3999004364013672,
+   "before": {
+    "muzzleForwardM": 0.2632304107840575,
+    "weaponFwdMaxM": 0.4349098008651957,
+    "armsFwdMaxM": 0.8562504448419546,
+    "visibleFwdMaxM": 0.8562504448419546,
+    "penetrationM": 0.4563500084405874
+   },
+   "after": {
+    "muzzleForwardM": 0.23372785931289997,
+    "weaponFwdMaxM": 0.4329762246904494,
+    "armsFwdMaxM": 0.8350377374801319,
+    "clipPlaneDistanceM": 0.3028956665146885,
+    "visibleFwdMaxM": 0.3028956665146885,
+    "penetrationM": -0.09700476988667867
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "flat-wall",
+   "weapon": "explosive-crossbow",
+   "stance": "prone",
+   "surfaceDistanceM": 0,
+   "before": {
+    "muzzleForwardM": 0.2632304107840575,
+    "weaponFwdMaxM": 0.4349098008651957,
+    "armsFwdMaxM": 0.7916105207131103,
+    "visibleFwdMaxM": 0.7916105207131103,
+    "penetrationM": 0.7916105207131103
+   },
+   "after": {
+    "muzzleForwardM": 0.23372785931289997,
+    "weaponFwdMaxM": 0.4329762246904494,
+    "armsFwdMaxM": 0.771007561025506,
+    "clipPlaneDistanceM": 0.3028956665146885,
+    "visibleFwdMaxM": 0.3028956665146885,
+    "penetrationM": 0.3028956665146885
+   },
+   "graded": false
+  },
+  {
+   "arena": "test2",
+   "site": "flat-wall",
+   "weapon": "flamethrower",
+   "stance": "prone",
+   "surfaceDistanceM": 0.39999961853027344,
+   "before": {
+    "muzzleForwardM": 0.30246085867773687,
+    "weaponFwdMaxM": 0.468288980163841,
+    "armsFwdMaxM": 0.7289962042999001,
+    "visibleFwdMaxM": 0.7289962042999001,
+    "penetrationM": 0.7289962042999001
+   },
+   "after": {
+    "muzzleForwardM": 0.2977076175827733,
+    "weaponFwdMaxM": 0.4635357390688739,
+    "armsFwdMaxM": 0.7303405865182597,
+    "clipPlaneDistanceM": 0.17481077536372006,
+    "visibleFwdMaxM": 0.17481077536372006,
+    "penetrationM": -0.22518884316655338
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "flat-wall",
+   "weapon": "flamethrower",
+   "stance": "crouch",
+   "surfaceDistanceM": 0.3999004364013672,
+   "before": {
+    "muzzleForwardM": 0.30246085867773687,
+    "weaponFwdMaxM": 0.468288980163841,
+    "armsFwdMaxM": 0.7578833329618071,
+    "visibleFwdMaxM": 0.7578833329618071,
+    "penetrationM": 0.3579828965604399
+   },
+   "after": {
+    "muzzleForwardM": 0.29770761758276976,
+    "weaponFwdMaxM": 0.4635357390688739,
+    "armsFwdMaxM": 0.7542807740111677,
+    "clipPlaneDistanceM": 0.17481077536372006,
+    "visibleFwdMaxM": 0.17481077536372006,
+    "penetrationM": -0.22508966103764713
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "flat-wall",
+   "weapon": "flamethrower",
+   "stance": "prone",
+   "surfaceDistanceM": 0,
+   "before": {
+    "muzzleForwardM": 0.30246085867773687,
+    "weaponFwdMaxM": 0.468288980163841,
+    "armsFwdMaxM": 0.7289962042999001,
+    "visibleFwdMaxM": 0.7289962042999001,
+    "penetrationM": 0.7289962042999001
+   },
+   "after": {
+    "muzzleForwardM": 0.29770761758276976,
+    "weaponFwdMaxM": 0.4635357390688739,
+    "armsFwdMaxM": 0.7268935734584829,
+    "clipPlaneDistanceM": 0.17481077536372006,
+    "visibleFwdMaxM": 0.17481077536372006,
+    "penetrationM": 0.17481077536372006
+   },
+   "graded": false
+  },
+  {
+   "arena": "test2",
+   "site": "floor-down",
+   "weapon": "carbine",
+   "stance": "prone",
+   "surfaceDistanceM": 0.8046872832824229,
+   "before": {
+    "muzzleForwardM": 0.5942752502854229,
+    "weaponFwdMaxM": 0.6964775505686217,
+    "armsFwdMaxM": 1.0404238867966376,
+    "visibleFwdMaxM": 1.0404238867966376,
+    "penetrationM": 0.23573660351421466
+   },
+   "after": {
+    "muzzleForwardM": 0.774612488031748,
+    "weaponFwdMaxM": 0.8122194068376115,
+    "armsFwdMaxM": 1.0361917192714794,
+    "clipPlaneDistanceM": 0.6344789904030372,
+    "visibleFwdMaxM": 0.6344789904030372,
+    "penetrationM": -0.17020829287938566
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "floor-down",
+   "weapon": "carbine",
+   "stance": "crouch",
+   "surfaceDistanceM": 1.3947912910228664,
+   "before": {
+    "muzzleForwardM": 1.1816291292853072,
+    "weaponFwdMaxM": 1.1980284301173805,
+    "armsFwdMaxM": 1.5591889048976153,
+    "visibleFwdMaxM": 1.5591889048976153,
+    "penetrationM": 0.16439761387474894
+   },
+   "after": {
+    "muzzleForwardM": 1.165074048445632,
+    "weaponFwdMaxM": 1.1818363715517195,
+    "armsFwdMaxM": 1.5579064781886938,
+    "clipPlaneDistanceM": 1.2245829981434806,
+    "visibleFwdMaxM": 1.2245829981434806,
+    "penetrationM": -0.17020829287938577
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "floor-down",
+   "weapon": "carbine",
+   "stance": "prone",
+   "surfaceDistanceM": 0.8046872832824229,
+   "before": {
+    "muzzleForwardM": 0.5942752502854229,
+    "weaponFwdMaxM": 0.6964775505686217,
+    "armsFwdMaxM": 1.0404238867966376,
+    "visibleFwdMaxM": 1.0404238867966376,
+    "penetrationM": 0.23573660351421466
+   },
+   "after": {
+    "muzzleForwardM": 0.40739453132571746,
+    "weaponFwdMaxM": 0.595919620423647,
+    "armsFwdMaxM": 0.9082871593665021,
+    "clipPlaneDistanceM": 0.6344789904030372,
+    "visibleFwdMaxM": 0.6344789904030372,
+    "penetrationM": -0.17020829287938566
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "floor-down",
+   "weapon": "sniper",
+   "stance": "stand",
+   "surfaceDistanceM": 1.974166134986211,
+   "before": {
+    "muzzleForwardM": 1.7614464111791395,
+    "weaponFwdMaxM": 1.771627640371927,
+    "armsFwdMaxM": 1.810167497995343,
+    "visibleFwdMaxM": 1.810167497995343,
+    "penetrationM": -0.16399863699086792
+   },
+   "after": {
+    "muzzleForwardM": 1.7560507581506068,
+    "weaponFwdMaxM": 1.7695726534351046,
+    "armsFwdMaxM": 1.8086498645470361,
+    "clipPlaneDistanceM": 1.8039578421068252,
+    "visibleFwdMaxM": 1.8039578421068252,
+    "penetrationM": -0.17020829287938577
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "floor-down",
+   "weapon": "sniper",
+   "stance": "crouch",
+   "surfaceDistanceM": 1.3947912910228664,
+   "before": {
+    "muzzleForwardM": 1.1846484775094221,
+    "weaponFwdMaxM": 1.28998747192181,
+    "armsFwdMaxM": 1.4036593846399237,
+    "visibleFwdMaxM": 1.4036593846399237,
+    "penetrationM": 0.008868093617057315
+   },
+   "after": {
+    "muzzleForwardM": 1.011780452466713,
+    "weaponFwdMaxM": 1.1911392982919433,
+    "armsFwdMaxM": 1.3846697897304432,
+    "clipPlaneDistanceM": 1.2245829981434806,
+    "visibleFwdMaxM": 1.2245829981434806,
+    "penetrationM": -0.17020829287938577
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "floor-down",
+   "weapon": "sniper",
+   "stance": "prone",
+   "surfaceDistanceM": 0.8046872832824229,
+   "before": {
+    "muzzleForwardM": 0.5942942927860115,
+    "weaponFwdMaxM": 0.80083494146812,
+    "armsFwdMaxM": 1.0067434181775934,
+    "visibleFwdMaxM": 1.0067434181775934,
+    "penetrationM": 0.2020561348951705
+   },
+   "after": {
+    "muzzleForwardM": 0.37307578825281096,
+    "weaponFwdMaxM": 0.6050524617658299,
+    "armsFwdMaxM": 0.8481881543845491,
+    "clipPlaneDistanceM": 0.6344789904030372,
+    "visibleFwdMaxM": 0.6344789904030372,
+    "penetrationM": -0.17020829287938566
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "floor-down",
+   "weapon": "explosive-crossbow",
+   "stance": "stand",
+   "surfaceDistanceM": 1.974166134986211,
+   "before": {
+    "muzzleForwardM": 1.7604277793501781,
+    "weaponFwdMaxM": 1.7546230860668497,
+    "armsFwdMaxM": 1.6031080337593626,
+    "visibleFwdMaxM": 1.7546230860668497,
+    "penetrationM": -0.21954304891936127
+   },
+   "after": {
+    "muzzleForwardM": 1.760427779350179,
+    "weaponFwdMaxM": 1.7546230860668506,
+    "armsFwdMaxM": 1.6046959517201107,
+    "clipPlaneDistanceM": 1.8039578421068252,
+    "visibleFwdMaxM": 1.7546230860668506,
+    "penetrationM": -0.21954304891936038
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "floor-down",
+   "weapon": "explosive-crossbow",
+   "stance": "crouch",
+   "surfaceDistanceM": 1.3947912910228664,
+   "before": {
+    "muzzleForwardM": 1.1840592949009443,
+    "weaponFwdMaxM": 1.1804693230659158,
+    "armsFwdMaxM": 1.466670910779264,
+    "visibleFwdMaxM": 1.466670910779264,
+    "penetrationM": 0.07187961975639756
+   },
+   "after": {
+    "muzzleForwardM": 1.1840592949009479,
+    "weaponFwdMaxM": 1.1804693230659191,
+    "armsFwdMaxM": 1.4623690175322699,
+    "clipPlaneDistanceM": 1.2245829981434806,
+    "visibleFwdMaxM": 1.2245829981434806,
+    "penetrationM": -0.17020829287938577
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "floor-down",
+   "weapon": "explosive-crossbow",
+   "stance": "prone",
+   "surfaceDistanceM": 0.8046872832824229,
+   "before": {
+    "muzzleForwardM": 0.5948248359879849,
+    "weaponFwdMaxM": 0.64146504544672,
+    "armsFwdMaxM": 0.9750744128328173,
+    "visibleFwdMaxM": 0.9750744128328173,
+    "penetrationM": 0.17038712955039437
+   },
+   "after": {
+    "muzzleForwardM": 0.5430862154396536,
+    "weaponFwdMaxM": 0.5963219791152921,
+    "armsFwdMaxM": 0.9506394039369512,
+    "clipPlaneDistanceM": 0.6344789904030372,
+    "visibleFwdMaxM": 0.6344789904030372,
+    "penetrationM": -0.17020829287938566
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "floor-down",
+   "weapon": "flamethrower",
+   "stance": "stand",
+   "surfaceDistanceM": 1.974166134986211,
+   "before": {
+    "muzzleForwardM": 1.761153270131538,
+    "weaponFwdMaxM": 1.7830779890835726,
+    "armsFwdMaxM": 1.82775548616698,
+    "visibleFwdMaxM": 1.82775548616698,
+    "penetrationM": -0.14641064881923094
+   },
+   "after": {
+    "muzzleForwardM": 1.737317669830282,
+    "weaponFwdMaxM": 1.7613616121630018,
+    "armsFwdMaxM": 1.8308746355379717,
+    "clipPlaneDistanceM": 1.8039578421068252,
+    "visibleFwdMaxM": 1.8039578421068252,
+    "penetrationM": -0.17020829287938577
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "floor-down",
+   "weapon": "flamethrower",
+   "stance": "crouch",
+   "surfaceDistanceM": 1.3947912910228664,
+   "before": {
+    "muzzleForwardM": 1.1846174015854518,
+    "weaponFwdMaxM": 1.21153552019434,
+    "armsFwdMaxM": 1.28088919175636,
+    "visibleFwdMaxM": 1.28088919175636,
+    "penetrationM": -0.1139020992665063
+   },
+   "after": {
+    "muzzleForwardM": 1.1555349087627194,
+    "weaponFwdMaxM": 1.1845427395227894,
+    "armsFwdMaxM": 1.2857377119839906,
+    "clipPlaneDistanceM": 1.2245829981434806,
+    "visibleFwdMaxM": 1.2245829981434806,
+    "penetrationM": -0.17020829287938577
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "floor-down",
+   "weapon": "flamethrower",
+   "stance": "prone",
+   "surfaceDistanceM": 0.8046872832824229,
+   "before": {
+    "muzzleForwardM": 0.59390126087955,
+    "weaponFwdMaxM": 0.6359133494151992,
+    "armsFwdMaxM": 0.9650924367858987,
+    "visibleFwdMaxM": 0.9650924367858987,
+    "penetrationM": 0.16040515350347584
+   },
+   "after": {
+    "muzzleForwardM": 0.5511655933567913,
+    "weaponFwdMaxM": 0.5936117889134878,
+    "armsFwdMaxM": 0.9352974325588614,
+    "clipPlaneDistanceM": 0.6344789904030372,
+    "visibleFwdMaxM": 0.6344789904030372,
+    "penetrationM": -0.17020829287938566
+   },
+   "graded": true
+  },
+  {
+   "arena": "test2",
+   "site": "open",
+   "weapon": "carbine",
+   "stance": "stand",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 1.9579854110769297,
+    "weaponFwdMaxM": 1.9594034817102504,
+    "armsFwdMaxM": 1.7197485665562837,
+    "visibleFwdMaxM": 1.9594034817102504,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 1.9579854110769332,
+    "weaponFwdMaxM": 1.9594034817102504,
+    "armsFwdMaxM": 1.7220709053858982,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 1.9594034817102504,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "test2",
+   "site": "open",
+   "weapon": "carbine",
+   "stance": "crouch",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 1.957985411076919,
+    "weaponFwdMaxM": 1.9594034817102397,
+    "armsFwdMaxM": 1.7172236889724815,
+    "visibleFwdMaxM": 1.9594034817102397,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 1.957985411076919,
+    "weaponFwdMaxM": 1.9594034817102397,
+    "armsFwdMaxM": 1.714603862194764,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 1.9594034817102397,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "test2",
+   "site": "open",
+   "weapon": "carbine",
+   "stance": "prone",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 1.8679854110769192,
+    "weaponFwdMaxM": 1.8694034817102398,
+    "armsFwdMaxM": 1.6282578178299012,
+    "visibleFwdMaxM": 1.8694034817102398,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 1.8679854110769192,
+    "weaponFwdMaxM": 1.8694034817102398,
+    "armsFwdMaxM": 1.6309347207398126,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 1.8694034817102398,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "test2",
+   "site": "open",
+   "weapon": "sniper",
+   "stance": "stand",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 2.156749629026642,
+    "weaponFwdMaxM": 2.141693787972251,
+    "armsFwdMaxM": 1.7342502832408755,
+    "visibleFwdMaxM": 2.141693787972251,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 2.156749629026642,
+    "weaponFwdMaxM": 2.141693787972251,
+    "armsFwdMaxM": 1.7312393871427467,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 2.141693787972251,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "test2",
+   "site": "open",
+   "weapon": "sniper",
+   "stance": "crouch",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 2.1567496290266455,
+    "weaponFwdMaxM": 2.141693787972251,
+    "armsFwdMaxM": 1.7319457165325751,
+    "visibleFwdMaxM": 2.141693787972251,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 2.1567496290266455,
+    "weaponFwdMaxM": 2.141693787972251,
+    "armsFwdMaxM": 1.7327001474424293,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 2.141693787972251,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "test2",
+   "site": "open",
+   "weapon": "sniper",
+   "stance": "prone",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 2.1117496290266438,
+    "weaponFwdMaxM": 2.0966937879722494,
+    "armsFwdMaxM": 1.6870478084282752,
+    "visibleFwdMaxM": 2.0966937879722494,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 2.1567496290266455,
+    "weaponFwdMaxM": 2.141693787972251,
+    "armsFwdMaxM": 1.733017288034297,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 2.141693787972251,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "test2",
+   "site": "open",
+   "weapon": "explosive-crossbow",
+   "stance": "prone",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 1.9613774049630663,
+    "weaponFwdMaxM": 1.9521991503070133,
+    "armsFwdMaxM": 1.5468409747998386,
+    "visibleFwdMaxM": 1.9521991503070133,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 2.0513774049630698,
+    "weaponFwdMaxM": 2.042199150307013,
+    "armsFwdMaxM": 1.733017288034297,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 2.042199150307013,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "test2",
+   "site": "open",
+   "weapon": "explosive-crossbow",
+   "stance": "crouch",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 2.0513774049630698,
+    "weaponFwdMaxM": 2.042199150307013,
+    "armsFwdMaxM": 1.6234788179936714,
+    "visibleFwdMaxM": 2.042199150307013,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 2.0513774049630698,
+    "weaponFwdMaxM": 2.042199150307013,
+    "armsFwdMaxM": 1.733017288034297,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 2.042199150307013,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "test2",
+   "site": "open",
+   "weapon": "explosive-crossbow",
+   "stance": "crouch",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 2.0513774049630698,
+    "weaponFwdMaxM": 2.042199150307013,
+    "armsFwdMaxM": 1.6234788179936714,
+    "visibleFwdMaxM": 2.042199150307013,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 2.0513774049630698,
+    "weaponFwdMaxM": 2.042199150307013,
+    "armsFwdMaxM": 1.733017288034297,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 2.042199150307013,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "test2",
+   "site": "open",
+   "weapon": "flamethrower",
+   "stance": "crouch",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 2.184479137317769,
+    "weaponFwdMaxM": 2.1840242960178884,
+    "armsFwdMaxM": 1.6881038557390085,
+    "visibleFwdMaxM": 2.1840242960178884,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 2.184479137317769,
+    "weaponFwdMaxM": 2.1840242960178884,
+    "armsFwdMaxM": 1.733017288034297,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 2.1840242960178884,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "test2",
+   "site": "open",
+   "weapon": "flamethrower",
+   "stance": "crouch",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 2.184479137317769,
+    "weaponFwdMaxM": 2.1840242960178884,
+    "armsFwdMaxM": 1.6881038557390085,
+    "visibleFwdMaxM": 2.1840242960178884,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 2.184479137317769,
+    "weaponFwdMaxM": 2.1840242960178884,
+    "armsFwdMaxM": 1.733017288034297,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 2.1840242960178884,
+    "penetrationM": null
+   },
+   "graded": false
+  },
+  {
+   "arena": "test2",
+   "site": "open",
+   "weapon": "flamethrower",
+   "stance": "crouch",
+   "surfaceDistanceM": null,
+   "before": {
+    "muzzleForwardM": 2.184479137317769,
+    "weaponFwdMaxM": 2.1840242960178884,
+    "armsFwdMaxM": 1.6881038557390085,
+    "visibleFwdMaxM": 2.1840242960178884,
+    "penetrationM": null
+   },
+   "after": {
+    "muzzleForwardM": 2.184479137317769,
+    "weaponFwdMaxM": 2.1840242960178884,
+    "armsFwdMaxM": 1.733017288034297,
+    "clipPlaneDistanceM": null,
+    "visibleFwdMaxM": 2.1840242960178884,
+    "penetrationM": null
+   },
+   "graded": false
+  }
+ ]
+}

@@ -36,7 +36,7 @@ if (servedCandidate?.schemaVersion !== 4 || servedCandidate.channel !== 'the-big
 }
 const browser = await chromium.launch({
   headless: true,
-  args: [
+  args: ['--mute-audio', 
     '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
     '--disable-backgrounding-occluded-windows', '--allow-loopback-in-peer-connection',
     '--disable-features=WebRtcHideLocalIpsWithMdns',

@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "releasePass": "PASS 95",
+  "feedbackReceivedAt": "2026-09-04T23:55:00Z",
+  "status": "candidate",
+  "bindingState": "awaiting-immutable-preview-and-owner-hitl",
+  "preview": null,
+  "humanAcceptance": null,
+  "requirements": [
+    {
+      "id": "R1",
+      "summary": "A bounded three-peer soak gate runs through the real multiplayer lobby and audit scenario engine",
+      "expected": "The built candidate runs host plus two guests in headless installed Chrome for three minutes on the permitted QA ports, with a hard browser-run timeout below four minutes.",
+      "falsifier": "The gate uses fewer than three peers, a headed or bundled browser, an unbounded browser process, a port outside 4227-4229, or a play duration below three minutes.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "scripts/qa/mp-soak-gate.mjs",
+          "command": "node --check scripts/qa/mp-soak-gate.mjs",
+          "note": "The runner has an explicit three-peer schedule, permitted ports, and a 235-second hard-stop path that kills only its owned browser trees."
+        },
+        {
+          "kind": "browser",
+          "ref": "artifacts/qa/mp-soak-gate/hf499-bundle.json",
+          "command": "PASS73_NATIVE_WEBGPU=1 npm run qa:mp-soak",
+          "note": "The real candidate soak receipt is required before publication; this entry is not owner preview approval."
+        }
+      ]
+    },
+    {
+      "id": "R2",
+      "summary": "Deterministic 120 ms RTT and 1% loss impairment is applied to both multiplayer lanes",
+      "expected": "Local QA pages apply 60 ms one-way delay and seeded 1% pre-send loss to state and event traffic, with trace counters recording impairment and drops.",
+      "falsifier": "The loss or delay is nondeterministic, applies only to events, is active outside the loopback QA fence, or is absent from the evidence trace.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/network.ts",
+          "command": "npx tsc --noEmit; npx vitest run src/hf504-multiplayer-audit-fixes.test.ts",
+          "note": "The impairment seam is loopback-QA fenced and the focused network/audit tests pass."
+        }
+      ]
+    },
+    {
+      "id": "R3",
+      "summary": "The soak bundle fails closed on all required multiplayer invariants",
+      "expected": "The table asserts directed position replication within 1.5 m every second, guest-B leave/rejoin and damage within one RTT, reload after death, respawn reset, stair firing, clean browser logs, and scoreboard agreement.",
+      "falsifier": "Any required row is omitted, a divergence is ignored, a console error is admitted, or the gate exits zero with a failed row.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "scripts/qa/mp-soak-assertions.test.mjs",
+          "command": "npm run qa:mp-soak:contract",
+          "note": "Valid and invalid JSON fixtures prove bundle-to-table pass/fail behavior and retain the exact 1.5 m bound."
+        },
+        {
+          "kind": "browser",
+          "ref": "artifacts/qa/mp-soak-gate/hf499-table.md",
+          "command": "PASS73_NATIVE_WEBGPU=1 npm run qa:mp-soak",
+          "note": "The real run table is the release evidence and is reported honestly, including any failed finding."
+        }
+      ]
+    },
+    {
+      "id": "R4",
+      "summary": "Dave reviews the immutable Pass 95 preview and the soak evidence before publication",
+      "expected": "Dave approves the exact immutable preview source SHA after the required mechanical checks and the completed soak bundle/table are available.",
+      "falsifier": "This manifest claims owner approval, live publication, or a successful soak before those exact artifacts exist.",
+      "acceptance": "human",
+      "state": "pending",
+      "evidence": []
+    }
+  ]
+}

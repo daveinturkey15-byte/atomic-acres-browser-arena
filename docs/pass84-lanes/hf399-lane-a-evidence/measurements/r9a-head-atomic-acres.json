@@ -1,0 +1,347 @@
+{
+  "contract": "hf399-fps-phase-probe-v1",
+  "measuredAt": "2026-09-02T12:57:27.158Z",
+  "label": "r9a-head",
+  "arena": "atomic-acres",
+  "base": "http://127.0.0.1:41941/",
+  "requestedProfile": "high",
+  "viewport": {
+    "width": 2560,
+    "height": 1440
+  },
+  "secondsPerPhase": 8,
+  "phases": [
+    {
+      "phase": "menu",
+      "frames": 11478,
+      "elapsedMs": 8004,
+      "fps": 1434,
+      "frameMs": {
+        "p50": 0.6,
+        "p95": 1.1,
+        "p99": 1.9,
+        "max": 9.5,
+        "mean": 0.7
+      },
+      "perFrame": {
+        "draws": 0,
+        "triangles": 0,
+        "instances": 0,
+        "renderPasses": 0,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 0
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 0,
+        "shaderModulesTotal": 0
+      },
+      "longTasks": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0
+      },
+      "heap": {
+        "startBytes": 114488073,
+        "endBytes": 117618785,
+        "deltaMbPerMinute": 22.38
+      },
+      "activeClipPlanes": 5,
+      "pose": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0,
+        "alive": true,
+        "phase": "warmup"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-hf399\\artifacts\\qa\\hf399\\r9a-head-atomic-acres-menu.png"
+    },
+    {
+      "phase": "deployed-idle",
+      "frames": 562,
+      "elapsedMs": 8018,
+      "fps": 70.1,
+      "frameMs": {
+        "p50": 14.1,
+        "p95": 16.8,
+        "p99": 19.4,
+        "max": 85.4,
+        "mean": 14.24
+      },
+      "perFrame": {
+        "draws": 194.3,
+        "triangles": 542501.6,
+        "instances": 27302.5,
+        "renderPasses": 23,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 23
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 374,
+        "shaderModulesTotal": 431
+      },
+      "longTasks": {
+        "count": 1,
+        "totalMs": 70,
+        "maxMs": 70
+      },
+      "heap": {
+        "startBytes": 331626469,
+        "endBytes": 225579632,
+        "deltaMbPerMinute": -756.83
+      },
+      "activeClipPlanes": 5,
+      "pose": {
+        "position": [
+          -34.5,
+          1.6983986282348633,
+          23
+        ],
+        "yaw": -0.982793723247329,
+        "alive": true,
+        "phase": "active"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-hf399\\artifacts\\qa\\hf399\\r9a-head-atomic-acres-deployed-idle.png"
+    },
+    {
+      "phase": "lawn-move",
+      "frames": 532,
+      "elapsedMs": 8029,
+      "fps": 66.3,
+      "frameMs": {
+        "p50": 14.8,
+        "p95": 19.7,
+        "p99": 33.4,
+        "max": 47.2,
+        "mean": 15.06
+      },
+      "perFrame": {
+        "draws": 124.2,
+        "triangles": 529663.6,
+        "instances": 26784.2,
+        "renderPasses": 23,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 23
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 374,
+        "shaderModulesTotal": 431
+      },
+      "longTasks": {
+        "count": 1,
+        "totalMs": 73,
+        "maxMs": 73
+      },
+      "heap": {
+        "startBytes": 236204529,
+        "endBytes": 233928748,
+        "deltaMbPerMinute": -16.22
+      },
+      "activeClipPlanes": 5,
+      "pose": {
+        "position": [
+          11.069182395935059,
+          1.7170756840705872,
+          -20
+        ],
+        "yaw": -1.5707963267948966,
+        "alive": true,
+        "phase": "active"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-hf399\\artifacts\\qa\\hf399\\r9a-head-atomic-acres-lawn-move.png"
+    },
+    {
+      "phase": "near-wall",
+      "frames": 581,
+      "elapsedMs": 8014,
+      "fps": 72.5,
+      "frameMs": {
+        "p50": 13.5,
+        "p95": 18.6,
+        "p99": 31.5,
+        "max": 69.1,
+        "mean": 13.78
+      },
+      "perFrame": {
+        "draws": 111.2,
+        "triangles": 504940.6,
+        "instances": 26417.4,
+        "renderPasses": 23,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 23
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 374,
+        "shaderModulesTotal": 431
+      },
+      "longTasks": {
+        "count": 1,
+        "totalMs": 65,
+        "maxMs": 65
+      },
+      "heap": {
+        "startBytes": 231561434,
+        "endBytes": 224636308,
+        "deltaMbPerMinute": -49.45
+      },
+      "activeClipPlanes": 5,
+      "pose": {
+        "position": [
+          -18.999988555908203,
+          1.7000993871688843,
+          -7.599999904632568
+        ],
+        "yaw": 0,
+        "alive": true,
+        "phase": "active"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-hf399\\artifacts\\qa\\hf399\\r9a-head-atomic-acres-near-wall.png"
+    },
+    {
+      "phase": "open-ground",
+      "frames": 534,
+      "elapsedMs": 8016,
+      "fps": 66.6,
+      "frameMs": {
+        "p50": 14.7,
+        "p95": 18.8,
+        "p99": 32.2,
+        "max": 66.4,
+        "mean": 14.98
+      },
+      "perFrame": {
+        "draws": 190.4,
+        "triangles": 542159.4,
+        "instances": 27301,
+        "renderPasses": 23,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 23
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 374,
+        "shaderModulesTotal": 431
+      },
+      "longTasks": {
+        "count": 1,
+        "totalMs": 74,
+        "maxMs": 74
+      },
+      "heap": {
+        "startBytes": 219061495,
+        "endBytes": 212049163,
+        "deltaMbPerMinute": -50.06
+      },
+      "activeClipPlanes": 5,
+      "pose": {
+        "position": [
+          -29.999996185302734,
+          1.700099983215332,
+          0
+        ],
+        "yaw": -1.5707963267948966,
+        "alive": true,
+        "phase": "active"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-hf399\\artifacts\\qa\\hf399\\r9a-head-atomic-acres-open-ground.png"
+    },
+    {
+      "phase": "lawn-idle",
+      "frames": 579,
+      "elapsedMs": 8029,
+      "fps": 72.1,
+      "frameMs": {
+        "p50": 13.5,
+        "p95": 18.3,
+        "p99": 32.1,
+        "max": 39.3,
+        "mean": 13.84
+      },
+      "perFrame": {
+        "draws": 135.2,
+        "triangles": 531940.1,
+        "instances": 26841.3,
+        "renderPasses": 23,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 23
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 374,
+        "shaderModulesTotal": 431
+      },
+      "longTasks": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0
+      },
+      "heap": {
+        "startBytes": 234127449,
+        "endBytes": 236114570,
+        "deltaMbPerMinute": 14.16
+      },
+      "activeClipPlanes": 5,
+      "pose": {
+        "position": [
+          -4,
+          1.7001000428199768,
+          -20
+        ],
+        "yaw": -1.5707963267948966,
+        "alive": true,
+        "phase": "active"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-hf399\\artifacts\\qa\\hf399\\r9a-head-atomic-acres-lawn-idle.png"
+    }
+  ],
+  "profileSelection": {
+    "before": "high",
+    "after": "high",
+    "options": [
+      "high=QUALITY",
+      "performance=PERFORMANCE",
+      "raytraced=RAY TRACED",
+      "max=MAX",
+      "custom=CUSTOM"
+    ]
+  },
+  "profileState": {
+    "graphicsPreset": "high",
+    "renderBackend": "webgpu",
+    "effective": "EFFECTIVE: HIGH",
+    "advanced": null,
+    "devicePixelRatio": 1,
+    "hardwareConcurrency": 16,
+    "deviceMemory": 32
+  }
+}

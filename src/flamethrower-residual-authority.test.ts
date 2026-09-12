@@ -67,6 +67,19 @@ describe('Flamethrower residual remote authority', () => {
       expectedTargetLifeId: 4, alreadyProcessed: false,
     })).toEqual({ accepted: true, appliedDamage: 10, resultingHealth: 90 });
   });
+  it('accepts every flamethrower-stream weapon, including the crimson care-package variant', () => {
+    // Owner 2026-08-25: same fire style as the map flamethrower, only direct
+    // damage differs - so its napalm pulses must resolve through the SAME
+    // host-authored residual lane, never rejected on weapon identity.
+    const crimson = { ...retained, weapon: 'crimson-flamethrower' as const };
+    expect(resolve({ retainedAction: crimson })).toEqual({
+      accepted: true,
+      route: 'human-canonical-hit',
+      weapon: 'crimson-flamethrower',
+      reason: 'accepted-human-action',
+    });
+  });
+
 
   it.each([
     ['missing action', { retainedAction: null }, 'missing-action'],

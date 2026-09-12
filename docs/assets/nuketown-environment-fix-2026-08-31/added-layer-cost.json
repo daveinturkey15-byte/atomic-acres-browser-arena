@@ -1,0 +1,65 @@
+{
+  "detached": [
+    "nuketown-yard-vegetation",
+    "forest-contact-skirts"
+  ],
+  "poses": {
+    "lane": {
+      "withMs": [
+        14.035,
+        14.105,
+        13.894,
+        13.551,
+        13.765,
+        13.425
+      ],
+      "withoutMs": [
+        14.084,
+        14.376,
+        13.716,
+        14.385,
+        13.166,
+        13.333
+      ],
+      "deltaMs": [
+        -0.049,
+        -0.272,
+        0.178,
+        -0.834,
+        0.599,
+        0.092
+      ],
+      "medianDeltaMs": 0.092,
+      "meanDeltaMs": -0.048
+    },
+    "yard-tree": {
+      "withMs": [
+        12.423,
+        12.28,
+        12.531,
+        12.692,
+        12.623,
+        12.415
+      ],
+      "withoutMs": [
+        11.977,
+        12.425,
+        12.148,
+        12.552,
+        12.464,
+        12.209
+      ],
+      "deltaMs": [
+        0.446,
+        -0.146,
+        0.384,
+        0.14,
+        0.159,
+        0.207
+      ],
+      "medianDeltaMs": 0.207,
+      "meanDeltaMs": 0.198
+    }
+  },
+  "note": "meanMs per 280-frame sample, 6 interleaved pairs per pose"
+}

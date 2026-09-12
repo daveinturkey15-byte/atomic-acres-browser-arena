@@ -36,11 +36,11 @@ violating tree in every non-`doctor` mode, and
   receipts. A runtime commit on a `release/*` branch is how a fix ships without ever
   touching `main`.
 
-Why these exist: seven parentless full-tree snapshot imports on 2026-09-03..05 severed the
-shipping line from `origin/main`. Nothing executable refused them, so the break survived 21
-passes and turned a lossless fast-forward into 385 phantom merge conflicts against a tree
-that was already a strict superset of `main`. Full record with every command:
-`docs/RELEASE_LINE_RECONCILIATION_2026-09-06.md`.
+Correction verified 2026-09-09: the earlier parentless-import diagnosis interpreted shallow
+boundaries as roots. Their raw commit objects have parents. Complete locally available
+history has one actual root; the guard now refuses shallow ancestry before classification.
+The original evidence is retained, with its correction in `docs/ANCESTRY_RECOVERY_2026-09-09.md`.
+The no-new-root, current-main containment and exact acceptance rules remain enforced.
 
 ## Pass 65 routing
 
@@ -57,6 +57,44 @@ that was already a strict superset of `main`. Full record with every command:
 - Normal browser throttling is an operating constraint: hidden presentation frames are forbidden. Generation-owned fetch/decode/preparation may progress where Chromium permits, hosted authority runs only its minimum fixed-step/network path, offline simulation pauses, and one coalesced foreground recovery resumes the existing admission.
 - Solo skirmish starts with exactly one enemy bot on every bot-enabled arena. Hosted-lobby choices, arena-specific reinforcements and hard caps remain separate catalog values; graphics profiles never change gameplay counts.
 - Smoke colour, lifetime, radius, shot corridors, human LOS and bot perception are projections of one host-authoritative volume contract. Glass presentation, collision, damage state and projectile aperture are likewise one authoritative lifecycle in every graphics profile.
+
+## Project routing (2026-09-11)
+
+- The project has one stable identity, `atomic-acres-browser-arena`, in
+  `.github/project-identity.json`. Which Git database, worktrees, integration ref, inspected
+  preview, production and rollback that identity means **on this machine** is a gitignored
+  machine record with a versioned schema (`docs/PROJECT_ROUTING.example.json`), an installer
+  and a readback (`node scripts/release/project-routing.mjs init|show`). Never commit that
+  record and never replace it with a pass-numbered pointer in prose.
+- Launch through the guard with identity:
+  `npm run pipeline:preflight -- --machine <m> --harness <h> --project atomic-acres-browser-arena --lane <id>`.
+  It fails closed on a wrong worktree path, wrong branch, wrong Git database, stale base or
+  head, dirty state, expired or closed lane, protected checkout, or a change outside the
+  lane's allowed paths. A call without `--project/--lane` is **legacy**: it is stamped
+  `routing.mode: "legacy"` and warns until root flips enforcement to `refuse`, after which it
+  is refused. Do not describe a legacy receipt as proof of routing.
+- A lane closes only as `integrated` or `rejected` with verified preservation
+  (`npm run pipeline:lane-close`). The guard never deletes a tree, moves a ref or marks an
+  artifact accepted. Full contract and root cutover steps: `docs/PROJECT_ROUTING.md`.
+
+## Multi-agent discipline (all harnesses)
+
+**Read `docs/MULTI_AGENT_REPO_DISCIPLINE.md` before writing anything in this repository.**
+It applies to Claude Code, Codex, Cursor, Antigravity/Gemini, Pi, OMP, Hermes desktop and
+Hermes headless alike, and every rule in it was written after a real incident on this
+machine. The five that cause the most damage when ignored:
+
+- **Confirm the worktree path and branch; never infer them.** There are 365 worktrees and
+  458 branches here. A worker once wrote into the protected Pass 62 benchmark checkout and
+  its critic then reviewed that copy and approved it.
+- **Feature worktrees edit and test; they never publish.** One canonical checkout performs
+  release, compliance, vault sync and backup.
+- **Exit code 0 is not success.** Six of eleven workers once reported success having done
+  nothing — quota rejections that still exit 0. Verify against the repository.
+- **Never weaken a test, threshold or assertion to reach green.** A correct failure stays
+  failing and its row stays OPEN. A red test you can trust beats a green one you cannot.
+- **Boot the app before claiming a candidate works.** 2,858 passing tests once accompanied a
+  build that would not start, because unit tests never boot the DOM.
 
 ## Contribution isolation
 
@@ -96,11 +134,25 @@ that was already a strict superset of `main`. Full record with every command:
 - A separate integrator reviews the actual diff and checks. The PR must contain current `origin/main` before merge.
 - A **release-line reconciliation** PR is the single narrow exception to "exactly one enforced acceptance manifest per PR". It must be a two-parent merge whose tree is byte-identical to its first parent and whose second parent is the PR base, it must carry the `reconciliation` label so `verify.yml` selects `--phase reconciliation`, and it grants no acceptance: the receipt records `grantsAcceptance: false` and owner approval of the bytes remains owed on the contribution line. Every other shape still throws. It runs the FULL browser matrix — do not shortcut it.
 - `requirements-acceptance` is a required check alongside both static/unit and both bounded-browser checks. Green tests without complete requirement coverage are not release evidence.
-- Production promotion is serialized by `.github/workflows/release-production.yml`. Supply the exact green `main` SHA and release pass; never deploy from a feature branch or local dirty tree.
-- Do not describe a change as live until the workflow receipt names the source SHA and Pages SHA and the canonical HTTPS site is checked.
-- The production workflow must revalidate the acceptance manifest and pass its post-Pages canonical live smoke before writing a successful receipt.
+- Release VERIFICATION is serialized by `.github/workflows/release-production.yml` (workflow `release-verification`, job `verify`). Supply the exact green `main` SHA and release pass; it builds, revalidates the acceptance manifest, runs the static gates, checks the HF-400 two-channel policy, stages and verifies the whole channel topology and writes a `published: false` receipt. It has `contents: read` and cannot publish.
+- Production PUBLICATION is `python scripts/orchestration/publish_pass<N>.py` from the canonical checkout, and nothing else. Run `--dry-run` first; `--rollback` re-points the default without deleting a tree. `scripts/orchestration/roll_pass.py` rolls the stamp to the next pass. Never deploy from a feature branch or local dirty tree, and never run `npm run deploy` or `npm run deploy:ci`.
+- Do not describe a change as live until the publish script's asserted post-state and the canonical HTTPS site both name the new pass, and gh-pages carries exactly the live pass and its pinned safe backup (HF-400).
 - The first successful receipt plus cache-busted live smoke is terminal for that release task. Report success immediately; route non-blocking hygiene to a later PR instead of silently extending the release.
 - Do not run synchronous or duplicate `gh run watch` processes from an agent turn. Use one-shot status reads, report material state changes, and keep waits bounded.
+
+## Pass 95 required gate list
+
+- **REQUIRED before any Pass 95 publish:** from the candidate checkout, set
+  `PASS73_NATIVE_WEBGPU=1` and run `npm run qa:mp-soak`. This is the three-peer,
+  three-minute, headless installed-Chrome soak on ports 4227-4228 with seeded 120 ms
+  RTT and 1% packet loss. It must complete with exit code 0 and a passing table in
+  `artifacts/qa/mp-soak-gate/`; any failed row is a release-blocking finding.
+- The gate must retain its 1.5 m position bound, one-RTT damage bound, no-console-error
+  assertion, and final scoreboard agreement. Do not replace it with a shorter smoke,
+  a two-peer run, a headed browser, or a rerun with weaker thresholds.
+- The gate's own browser-free logic is covered by
+  `npm run qa:mp-soak:contract`; the real soak remains required even when that unit
+  test is green.
 
 ## Durable gotcha
 
@@ -115,3 +167,7 @@ that was already a strict superset of `main`. Full record with every command:
 **Symptom -> Cause -> Correction -> Verify:** a corpse or low-detail path shows the retired block-built humanoid while live combatants use the authored rig -> character presentation was given a separate primitive fallback or a caller could opt out of the canonical rig -> all players, bots, reinforcements, and corpses must use `buildOperator` with the same loaded rig, team appearance, and carried weapon; performance profiles may simplify materials but never substitute anatomy -> run `src/corpse-presentation-contract.test.ts` and the canonical rigged death browser check.
 
 **Symptom -> Cause -> Correction -> Verify:** gameplay simulation/audio continue but the visible native-WebGPU frame freezes for seconds -> the active renderer periodically copied the presented game canvas into a 2D pause canvas and forced a synchronous GPU readback -> remove active/periodic canvas capture, use CSS compositor blur for WebGPU, and retain at most one backend-guarded pause-open copy for WebGL2 -> run `npm run qa:pass65:frame-pacing-policy`, both lifecycle gates, and the clean exact-SHA installed-Chrome 2560x1440 Atomic-versus-Terminal p50/p95/p99/max and >20/33/50/100 ms gate before headed owner HITL.
+
+## Final candidate capability handoff
+
+Final candidate handoff must pass `npm run pipeline:handoff -- --machine <machine> --harness <harness> --project atomic-acres-browser-arena --lane <lane-id>` at the final clean HEAD after capability evidence rebind. Attach that receipt before claiming handoff complete. Ordinary `pipeline:preflight` remains the work-in-progress gate. The normal local candidate publisher reruns capability verification at its own HEAD; this never grants product or owner acceptance. Configuration: `docs/CAPABILITY_HANDOFF.md`.

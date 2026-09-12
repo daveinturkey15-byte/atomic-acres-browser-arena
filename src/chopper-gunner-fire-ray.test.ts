@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { parseKillstreakLoadout } from './killstreak-catalog';
 import {
   CHOPPER_GUN_PROFILE,
+  supportGunDamageAtDistance,
   CHOPPER_GUNNER_RAY_POLICY,
 } from './killstreak-support-catalog';
 import {
@@ -75,6 +76,12 @@ function setupPlayerGunner(): Readonly<{ runtime: HostKillstreakRuntime; entityI
 }
 
 describe('HF-135 authoritative Chopper Gunner fire ray', () => {
+  // Shot timing derives from the authoritative cadence so an owner damage/
+  // cadence retune moves these tests with it instead of silently skipping
+  // shots between advances (first shot lands at 1_600).
+  const SECOND_SHOT_AT = 1_600 + CHOPPER_GUN_PROFILE.cadenceMs;
+  const THIRD_SHOT_AT = 1_600 + 2 * CHOPPER_GUN_PROFILE.cadenceMs;
+
   it('matches the authored socket transforms and full camera yaw/pitch limits at moving poses', () => {
     const poses = [
       { position: [0, 18, 0] as const, attitude: [0, 0, 0] as const, yaw: -Math.PI, pitch: -1.2 },
@@ -125,28 +132,28 @@ describe('HF-135 authoritative Chopper Gunner fire ray', () => {
       atMs: 1_600,
     })]);
 
-    runtime.advance(1_879, world());
-    entity = activeChopper(runtime, 1_879);
+    runtime.advance(SECOND_SHOT_AT - 1, world());
+    entity = activeChopper(runtime, SECOND_SHOT_AT - 1);
     ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, Math.PI, -1.2);
     const near = target('near-centre', pointAlong(ray, 4));
     expect(runtime.control({
       by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 3, entityId,
       action: 'pilot-control', yawQ: Math.PI, pitchQ: -1.2, fire: true,
-    }, 1_879).accepted).toBe(true);
-    const nearResult = runtime.advance(1_880, world([near]));
+    }, SECOND_SHOT_AT - 1).accepted).toBe(true);
+    const nearResult = runtime.advance(SECOND_SHOT_AT, world([near]));
     expect(nearResult.damageEvents).toHaveLength(1);
     expect(nearResult.shotEvents).toEqual([expect.objectContaining({ entityId, source: 'chopper', ordinal: 1 })]);
     expect(nearResult.damageEvents[0]).toMatchObject({ targetId: 'near-centre', source: 'chopper' });
 
-    runtime.advance(2_159, world());
-    entity = activeChopper(runtime, 2_159);
+    runtime.advance(THIRD_SHOT_AT - 1, world());
+    entity = activeChopper(runtime, THIRD_SHOT_AT - 1);
     ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, -Math.PI / 2, 0.5);
     const far = target('far-centre', pointAlong(ray, 50));
     expect(runtime.control({
       by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 4, entityId,
       action: 'pilot-control', yawQ: -Math.PI / 2, pitchQ: 0.5, fire: true,
-    }, 2_159).accepted).toBe(true);
-    const farResult = runtime.advance(2_160, world([far]));
+    }, THIRD_SHOT_AT - 1).accepted).toBe(true);
+    const farResult = runtime.advance(THIRD_SHOT_AT, world([far]));
     expect(farResult.damageEvents).toHaveLength(1);
     expect(farResult.shotEvents).toEqual([expect.objectContaining({ entityId, source: 'chopper', ordinal: 2 })]);
     expect(farResult.damageEvents[0]).toMatchObject({ targetId: 'far-centre', source: 'chopper' });
@@ -186,6 +193,46 @@ describe('HF-135 authoritative Chopper Gunner fire ray', () => {
       result.damageEvents[0]!.origin[1] - activeChopper(runtime, 1_600).position[1],
       result.damageEvents[0]!.origin[2] - activeChopper(runtime, 1_600).position[2],
     )).toBeGreaterThan(0.5);
+  });
+
+  // HF-335: the owner asked whether the Chopper "can see through walls like it
+  // should be able to". Perception has two halves - the thermal reveal in the
+  // cockpit and the autocannon's wallbang admission. This locks the second so a
+  // future occlusion change cannot silently delete the through-wall shot, and
+  // pins the exact half-damage rule rather than merely asserting "some damage".
+  it('admits an occluded hostile at exactly half cannon damage', () => {
+    const { runtime, entityId } = setupPlayerGunner();
+    runtime.advance(1_599, world());
+    const entity = activeChopper(runtime, 1_599);
+    const ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, 0.4, -0.35);
+    const victim = target('occluded-hostile', pointAlong(ray, 18));
+    const losEvidence: Array<{ from: SupportVec3; to: SupportVec3; occluded: boolean }> = [];
+
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId,
+      action: 'pilot-control', yawQ: 0.4, pitchQ: -0.35, fire: true,
+    }, 1_599).accepted).toBe(true);
+    const result = runtime.advance(1_600, world([victim], (from, to) => {
+      losEvidence.push({ from, to, occluded: true });
+      return false;
+    }));
+
+    expect(losEvidence).toHaveLength(1);
+    expect(losEvidence[0]!.occluded).toBe(true);
+    expect(losEvidence[0]!.from).toEqual(result.damageEvents[0]!.origin);
+    expect(result.shotEvents).toHaveLength(1);
+    expect(result.damageEvents).toHaveLength(1);
+    expect(result.damageEvents[0]).toMatchObject({
+      targetId: victim.id,
+      source: 'chopper',
+      // HF-458 moved the profile to a fractional 25.5 (-25%), so "exactly
+      // half" now means half of the ADMITTED shell the shared oracle rounds -
+      // which is what the runtime halves - not half of the raw profile field.
+      damage: supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, 18) * 0.5,
+    });
+    vecClose(result.damageEvents[0]!.endpoint, ray.origin.map(
+      (value, index) => value + ray.direction[index]! * 17,
+    ));
   });
 
   it('resolves an accepted player shot from its snapshot camera before a low-FPS flight step', () => {
@@ -228,19 +275,19 @@ describe('HF-135 authoritative Chopper Gunner fire ray', () => {
       by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, entityId,
       action: 'toggle-chopper-gunner',
     }, 1_601).accepted).toBe(true);
-    runtime.advance(1_879, world());
-    const playerEntity = activeChopper(runtime, 1_879);
+    runtime.advance(SECOND_SHOT_AT - 1, world());
+    const playerEntity = activeChopper(runtime, SECOND_SHOT_AT - 1);
     const playerRay = chopperGunnerAuthoritativeRay(playerEntity.position, playerEntity.attitude, 0.25, -0.25);
     expect(runtime.control({
       by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId,
       action: 'pilot-control', yawQ: 0.25, pitchQ: -0.25, fire: true,
-    }, 1_879).accepted).toBe(true);
-    const playerEvent = runtime.advance(1_880, world([target('player-target', pointAlong(playerRay, 20))])).damageEvents[0]!;
+    }, SECOND_SHOT_AT - 1).accepted).toBe(true);
+    const playerEvent = runtime.advance(SECOND_SHOT_AT, world([target('player-target', pointAlong(playerRay, 20))])).damageEvents[0]!;
     expect(playerEvent.targetId).toBe('player-target');
     expect(Math.hypot(
-      playerEvent.origin[0] - activeChopper(runtime, 1_880).position[0],
-      playerEvent.origin[1] - activeChopper(runtime, 1_880).position[1],
-      playerEvent.origin[2] - activeChopper(runtime, 1_880).position[2],
+      playerEvent.origin[0] - activeChopper(runtime, SECOND_SHOT_AT).position[0],
+      playerEvent.origin[1] - activeChopper(runtime, SECOND_SHOT_AT).position[1],
+      playerEvent.origin[2] - activeChopper(runtime, SECOND_SHOT_AT).position[2],
     )).toBeGreaterThan(0.5);
 
     expect(runtime.control({
@@ -248,8 +295,8 @@ describe('HF-135 authoritative Chopper Gunner fire ray', () => {
       action: 'toggle-chopper-gunner',
     }, 1_881).accepted).toBe(true);
     const resumedAiFiringEntity = activeChopper(runtime, 1_881);
-    const resumedAi = runtime.advance(2_160, world([aiTarget])).damageEvents[0]!;
-    expect(runtime.snapshotFor('owner', 2_160).actors[0]!.possession).toBeNull();
+    const resumedAi = runtime.advance(THIRD_SHOT_AT, world([aiTarget])).damageEvents[0]!;
+    expect(runtime.snapshotFor('owner', THIRD_SHOT_AT).actors[0]!.possession).toBeNull();
     vecClose(resumedAi.origin, resumedAiFiringEntity.position);
     vecClose(resumedAi.tracerOrigin, resumedAi.origin);
     vecClose(resumedAi.endpoint, resumedAi.targetPosition);

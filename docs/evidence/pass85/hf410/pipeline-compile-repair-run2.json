@@ -1,0 +1,738 @@
+{
+  "contract": "pipeline-compile-stall-probe-v1",
+  "measuredAt": "2026-09-02T18:37:08.625Z",
+  "label": "hf410-repair-run2",
+  "arena": "atomic-acres",
+  "idle": false,
+  "dist": "C:\\Users\\david\\projects\\aa-claude-hf395\\dist",
+  "seconds": 75,
+  "hooked": true,
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "window": {
+    "windowS": 74.983,
+    "rafCallbacks": 2615,
+    "stallCount": 53,
+    "stallsPerMinute": 42.41,
+    "frozenFractionPercent": 7.64,
+    "medianStallMs": 105.6,
+    "maxStallMs": 138.9
+  },
+  "pipelines": {
+    "beforeWindow": 374,
+    "inWindow": 1,
+    "perMinuteInWindow": 0.8,
+    "inStall": 0,
+    "inStallSharePercent": 0,
+    "expectedIfUnrelatedPercent": 7.64,
+    "enrichment": 0
+  },
+  "shaderModules": {
+    "beforeWindow": 431,
+    "inWindow": 0,
+    "perMinuteInWindow": 0,
+    "inStall": 0,
+    "inStallSharePercent": null,
+    "expectedIfUnrelatedPercent": 7.64,
+    "enrichment": null
+  },
+  "stateTransitions": [
+    {
+      "atMs": 87872,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 100136,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 102081,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 108214,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 110100,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 115383,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 117336,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 123388,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 125380,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 129337,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 131353,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 138322,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 140349,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 149571,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 151618,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 157601,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 159585,
+      "alive": true,
+      "weapon": "carbine"
+    }
+  ],
+  "cacheKeyDiffs": [
+    {
+      "atMs": 99957,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 108252,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 115410,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 123494,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 129282,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 129906,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 137946,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 138238,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 145197,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 149470,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 153362,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 157427,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 159174,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    }
+  ],
+  "cacheKeyDiffCount": 13,
+  "determinantFlips": [
+    {
+      "atMs": 87561,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:9.28e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 99957,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Glove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:1.16e-14",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 108252,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Glove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:1.16e-14",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.00e+0",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 115410,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Glove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:1.16e-14",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.00e+0",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 123494,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Glove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:1.16e-14",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 129282,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Glove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:1.16e-14",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 129906,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Glove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:1.16e-14",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 137945,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:9.28e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 138237,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Glove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:1.16e-14",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 145196,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:9.30e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:9.30e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:9.30e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:9.30e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 149470,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Glove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:1.16e-14",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 153362,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:9.28e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 157427,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Glove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:1.16e-14",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 159174,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Glove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:1.16e-14",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    }
+  ],
+  "determinantFlipCount": 14,
+  "samplePipelineLabels": [
+    {
+      "atMs": 101863,
+      "syncMs": 0.1,
+      "label": "renderPipeline_MeshBasicMaterial_774",
+      "stack": "at GPUDevice.patched [as createRenderPipeline] (<anonymous>:31:50) <- at zV.createRenderPipeline (http://127.0.0.1:4193/assets/vendor-three-CkGIDcsI.js:541:12500) <- at aH.createRenderPipeline (http://127.0.0.1:4193/assets/vendor-three-CkGIDcsI.js:542:29414) <- at Uk._getRenderPipeline (http://127.0.0.1:4193/assets/vendor-three-CkGIDcsI.js:27:96560) <- at Uk.getForRender (http://127.0.0.1:4193/assets/vendor-three-CkGIDcsI.js:27:95356) <- at Uk.updateForRender (http://127.0.0.1:4193/assets/vendor-three-CkGIDcsI.js:27:96185) <- at lH._renderObjectDirect (http://127.0.0.1:4193/assets/vendor-three-CkGIDcsI.js:33:70133) <- at lH.renderObject (http://127.0.0.1:4193/assets/vendor-three-CkGIDcsI.js:33:68962) <- at lH._renderObjects (http://127.0.0.1:4193/assets/vendor-three-CkGIDcsI.js:33:66141) <- at lH._renderTransparents (http://127.0.0.1:4193/assets/vendor-three-CkGIDcsI.js:33:65982)"
+    }
+  ],
+  "stalls": [
+    {
+      "startMs": 87806,
+      "endMs": 87906,
+      "durationMs": 100
+    },
+    {
+      "startMs": 88027.9,
+      "endMs": 88139,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 94284,
+      "endMs": 94384,
+      "durationMs": 100
+    },
+    {
+      "startMs": 97272.4,
+      "endMs": 97378,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 100022.4,
+      "endMs": 100139,
+      "durationMs": 116.6
+    },
+    {
+      "startMs": 108089.2,
+      "endMs": 108228,
+      "durationMs": 138.8
+    },
+    {
+      "startMs": 112784,
+      "endMs": 112884,
+      "durationMs": 100
+    },
+    {
+      "startMs": 113639,
+      "endMs": 113739,
+      "durationMs": 100
+    },
+    {
+      "startMs": 114033.4,
+      "endMs": 114139,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 114306,
+      "endMs": 114406,
+      "durationMs": 100
+    },
+    {
+      "startMs": 114528.4,
+      "endMs": 114634,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 114766.7,
+      "endMs": 114867,
+      "durationMs": 100.3
+    },
+    {
+      "startMs": 115033.4,
+      "endMs": 115139,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 115272.2,
+      "endMs": 115389,
+      "durationMs": 116.8
+    },
+    {
+      "startMs": 119756,
+      "endMs": 119856,
+      "durationMs": 100
+    },
+    {
+      "startMs": 120039,
+      "endMs": 120139,
+      "durationMs": 100
+    },
+    {
+      "startMs": 120300,
+      "endMs": 120400,
+      "durationMs": 100
+    },
+    {
+      "startMs": 120539.8,
+      "endMs": 120640,
+      "durationMs": 100.2
+    },
+    {
+      "startMs": 121039.4,
+      "endMs": 121145,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 121305.9,
+      "endMs": 121406,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 121533.8,
+      "endMs": 121645,
+      "durationMs": 111.2
+    },
+    {
+      "startMs": 122061.8,
+      "endMs": 122173,
+      "durationMs": 111.2
+    },
+    {
+      "startMs": 122239.4,
+      "endMs": 122356,
+      "durationMs": 116.6
+    },
+    {
+      "startMs": 122356.2,
+      "endMs": 122484,
+      "durationMs": 127.8
+    },
+    {
+      "startMs": 122555.8,
+      "endMs": 122667,
+      "durationMs": 111.2
+    },
+    {
+      "startMs": 122789.9,
+      "endMs": 122901,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 123300.5,
+      "endMs": 123406,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 123495.3,
+      "endMs": 123612,
+      "durationMs": 116.7
+    },
+    {
+      "startMs": 123661.9,
+      "endMs": 123762,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 124016.8,
+      "endMs": 124117,
+      "durationMs": 100.2
+    },
+    {
+      "startMs": 125290,
+      "endMs": 125401,
+      "durationMs": 111
+    },
+    {
+      "startMs": 125494.9,
+      "endMs": 125606,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 125605.8,
+      "endMs": 125717,
+      "durationMs": 111.2
+    },
+    {
+      "startMs": 125783.7,
+      "endMs": 125906,
+      "durationMs": 122.3
+    },
+    {
+      "startMs": 126034,
+      "endMs": 126134,
+      "durationMs": 100
+    },
+    {
+      "startMs": 127795.4,
+      "endMs": 127901,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 128028.3,
+      "endMs": 128145,
+      "durationMs": 116.7
+    },
+    {
+      "startMs": 128417.2,
+      "endMs": 128534,
+      "durationMs": 116.8
+    },
+    {
+      "startMs": 132789,
+      "endMs": 132900,
+      "durationMs": 111
+    },
+    {
+      "startMs": 137045.4,
+      "endMs": 137151,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 141378,
+      "endMs": 141478,
+      "durationMs": 100
+    },
+    {
+      "startMs": 144023.1,
+      "endMs": 144162,
+      "durationMs": 138.9
+    },
+    {
+      "startMs": 145744.9,
+      "endMs": 145845,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 146755.6,
+      "endMs": 146889,
+      "durationMs": 133.4
+    },
+    {
+      "startMs": 151539,
+      "endMs": 151639,
+      "durationMs": 100
+    },
+    {
+      "startMs": 151783.5,
+      "endMs": 151889,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 151889.5,
+      "endMs": 151995,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 152289.4,
+      "endMs": 152395,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 154728,
+      "endMs": 154828,
+      "durationMs": 100
+    },
+    {
+      "startMs": 157606,
+      "endMs": 157706,
+      "durationMs": 100
+    },
+    {
+      "startMs": 159794.8,
+      "endMs": 159895,
+      "durationMs": 100.2
+    },
+    {
+      "startMs": 160306.3,
+      "endMs": 160412,
+      "durationMs": 105.7
+    },
+    {
+      "startMs": 162294.9,
+      "endMs": 162395,
+      "durationMs": 100.1
+    }
+  ]
+}

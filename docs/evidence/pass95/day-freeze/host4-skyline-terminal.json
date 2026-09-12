@@ -1,0 +1,165 @@
+{
+  "contract": "pass95-frame-hitch-attributor-v1",
+  "measuredAt": "2026-09-06T06:04:04.622Z",
+  "label": "host4-skyline-terminal",
+  "arena": "skyline-terminal",
+  "base": "http://127.0.0.1:4292/",
+  "requestedProfile": "high",
+  "viewport": {
+    "width": 2560,
+    "height": 1440
+  },
+  "sampleSeconds": 120,
+  "hitchThresholdMs": 50,
+  "mode": "host",
+  "hostBots": 4,
+  "peerPort": 4392,
+  "profileState": {
+    "graphicsPreset": "high",
+    "renderBackend": "webgpu",
+    "effective": "EFFECTIVE: HIGH",
+    "hardwareConcurrency": 16
+  },
+  "deployMs": 44712,
+  "consoleErrors": [],
+  "matchState": {
+    "matchPhase": "active",
+    "bots": 4,
+    "alive": true
+  },
+  "traceAligned": true,
+  "traceEventsKept": 29065,
+  "frameCount": 11263,
+  "sampledSeconds": 120,
+  "fps": 93.9,
+  "frameMs": {
+    "p50": 10.3,
+    "p95": 14.6,
+    "p99": 18.3,
+    "p999": 24.7,
+    "max": 54.3
+  },
+  "hitches": {
+    "thresholdMs": 50,
+    "count": 1,
+    "totalMs": 54.3,
+    "worstMs": 54.3,
+    "over100": 0,
+    "over33": 3
+  },
+  "causeTable": [
+    {
+      "cause": "gpu-task",
+      "count": 1,
+      "totalMs": 44.9,
+      "worstMs": 44.9,
+      "worstFrame": 612
+    },
+    {
+      "cause": "style-recalculation",
+      "count": 1,
+      "totalMs": 5.4,
+      "worstMs": 5.4,
+      "worstFrame": 612
+    },
+    {
+      "cause": "pipeline-shader-compile",
+      "count": 1,
+      "totalMs": 0.1,
+      "worstMs": 0.1,
+      "worstFrame": 612
+    }
+  ],
+  "hitchFrames": [
+    {
+      "i": 612,
+      "atMs": 55343.2,
+      "frameMs": 54.3,
+      "jsMs": 3.3,
+      "heapDeltaMb": 13.631,
+      "causes": [
+        {
+          "id": "pipeline-shader-compile",
+          "ms": 0.1,
+          "count": 5
+        },
+        {
+          "id": "style-recalculation",
+          "ms": 5.39,
+          "count": 1
+        },
+        {
+          "id": "gpu-task",
+          "ms": 44.86,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "pipelines": 2,
+        "shaderModules": 3,
+        "shaderMs": 0.1,
+        "gpuBuffers": 12,
+        "gpuBufferBytes": 1072,
+        "gpuBufferMs": 0.2,
+        "gpuTextures": 2,
+        "gpuTextureMs": 0.1,
+        "writeBuffer": 106,
+        "writeBufferBytes": 295781,
+        "writeBufferMs": 0.2,
+        "writeTexture": 4,
+        "writeTextureBytes": 34688,
+        "writeTextureMs": 0.1,
+        "draws": 104,
+        "triangles": 38124.33,
+        "submits": 27,
+        "passes": 36,
+        "canvas2d": 14
+      }
+    }
+  ],
+  "totals": {
+    "pipelines": 221,
+    "pipelineMs": 6.6000001430511475,
+    "shaderModules": 291,
+    "shaderMs": 9.300000190734863,
+    "gpuBuffers": 3432,
+    "gpuBufferBytes": 23308368,
+    "gpuBufferMs": 15.49999988079071,
+    "gpuTextures": 213,
+    "gpuTextureBytes": 0,
+    "gpuTextureMs": 1.2000000476837158,
+    "writeBuffer": 2075308,
+    "writeBufferBytes": 4021298614,
+    "writeBufferMs": 2247.2000098228455,
+    "writeTexture": 25513,
+    "writeTextureBytes": 316633572,
+    "writeTextureMs": 193.79999995231628,
+    "externalImage": 158,
+    "externalImageMs": 84.3999993801117,
+    "draws": 1315668,
+    "triangles": 768092316.0000567,
+    "submits": 285627,
+    "passes": 275494,
+    "canvas2d": 38885,
+    "canvas2dMs": 178.79999709129333,
+    "styleReads": 0,
+    "styleReadMs": 0,
+    "layoutReads": 2144,
+    "layoutReadMs": 20.90000092983246,
+    "audioDecode": 0,
+    "audioDecodeMs": 0,
+    "audioStarts": 618,
+    "geometryBuilds": 0,
+    "geometryBuildMs": 0
+  },
+  "longTasks": {
+    "count": 1,
+    "totalMs": 52,
+    "worstMs": 52
+  },
+  "attributionCoverage": {
+    "attributedMs": 50.4,
+    "hitchTotalMs": 54.3,
+    "pct": 92.8
+  }
+}

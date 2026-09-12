@@ -3,13 +3,14 @@ import { spawn } from 'node:child_process';
 import http from 'node:http';
 import { resolve } from 'node:path';
 import { chromium } from '@playwright/test';
+import { OFFSCREEN_ARGS } from './lib/browser-launch-flags.mjs';
 
 const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4182/';
 const peerPort = Number(process.env.QA_PEER_PORT ?? 9000);
 const headed = process.env.QA_HEADED === '1';
 const browser = await chromium.launch({
   headless: !headed,
-  args: [
+  args: [...OFFSCREEN_ARGS,
     '--allow-loopback-in-peer-connection',
     '--disable-features=WebRtcHideLocalIpsWithMdns',
   ],

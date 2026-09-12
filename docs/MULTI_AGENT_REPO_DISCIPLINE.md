@@ -52,6 +52,10 @@ is the condition under which agents pick the wrong tree.
   Enforced by `scripts/release/pipeline-guard.mjs` in every non-`doctor` mode since HF-536;
   see `docs/RELEASE_LINE_RECONCILIATION_2026-09-06.md` for what 21 passes of unchecked
   drift cost.
+- **A lane is closed as `integrated` or `rejected`, never by disappearing.** `pipeline-guard.mjs
+  lane-close` verifies the closure record — integration reachable from `origin/main`, or a
+  ref/bundle that provably carries the lane head — refuses a dirty tree, and removes nothing.
+  Retirement follows the bullet above only after that receipt exists (`docs/PROJECT_ROUTING.md`).
 
 > **Incident.** A worker wrote `src/test-bay-dummy-colliders.ts`, its test, and a 19-line
 > `legacy-main.ts` edit into `atomic-acres-production-27e0858` — a *different* checkout, on
@@ -81,10 +85,20 @@ Adopting the owner's Ops-Brain model, generalised:
   irreversible outward action.
 - A feature branch becomes visible to others only when pushed. A local worktree is not a
   publication and must never be treated as one.
-- For this repository that means: contributors stop at a green PR; only
-  `.github/workflows/release-production.yml` publishes, with an exact green `main` SHA.
+- For this repository that means: contributors stop at a green PR;
+  `.github/workflows/release-production.yml` **verifies** an exact green `main` SHA and writes
+  a `published: false` receipt (it has `contents: read` and cannot publish — asserted by
+  `scripts/release/release-policy-contract.test.mjs`); the only publisher is
+  `python scripts/orchestration/publish_pass<N>.py` run from the canonical checkout, as
+  `AGENTS.md` and `docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md` already state. An earlier
+  revision of this line named the workflow as the publisher; that was true before Pass 74
+  and is not now.
   **The folder-level rule is the upgrade** — a process rule alone did not stop a worker
-  dirtying a protected checkout.
+  dirtying a protected checkout. Since 2026-09-11 that rule is executable: `pipeline-guard.mjs
+  contribute --project --lane` refuses a wrong worktree, wrong branch, wrong Git database,
+  stale head or protected checkout against the machine routing registry
+  (`docs/PROJECT_ROUTING.md`). Legacy calls without identity stay visibly legacy until root
+  flips enforcement.
 
 ## 4. When several agents must share one worktree
 

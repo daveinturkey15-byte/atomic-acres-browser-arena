@@ -1,0 +1,20 @@
+
+=== repair-1-admitted.png -> repair-2-admitted.png ===
+mean signed luminance: 0.015 | %brighter>8: 3.6 | %darker>8: 3.68 | %anyChannel>16: 6.72
+per-tile mean signed luminance (6 rows x 8 cols, top->bottom):
+    0.02   0.02  -0.38  -1.51  -0.01  -0.01   0.01   0.05
+    0.02   0.01   0.48  -0.08  -0.02   0.07   0.19   0.03
+    0.12   0.06   0.12   0.18   0.03   0.20  -0.07   0.21
+    0.56  -0.02   0.02  -0.21  -0.05   0.02   0.50  -1.47
+    0.08   0.01  -0.01   0.02   0.36  -1.13  -0.68  -0.14
+    0.02   0.01  -0.02  -0.05   1.17   0.39  -0.37   1.92
+
+=== before-foliage-admitted.png -> repair-2-admitted.png ===
+mean signed luminance: 0.0342 | %brighter>8: 3.42 | %darker>8: 3.54 | %anyChannel>16: 6.39
+per-tile mean signed luminance (6 rows x 8 cols, top->bottom):
+    0.01   0.03  -0.02   0.33  -0.00  -0.00   0.01   0.04
+    0.03  -0.01   0.13  -0.17  -0.01  -0.07  -0.07   0.04
+    0.19   0.36  -0.09   0.07  -0.13  -0.06  -0.54  -0.37
+    0.78   0.12   0.07  -0.09  -0.03  -0.07  -0.07  -0.35
+    0.10   0.02  -0.00   0.03   0.43  -1.12  -0.54   0.08
+    0.01   0.01  -0.01  -0.05   1.22   0.46   0.33   0.64

@@ -1,0 +1,62 @@
+[mp-audit] servers-up {"dist":4198,"peer":4199}
+[mp-audit] browsers-up {"count":3}
+[mp-audit] booted {"backends":["webgpu","webgpu","webgpu"]}
+[mp-audit] room-open {"codeLength":36}
+[mp-audit] guest-joined {"guest":"guestA"}
+[mp-audit] guest-joined {"guest":"guestB"}
+[mp-audit] arena-synced {"host":"fulfilled","guestA":"fulfilled","guestB":"fulfilled"}
+[mp-audit] all-ready
+[mp-audit] deployed
+[mp-audit] state-diff {"seconds":12}
+[mp-audit] state-diff-clean
+[mp-audit] scenarios {"peer":"guestA"}
+  [high] RELOAD-NOT-VISIBLE-guestA-pre-respawn: the other guest did not observe the host-authored reload state
+  [high] SWAP-NOT-REPLICATED-guestA-to-host: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestA-to-guestB: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestA-to-host: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestA-to-guestB: a weapon swap never reached another peer
+  [high] RELOAD-NOT-VISIBLE-guestA-post-death: the other guest did not observe the host-authored reload state
+  [high] SWAP-THEN-FIRE-NO-EFFECT-guestA: a fast weapon did not fire after switching from a slow weapon
+  [high] RELOAD-NOT-VISIBLE-guestA-post-respawn: the other guest did not observe the host-authored reload state
+  [high] RELOAD-HOST-DISAGREES-guestA: the host's replica of the guest carries different ammo after a reload
+[mp-audit] scenarios {"peer":"guestB"}
+  [high] RELOAD-NOT-VISIBLE-guestB-pre-respawn: the other guest did not observe the host-authored reload state
+  [high] SWAP-NOT-REPLICATED-guestB-to-host: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestB-to-guestA: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestB-to-host: a weapon swap never reached another peer
+  [high] SWAP-NOT-REPLICATED-guestB-to-guestA: a weapon swap never reached another peer
+  [high] RELOAD-NOT-VISIBLE-guestB-post-death: the other guest did not observe the host-authored reload state
+  [high] SWAP-THEN-FIRE-NO-EFFECT-guestB: a fast weapon did not fire after switching from a slow weapon
+  [high] RELOAD-NOT-VISIBLE-guestB-post-respawn: the other guest did not observe the host-authored reload state
+  [high] RELOAD-HOST-DISAGREES-guestB: the host's replica of the guest carries different ammo after a reload
+  [high] RELAY-GAP-guestA-to-guestB: the host received a guest message type it never relayed to the other guest
+  [high] RELAY-GAP-guestB-to-guestA: the host received a guest message type it never relayed to the other guest
+
+=== mp-audit summary ===
+label=baseline arena=nuketown2 impairment=0ms/0ms completed=true
+findings: 20 (high=20)
+  - [high] RELOAD-NOT-VISIBLE-guestA-pre-respawn: the other guest did not observe the host-authored reload state
+  - [high] SWAP-NOT-REPLICATED-guestA-to-host: a weapon swap never reached another peer
+  - [high] SWAP-NOT-REPLICATED-guestA-to-guestB: a weapon swap never reached another peer
+  - [high] SWAP-NOT-REPLICATED-guestA-to-host: a weapon swap never reached another peer
+  - [high] SWAP-NOT-REPLICATED-guestA-to-guestB: a weapon swap never reached another peer
+  - [high] RELOAD-NOT-VISIBLE-guestA-post-death: the other guest did not observe the host-authored reload state
+  - [high] SWAP-THEN-FIRE-NO-EFFECT-guestA: a fast weapon did not fire after switching from a slow weapon
+  - [high] RELOAD-NOT-VISIBLE-guestA-post-respawn: the other guest did not observe the host-authored reload state
+  - [high] RELOAD-HOST-DISAGREES-guestA: the host's replica of the guest carries different ammo after a reload
+  - [high] RELOAD-NOT-VISIBLE-guestB-pre-respawn: the other guest did not observe the host-authored reload state
+  - [high] SWAP-NOT-REPLICATED-guestB-to-host: a weapon swap never reached another peer
+  - [high] SWAP-NOT-REPLICATED-guestB-to-guestA: a weapon swap never reached another peer
+  - [high] SWAP-NOT-REPLICATED-guestB-to-host: a weapon swap never reached another peer
+  - [high] SWAP-NOT-REPLICATED-guestB-to-guestA: a weapon swap never reached another peer
+  - [high] RELOAD-NOT-VISIBLE-guestB-post-death: the other guest did not observe the host-authored reload state
+  - [high] SWAP-THEN-FIRE-NO-EFFECT-guestB: a fast weapon did not fire after switching from a slow weapon
+  - [high] RELOAD-NOT-VISIBLE-guestB-post-respawn: the other guest did not observe the host-authored reload state
+  - [high] RELOAD-HOST-DISAGREES-guestB: the host's replica of the guest carries different ammo after a reload
+  - [high] RELAY-GAP-guestA-to-guestB: the host received a guest message type it never relayed to the other guest
+  - [high] RELAY-GAP-guestB-to-guestA: the host received a guest message type it never relayed to the other guest
+state-diff divergences by field: {}
+killstreak awareness (HF-509): ok=false activated=true damageObserved=true
+  guestA: announced=true relayedByGuest=false banner=true replicated=true samples=[{"guestPhase":"inbound","hostPhase":"inbound","distanceFromHostM":0.48},{"guestPhase":"inbound","hostPhase":"orbiting","distanceFromHostM":0.51},{"guestPhase":"orbiting","hostPhase":"orbiting","distanceFromHostM":0.31}] damageSource=CHOPPER GUNNER@[11.95222994305698,17.56101657071244,-13.339609463778777]
+  guestB: announced=true relayedByGuest=false banner=true replicated=true samples=[{"guestPhase":"orbiting","hostPhase":"orbiting","distanceFromHostM":0.67},{"guestPhase":"orbiting","hostPhase":"orbiting","distanceFromHostM":0.36},{"guestPhase":"orbiting","hostPhase":"orbiting","distanceFromHostM":0.35}] damageSource=null
+artifact: C:\Users\david\projects\aa-claude-hitl\artifacts\qa\mp-audit\baseline-audit.json

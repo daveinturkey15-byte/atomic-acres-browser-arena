@@ -1,0 +1,2204 @@
+{
+  "contract": "farcrysis-boot-probe-v1",
+  "measuredAt": "2026-09-02T06:44:00.175Z",
+  "label": "compare-atomic-acres",
+  "arena": "atomic-acres",
+  "dist": "C:\\Users\\david\\projects\\aa-farcrysis-load\\dist",
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "outcome": "admitted",
+  "pageErrors": [],
+  "consoleErrors": [],
+  "crashed": false,
+  "menu": {
+    "readyMs": 2400,
+    "pipelines": 0,
+    "shaderModules": 0,
+    "hooked": true
+  },
+  "selection": {
+    "outcome": "ok",
+    "elapsedMs": 38430
+  },
+  "solo": {
+    "outcome": "active",
+    "elapsedMs": 21108
+  },
+  "totalToActiveMs": 61953,
+  "heap": {
+    "usedSize": 203258280,
+    "totalSize": 350576640
+  },
+  "timings": {
+    "selectToAdmittedMs": 38433,
+    "selectToFailedMs": null,
+    "soloToActiveMs": 21096,
+    "selectToActiveMs": 59540
+  },
+  "transitionProfile": {
+    "generation": 1,
+    "arenaId": "atomic-acres",
+    "startedAt": 2410.899999976158,
+    "completedAt": 40834.199999928474,
+    "durationMs": 38423.3,
+    "outcome": "committed",
+    "phases": [
+      {
+        "phase": "shared-gameplay-assets",
+        "startedAt": 2410.899999976158,
+        "completedAt": 5569.299999952316,
+        "durationMs": 3158.4
+      },
+      {
+        "phase": "previous-webgpu-fence",
+        "startedAt": 5569.299999952316,
+        "completedAt": 5569.5,
+        "durationMs": 0.2
+      },
+      {
+        "phase": "arena-construction",
+        "startedAt": 5569.5,
+        "completedAt": 5586.699999928474,
+        "durationMs": 17.2
+      },
+      {
+        "phase": "interactive-world-construction",
+        "startedAt": 5586.699999928474,
+        "completedAt": 5599.5,
+        "durationMs": 12.8
+      },
+      {
+        "phase": "physics-construction",
+        "startedAt": 5599.5,
+        "completedAt": 5698.199999928474,
+        "durationMs": 98.7
+      },
+      {
+        "phase": "authority-commit",
+        "startedAt": 5698.199999928474,
+        "completedAt": 5700.299999952316,
+        "durationMs": 2.1
+      },
+      {
+        "phase": "visual-definition",
+        "startedAt": 5700.299999952316,
+        "completedAt": 11794.600000023842,
+        "durationMs": 6094.3
+      },
+      {
+        "phase": "quality-presentation",
+        "startedAt": 11794.600000023842,
+        "completedAt": 12147.399999976158,
+        "durationMs": 352.8
+      },
+      {
+        "phase": "material-tuning",
+        "startedAt": 12147.399999976158,
+        "completedAt": 12339.699999928474,
+        "durationMs": 192.3
+      },
+      {
+        "phase": "art-texture-settle",
+        "startedAt": 12339.699999928474,
+        "completedAt": 12340.299999952316,
+        "durationMs": 0.6
+      },
+      {
+        "phase": "weapon-catalog-prewarm",
+        "startedAt": 12340.299999952316,
+        "completedAt": 17434.600000023842,
+        "durationMs": 5094.3
+      },
+      {
+        "phase": "presentation-batching",
+        "startedAt": 17434.600000023842,
+        "completedAt": 17448.5,
+        "durationMs": 13.9
+      },
+      {
+        "phase": "match-authority-reset",
+        "startedAt": 17448.5,
+        "completedAt": 17456.199999928474,
+        "durationMs": 7.7
+      },
+      {
+        "phase": "prewarm-batched-effects",
+        "startedAt": 17456.199999928474,
+        "completedAt": 33965.10000002384,
+        "durationMs": 16508.9
+      },
+      {
+        "phase": "coverage-submit-fence",
+        "startedAt": 33965.10000002384,
+        "completedAt": 40833.5,
+        "durationMs": 6868.4
+      },
+      {
+        "phase": "retire-previous-arenas",
+        "startedAt": 40833.5,
+        "completedAt": 40833.60000002384,
+        "durationMs": 0.1
+      },
+      {
+        "phase": "commit-bookkeeping",
+        "startedAt": 40833.60000002384,
+        "completedAt": 40834.199999928474,
+        "durationMs": 0.6
+      },
+      {
+        "phase": "finalize",
+        "startedAt": 40834.199999928474,
+        "completedAt": 40834.199999928474,
+        "durationMs": 0
+      }
+    ]
+  },
+  "transitionState": {
+    "phase": "idle",
+    "failure": null,
+    "generation": 1
+  },
+  "pipelines": {
+    "atMenu": 0,
+    "duringLoad": 374,
+    "total": 374,
+    "byPhase": {
+      "visual-definition": 75,
+      "weapon-catalog-prewarm": 17,
+      "prewarm-batched-effects": 196,
+      "coverage-submit-fence": 72,
+      "after-transition(startSolo)": 14
+    },
+    "syncMsTotal": 18,
+    "topStacks": [
+      [
+        "at zV.createRenderPipeline (http://127.0.0.1:41943/assets/vendor-three-CkGIDcsI.js:541:12500) <- at aH.createRenderPipeline (http://127.0.0.1:41943/assets/vendor-three-CkGIDcsI.js:542:29414) <- at Uk._getRenderPipeline (http://127.0.0.1:41943/assets/vendor-three-CkGIDcsI.js:27:96560)",
+        329
+      ],
+      [
+        "at http://127.0.0.1:41943/assets/vendor-three-CkGIDcsI.js:541:12762 <- at new Promise (<anonymous>) <- at zV.createRenderPipeline (http://127.0.0.1:41943/assets/vendor-three-CkGIDcsI.js:541:12710)",
+        42
+      ],
+      [
+        "at FB.getTransferPipeline (http://127.0.0.1:41943/assets/vendor-three-CkGIDcsI.js:295:377) <- at FB._mipmapCreateBundles (http://127.0.0.1:41943/assets/vendor-three-CkGIDcsI.js:295:1910) <- at FB.generateMipmaps (http://127.0.0.1:41943/assets/vendor-three-CkGIDcsI.js:295:1640)",
+        3
+      ]
+    ],
+    "sampleLabels": [
+      {
+        "atMs": 6029,
+        "label": "renderPipeline_PMREM_equirect_6409"
+      },
+      {
+        "atMs": 6043,
+        "label": "renderPipeline_PMREM_ggx_6411"
+      },
+      {
+        "atMs": 6097,
+        "label": "renderPipeline_NodeMaterial_6421"
+      },
+      {
+        "atMs": 6100,
+        "label": "mipmap-rgba8unorm-srgb-2d-array"
+      },
+      {
+        "atMs": 6105,
+        "label": "renderPipeline_Background.material_6420"
+      },
+      {
+        "atMs": 6171,
+        "label": "renderPipeline_ShadowMaterial_6423"
+      },
+      {
+        "atMs": 6186,
+        "label": "renderPipeline_ShadowMaterial_6423"
+      },
+      {
+        "atMs": 6189,
+        "label": "renderPipeline_ShadowMaterial_6423"
+      },
+      {
+        "atMs": 6194,
+        "label": "renderPipeline_ShadowMaterial_6423"
+      },
+      {
+        "atMs": 6197,
+        "label": "renderPipeline_ShadowMaterial_6423"
+      },
+      {
+        "atMs": 6223,
+        "label": "renderPipeline_ShadowMaterial_6423"
+      },
+      {
+        "atMs": 6272,
+        "label": "renderPipeline_ShadowMaterial_6423"
+      },
+      {
+        "atMs": 6274,
+        "label": "renderPipeline_ShadowMaterial_6423"
+      },
+      {
+        "atMs": 6277,
+        "label": "renderPipeline_ShadowMaterial_6423"
+      },
+      {
+        "atMs": 6279,
+        "label": "renderPipeline_ShadowMaterial_6423"
+      },
+      {
+        "atMs": 6290,
+        "label": "renderPipeline_ShadowMaterial_6423"
+      },
+      {
+        "atMs": 6293,
+        "label": "renderPipeline_ShadowMaterial_6423"
+      },
+      {
+        "atMs": 6295,
+        "label": "renderPipeline_ShadowMaterial_6423"
+      },
+      {
+        "atMs": 6296,
+        "label": "renderPipeline_ShadowMaterial_6423"
+      },
+      {
+        "atMs": 6303,
+        "label": "renderPipeline_ShadowMaterial_6424"
+      },
+      {
+        "atMs": 6305,
+        "label": "renderPipeline_ShadowMaterial_6424"
+      },
+      {
+        "atMs": 6307,
+        "label": "renderPipeline_ShadowMaterial_6424"
+      },
+      {
+        "atMs": 6323,
+        "label": "renderPipeline_ShadowMaterial_6425"
+      },
+      {
+        "atMs": 6325,
+        "label": "renderPipeline_ShadowMaterial_6425"
+      },
+      {
+        "atMs": 6328,
+        "label": "renderPipeline_ShadowMaterial_6425"
+      },
+      {
+        "atMs": 6334,
+        "label": "renderPipeline_ShadowMaterial_6425"
+      },
+      {
+        "atMs": 6335,
+        "label": "renderPipeline_ShadowMaterial_6425"
+      },
+      {
+        "atMs": 6336,
+        "label": "renderPipeline_ShadowMaterial_6425"
+      },
+      {
+        "atMs": 6347,
+        "label": "renderPipeline_ShadowMaterial_6426"
+      },
+      {
+        "atMs": 6348,
+        "label": "renderPipeline_ShadowMaterial_6426"
+      },
+      {
+        "atMs": 6350,
+        "label": "renderPipeline_ShadowMaterial_6426"
+      },
+      {
+        "atMs": 6356,
+        "label": "renderPipeline_ShadowMaterial_6426"
+      },
+      {
+        "atMs": 6357,
+        "label": "renderPipeline_ShadowMaterial_6426"
+      },
+      {
+        "atMs": 6358,
+        "label": "renderPipeline_ShadowMaterial_6426"
+      },
+      {
+        "atMs": 6371,
+        "label": "mipmap-rgba8unorm-2d-array"
+      },
+      {
+        "atMs": 6376,
+        "label": "renderPipeline_MeshStandardMaterial_6360"
+      },
+      {
+        "atMs": 6426,
+        "label": "renderPipeline_MeshStandardMaterial_6358"
+      },
+      {
+        "atMs": 6494,
+        "label": "renderPipeline_atomic-house-fragment-aqua-wall-v1_6388"
+      },
+      {
+        "atMs": 6528,
+        "label": "renderPipeline_atomic-house-fragment-roof-shingles-v1_6390"
+      },
+      {
+        "atMs": 6577,
+        "label": "renderPipeline_atomic-house-fragment-storage-locker-v1_6391"
+      }
+    ],
+    "allLabels": [
+      "6029:renderPipeline_PMREM_equirect_6409",
+      "6043:renderPipeline_PMREM_ggx_6411",
+      "6097:renderPipeline_NodeMaterial_6421",
+      "6100:mipmap-rgba8unorm-srgb-2d-array",
+      "6105:renderPipeline_Background.material_6420",
+      "6171:renderPipeline_ShadowMaterial_6423",
+      "6186:renderPipeline_ShadowMaterial_6423",
+      "6189:renderPipeline_ShadowMaterial_6423",
+      "6194:renderPipeline_ShadowMaterial_6423",
+      "6197:renderPipeline_ShadowMaterial_6423",
+      "6223:renderPipeline_ShadowMaterial_6423",
+      "6272:renderPipeline_ShadowMaterial_6423",
+      "6274:renderPipeline_ShadowMaterial_6423",
+      "6277:renderPipeline_ShadowMaterial_6423",
+      "6279:renderPipeline_ShadowMaterial_6423",
+      "6290:renderPipeline_ShadowMaterial_6423",
+      "6293:renderPipeline_ShadowMaterial_6423",
+      "6295:renderPipeline_ShadowMaterial_6423",
+      "6296:renderPipeline_ShadowMaterial_6423",
+      "6303:renderPipeline_ShadowMaterial_6424",
+      "6305:renderPipeline_ShadowMaterial_6424",
+      "6307:renderPipeline_ShadowMaterial_6424",
+      "6323:renderPipeline_ShadowMaterial_6425",
+      "6325:renderPipeline_ShadowMaterial_6425",
+      "6328:renderPipeline_ShadowMaterial_6425",
+      "6334:renderPipeline_ShadowMaterial_6425",
+      "6335:renderPipeline_ShadowMaterial_6425",
+      "6336:renderPipeline_ShadowMaterial_6425",
+      "6347:renderPipeline_ShadowMaterial_6426",
+      "6348:renderPipeline_ShadowMaterial_6426",
+      "6350:renderPipeline_ShadowMaterial_6426",
+      "6356:renderPipeline_ShadowMaterial_6426",
+      "6357:renderPipeline_ShadowMaterial_6426",
+      "6358:renderPipeline_ShadowMaterial_6426",
+      "6371:mipmap-rgba8unorm-2d-array",
+      "6376:renderPipeline_MeshStandardMaterial_6360",
+      "6426:renderPipeline_MeshStandardMaterial_6358",
+      "6494:renderPipeline_atomic-house-fragment-aqua-wall-v1_6388",
+      "6528:renderPipeline_atomic-house-fragment-roof-shingles-v1_6390",
+      "6577:renderPipeline_atomic-house-fragment-storage-locker-v1_6391",
+      "6614:renderPipeline_MeshStandardNodeMaterial_6403",
+      "6666:renderPipeline_MAT_Pass65_Arms_Sleeve_PBR_853",
+      "6700:renderPipeline_MAT_Pass65_Arms_FingerGlove_PBR_855",
+      "6726:renderPipeline_MAT_Pass65_Arms_WristAccent_PBR_856",
+      "6780:renderPipeline_MeshStandardMaterial_6359",
+      "6810:renderPipeline_MeshStandardMaterial_6372",
+      "6860:renderPipeline_MeshStandardMaterial_6356",
+      "6872:renderPipeline_MeshBasicMaterial_6370",
+      "6879:renderPipeline_MeshBasicMaterial_744",
+      "6881:renderPipeline_PointsNodeMaterial_6400",
+      "6884:renderPipeline_PointsNodeMaterial_6401",
+      "6927:mipmap-rgba16float-2d-array",
+      "6928:renderPipeline_MeshPhysicalMaterial_6361",
+      "6932:renderPipeline_PointsNodeMaterial_6402",
+      "6937:renderPipeline_MeshBasicMaterial_696",
+      "6942:renderPipeline_MeshBasicMaterial_697",
+      "6945:renderPipeline_pass76-rain-splash-ring_746",
+      "6952:renderPipeline_pass76-rain-streak_745",
+      "6957:renderPipeline_pass76-rain-streak_745",
+      "6962:renderPipeline_MeshBasicMaterial_743",
+      "6967:renderPipeline_MeshBasicMaterial_741",
+      "6972:renderPipeline_MeshBasicMaterial_742",
+      "6993:renderPipeline_SSRNode.SSR_6405",
+      "6995:renderPipeline_SSRNode.Copy_6407",
+      "6997:renderPipeline_SSRNode.Blur_6406",
+      "6999:renderPipeline_Bloom_highPass_6412",
+      "7001:renderPipeline_Bloom_separable_6413",
+      "7003:renderPipeline_Bloom_separable_6414",
+      "7005:renderPipeline_Bloom_separable_6415",
+      "7007:renderPipeline_Bloom_separable_6416",
+      "7009:renderPipeline_Bloom_separable_6417",
+      "7012:renderPipeline_Bloom_comp_6418",
+      "7033:renderPipeline_Godrays_6408",
+      "7040:renderPipeline_Bilateral_blur_6419",
+      "7043:renderPipeline_RenderPipeline_25",
+      "12391:renderPipeline_ShadowMaterial_6423",
+      "12392:renderPipeline_ShadowMaterial_6423",
+      "12395:renderPipeline_ShadowMaterial_6423",
+      "12412:renderPipeline_MAT_Pass65_smg_Rubber_1395",
+      "12443:renderPipeline_MAT_Pass65_carbine_Gunmetal_939",
+      "12482:renderPipeline_MAT_Pass65_carbine_Polymer_PBR_936",
+      "12518:renderPipeline_MAT_Pass65_Arms_Sleeve_PBR_853",
+      "12556:renderPipeline_MAT_Pass65_Arms_FingerGlove_PBR_855",
+      "12591:renderPipeline_MAT_Pass65_Arms_WristAccent_PBR_856",
+      "12621:renderPipeline_MAT_Pass65_smg_Lens_1399",
+      "12648:renderPipeline_MAT_Pass65_smg_Lens_1399",
+      "12655:renderPipeline_Godrays_6408",
+      "15157:renderPipeline_MAT_Pass65_lmg_Polymer_PBR_1445",
+      "15576:renderPipeline_MAT_Pass65_sniper_Lens_1526",
+      "15600:renderPipeline_MAT_Pass65_sniper_Lens_1526",
+      "16565:renderPipeline_MAT_Pass65_Crossbow_Rubber_2266",
+      "16616:renderPipeline_MAT_Pass65_Crossbow_Armor_PBR_2292",
+      "17490:renderPipeline_Background.material_6420",
+      "17495:renderPipeline_MeshBasicMaterial_672",
+      "17517:renderPipeline_MeshStandardMaterial_799",
+      "17526:renderPipeline_smoke-grenade-shot-corridor-mask_701",
+      "17531:renderPipeline_smoke-grenade-shot-corridor-mask_704",
+      "17582:renderPipeline_MeshPhysicalMaterial_23",
+      "17623:renderPipeline_MeshPhysicalMaterial_23",
+      "17666:renderPipeline_MeshPhysicalMaterial_23",
+      "17725:renderPipeline_MeshPhysicalMaterial_23",
+      "17770:renderPipeline_MeshPhysicalMaterial_23",
+      "17816:renderPipeline_MeshPhysicalMaterial_23",
+      "17870:renderPipeline_MeshPhysicalMaterial_23",
+      "17911:renderPipeline_MeshPhysicalMaterial_23",
+      "17954:renderPipeline_MeshPhysicalMaterial_23",
+      "17996:renderPipeline_MeshPhysicalMaterial_23",
+      "18051:renderPipeline_MeshPhysicalMaterial_23",
+      "18091:renderPipeline_MeshPhysicalMaterial_23",
+      "18095:renderPipeline_MeshBasicMaterial_762",
+      "18099:renderPipeline_LineBasicMaterial_749",
+      "18103:renderPipeline_MeshBasicMaterial_750",
+      "18107:renderPipeline_MeshBasicMaterial_752",
+      "18111:renderPipeline_PointsMaterial_747",
+      "18162:renderPipeline_MeshPhysicalMaterial_23",
+      "18207:renderPipeline_MeshPhysicalMaterial_23",
+      "18252:renderPipeline_MeshPhysicalMaterial_23",
+      "18295:renderPipeline_MeshPhysicalMaterial_23",
+      "18344:renderPipeline_MeshPhysicalMaterial_23",
+      "18385:renderPipeline_MeshPhysicalMaterial_23",
+      "18424:renderPipeline_MeshPhysicalMaterial_23",
+      "18477:renderPipeline_MeshPhysicalMaterial_23",
+      "18515:renderPipeline_MeshPhysicalMaterial_23",
+      "18553:renderPipeline_MeshPhysicalMaterial_23",
+      "18602:renderPipeline_MeshPhysicalMaterial_23",
+      "18645:renderPipeline_MeshPhysicalMaterial_23",
+      "18652:renderPipeline_MeshBasicMaterial_696",
+      "18657:renderPipeline_MeshBasicMaterial_697",
+      "18664:renderPipeline_MeshBasicMaterial_748",
+      "18668:renderPipeline_MeshBasicMaterial_748",
+      "18674:renderPipeline_smoke-grenade-inner-density_699",
+      "18678:renderPipeline_smoke-grenade-inner-density_702",
+      "18684:renderPipeline_smoke-grenade-soft-edge_700",
+      "18689:renderPipeline_smoke-grenade-soft-edge_703",
+      "20430:renderPipeline_ShadowMaterial_6423",
+      "20466:renderPipeline_ShadowMaterial_6423",
+      "20468:renderPipeline_ShadowMaterial_6423",
+      "20469:renderPipeline_ShadowMaterial_6423",
+      "20582:renderPipeline_MAT_Pass65_sniper_Rubber_1547",
+      "20617:renderPipeline_MAT_Pass65_scattergun_Polymer_PBR_1500",
+      "20645:renderPipeline_MAT_Pass65_flamethrower_Accent_2036",
+      "20672:renderPipeline_MAT_Pass65_flamethrower_Gunmetal_2037",
+      "20703:renderPipeline_MAT_Pass65_flamethrower_Primary_PBR_2038",
+      "20751:renderPipeline_MAT_Pass65_m4a1_Primary_PBR_1733",
+      "20828:renderPipeline_MAT_Pass65_pistol_Primary_PBR_1593",
+      "20979:renderPipeline_Semtex woven retaining tape_960",
+      "21015:renderPipeline_Semtex insulated wire_962",
+      "21043:renderPipeline_Olive cast steel_947",
+      "21095:renderPipeline_Semtex red PBR_1344",
+      "22663:renderPipeline_smoke-grenade-shot-corridor-mask_707",
+      "22668:renderPipeline_smoke-grenade-shot-corridor-mask_710",
+      "22673:renderPipeline_smoke-grenade-inner-density_705",
+      "22678:renderPipeline_smoke-grenade-inner-density_708",
+      "22682:renderPipeline_smoke-grenade-soft-edge_706",
+      "22687:renderPipeline_smoke-grenade-soft-edge_709",
+      "22848:renderPipeline_smoke-grenade-shot-corridor-mask_713",
+      "22852:renderPipeline_smoke-grenade-shot-corridor-mask_716",
+      "22858:renderPipeline_smoke-grenade-inner-density_711",
+      "22863:renderPipeline_smoke-grenade-inner-density_714",
+      "22867:renderPipeline_smoke-grenade-soft-edge_712",
+      "22873:renderPipeline_smoke-grenade-soft-edge_715",
+      "23024:renderPipeline_smoke-grenade-shot-corridor-mask_719",
+      "23028:renderPipeline_smoke-grenade-shot-corridor-mask_722",
+      "23034:renderPipeline_smoke-grenade-inner-density_717",
+      "23039:renderPipeline_smoke-grenade-inner-density_720",
+      "23044:renderPipeline_smoke-grenade-soft-edge_718",
+      "23048:renderPipeline_smoke-grenade-soft-edge_721",
+      "23206:renderPipeline_smoke-grenade-shot-corridor-mask_725",
+      "23211:renderPipeline_smoke-grenade-shot-corridor-mask_728",
+      "23217:renderPipeline_smoke-grenade-inner-density_723",
+      "23221:renderPipeline_smoke-grenade-inner-density_726",
+      "23225:renderPipeline_smoke-grenade-soft-edge_724",
+      "23229:renderPipeline_smoke-grenade-soft-edge_727",
+      "23386:renderPipeline_smoke-grenade-shot-corridor-mask_731",
+      "23391:renderPipeline_smoke-grenade-shot-corridor-mask_734",
+      "23396:renderPipeline_smoke-grenade-inner-density_729",
+      "23401:renderPipeline_smoke-grenade-inner-density_732",
+      "23406:renderPipeline_smoke-grenade-soft-edge_730",
+      "23411:renderPipeline_smoke-grenade-soft-edge_733",
+      "23597:renderPipeline_ShadowMaterial_7490",
+      "23599:renderPipeline_ShadowMaterial_7490",
+      "23600:renderPipeline_ShadowMaterial_7490",
+      "23602:renderPipeline_ShadowMaterial_7490",
+      "23603:renderPipeline_ShadowMaterial_7490",
+      "23610:renderPipeline_ShadowMaterial_7490",
+      "23611:renderPipeline_ShadowMaterial_7490",
+      "23617:renderPipeline_ShadowMaterial_7490",
+      "23618:renderPipeline_ShadowMaterial_7490",
+      "23620:renderPipeline_ShadowMaterial_7490",
+      "23625:renderPipeline_ShadowMaterial_7490",
+      "23626:renderPipeline_ShadowMaterial_7490",
+      "23635:renderPipeline_ShadowMaterial_7491",
+      "23635:renderPipeline_ShadowMaterial_7491",
+      "23636:renderPipeline_ShadowMaterial_7491",
+      "23639:renderPipeline_ShadowMaterial_7491",
+      "23640:renderPipeline_ShadowMaterial_7491",
+      "23644:renderPipeline_ShadowMaterial_7491",
+      "23645:renderPipeline_ShadowMaterial_7491",
+      "23649:renderPipeline_MAT_coral_oxide_6540",
+      "23719:renderPipeline_MAT_brushed_alloy_6497",
+      "23723:renderPipeline_MeshBasicMaterial_6453",
+      "23748:renderPipeline_MeshStandardMaterial_6477",
+      "23775:renderPipeline_MeshStandardMaterial_6482",
+      "23789:renderPipeline_MeshLambertMaterial_6455",
+      "23833:renderPipeline_MeshStandardNodeMaterial_6473",
+      "23925:renderPipeline_MAT_foliage_military_6517",
+      "23967:renderPipeline_atomic-house-fragment-storage-locker-v1_6391",
+      "23999:renderPipeline_MeshStandardNodeMaterial_6403",
+      "24027:renderPipeline_MeshStandardMaterial_6454",
+      "24039:renderPipeline_MeshLambertMaterial_6456",
+      "24044:renderPipeline_nuketown-ridge-painted_6474",
+      "24067:renderPipeline_MeshStandardMaterial_6475",
+      "24101:renderPipeline_MeshStandardMaterial_6476",
+      "24126:renderPipeline_MeshStandardMaterial_6478",
+      "24148:renderPipeline_MeshStandardMaterial_6479",
+      "24174:renderPipeline_MAT_ceiling_warm_white_6527",
+      "24181:renderPipeline_MeshLambertMaterial_6472",
+      "24207:renderPipeline_MeshStandardMaterial_6482",
+      "24226:renderPipeline_MeshStandardMaterial_6484",
+      "24252:renderPipeline_MeshStandardMaterial_6483",
+      "24276:renderPipeline_MeshStandardMaterial_6482",
+      "24300:renderPipeline_MeshStandardMaterial_6480",
+      "24330:renderPipeline_MeshStandardMaterial_6481",
+      "24362:renderPipeline_MAT_Pass65_flare_gun_Polymer_PBR_2628",
+      "24390:renderPipeline_MAT_Pass65_flare_gun_Gunmetal_2635",
+      "24418:renderPipeline_MAT_Pass65_Arms_Sleeve_PBR_853",
+      "24446:renderPipeline_MAT_Pass65_Arms_FingerGlove_PBR_855",
+      "24486:renderPipeline_MAT_Pass65_Arms_WristAccent_PBR_856",
+      "24515:renderPipeline_MeshStandardMaterial_803",
+      "24548:renderPipeline_MAT_Pass65_flare_gun_Accent_2626",
+      "24597:renderPipeline_MeshStandardMaterial_6349",
+      "24603:renderPipeline_MeshBasicMaterial_744",
+      "24606:renderPipeline_PointsNodeMaterial_6401",
+      "24645:renderPipeline_MAT_glass_tactical_6495",
+      "24678:renderPipeline_MAT_glass_tactical_6495",
+      "24684:renderPipeline_MeshBasicMaterial_809",
+      "24689:renderPipeline_MeshBasicMaterial_809",
+      "24691:renderPipeline_PointsMaterial_810",
+      "24694:renderPipeline_PointsNodeMaterial_6402",
+      "24702:renderPipeline_pass76-rain-splash-ring_746",
+      "24707:renderPipeline_pass76-rain-streak_745",
+      "24712:renderPipeline_pass76-rain-streak_745",
+      "24716:renderPipeline_MeshBasicMaterial_743",
+      "24721:renderPipeline_MeshBasicMaterial_741",
+      "24725:renderPipeline_MeshBasicMaterial_742",
+      "30430:renderPipeline_MAT_Pass65_flamethrower_Lens_2575",
+      "30458:renderPipeline_MAT_Pass65_flamethrower_Lens_2575",
+      "31032:renderPipeline_MAT_Pass65SupportAircraft_PanelWear_1799",
+      "31075:renderPipeline_MAT_Pass65SupportAircraft_Metal_1805",
+      "31116:renderPipeline_MAT_Pass65Chopper_Gunmetal_1024",
+      "31154:renderPipeline_MAT_Pass65SupportAircraft_PanelSeam_2658",
+      "31190:renderPipeline_MAT_Pass65Chopper_RearTailArmor_PBR_1365",
+      "31243:renderPipeline_MAT_Pass65Chopper_RearTailArmor_PBR_1364",
+      "31281:renderPipeline_MAT_Pass65SupportAircraft_Armor_PBR_1897",
+      "31316:renderPipeline_MAT_Pass65SupportAircraft_Metal_1793",
+      "31323:renderPipeline_pass74-support-shadow-silhouette_22",
+      "31360:renderPipeline_MAT_HunterDrone_Vents_965",
+      "31411:renderPipeline_MAT_Pass65SupportAircraft_Carpet_PBR_2736",
+      "31446:renderPipeline_MAT_Pass65Chopper_Gunmetal_2398",
+      "31484:renderPipeline_MAT_HunterDrone_Armor_PBR_1345",
+      "31532:renderPipeline_MAT_Pass65SupportAircraft_Armor_PBR_1347",
+      "31589:renderPipeline_MAT_HunterDrone_Gunmetal_966",
+      "31626:renderPipeline_MAT_HunterDrone_Gunmetal_966",
+      "31661:renderPipeline_MAT_HunterDrone_MuzzleFlash_971",
+      "31690:renderPipeline_MAT_HunterDrone_Optic_972",
+      "31718:renderPipeline_MAT_HunterDrone_Gunmetal_966",
+      "31756:renderPipeline_MAT_HunterDrone_Gunmetal_966",
+      "31789:renderPipeline_MAT_HunterDrone_Gunmetal_966",
+      "31820:renderPipeline_MAT_HunterDrone_DarkArmor_963",
+      "31856:renderPipeline_MAT_HunterDrone_IdentityLight_964",
+      "31907:renderPipeline_MAT_HunterDrone_DarkArmor_969",
+      "31940:renderPipeline_MAT_HunterDrone_Gunmetal_970",
+      "32069:renderPipeline_MAT_Pass65SupportAircraft_Carpet_PBR_2737",
+      "32150:renderPipeline_MAT_Pass70_DroneSwarmLogo_BlackField_20",
+      "32154:renderPipeline_MAT_Pass70_DroneSwarmLogo_WhiteMark_21",
+      "32199:renderPipeline_MAT_Pass65SupportAircraft_Glass_1198",
+      "32229:renderPipeline_MAT_Pass65SupportAircraft_Glass_1198",
+      "32263:renderPipeline_MAT_Pass65SupportAircraft_Glass_2656",
+      "32296:renderPipeline_MAT_Pass65SupportAircraft_Glass_2656",
+      "32334:renderPipeline_MAT_Pass65Chopper_HUDGlass_1028",
+      "32366:renderPipeline_MAT_Pass65Chopper_HUDGlass_1028",
+      "32403:renderPipeline_MAT_Pass65Chopper_HUDGlass_1028",
+      "32434:renderPipeline_MAT_Pass65Chopper_HUDGlass_1028",
+      "32462:renderPipeline_piloted-drone-hostile-through-wall_554",
+      "33950:renderPipeline_MAT_Pass65Chopper_Gunmetal_2838",
+      "33950:renderPipeline_MAT_Pass65Chopper_HUDGreen_2827",
+      "33950:renderPipeline_MAT_Pass65Chopper_DarkArmor_2829",
+      "33951:renderPipeline_MAT_Pass65Chopper_Gunmetal_2838",
+      "34003:renderPipeline_MAT_Pass65_Arms_Sleeve_PBR_853",
+      "34371:renderPipeline_MAT_Pass65_Arms_FingerGlove_PBR_855",
+      "34713:renderPipeline_MAT_Pass65_Arms_WristAccent_PBR_856",
+      "35049:renderPipeline_MAT_Pass65_carbine_Gunmetal_934",
+      "35389:renderPipeline_MAT_Pass65_carbine_Polymer_PBR_936",
+      "35711:renderPipeline_MeshBasicMaterial_744",
+      "35772:renderPipeline_field-shed-sheet-corrugated-green-v1_6380",
+      "36162:renderPipeline_field-shed-frame-structural-steel-v1_6376",
+      "36216:renderPipeline_field-shed-floor-industrial-v1_6381",
+      "36245:renderPipeline_field-shed-aperture-rim-exposed-metal-v1_6377",
+      "36298:renderPipeline_field-shed-dent-stressed-metal-v1_6378",
+      "36672:renderPipeline_field-shed-debris-corrugated-green-v1_6379",
+      "37015:renderPipeline_field-shed-frame-structural-steel-v1_6382",
+      "37069:renderPipeline_field-shed-aperture-rim-exposed-metal-v1_6383",
+      "37120:renderPipeline_field-shed-dent-stressed-metal-v1_6384",
+      "37177:renderPipeline_field-shed-debris-corrugated-green-v1_6385",
+      "37238:renderPipeline_atomic-house-fragment-storage-locker-v1_6391",
+      "37300:renderPipeline_MeshStandardNodeMaterial_6403",
+      "37409:renderPipeline_MeshStandardMaterial_6454",
+      "37448:renderPipeline_MeshLambertMaterial_6455",
+      "37486:renderPipeline_MeshLambertMaterial_6456",
+      "37625:renderPipeline_MeshStandardNodeMaterial_6473",
+      "37993:renderPipeline_MeshStandardNodeMaterial_6473",
+      "38087:renderPipeline_MeshStandardMaterial_6476",
+      "38135:renderPipeline_MeshStandardMaterial_6477",
+      "38186:renderPipeline_MeshStandardMaterial_6478",
+      "38230:renderPipeline_MeshStandardMaterial_6479",
+      "38277:renderPipeline_MeshStandardMaterial_6480",
+      "38353:renderPipeline_MeshStandardMaterial_6481",
+      "38406:renderPipeline_MeshStandardMaterial_6482",
+      "38455:renderPipeline_MeshStandardMaterial_6482",
+      "38501:renderPipeline_MeshStandardMaterial_6483",
+      "38552:renderPipeline_MeshStandardMaterial_6482",
+      "38837:renderPipeline_MAT_Pass65_carbine_Lens_935",
+      "39065:renderPipeline_MeshBasicMaterial_696",
+      "39097:renderPipeline_MeshBasicMaterial_697",
+      "39135:renderPipeline_MeshBasicMaterial_741",
+      "39159:renderPipeline_MeshBasicMaterial_742",
+      "39188:renderPipeline_MeshBasicMaterial_743",
+      "39216:renderPipeline_pass76-rain-streak_745",
+      "39262:renderPipeline_pass76-rain-splash-ring_746",
+      "39319:renderPipeline_MAT_glass_tactical_6495",
+      "39636:renderPipeline_ShadowMaterial_6423",
+      "39637:renderPipeline_ShadowMaterial_6423",
+      "39639:renderPipeline_ShadowMaterial_6423",
+      "39643:renderPipeline_ShadowMaterial_6424",
+      "39645:renderPipeline_ShadowMaterial_6424",
+      "39646:renderPipeline_ShadowMaterial_6424",
+      "39648:renderPipeline_ShadowMaterial_6424",
+      "39651:renderPipeline_ShadowMaterial_6424",
+      "39652:renderPipeline_ShadowMaterial_6424",
+      "39654:renderPipeline_ShadowMaterial_6424",
+      "39655:renderPipeline_ShadowMaterial_6424",
+      "39656:renderPipeline_ShadowMaterial_6424",
+      "39661:renderPipeline_ShadowMaterial_7490",
+      "39662:renderPipeline_ShadowMaterial_7490",
+      "39663:renderPipeline_ShadowMaterial_7490",
+      "39668:renderPipeline_ShadowMaterial_7491",
+      "39669:renderPipeline_ShadowMaterial_7491",
+      "39669:renderPipeline_ShadowMaterial_7491",
+      "39737:renderPipeline_field-shed-frame-structural-steel-v1_6376",
+      "39788:renderPipeline_field-shed-aperture-rim-exposed-metal-v1_6377",
+      "39820:renderPipeline_field-shed-dent-stressed-metal-v1_6378",
+      "39850:renderPipeline_field-shed-debris-corrugated-green-v1_6379",
+      "39889:renderPipeline_MeshStandardNodeMaterial_6473",
+      "39919:renderPipeline_MeshStandardNodeMaterial_6473",
+      "39954:renderPipeline_field-shed-frame-structural-steel-v1_6382",
+      "39977:renderPipeline_field-shed-aperture-rim-exposed-metal-v1_6383",
+      "40013:renderPipeline_field-shed-dent-stressed-metal-v1_6384",
+      "40038:renderPipeline_field-shed-debris-corrugated-green-v1_6385",
+      "40127:renderPipeline_MAT_Pass65_carbine_Lens_935",
+      "40151:renderPipeline_MAT_Pass65_carbine_Lens_935",
+      "43562:renderPipeline_Swat_Black_7801",
+      "43603:renderPipeline_MAT_Pass65_smg_Rubber_7815",
+      "43675:renderPipeline_Visor_7802",
+      "43681:renderPipeline_MeshBasicMaterial_7731",
+      "45871:renderPipeline_MeshStandardMaterial_735",
+      "45882:renderPipeline_SpriteMaterial_7730",
+      "45888:renderPipeline_MeshBasicMaterial_736",
+      "45889:renderPipeline_SpriteMaterial_739",
+      "46283:renderPipeline_MAT_Pass65_lmg_Polymer_PBR_1445",
+      "47978:renderPipeline_through-wall-exact:Skin_8941",
+      "48011:renderPipeline_through-wall-exact:Visor_8944",
+      "48028:renderPipeline_through-wall-operator-orange-halo_698",
+      "49777:renderPipeline_MAT_Pass65_Crossbow_Rubber_2266",
+      "49812:renderPipeline_MAT_Pass65_Crossbow_Armor_PBR_2292"
+    ]
+  },
+  "shaderModules": {
+    "atMenu": 0,
+    "duringLoad": 431,
+    "total": 431,
+    "byPhase": {
+      "visual-definition": 107,
+      "weapon-catalog-prewarm": 22,
+      "prewarm-batched-effects": 208,
+      "coverage-submit-fence": 78,
+      "after-transition(startSolo)": 16
+    },
+    "syncMsTotal": 24
+  },
+  "longTasks": {
+    "countDuringLoad": 263,
+    "totalMsDuringLoad": 25143,
+    "maxMs": 1480,
+    "msByPhase": {
+      "shared-gameplay-assets": 56,
+      "visual-definition": 1473,
+      "quality-presentation": 545,
+      "weapon-catalog-prewarm": 1497,
+      "prewarm-batched-effects": 3573,
+      "coverage-submit-fence": 527,
+      "unbucketed": 17472
+    },
+    "top": [
+      {
+        "atMs": 30988,
+        "durationMs": 1480,
+        "attribution": "window::"
+      },
+      {
+        "atMs": 17434,
+        "durationMs": 1257,
+        "attribution": "window::"
+      },
+      {
+        "atMs": 23552,
+        "durationMs": 1174,
+        "attribution": "window::"
+      },
+      {
+        "atMs": 5893,
+        "durationMs": 1150,
+        "attribution": "window::"
+      },
+      {
+        "atMs": 20306,
+        "durationMs": 839,
+        "attribution": "window::"
+      },
+      {
+        "atMs": 12112,
+        "durationMs": 545,
+        "attribution": "window::"
+      },
+      {
+        "atMs": 39627,
+        "durationMs": 527,
+        "attribution": "window::"
+      },
+      {
+        "atMs": 43445,
+        "durationMs": 242,
+        "attribution": "window::"
+      },
+      {
+        "atMs": 47819,
+        "durationMs": 216,
+        "attribution": "window::"
+      },
+      {
+        "atMs": 48035,
+        "durationMs": 215,
+        "attribution": "window::"
+      },
+      {
+        "atMs": 51713,
+        "durationMs": 206,
+        "attribution": "window::"
+      },
+      {
+        "atMs": 5709,
+        "durationMs": 162,
+        "attribution": "window::"
+      },
+      {
+        "atMs": 11794,
+        "durationMs": 161,
+        "attribution": "window::"
+      },
+      {
+        "atMs": 49670,
+        "durationMs": 156,
+        "attribution": "window::"
+      },
+      {
+        "atMs": 58159,
+        "durationMs": 126,
+        "attribution": "window::"
+      }
+    ]
+  },
+  "scene": {
+    "meshes": 6611,
+    "instancedMeshes": 108,
+    "instanceCount": 27615,
+    "lights": 27,
+    "uniqueMaterials": 1831,
+    "uniqueGeometries": 2791,
+    "arenaMeshes": 0,
+    "arenaUniqueMaterials": 0,
+    "arenaVertexAttributeCount": 0,
+    "materialSignatures": [
+      [
+        "MeshStandardMaterial|||||||2||||||",
+        4279
+      ],
+      [
+        "MeshBasicMaterial||||||T|0||||||",
+        369
+      ],
+      [
+        "MeshStandardMaterial|map|nrm|rgh||||2||||||",
+        321
+      ],
+      [
+        "MeshStandardMaterial|map|nrm|rgh||emi||2||||||",
+        298
+      ],
+      [
+        "MeshBasicMaterial|||||||0||||||",
+        276
+      ],
+      [
+        "MeshStandardMaterial|||||||0||||||",
+        261
+      ],
+      [
+        "MeshStandardMaterial|map|nrm|rgh||||0||||||skin",
+        186
+      ],
+      [
+        "MeshStandardMaterial|map|nrm|rgh||||0||||||",
+        171
+      ],
+      [
+        "MeshStandardMaterial||||||T|2||||||",
+        94
+      ],
+      [
+        "MeshStandardMaterial|map||||||0||||||",
+        82
+      ],
+      [
+        "MeshBasicMaterial||||||T|1||||||skin",
+        81
+      ],
+      [
+        "MeshStandardMaterial||nrm|rgh||||0||||||skin",
+        25
+      ],
+      [
+        "MeshBasicMaterial||||alp||T|2||at|||inst|",
+        24
+      ],
+      [
+        "MeshStandardMaterial|||||||0|||||inst|",
+        22
+      ],
+      [
+        "MeshPhysicalMaterial||||||T|0||||||",
+        22
+      ],
+      [
+        "MeshBasicMaterial||||||T|2||||||",
+        21
+      ],
+      [
+        "MeshPhysicalMaterial||||||T|2|||||inst|",
+        16
+      ],
+      [
+        "MeshStandardMaterial|||||||2|||||inst|",
+        14
+      ],
+      [
+        "MeshBasicMaterial|||||||2|||||inst|",
+        12
+      ],
+      [
+        "MeshStandardNodeMaterial|||||||2|||colorNode|posNode|inst|",
+        5
+      ],
+      [
+        "MeshBasicMaterial|map|||||T|0|||||inst|",
+        4
+      ],
+      [
+        "MeshBasicMaterial|||||||0|||||inst|",
+        3
+      ],
+      [
+        "MeshBasicMaterial|||||||0|vc|||||",
+        3
+      ],
+      [
+        "MeshPhysicalMaterial||||||T|2||||||",
+        2
+      ],
+      [
+        "MeshBasicMaterial|map||||||0||||||",
+        2
+      ],
+      [
+        "MeshBasicMaterial|map|||||T|1||||||",
+        2
+      ],
+      [
+        "MeshLambertMaterial|||||||0|||||inst|",
+        2
+      ],
+      [
+        "MeshLambertMaterial|||||||0|vc|||||",
+        2
+      ],
+      [
+        "MeshStandardMaterial|||||||0|vc|||||",
+        2
+      ],
+      [
+        "MeshStandardMaterial|map|nrm|rgh||emi||2|||||inst|",
+        1
+      ],
+      [
+        "MeshBasicMaterial||||||T|0|vc||||inst|",
+        1
+      ],
+      [
+        "MeshBasicMaterial||||||T|0|||||inst|",
+        1
+      ],
+      [
+        "MeshBasicMaterial|map||||||0||at|||inst|",
+        1
+      ],
+      [
+        "MeshBasicMaterial|map|||||T|2|||||inst|",
+        1
+      ],
+      [
+        "MeshBasicMaterial|map|||||T|2||at|||inst|",
+        1
+      ],
+      [
+        "MeshBasicMaterial||||||T|1||||||",
+        1
+      ],
+      [
+        "NodeMaterial||||||T|1|||colorNode|||",
+        1
+      ],
+      [
+        "MeshStandardNodeMaterial|||||||0||||||",
+        1
+      ],
+      [
+        "MeshBasicMaterial|map||||||2||||||",
+        1
+      ]
+    ],
+    "uniqueMaterialSignatures": [
+      [
+        "MeshStandardMaterial|||||||2||||||",
+        916
+      ],
+      [
+        "MeshBasicMaterial||||||T|0||||||",
+        321
+      ],
+      [
+        "MeshStandardMaterial|map|nrm|rgh||||2||||||",
+        208
+      ],
+      [
+        "MeshStandardMaterial|map|nrm|rgh||||0||||||skin",
+        71
+      ],
+      [
+        "MeshStandardMaterial|||||||0||||||",
+        58
+      ],
+      [
+        "MeshStandardMaterial||||||T|2||||||",
+        41
+      ],
+      [
+        "MeshBasicMaterial|||||||0||||||",
+        33
+      ],
+      [
+        "MeshStandardMaterial|map|nrm|rgh||||0||||||",
+        31
+      ],
+      [
+        "MeshStandardMaterial||nrm|rgh||||0||||||skin",
+        25
+      ],
+      [
+        "MeshBasicMaterial||||alp||T|2||at|||inst|",
+        24
+      ],
+      [
+        "MeshBasicMaterial||||||T|2||||||",
+        21
+      ],
+      [
+        "MeshStandardMaterial|||||||0|||||inst|",
+        20
+      ],
+      [
+        "MeshStandardMaterial|map|nrm|rgh||emi||2||||||",
+        16
+      ],
+      [
+        "MeshBasicMaterial|||||||2|||||inst|",
+        12
+      ],
+      [
+        "MeshBasicMaterial|map|||||T|0|||||inst|",
+        4
+      ],
+      [
+        "MeshStandardMaterial|||||||2|||||inst|",
+        2
+      ],
+      [
+        "MeshPhysicalMaterial||||||T|2||||||",
+        2
+      ],
+      [
+        "MeshBasicMaterial|map||||||0||||||",
+        2
+      ],
+      [
+        "MeshBasicMaterial|map|||||T|1||||||",
+        2
+      ],
+      [
+        "MeshStandardNodeMaterial|||||||2|||colorNode|posNode|inst|",
+        2
+      ],
+      [
+        "MeshLambertMaterial|||||||0|||||inst|",
+        2
+      ],
+      [
+        "MeshStandardMaterial|||||||0|vc|||||",
+        2
+      ],
+      [
+        "MeshBasicMaterial||||||T|0|vc||||inst|",
+        1
+      ],
+      [
+        "MeshBasicMaterial||||||T|0|||||inst|",
+        1
+      ],
+      [
+        "MeshBasicMaterial|map||||||0||at|||inst|",
+        1
+      ],
+      [
+        "MeshBasicMaterial|map|||||T|2|||||inst|",
+        1
+      ],
+      [
+        "MeshBasicMaterial|map|||||T|2||at|||inst|",
+        1
+      ],
+      [
+        "MeshBasicMaterial||||||T|1||||||",
+        1
+      ],
+      [
+        "MeshPhysicalMaterial||||||T|0||||||",
+        1
+      ],
+      [
+        "MeshStandardMaterial|map||||||0||||||",
+        1
+      ],
+      [
+        "NodeMaterial||||||T|1|||colorNode|||",
+        1
+      ],
+      [
+        "MeshStandardNodeMaterial|||||||0||||||",
+        1
+      ],
+      [
+        "MeshBasicMaterial|||||||0|||||inst|",
+        1
+      ],
+      [
+        "MeshBasicMaterial|map||||||2||||||",
+        1
+      ],
+      [
+        "MeshLambertMaterial|||||||0|vc|||||",
+        1
+      ],
+      [
+        "MeshBasicMaterial|||||||0|vc|||||",
+        1
+      ],
+      [
+        "MeshBasicMaterial||||||T|1||||||skin",
+        1
+      ],
+      [
+        "MeshPhysicalMaterial||||||T|2|||||inst|",
+        1
+      ]
+    ]
+  },
+  "renderInfo": {
+    "profile": "blender",
+    "liveProfile": "blender",
+    "representation": "blender",
+    "graphicsApplication": {
+      "appliedAt": 0,
+      "requestedProfile": "blender",
+      "constructionProfile": "blender",
+      "state": "fully-effective",
+      "fullPresetEffective": true,
+      "stagedReconstruction": [],
+      "pendingRendererReload": false,
+      "requestedPixelRatioCap": 1
+    },
+    "atomicSignal": {
+      "enabled": true,
+      "profile": "blender",
+      "liveProfile": "blender",
+      "owner": "pass64-webgpu-tsl",
+      "fallbackReason": null,
+      "bypassReason": null,
+      "samples": 92,
+      "canvasAntialias": true,
+      "canvasSamples": 4,
+      "principalHdrSamples": 4,
+      "bloomSamples": 0,
+      "targetValidated": true,
+      "outputValidated": true,
+      "depthAwareBloom": true,
+      "bloomGraphId": "pass64.full-scene-depth-tested-bloom.v1",
+      "bloomOcclusionSource": "authoritative-scene-depth",
+      "advancedGraphics": {
+        "principalSamples": 4,
+        "volumetricScale": 0.8,
+        "volumetricActual": {
+          "scale": 0.8,
+          "mistOpacity": 0.06697600000000001,
+          "mistLayers": 3,
+          "smokeOpacity": 0.078568,
+          "smokeLayers": 3,
+          "dustOpacity": 0.256,
+          "dustMotes": 51
+        },
+        "oceanWaveAmplitude": 0,
+        "bloomStrength": 0.14,
+        "filmGrainScale": 0.32,
+        "vignetteStrength": 0.16,
+        "ambientOcclusion": {
+          "quality": "off",
+          "enabled": false,
+          "resolutionScale": 0,
+          "samples": 0,
+          "radius": 0,
+          "strength": 0,
+          "denoise": false
+        },
+        "screenSpace": {
+          "godrays": {
+            "quality": "low",
+            "enabled": true,
+            "unavailableReason": null,
+            "raymarchSteps": 24,
+            "resolutionScale": 0.35,
+            "density": 0.35,
+            "maximumDensity": 0.12,
+            "distanceAttenuation": 2.6,
+            "additiveGain": 0.14,
+            "bilateralBlur": true,
+            "effectiveAdditiveGain": 0.14
+          },
+          "reflections": {
+            "quality": "low",
+            "enabled": true,
+            "resolutionScale": 0.5,
+            "marchQuality": 0.35,
+            "maximumDistance": 6,
+            "thickness": 0.18,
+            "intensity": 0.5,
+            "screenEdgeFade": 0.24,
+            "binaryRefine": false,
+            "reflectNonMetals": true
+          },
+          "globalIllumination": {
+            "quality": "off",
+            "enabled": false,
+            "sliceCount": 0,
+            "stepCount": 0,
+            "giIntensity": 0,
+            "radius": 0,
+            "thickness": 0,
+            "expFactor": 0,
+            "denoise": false
+          },
+          "depthOfField": {
+            "enabled": false,
+            "strength": 0.3,
+            "focusDistanceM": 26,
+            "focalLengthM": 120,
+            "bokehScale": 0
+          },
+          "motionBlur": {
+            "enabled": false,
+            "strength": 0,
+            "samples": 0,
+            "deadZoneNdc": 0.006,
+            "kneeNdc": 0.024,
+            "maximumUvOffset": 0
+          },
+          "upscaling": {
+            "mode": "off",
+            "enabled": false,
+            "sceneResolutionScale": 1,
+            "label": "Off"
+          }
+        },
+        "linearSourceStages": [
+          "scene-pass-linear-hdr",
+          "contact-occlusion-multiply",
+          "ssr-screen-space-reflection-add",
+          "depth-guarded-bloom-add",
+          "godrays-volumetric-shaft-add"
+        ],
+        "exactScenePassPrecompile": {
+          "durationMs": 5659.5,
+          "runs": 1
+        },
+        "arenaEnvironment": {
+          "arenaId": "atomic-acres",
+          "reflectionQuality": "high",
+          "present": true,
+          "environmentName": "pass64-arena-environment-atomic-acres-256",
+          "environmentIntensity": 0.24,
+          "expectedEnvironmentIntensity": 0.24,
+          "matchesIblState": true,
+          "sourceTextureName": "pass66-generated-sky-backdrop-sunset-farmland",
+          "resolutionTier": 256,
+          "generatedCubeSize": 4096
+        }
+      }
+    },
+    "runtime": {
+      "requestedBackend": "webgpu",
+      "actualBackend": "webgpu",
+      "initialized": true,
+      "failClosed": false,
+      "adapterLabel": "nvidia / blackwell",
+      "adapterClass": "GPUAdapter",
+      "deviceClass": "GPUDevice",
+      "deviceFeatures": [
+        "rg11b10ufloat-renderable",
+        "float32-filterable"
+      ],
+      "softwareAdapter": false,
+      "canvasAlphaMode": "opaque",
+      "canvasAntialias": true,
+      "canvasSamples": 4,
+      "principalHdrSamples": 4,
+      "bloomSamples": 0,
+      "renderPipelineApi": "three-r185-render-pipeline",
+      "deviceLost": false,
+      "uncapturedErrors": 0,
+      "lastUncapturedError": null,
+      "slowNodeBuilds": [],
+      "tslNodeBuild": {
+        "count": 0,
+        "messages": []
+      },
+      "presentation": {
+        "status": "healthy",
+        "submissionMode": "warmed-live",
+        "maximumInFlightSubmissions": 3,
+        "inFlightSubmissions": 2,
+        "completionProbeTargetSequence": 227,
+        "outstandingCompletionProbes": 2,
+        "completionProbeCount": 228,
+        "submissionSequence": 228,
+        "completedSequence": 226,
+        "lastSubmittedAt": 63469.199999928474,
+        "lastCompletedAt": 63473.299999952316,
+        "pendingSince": 63473.299999952316,
+        "pendingForMs": 52,
+        "lastCompletionLatencyMs": 24.100000023841858,
+        "completionFailures": 0,
+        "lastFailure": null,
+        "backpressureActive": false,
+        "skippedSubmissions": 17,
+        "progress": {
+          "windowStartedAt": 58851.5,
+          "elapsedMs": 4673.799999952316,
+          "submissionAdvances": 75,
+          "completionAdvances": 73,
+          "submittedHz": 16.046899739134147,
+          "completedHz": 15.618982412757237,
+          "currentSubmissionGapMs": 56.10000002384186,
+          "currentCompletionGapMs": 52,
+          "maximumSubmissionGapMs": 218.29999995231628,
+          "maximumCompletionGapMs": 225.10000002384186,
+          "maximumPendingForMs": 186.10000002384186,
+          "maximumCompletionLatencyMs": 186.10000002384186,
+          "submissionPacing": {
+            "ready": false,
+            "sampleCount": 75,
+            "rateHz": 16.241852004496113,
+            "cadenceHz": 37.17472122253957,
+            "meanMs": 61.56933333237966,
+            "p05Ms": 21.5,
+            "medianMs": 26.899999976158142,
+            "p95Ms": 182.70000004768372,
+            "p99Ms": 192.30000007152557,
+            "maxMs": 218.29999995231628,
+            "longFrames": {
+              "over20Ms": 74,
+              "over33Ms": 23,
+              "over50Ms": 18,
+              "over100Ms": 18
+            },
+            "lastResetReason": "animation frame eligibility · recovery 1"
+          },
+          "completionPacing": {
+            "ready": false,
+            "sampleCount": 62,
+            "rateHz": 13.422528199103775,
+            "cadenceHz": 33.44481608018015,
+            "meanMs": 74.50161289784216,
+            "p05Ms": 22.5,
+            "medianMs": 29.899999976158142,
+            "p95Ms": 185.69999992847443,
+            "p99Ms": 191.10000002384186,
+            "maxMs": 225.10000002384186,
+            "longFrames": {
+              "over20Ms": 61,
+              "over33Ms": 28,
+              "over50Ms": 27,
+              "over100Ms": 18
+            },
+            "lastResetReason": "animation frame eligibility · recovery 1"
+          }
+        }
+      }
+    },
+    "playableScene": {
+      "route": "complete-playable-game",
+      "sceneId": "d752bfae-9d22-4dc1-adfd-2d9f7d7bd74c",
+      "arena": {
+        "arenaId": "atomic-acres",
+        "generation": 1,
+        "moduleId": "arena.visual.atomic-acres.v1",
+        "requestedResources": [
+          "./assets/original/skies/atomic-acres-sunset.webp",
+          "./assets/original/models/atomic-acres-blender-arena.glb?v=pass73-20260821-route-authority1"
+        ],
+        "activePresentationRoots": 1,
+        "authority": "gameplay-root-adopted",
+        "retiredPresentationInventory": {
+          "geometries": 0,
+          "materials": 0
+        }
+      },
+      "authoritativeArenaRoots": 1,
+      "authoritativeArenaRootIsGameplayRoot": true,
+      "duplicateArenaRoots": false,
+      "renderWatchdog": {
+        "status": "healthy",
+        "consecutiveInvalidFrames": 0,
+        "incidents": 0,
+        "recoveries": 0,
+        "recoveryActions": 0,
+        "lastRecoveryReason": null,
+        "lastHealthyAt": 63312.7,
+        "lastAudit": {
+          "arenaId": "atomic-acres",
+          "presentationRootName": "Atomic Acres Quality Graphics arena",
+          "eligible": true,
+          "rootAttached": true,
+          "rootVisible": true,
+          "definitionMatches": true,
+          "activeDefinitionRoots": 1,
+          "renderableDescendants": 59,
+          "visibleRenderableDescendants": 59,
+          "cameraLayerRenderableDescendants": 59,
+          "submissionExpected": false,
+          "calls": 190,
+          "triangles": 536033,
+          "reasons": []
+        },
+        "fatal": false,
+        "fatalReasons": [],
+        "lastFatalAt": null
+      },
+      "playerCamera": true,
+      "cameraComposition": {
+        "position": [
+          -34.5,
+          1.8383986282348634,
+          23
+        ],
+        "forward": [
+          0.8320502943378438,
+          0,
+          -0.5547001962252293
+        ],
+        "insideHorizontalCollider": false,
+        "aboveArenaFloor": true
+      },
+      "botObjects": 6,
+      "weaponObject": true,
+      "railgunObject": true,
+      "multiplayerSystem": true,
+      "remoteObjects": 0,
+      "traversal": {
+        "legacyShaderMaterials": [],
+        "nodeMaterialPipelineIds": [
+          "pass64.atmosphere-dust.tsl.v1",
+          "pass64.atmosphere-mist.tsl.v1",
+          "pass64.atmosphere-smoke.tsl.v1",
+          "pass64.grass.tsl.v1",
+          "pass64.sky-atmosphere.tsl.v1",
+          "pass64.water.tsl.v1"
+        ],
+        "compiledPipelineIds": [
+          "pass64.atmosphere-dust.tsl.v1",
+          "pass64.atmosphere-mist.tsl.v1",
+          "pass64.atmosphere-smoke.tsl.v1",
+          "pass64.grass.tsl.v1",
+          "pass64.hdr-grade-grain.tsl.v1",
+          "pass64.sky-atmosphere.tsl.v1",
+          "pass64.water.tsl.v1"
+        ]
+      },
+      "appliedTslArenaDefinitions": 1,
+      "appliedArenaVisualPolicy": {
+        "definitionId": "atomic-acres",
+        "sun": {
+          "color": 16773582,
+          "intensity": 3.2
+        },
+        "ambient": {
+          "color": 9416895,
+          "intensity": 0.42
+        },
+        "fog": {
+          "color": 11649214,
+          "near": 58,
+          "far": 148
+        },
+        "shadows": {
+          "enabled": true,
+          "mapSize": 2048,
+          "maximumDistance": 176,
+          "normalBias": 0.035
+        },
+        "atmosphere": {
+          "preset": "sunset-farmland",
+          "mist": 0.42,
+          "dust": 0.28,
+          "clouds": true
+        },
+        "colorPipelineId": "pass64.nuke-town.hdr.v1",
+        "budgets": {
+          "maximumDrawCalls": 560,
+          "maximumTriangles": 1600000,
+          "maximumTextureBytes": 402653184,
+          "maximumResidentTextureBytes": 536870912,
+          "maximumShadowLights": 3,
+          "maximumShadowMapPixels": 25165824,
+          "maximumPostTextureSamples": 28,
+          "maximumTransientBytes": 268435456,
+          "cpuFrameP95Ms": 16.7,
+          "gpuFrameP95Ms": 16.7
+        },
+        "reviewCameraIds": [
+          "nuke-town-overview",
+          "nuke-town-plan",
+          "nuke-town-street-axis",
+          "nuke-town-west-garden",
+          "nuke-town-aqua-upper-roof",
+          "nuke-town-aqua-wall-closed",
+          "nuke-town-aqua-door-open"
+        ]
+      },
+      "deterministicReview": {
+        "cameraId": null,
+        "fixedTimeMs": null,
+        "seed": null,
+        "exposure": null,
+        "hud": null,
+        "tslTimeMs": 63446,
+        "tslSeed": 6401
+      },
+      "actualArenaVisualPolicy": {
+        "definitionId": "atomic-acres",
+        "sun": {
+          "color": 16773582,
+          "intensity": 3.2
+        },
+        "ambient": {
+          "color": 9416895,
+          "intensity": 0.42
+        },
+        "fog": {
+          "color": 11649214,
+          "near": 58,
+          "far": 148
+        },
+        "shadows": {
+          "enabled": true,
+          "sunCastShadow": true,
+          "mapSize": 2048,
+          "maximumDistance": 176,
+          "normalBias": 0.035
+        },
+        "atmosphereDefinitionId": "atomic-acres",
+        "atmosphere": {
+          "preset": "sunset-farmland",
+          "mist": 0.42,
+          "dust": 0.28,
+          "clouds": true
+        },
+        "practicals": {
+          "profile": "blender",
+          "arenaId": "atomic-acres",
+          "definitionId": "atomic-acres",
+          "practicalPolicyIds": [
+            "house-fixtures",
+            "exterior-contrast-keys"
+          ],
+          "maximumShadowLights": 3,
+          "activeLights": 2,
+          "shadowCastingLights": 2,
+          "authoredLights": [],
+          "occlusion": {
+            "activeLocalLights": 2,
+            "shadowedLocalLights": 2,
+            "emissiveOnlySources": 0,
+            "violations": []
+          }
+        }
+      },
+      "budgetAudit": {
+        "definitionId": "atomic-acres",
+        "limits": {
+          "maximumDrawCalls": 560,
+          "maximumTriangles": 1600000,
+          "maximumTextureBytes": 402653184,
+          "maximumResidentTextureBytes": 536870912,
+          "maximumShadowLights": 3,
+          "maximumShadowMapPixels": 25165824,
+          "maximumPostTextureSamples": 28,
+          "maximumTransientBytes": 268435456,
+          "cpuFrameP95Ms": 16.7,
+          "gpuFrameP95Ms": 16.7,
+          "viewmodelShadows": {
+            "maximumLights": 1,
+            "maximumMapPixels": 262144
+          }
+        },
+        "measured": {
+          "drawCalls": 158,
+          "triangles": 532931,
+          "rendererReportedCalls": 190,
+          "drawCallMethod": "visible-camera-layer-renderable-upper-bound",
+          "drawCallsByRoot": [
+            {
+              "root": "Atomic Acres Quality Graphics arena",
+              "drawCalls": 59,
+              "triangles": 32884
+            },
+            {
+              "root": "pass31-neighbourhood-life",
+              "drawCalls": 22,
+              "triangles": 450953
+            },
+            {
+              "root": "bot-operator",
+              "drawCalls": 19,
+              "triangles": 15626
+            },
+            {
+              "root": "interactive-world:atomic-acres",
+              "drawCalls": 15,
+              "triangles": 448
+            },
+            {
+              "root": "PerspectiveCamera",
+              "drawCalls": 11,
+              "triangles": 21636
+            },
+            {
+              "root": "pass27-world-identity-presentation",
+              "drawCalls": 10,
+              "triangles": 126
+            },
+            {
+              "root": "Pass 64 WebGPU TSL presentation systems",
+              "drawCalls": 8,
+              "triangles": 1080
+            },
+            {
+              "root": "overdrive-core-pickup",
+              "drawCalls": 6,
+              "triangles": 1468
+            },
+            {
+              "root": "hf371-particles",
+              "drawCalls": 4,
+              "triangles": 694
+            },
+            {
+              "root": "flamethrower-stream-pool",
+              "drawCalls": 2,
+              "triangles": 8016
+            },
+            {
+              "root": "pass76-weather-rain",
+              "drawCalls": 2,
+              "triangles": 0
+            }
+          ],
+          "shadowLights": 3,
+          "shadowMapPixels": 4325376,
+          "viewmodelShadowLights": 0,
+          "viewmodelShadowMapPixels": 0,
+          "residentViewmodelShadowLights": 1,
+          "residentViewmodelShadowMapPixels": 262144,
+          "totalActiveShadowLights": 3,
+          "totalActiveShadowMapPixels": 4325376,
+          "shadowLightInventory": [
+            {
+              "name": "always-on-solid-occluded-weapon-flashlight",
+              "scope": "viewmodel",
+              "active": false,
+              "intensity": 0,
+              "mapPixels": 262144
+            },
+            {
+              "name": "DirectionalLight",
+              "scope": "arena",
+              "active": true,
+              "intensity": 3.2,
+              "mapPixels": 4194304
+            },
+            {
+              "name": "atomic-acres-exterior-contrast-keys-1",
+              "scope": "arena",
+              "active": true,
+              "intensity": 13,
+              "mapPixels": 65536
+            },
+            {
+              "name": "atomic-acres-exterior-contrast-keys-2",
+              "scope": "arena",
+              "active": true,
+              "intensity": 11,
+              "mapPixels": 65536
+            }
+          ],
+          "postTextureSamples": 18,
+          "textureBytes": null,
+          "residentTextureBytes": null,
+          "residentGeometryBytes": null,
+          "transientBytes": null,
+          "cpuFrameP95Ms": null,
+          "gpuFrameP95Ms": null
+        },
+        "performanceSample": null,
+        "pass": false,
+        "violations": [
+          "textureBytes budget has not been sampled",
+          "residentTextureBytes budget has not been sampled",
+          "transientBytes budget has not been sampled",
+          "cpuFrameP95Ms budget has not been sampled",
+          "gpuFrameP95Ms budget has not been sampled"
+        ]
+      },
+      "tslSystemVisibility": {
+        "waterVisible": false,
+        "waterGeometryMinY": null,
+        "waterGeometryMaxY": null,
+        "waterWaveBands": 0,
+        "waterWaveAmplitude": 0,
+        "waterWaveAuthority": null,
+        "grassVisible": true
+      }
+    },
+    "materialCompatibility": {
+      "materials": 757,
+      "colorTexturesCorrected": 0,
+      "dataTexturesCorrected": 0,
+      "anisotropyAdjusted": 156,
+      "darkSurfacesLifted": 221,
+      "roughnessAdjusted": 265,
+      "metalnessAdjusted": 313
+    },
+    "fpsCounter": {
+      "value": "13",
+      "pacing": "slow",
+      "visible": true,
+      "anchor": "top-right"
+    },
+    "pixelRatio": 1,
+    "drawingBuffer": [
+      1600,
+      900
+    ],
+    "antialias": true,
+    "webglVersion": null,
+    "calls": 190,
+    "triangles": 536033,
+    "points": 303,
+    "lines": 0,
+    "sceneObjects": 64,
+    "reducedMode": false,
+    "shadows": true,
+    "shadowAutoUpdate": false,
+    "shadowNeedsUpdate": false,
+    "staticShadowDynamicRefreshes": 0,
+    "contextLifecycle": {
+      "lost": false,
+      "losses": 0,
+      "restorations": 0
+    },
+    "authoredShadows": true,
+    "shadowMode": "static",
+    "framePacing": {
+      "ready": false,
+      "sampleCount": 62,
+      "rateHz": 13.422528199103775,
+      "cadenceHz": 13.422528199103775,
+      "meanMs": 74.50161289784216,
+      "p05Ms": 22.5,
+      "medianMs": 29.899999976158142,
+      "p95Ms": 185.69999992847443,
+      "p99Ms": 191.10000002384186,
+      "maxMs": 225.10000002384186,
+      "longFrames": {
+        "over20Ms": 61,
+        "over33Ms": 28,
+        "over50Ms": 27,
+        "over100Ms": 18
+      },
+      "lastResetReason": "animation frame eligibility · recovery 1",
+      "source": "webgpu-presented",
+      "callbackCadenceHz": 19.788631322576443,
+      "callbackRefreshHz": 45.24886877826862,
+      "submittedCadenceHz": 16.241852004496113,
+      "completedCadenceHz": 13.422528199103775,
+      "displayLimited": false,
+      "progressWindow": {
+        "elapsedMs": 4677.299999952316,
+        "submissionAdvances": 75,
+        "completionAdvances": 73,
+        "currentSubmissionGapMs": 59.60000002384186,
+        "currentCompletionGapMs": 55.5,
+        "maximumSubmissionGapMs": 218.29999995231628,
+        "maximumCompletionGapMs": 225.10000002384186,
+        "maximumPendingForMs": 186.10000002384186
+      }
+    },
+    "minimapRenders": 92,
+    "minimapTargetHz": 60,
+    "adaptive": {
+      "enabled": true,
+      "profile": "blender",
+      "tier": 4,
+      "levels": [
+        0.55,
+        0.65,
+        0.75,
+        0.85,
+        1
+      ],
+      "pixelRatioCap": 1,
+      "targetFrameMs": 5.555555555555555,
+      "p50Ms": 0,
+      "p95Ms": 0,
+      "samples": 0,
+      "downshifts": 0,
+      "upshifts": 0,
+      "lastReason": "animation frame eligibility · recovery 1",
+      "cooldownFrames": 0
+    },
+    "adaptiveAdmission": {
+      "label": "Initial match",
+      "status": "stable",
+      "initialPixelRatioCap": 1,
+      "presetPixelRatioCap": 1,
+      "finalPixelRatioCap": 1,
+      "windows": [
+        {
+          "tier": 4,
+          "pixelRatioCap": 1,
+          "samples": 0,
+          "p50SubmissionGapMs": 0,
+          "p95SubmissionGapMs": 0,
+          "submittedCadenceHz": 0,
+          "maximumSubmissionGapMs": 0,
+          "maximumQueueLatencyMs": 108.19999992847443,
+          "startingSubmissionSequence": 70,
+          "endingSubmissionSequence": 70,
+          "startingCompletedSequence": 70,
+          "endingCompletedSequence": 70,
+          "submissionAdvances": 0,
+          "completionAdvances": 0,
+          "decision": "preset-locked"
+        }
+      ],
+      "startedAt": 52988.10000002384,
+      "completedAt": 52988.299999952316
+    },
+    "adaptiveMatchFrozen": true,
+    "graphicsRefinement": {
+      "pass": 62,
+      "profile": "blender",
+      "arenaId": "atomic-acres",
+      "environmentEnabled": false,
+      "environmentFailure": null,
+      "environmentIntensity": 0.24,
+      "refinedMaterials": 757,
+      "refinedTextures": 221,
+      "requestedAnisotropy": 8,
+      "reflectionScale": 1,
+      "selectiveBloomObjects": 667,
+      "shadowVolume": {
+        "halfWidth": 54,
+        "halfHeight": 60,
+        "near": 4,
+        "far": 176
+      },
+      "budget": {
+        "tier": "full",
+        "environmentIntensity": 1,
+        "contactShadowStrength": 0.16,
+        "bloomStrength": 0.14,
+        "bloomResolutionScale": 0.5,
+        "depthFogStrength": 0.068,
+        "particleDensityScale": 0.8,
+        "decalLifetimeScale": 0.8
+      }
+    },
+    "arenaContrastLighting": {
+      "profile": "blender",
+      "arenaId": "atomic-acres",
+      "definitionId": "atomic-acres",
+      "practicalPolicyIds": [
+        "house-fixtures",
+        "exterior-contrast-keys"
+      ],
+      "maximumShadowLights": 3,
+      "activeLights": 2,
+      "shadowCastingLights": 2,
+      "authoredLights": [],
+      "occlusion": {
+        "activeLocalLights": 2,
+        "shadowedLocalLights": 2,
+        "emissiveOnlySources": 0,
+        "violations": []
+      }
+    },
+    "worldLocalLightOcclusion": {
+      "activeLocalLights": 2,
+      "shadowedLocalLights": 2,
+      "emissiveOnlySources": 13,
+      "violations": []
+    },
+    "qualityAssetStreaming": {
+      "atomicAcres": "ready",
+      "rustworks": "idle",
+      "initialArena": "atomic-acres",
+      "eagerQualityGlbs": 0
+    },
+    "skyBackdrop": {
+      "preset": "sunset-farmland",
+      "status": "asset-ready",
+      "source": "generated-equirectangular-webp",
+      "assetUrl": "/assets/original/skies/atomic-acres-sunset.webp"
+    },
+    "lighting": {
+      "exposure": 1.06,
+      "hemisphereIntensity": 1.2,
+      "ambientIntensity": 0.42,
+      "sunIntensity": 3.25,
+      "shadowBias": -0.00012,
+      "shadowNormalBias": 0.04,
+      "softShadows": true,
+      "fogColor": 11451837,
+      "fogNear": 58,
+      "fogFar": 148,
+      "skyTop": 5079973,
+      "skyHorizon": 14526333,
+      "skyBottom": 15318148,
+      "skySun": 16773064,
+      "skyCloud": 13358802,
+      "skyCloudShadow": 6189447,
+      "skyCloudLight": 16113605,
+      "hemisphereSky": 13229026,
+      "hemisphereGround": 12102541,
+      "ambientColor": 15133151,
+      "sunColor": 16773323,
+      "sunPosition": [
+        -48,
+        42,
+        30
+      ],
+      "fillColor": 13230063,
+      "fillIntensity": 0.52,
+      "fillPosition": [
+        54,
+        20,
+        -42
+      ],
+      "routeLightIntensity": 3,
+      "streetLightIntensity": 3.8,
+      "interiorLightIntensity": 16,
+      "routeLightCount": 3,
+      "streetLightCount": 4,
+      "interiorLightCount": 4,
+      "godRayStrength": 0.05,
+      "godRayLobes": 2,
+      "runtime": {
+        "fogColor": 11649214,
+        "hemisphere": {
+          "color": 13229026,
+          "groundColor": 12102541,
+          "intensity": 1.2
+        },
+        "ambient": {
+          "color": 9416895,
+          "intensity": 0.42
+        },
+        "sun": {
+          "color": 16773582,
+          "intensity": 3.2,
+          "position": [
+            -48,
+            42,
+            30
+          ],
+          "castShadow": true
+        },
+        "fill": {
+          "color": 13230063,
+          "intensity": 0.52,
+          "position": [
+            54,
+            20,
+            -42
+          ]
+        }
+      }
+    },
+    "sky": {
+      "pass": 30,
+      "top": "#4d83a5",
+      "horizon": "#dda77d",
+      "bottom": "#e9bc84",
+      "cloudShadow": "#5e7187",
+      "cloudLight": "#f5dfc5",
+      "cloudBands": 2,
+      "fogColor": "#b1c0be",
+      "fogNear": 58,
+      "fogFar": 148,
+      "godRayStrength": 0.05,
+      "godRayLobes": 2,
+      "extraDraws": 0,
+      "extraTextureSamples": 0,
+      "linearHdr": true
+    },
+    "grass": {
+      "enabled": true,
+      "owner": "pass64.grass.tsl.v1"
+    },
+    "atmosphere": {
+      "enabled": true,
+      "owner": "pass64.atmosphere.tsl",
+      "profile": "blender",
+      "arenaId": "atomic-acres",
+      "densityScale": 0.8,
+      "mistCards": 3,
+      "smokeCards": 3,
+      "dustMotes": 51,
+      "mistOpacity": 0.06697600000000001,
+      "smokeOpacity": 0.078568,
+      "dustOpacity": 0.256
+    },
+    "water": {
+      "enabled": false,
+      "arenaId": "atomic-acres",
+      "waveAmp": 0,
+      "segments": 160,
+      "waterLevel": 0,
+      "nearSize": 0,
+      "horizonRadius": 0,
+      "physicsActive": false,
+      "swimmable": false,
+      "waveBands": 5,
+      "waveAuthority": "shared-render-physics-ocean-spectrum"
+    },
+    "blenderEnvironment": {
+      "status": "ready",
+      "asset": "./assets/original/models/atomic-acres-blender-arena.glb?v=pass73-20260821-route-authority1",
+      "meshCount": 57,
+      "materialCount": 28,
+      "texturedMaterials": 20,
+      "pbrMaterials": 20,
+      "textureCount": 33,
+      "triangleCount": 32236,
+      "semanticWindows": 16,
+      "boundWindows": 16,
+      "transparentUpperWindows": 2,
+      "auditedApertures": 16,
+      "auditedOpenApertures": 10,
+      "auditedWindowApertures": 6,
+      "apertureAuditSamples": 144,
+      "routeLandmarks": 3,
+      "modeledBuses": 1,
+      "largeCoverAssets": 4,
+      "housePropSets": 2,
+      "collisionAuditVisuals": 2,
+      "collisionVisualOwners": 10,
+      "collisionRouteAuthorityPass": true,
+      "surfaceSeparationPass": true,
+      "worldIdentityPass": true,
+      "proceduralWorldHidden": true,
+      "error": null,
+      "proceduralRootActuallyVisible": false,
+      "qualityArtRootVisible": true,
+      "overlappingPrimaryArenaRoots": false
+    },
+    "rustworksBlender": {
+      "status": "idle",
+      "asset": "./assets/original/models/rustworks-central-tower.glb?v=pass62-20260724-1",
+      "overlayRetired": true,
+      "overlayVisible": false,
+      "assetVersion": null,
+      "meshCount": 0,
+      "materialCount": 0,
+      "texturedMaterials": 0,
+      "pbrMaterials": 0,
+      "textureCount": 0,
+      "triangleCount": 0,
+      "semanticParts": 0,
+      "authoredHeight": 0,
+      "containerTotal": 0,
+      "containerClosed": 0,
+      "containerOpenBothEnds": 0,
+      "containerOpenOneEnd": 0,
+      "forbiddenFloatingParts": 0,
+      "oversizedHandrailSlabs": 0,
+      "error": null
+    },
+    "rustworksQuality": {
+      "lights": 0,
+      "activeLocalLights": 0,
+      "emissiveOnlySources": 0,
+      "occlusionViolations": [],
+      "enhancedMaterials": 0,
+      "profile": "blender",
+      "active": false,
+      "night": false
+    },
+    "staticBatchPalette": []
+  },
+  "memory": {
+    "usedJSHeapSize": 322758003,
+    "totalJSHeapSize": 450784075,
+    "jsHeapSizeLimit": 4395630592
+  },
+  "stageTrack": [
+    {
+      "atMs": 2331,
+      "bootstrapStage": "ready",
+      "transitionPhase": "idle",
+      "matchPhase": "warmup",
+      "arenaId": "atomic-acres",
+      "pipelines": 0
+    },
+    {
+      "atMs": 2551,
+      "bootstrapStage": "loading-gameplay-assets",
+      "transitionPhase": "fencing",
+      "matchPhase": "warmup",
+      "arenaId": "atomic-acres",
+      "pipelines": 0
+    },
+    {
+      "atMs": 5875,
+      "bootstrapStage": "waiting-for-authored-textures",
+      "transitionPhase": "preparing",
+      "matchPhase": "warmup",
+      "arenaId": "atomic-acres",
+      "pipelines": 0
+    },
+    {
+      "atMs": 12662,
+      "bootstrapStage": "prewarming-weapon-catalog",
+      "transitionPhase": "preparing",
+      "matchPhase": "warmup",
+      "arenaId": "atomic-acres",
+      "pipelines": 87
+    },
+    {
+      "atMs": 18713,
+      "bootstrapStage": "prewarming-batched-presentations",
+      "transitionPhase": "preparing",
+      "matchPhase": "warmup",
+      "arenaId": "atomic-acres",
+      "pipelines": 134
+    },
+    {
+      "atMs": 34021,
+      "bootstrapStage": "compiling-scene",
+      "transitionPhase": "committing",
+      "matchPhase": "warmup",
+      "arenaId": "atomic-acres",
+      "pipelines": 289
+    },
+    {
+      "atMs": 41128,
+      "bootstrapStage": "finalizing",
+      "transitionPhase": "idle",
+      "matchPhase": "warmup",
+      "arenaId": "atomic-acres",
+      "pipelines": 360
+    },
+    {
+      "atMs": 53122,
+      "bootstrapStage": "verifying-first-presentation",
+      "transitionPhase": "idle",
+      "matchPhase": "warmup",
+      "arenaId": "atomic-acres",
+      "pipelines": 374
+    },
+    {
+      "atMs": 59077,
+      "bootstrapStage": "ready",
+      "transitionPhase": "idle",
+      "matchPhase": "warmup",
+      "arenaId": "atomic-acres",
+      "pipelines": 374
+    },
+    {
+      "atMs": 61945,
+      "bootstrapStage": "ready",
+      "transitionPhase": "idle",
+      "matchPhase": "active",
+      "arenaId": "atomic-acres",
+      "pipelines": 374
+    }
+  ]
+}

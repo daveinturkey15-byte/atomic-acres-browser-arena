@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { leaderboardNetworkEnabled } from './global-leaderboard';
 import { MatchDiagnostics } from './match-diagnostics';
 import {
   MATCH_DIAGNOSTICS_QUEUE_LIMIT,
@@ -33,6 +35,55 @@ function envelope(session = 'session'): MatchDiagnosticUploadEnvelope {
 }
 
 describe('automatic completed-match diagnostic delivery', () => {
+  // Execute the actual constructor's endpoint expression, so a correct policy
+  // helper with forgotten production wiring cannot pass this regression.
+  const mainSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+  const endpointExpression = mainSource.match(/const matchDiagnosticUploader = new MatchDiagnosticUploader\(\s*([^\r\n]+),/u)?.[1];
+  function runtimeEndpoint(search: string): string {
+    expect(endpointExpression).toBeTruthy();
+    return new Function('window', 'leaderboardNetworkEnabled', 'MATCH_DIAGNOSTICS_ENDPOINT', `return (${endpointExpression});`)(
+      { location: { search } }, leaderboardNetworkEnabled, 'https://diagnostics.example',
+    ) as string;
+  }
+
+  it.each(['?externalServices=off', '?multiplayerQa=1'])('never uploads or changes retained queue on disabled route %s', async (search) => {
+    const storage = new MemoryStorage();
+    const retained = JSON.stringify({ schemaVersion: 1, items: [envelope('retained-before-off')] });
+    storage.setItem(MATCH_DIAGNOSTICS_QUEUE_STORAGE_KEY, retained);
+    const fetcher = vi.fn(async () => new Response('{}', { status: 400 }));
+    const beacon = vi.fn(() => true);
+    const uploader = new MatchDiagnosticUploader(runtimeEndpoint(search), storage, fetcher, beacon);
+    expect(await uploader.flushPending()).toBe(0); // startup / online retry
+    uploader.beginMatch();
+    expect(uploader.flushForPageLifecycle()).toBe(0);
+    expect(await uploader.completeMatch(envelope('disabled-match'))).toBe(0);
+    uploader.abandonActiveMatch();
+    expect(await uploader.flushPending()).toBe(0);
+    expect(uploader.flushForPageLifecycle()).toBe(0); // pagehide / beforeunload
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(beacon).not.toHaveBeenCalled();
+    expect(storage.getItem(MATCH_DIAGNOSTICS_QUEUE_STORAGE_KEY)).toBe(retained);
+    expect(uploader.telemetry()).toMatchObject({ endpointConfigured: false, attempted: 0, delivered: 0, pending: 1 });
+  });
+
+  it.each(['', '?externalServices=on'])('retains delivery, retry and unload behavior on enabled route %s', async (search) => {
+    const storage = new MemoryStorage();
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response('{}', { status: 400 }))
+      .mockResolvedValue(new Response(JSON.stringify({ accepted: true, receiptId: 'enabled-retry' }), { status: 201 }));
+    const beacon = vi.fn(() => true);
+    const uploader = new MatchDiagnosticUploader(runtimeEndpoint(search), storage, fetcher, beacon);
+    uploader.beginMatch();
+    expect(await uploader.completeMatch(envelope('enabled-match'))).toBe(0);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(uploader.flushForPageLifecycle()).toBe(1);
+    expect(beacon).toHaveBeenCalledTimes(1);
+    expect(await uploader.flushPending()).toBe(1);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(storage.getItem(MATCH_DIAGNOSTICS_QUEUE_STORAGE_KEY)).toBeNull();
+    expect(uploader.telemetry()).toMatchObject({ endpointConfigured: true, attempted: 3, delivered: 1, pending: 0 });
+  });
+
   it('never starts a request while a match is active, including page-lifecycle flushes', async () => {
     const storage = new MemoryStorage();
     storage.setItem(MATCH_DIAGNOSTICS_QUEUE_STORAGE_KEY, JSON.stringify({ schemaVersion: 1, items: [envelope()] }));

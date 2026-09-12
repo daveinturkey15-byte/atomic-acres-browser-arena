@@ -1,0 +1,30 @@
+
+> atomic-acres-browser-arena@1.0.0 qa:pass65:menu-previews
+> node scripts/qa/verify-pass65-menu-preview-production.mjs
+
+Pass 65 menu preview production verification FAILED (9 issues):
+- canonical Pass 65 arena dependency manifest failed: C:\Users\david\projects\aa-claude-nuketown\src\protocol.ts:1
+import { presentationRandom } from './runtime-random';
+^
+
+ReferenceError: Cannot access 'WEAPON_IDS' before initialization
+    at Object.WEAPON_IDS (C:\Users\david\projects\aa-claude-nuketown\src\protocol.ts:1:1)
+    at Object.get [as WEAPON_IDS] (C:\Users\david\projects\aa-claude-nuketown\src\protocol.ts:2:595)
+    at cloneSkeleton (C:\Users\david\projects\aa-claude-nuketown\src\weapon-model.ts:52:12)
+    at Object.<anonymous> (C:\Users\david\projects\aa-claude-nuketown\src\weapon-model.ts:1480:17)
+    at Module._compile (node:internal/modules/cjs/loader:1761:14)
+    at Object.transformer (C:\Users\david\projects\aa-omp-pass84\node_modules\tsx\dist\register-BoI6-WNn.cjs:9:3252)
+    at Module.load (node:internal/modules/cjs/loader:1481:32)
+    at Module._load (node:internal/modules/cjs/loader:1300:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+
+Node.js v24.12.0
+- canonical arena dependency roster/order drifted
+- captured tool scripts/assets/generate-pass65-runtime-menu-previews.ts digest mismatch: expected 6579f04ced1e266bdb6065bb788eadd249e217ab63a33e9fa461a9b520101a26, got 317469cb997aae817982827bc075641e6ce2de838e20a2d88346a216faae186b
+- captured tool scripts/assets/pass65-menu-preview-arena-dependencies.ts digest mismatch: expected 032f37470731d3393cb47849e4d95acad50adf73f0406032ae12b21fbe2c62fc, got 4247f3fbd1443ecc394a41cc44467ee5fd857a9933802689042edf86f751b7a0
+- runtime capture generator digest mismatch: expected 6579f04ced1e266bdb6065bb788eadd249e217ab63a33e9fa461a9b520101a26, got 317469cb997aae817982827bc075641e6ce2de838e20a2d88346a216faae186b
+- scripts/assets/generate-pass65-runtime-menu-previews.ts digest mismatch: expected 6579f04ced1e266bdb6065bb788eadd249e217ab63a33e9fa461a9b520101a26, got 317469cb997aae817982827bc075641e6ce2de838e20a2d88346a216faae186b
+- scripts/assets/pass65-menu-preview-arena-dependencies.ts digest mismatch: expected 032f37470731d3393cb47849e4d95acad50adf73f0406032ae12b21fbe2c62fc, got 4247f3fbd1443ecc394a41cc44467ee5fd857a9933802689042edf86f751b7a0
+- provenance does not pin each canonical visual module to the recursive dependency closure
+- manifest runtime generator record is stale

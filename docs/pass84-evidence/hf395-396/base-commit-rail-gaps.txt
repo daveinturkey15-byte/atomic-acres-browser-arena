@@ -1,0 +1,152 @@
+
+ RUN  v4.1.9 C:/Users/david/projects/aa-claude-hf395
+
+stdout | src/zz-hf396-base-scratch.test.ts > HF-396 rail and optic seating on the delivered first-person weapons > m14-ebr: rail on the receiver line and optic on the rail, unbroken to within 12 mm
+m14-ebr z=-0.7 gap 16.0 mm
+m14-ebr z=-0.5 gap 21.1 mm
+m14-ebr z=-0.3 gap 22.6 mm
+m14-ebr z=0 gap 15.7 mm
+m14-ebr z=0.22 gap 31.4 mm
+m14-ebr z=-0.2 gap 77.8 mm
+m14-ebr z=0.12 gap 80.3 mm
+
+stdout | src/zz-hf396-base-scratch.test.ts > HF-396 rail and optic seating on the delivered first-person weapons > railgun: rail on the receiver line and optic on the rail, unbroken to within 12 mm
+railgun z=-0.6 gap 42.0 mm
+railgun z=-0.4 gap 29.8 mm
+railgun z=-0.15 gap 27.3 mm
+railgun z=0.2 gap 40.0 mm
+railgun z=-0.03 gap 73.5 mm
+
+stdout | src/zz-hf396-base-scratch.test.ts > HF-396 rail and optic seating on the delivered first-person weapons > carbine: rail on the receiver line and optic on the rail, unbroken to within 12 mm
+carbine z=-0.55 gap 18.2 mm
+carbine z=-0.35 gap 18.8 mm
+carbine z=-0.1 gap 27.6 mm
+carbine z=0.15 gap 27.6 mm
+carbine z=-0.02 gap 25.9 mm
+
+stdout | src/zz-hf396-base-scratch.test.ts > HF-396 rail and optic seating on the delivered first-person weapons > m4a1: rail on the receiver line and optic on the rail, unbroken to within 12 mm
+m4a1 z=-0.45 gap 18.2 mm
+m4a1 z=-0.3 gap 17.1 mm
+m4a1 z=-0.15 gap 2.8 mm
+m4a1 z=0.05 gap 0.0 mm
+m4a1 z=0.175 gap 7.0 mm
+
+stdout | src/zz-hf396-base-scratch.test.ts > HF-396 rail and optic seating on the delivered first-person weapons > slug-shotgun: rail on the receiver line and optic on the rail, unbroken to within 12 mm
+slug-shotgun z=-0.2 gap 32.9 mm
+slug-shotgun z=-0.05 gap 27.8 mm
+slug-shotgun z=0.1 gap 30.6 mm
+slug-shotgun z=0.2 gap 38.6 mm
+
+ ❯ src/zz-hf396-base-scratch.test.ts (6 tests | 5 failed) 104ms
+     × m14-ebr: rail on the receiver line and optic on the rail, unbroken to within 12 mm 39ms
+     × railgun: rail on the receiver line and optic on the rail, unbroken to within 12 mm 19ms
+     × carbine: rail on the receiver line and optic on the rail, unbroken to within 12 mm 9ms
+     × m4a1: rail on the receiver line and optic on the rail, unbroken to within 12 mm 20ms
+     × slug-shotgun: rail on the receiver line and optic on the rail, unbroken to within 12 mm 9ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/zz-hf396-base-scratch.test.ts > HF-396 rail and optic seating on the delivered first-person weapons > m14-ebr: rail on the receiver line and optic on the rail, unbroken to within 12 mm
+AssertionError: m14-ebr floating parts: expected [ …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "z=-0.7 gap 16.0 mm at y 0.134..0.150 (solid: 0.080..0.134)",
++   "z=-0.5 gap 21.1 mm at y 0.129..0.150 (solid: 0.080..0.129)",
++   "z=-0.3 gap 22.6 mm at y 0.127..0.150 (solid: 0.080..0.127)",
++   "z=0 gap 15.7 mm at y 0.134..0.150 (solid: 0.080..0.134)",
++   "z=0.22 gap 31.4 mm at y 0.119..0.150 (solid: 0.080..0.119)",
++   "z=-0.2 gap 77.8 mm at y 0.130..0.208 (solid: 0.080..0.130 0.208..0.330)",
++   "z=0.12 gap 80.3 mm at y 0.127..0.208 (solid: 0.080..0.127 0.208..0.330)",
++ ]
+
+ ❯ src/zz-hf396-base-scratch.test.ts:185:51
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/zz-hf396-base-scratch.test.ts > HF-396 rail and optic seating on the delivered first-person weapons > railgun: rail on the receiver line and optic on the rail, unbroken to within 12 mm
+AssertionError: railgun floating parts: expected [ …(5) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "z=-0.6 gap 42.0 mm at y 0.128..0.170 (solid: 0.050..0.128)",
++   "z=-0.4 gap 29.8 mm at y 0.140..0.170 (solid: 0.050..0.140)",
++   "z=-0.15 gap 27.3 mm at y 0.143..0.170 (solid: 0.050..0.143)",
++   "z=0.2 gap 40.0 mm at y 0.130..0.170 (solid: 0.050..0.130)",
++   "z=-0.03 gap 73.5 mm at y 0.144..0.217 (solid: 0.050..0.144 0.217..0.243 0.270..0.340)",
++ ]
+
+ ❯ src/zz-hf396-base-scratch.test.ts:185:51
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/zz-hf396-base-scratch.test.ts > HF-396 rail and optic seating on the delivered first-person weapons > carbine: rail on the receiver line and optic on the rail, unbroken to within 12 mm
+AssertionError: carbine floating parts: expected [ …(5) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "z=-0.55 gap 18.2 mm at y 0.142..0.160 (solid: 0.035..0.142 0.160..0.169)",
++   "z=-0.35 gap 18.8 mm at y 0.142..0.160 (solid: 0.035..0.142 0.160..0.169)",
++   "z=-0.1 gap 27.6 mm at y 0.133..0.160 (solid: 0.035..0.133 0.160..0.169)",
++   "z=0.15 gap 27.6 mm at y 0.133..0.160 (solid: 0.035..0.133 0.160..0.169)",
++   "z=-0.02 gap 25.9 mm at y 0.135..0.160 (solid: 0.035..0.135 0.160..0.200)",
++ ]
+
+ ❯ src/zz-hf396-base-scratch.test.ts:185:51
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/zz-hf396-base-scratch.test.ts > HF-396 rail and optic seating on the delivered first-person weapons > m4a1: rail on the receiver line and optic on the rail, unbroken to within 12 mm
+AssertionError: m4a1 floating parts: expected [ …(2) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "z=-0.45 gap 18.2 mm at y 0.114..0.132 (solid: 0.052..0.114 0.132..0.158)",
++   "z=-0.3 gap 17.1 mm at y 0.115..0.132 (solid: 0.052..0.115 0.132..0.158)",
++ ]
+
+ ❯ src/zz-hf396-base-scratch.test.ts:185:51
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/zz-hf396-base-scratch.test.ts > HF-396 rail and optic seating on the delivered first-person weapons > slug-shotgun: rail on the receiver line and optic on the rail, unbroken to within 12 mm
+AssertionError: slug-shotgun floating parts: expected [ …(4) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "z=-0.2 gap 32.9 mm at y 0.112..0.145 (solid: 0.100..0.112)",
++   "z=-0.05 gap 27.8 mm at y 0.117..0.145 (solid: 0.100..0.117)",
++   "z=0.1 gap 30.6 mm at y 0.114..0.145 (solid: 0.100..0.114)",
++   "z=0.2 gap 38.6 mm at y 0.106..0.145 (solid: 0.100..0.106)",
++ ]
+
+ ❯ src/zz-hf396-base-scratch.test.ts:185:51
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 1 passed (6)
+   Start at  13:52:33
+   Duration  344ms (transform 37ms, setup 0ms, import 72ms, tests 104ms, environment 0ms)
+

@@ -1,0 +1,11 @@
+{
+  "item": "Lane AR item 2 - minimap redraw cadence",
+  "shippedMinimapHz": 30,
+  "predecessorHz": 60,
+  "frames": 600,
+  "loopFps": 60,
+  "redrawsBefore": 600,
+  "redrawsAfter": 300,
+  "ratio": 0.5,
+  "note": "Redraw COUNT only. The main-thread ms/frame saving is not measured here and is OPEN in the lane report."
+}

@@ -1,0 +1,15 @@
+
+> atomic-acres-browser-arena@1.0.0 verify:release-topology
+> node scripts/qa/verify-release-topology.mjs
+
+file:///C:/Users/david/projects/aa-claude-releaseci/scripts/qa/verify-release-topology.mjs:79
+  throw new Error(`Root chooser is missing live ${config.experimental.pass}`);
+        ^
+
+Error: Root chooser is missing live PASS 86
+    at file:///C:/Users/david/projects/aa-claude-releaseci/scripts/qa/verify-release-topology.mjs:79:9
+    at ModuleJob.run (node:internal/modules/esm/module_job:413:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:660:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.12.0

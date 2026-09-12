@@ -1,0 +1,45 @@
+
+Running 4 tests using 1 worker
+
+(node:58092) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [chromium] › tests\e2e\pass93-stock-flags-boot.spec.ts:90:7 › PASS 93 stock-flags boot - installed Chrome without the unsafe WebGPU flag › launch arguments carry none of the flags that mask Tint lowering bugs (15ms)
+  ok 2 [chromium] › tests\e2e\pass93-stock-flags-boot.spec.ts:98:7 › PASS 93 stock-flags boot - installed Chrome without the unsafe WebGPU flag › stock-flag Chrome exposes a WebGPU device, or the arena boots skip by name (2.5s)
+  x  3 [chromium] › tests\e2e\pass93-stock-flags-boot.spec.ts:119:9 › PASS 93 stock-flags boot - installed Chrome without the unsafe WebGPU flag › nuketown2: the real menu reaches a live frame with zero pipeline errors (2.1m)
+(node:64832) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 4 [chromium] › tests\e2e\pass93-stock-flags-boot.spec.ts:119:9 › PASS 93 stock-flags boot - installed Chrome without the unsafe WebGPU flag › skyline-terminal: the real menu reaches a live frame with zero pipeline errors (1.4m)
+
+
+  1) [chromium] › tests\e2e\pass93-stock-flags-boot.spec.ts:119:9 › PASS 93 stock-flags boot - installed Chrome without the unsafe WebGPU flag › nuketown2: the real menu reaches a live frame with zero pipeline errors 
+
+    TimeoutError: page.waitForFunction: Timeout 120000ms exceeded.
+
+      150 |         await page.locator('#solo').click();
+      151 |
+    > 152 |         await page.waitForFunction(
+          |                    ^
+      153 |           ({ id, before }) => {
+      154 |             const root = document.documentElement;
+      155 |             const debug = (globalThis as { __ATOMIC_ACRES_DEBUG__?: DebugApi }).__ATOMIC_ACRES_DEBUG__;
+        at C:\Users\david\projects\aa-claude-hitl\tests\e2e\pass93-stock-flags-boot.spec.ts:152:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass93-stock-flags-boot-PA-2374b-e-with-zero-pipeline-errors-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass93-stock-flags-boot-PA-2374b-e-with-zero-pipeline-errors-chromium\error-context.md
+
+    Error Context: artifacts\pass25a\playwright-results\pass93-stock-flags-boot-PA-2374b-e-with-zero-pipeline-errors-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass93-stock-flags-boot-PA-2374b-e-with-zero-pipeline-errors-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace artifacts\pass25a\playwright-results\pass93-stock-flags-boot-PA-2374b-e-with-zero-pipeline-errors-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › tests\e2e\pass93-stock-flags-boot.spec.ts:119:9 › PASS 93 stock-flags boot - installed Chrome without the unsafe WebGPU flag › nuketown2: the real menu reaches a live frame with zero pipeline errors 
+  3 passed (3.6m)

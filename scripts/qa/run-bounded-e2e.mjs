@@ -21,6 +21,27 @@ const groups = [
   { name: 'pass69-3-frame-hitch', timeoutMs: 900_000, args: ['tests/e2e/pass69-3-glass-m14-frame-hitch.spec.ts', 'tests/e2e/pass69-3-special-weapon-frame-hitch.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass72-corrections', default: false, timeoutMs: 600_000, args: ['tests/e2e/pass72-lobby-squad-reset.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass73-gameplay-regressions', default: false, timeoutMs: 600_000, args: ['tests/e2e/pass73-gameplay-regressions.spec.ts', 'tests/e2e/pass73-network-reveal-authority.spec.ts', '--project=chromium', '--workers=1'] },
+  { name: 'pass74-chopper-hud', default: false, timeoutMs: 240_000, args: ['tests/e2e/pass74-chopper-hud.spec.ts', '--project=chromium', '--workers=1'] },
+  // Boot gate for every arena the game can name. Deliberately in the DEFAULT
+  // set: it was authored after a boot incident and then executed by nothing -
+  // no npm script, no group here, neither workflow - for as long as it existed.
+  // Opt-in was how it stayed dark, so it runs whenever the bounded suite runs
+  // without an explicit selection. The per-arena test allows 240 s (SwiftShader
+  // boot x 8 arenas); the group ceiling is the worst case plus headroom, so a
+  // slow-but-passing run is never killed and reported as a boot failure.
+  { name: 'pass74-arena-boot-smoke', timeoutMs: 2_100_000, args: ['tests/e2e/pass74-arena-boot-smoke.spec.ts', '--project=chromium', '--workers=1'] },
+  // PASS 85 Lane N. tests/e2e/pass84-gamepad.spec.ts shipped with the gamepad +
+  // aim-assist feature the owner asked for on 2026-08-31 and was executed by
+  // NOTHING: no npm script, no group here, neither workflow. Six tests covering
+  // pad connect/disconnect mid-match, HUD glyph swap, aim-assist near a staged
+  // target vs open air, the no-assist guarantee for keyboard/mouse players,
+  // pad-driven rebinding in Options, and the touch-overlay suppression on mobile.
+  // Measured before wiring: 6/6 green in 5.0 min on installed Chrome headless with
+  // a real WebGPU adapter, and re-checked green on bundled Chromium/SwiftShader
+  // (the CI path) for one in-match and one lobby test. DEFAULT, for the reason
+  // written on pass74-arena-boot-smoke below: opt-in is how a spec stays dark.
+  { name: 'pass84-gamepad', timeoutMs: 900_000, args: ['tests/e2e/pass84-gamepad.spec.ts', '--project=chromium', '--workers=1'] },
+  { name: 'pass74-selector-layout', default: false, timeoutMs: 420_000, args: ['tests/e2e/pass66-field-kit-killstreak-menu.spec.ts', '--project=chromium', '--workers=1', '--grep', 'previews the equipped streak on hover/focus without gameplay render ownership|uses poster-only demo mode for reduced motion and stacks cleanly at narrow width'] },
   { name: 'pass64-hud-contracts', default: false, timeoutMs: 900_000, args: ['tests/e2e/pass64-hud-menu.spec.ts', 'tests/e2e/pass65-menu-lifecycle.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass64-renderer-foundation', default: false, timeoutMs: 420_000, args: ['tests/e2e/pass64-renderer-foundation.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'capability-firefox', default: false, xvfb: true, args: ['tests/e2e/pass25a-capability.spec.ts', '--project=firefox', '--workers=1', '--headed'] },

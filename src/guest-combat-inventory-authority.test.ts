@@ -3,6 +3,7 @@ import {
   captureGuestCombatInventory,
   captureGuestCombatInventoryProjection,
   admitLocalShotInventoryRepair,
+  applyGuestCombatInventoryProjection,
   consumeGuestCombatRound,
   createGuestCombatInventory,
   createGuestCombatInventoryProjection,
@@ -164,5 +165,25 @@ describe('host-owned guest combat inventory', () => {
       grenades: 0,
     });
     expect(guestCombatInventoryWithinWeaponCaps(swapped)).toBe(true);
+  });
+
+  it('applies a host reload projection to a remote peer without granting client authority', () => {
+    const authority = createGuestCombatInventory('m4a1', 'pistol', 1);
+    const committed = setGuestCombatInventoryWeapon(authority, 'm4a1', 30, 67);
+    const projection = {
+      ...createGuestCombatInventoryProjection(committed, 4, 'm4a1', 'pistol'),
+      sidearm: { weapon: 'pistol' as const, ammo: 12, reserve: 48 },
+    };
+    const guestBView = applyGuestCombatInventoryProjection(authority, projection, 'm4a1', 'pistol');
+
+    expect(guestBView).toMatchObject({
+      ammo: { m4a1: 30, pistol: 12 },
+      reserve: { m4a1: 67, pistol: 48 },
+      grenades: 1,
+    });
+    expect(applyGuestCombatInventoryProjection(authority, {
+      ...projection,
+      primary: { ...projection.primary, weapon: 'sniper' },
+    }, 'm4a1', 'pistol')).toBeNull();
   });
 });

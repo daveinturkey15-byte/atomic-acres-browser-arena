@@ -325,9 +325,16 @@ async function startNativeHostHarness(): Promise<NativeHostHarness> {
   const hostSeedUrl = pathToFileURL(hostSeedPath).href;
   const coverSeedUrl = pathToFileURL(coverSeedPath).href;
   const port = await availablePort();
+  // DECLARED VISIBLE LANE - do not park this off-screen. This is the native
+  // hidden-host evidence run: it seeds two real tabs and covers one, so the
+  // genuine on-screen visibility of these windows IS the measurement. Parking
+  // them would change the occlusion state under test rather than hide it.
+  // It mutes, which is the half that can be fixed without lying.
+  // See scripts/qa/browser-visibility-contract.test.mjs.
   const args = [
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${profile}`,
+    '--mute-audio',
     '--no-first-run',
     '--no-default-browser-check',
     '--allow-loopback-in-peer-connection',

@@ -1,0 +1,17 @@
+✔ the plan deletes every tree except pass93, keeps pass93, adds pass94, and the post-state is exactly {pass93, pass94} (333.4991ms)
+✔ the chooser carries exactly two cards, keyed for the shell aliases: experimental -> PASS 94 live, previous -> PASS 93 backup (1170.777ms)
+✔ the in-build fallback (src/bootstrap.ts via release-channels.json) resolves to channels/pass93 (1124.6785ms)
+✔ the dry run writes, deletes and renames nothing in the gh-pages tree (1696.2189ms)
+✔ refuses when the pass93 backup is not on gh-pages to be pinned, and plans no deletions (1343.4524ms)
+✔ rollback re-points the default at PASS 93, keeps PASS 94 as the previous card, deletes nothing, needs no build (2197.3596ms)
+✔ rollback refuses when gh-pages is not already exactly {pass93, pass94} (1101.6649ms)
+✔ exit code is 2 while any guard is red and 0 only when every guard is green (1476.5854ms)
+✔ the outside-ownership patch is tracked and either applies cleanly or is already applied (428.1565ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11179.1082

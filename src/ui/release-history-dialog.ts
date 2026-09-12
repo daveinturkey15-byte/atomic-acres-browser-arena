@@ -3,6 +3,7 @@ import {
   PENDING_PRODUCTION_RELEASE,
   formatChangelogTimestampDetail,
   lastUpdatedButtonLabel,
+  releaseFeatureLine,
   type ChangelogEntry,
 } from '../changelog';
 import { bindDialog, type DialogController } from './dialog-controller';
@@ -16,20 +17,33 @@ function escapeHtml(value: string): string {
     .replaceAll("'", '&#39;');
 }
 
+/**
+ * HF-406: the top-right release badge. Two derived lines, one source: the pass number
+ * the build is stamped with, and this pass's own areas as its feature line. Nothing
+ * here is written twice, so it cannot fall behind the stamp.
+ */
 export function releaseHistoryButtonMarkup(entry: ChangelogEntry = CHANGELOG[0]!): string {
-  return `<button id="last-updated-btn" type="button" aria-haspopup="dialog" aria-controls="changelog-panel" aria-expanded="false">${escapeHtml(lastUpdatedButtonLabel(entry))}</button>`;
+  return `<button id="last-updated-btn" type="button" aria-haspopup="dialog" aria-controls="changelog-panel" aria-expanded="false">`
+    + `<b>${escapeHtml(lastUpdatedButtonLabel(entry))}</b>`
+    + `<small>${escapeHtml(releaseFeatureLine(entry))}</small>`
+    + `</button>`;
 }
 
 function releaseTimestampMarkup(entry: ChangelogEntry): string {
   if (entry.releasedAt === PENDING_PRODUCTION_RELEASE) {
-    return '<time><small>NOT PUBLISHED</small>AWAITING OWNER HITL</time>';
+    return '<time><small>NOT PUBLISHED</small>RELEASE CANDIDATE</time>';
   }
   return `<time datetime="${escapeHtml(entry.releasedAt)}"><small>PUBLISHED</small>${escapeHtml(formatChangelogTimestampDetail(entry.releasedAt))}</time>`;
 }
 
 export function releaseHistoryDialogMarkup(entries: readonly ChangelogEntry[] = CHANGELOG): string {
   const currentIsCandidate = entries[0]?.releasedAt === PENDING_PRODUCTION_RELEASE;
-  const historyEyebrow = currentIsCandidate ? 'RELEASE HISTORY · LOCAL CANDIDATE' : 'PUBLIC RELEASE HISTORY';
+  // HF-406: the panel names the pass it opens on, so the features list and the badge
+  // that opened it can never be read as belonging to different builds.
+  const currentPass = escapeHtml(entries[0]?.pass ?? 'BUILD');
+  const historyEyebrow = currentIsCandidate
+    ? `${currentPass} · RELEASE CANDIDATE`
+    : `${currentPass} · PUBLIC RELEASE HISTORY`;
   const historyLede = currentIsCandidate
     ? 'The current local candidate appears first and is explicitly not published. For earlier builds, <b>PUBLISHED</b> is the first successful live release time, shown in UK local time and with its UTC offset.'
     : 'Player-facing production releases only. <b>PUBLISHED</b> is the first successful live release time, shown in UK local time and with its UTC offset. Newest first.';

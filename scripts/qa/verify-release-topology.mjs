@@ -20,14 +20,81 @@ if (!rootIndex.includes('release-shell.js') || rootIndex.includes('type="module"
 const publicConfigSource = readFileSync(join(dist, 'release-channel-config.js'), 'utf8');
 const publicConfig = JSON.parse(publicConfigSource.slice(publicConfigSource.indexOf('=') + 1).replace(/;\s*$/, ''));
 const rollbackStaged = Boolean(config.rollback && existsSync(join(dist, config.rollback.path)));
-const expectedChannelKeys = rollbackStaged
+// LANE AD (PASS 87): every channel PATH below is read out of release-channels.json.
+// This verifier used to spell three of them as literals - `channels/the-big-one` for the
+// live channel path, the same name for the live channel id, and a six-name array for the
+// staged directory set - which were the pre-PASS-80 topology. From the pass80 cut onwards
+// the live channel is `channels/pass<N>`, so `npm run verify:release-topology` threw
+// `Root chooser is missing live PASS 86` on a correctly staged tree (measured on
+// d329628d, 2026-09-03). The production workflow runs this in the same step as staging,
+// so the release job could not reach its publish step at all.
+//
+// A literal is what goes stale; a derivation cannot. `channelDirectory` is also the only
+// place that knows how a channel path maps to a directory name.
+const channelDirectory = (key) => {
+  const path = config[key]?.path;
+  if (typeof path !== 'string' || !/^channels\/[a-z0-9-]+$/.test(path)) {
+    throw new Error(`release-channels.json ${key}.path must be one channels/<id> path`);
+  }
+  return path.slice('channels/'.length);
+};
+const liveChannelId = channelDirectory('experimental');
+const requiredChannelKeys = rollbackStaged
   ? ['experimental', 'previous', 'retained', 'historical', 'stable']
   : ['experimental', 'previous', 'retained', 'historical'];
-if (JSON.stringify(Object.keys(publicConfig)) !== JSON.stringify(expectedChannelKeys)) {
-  throw new Error(`Root chooser must expose exactly ${expectedChannelKeys.join(', ')}: ${Object.keys(publicConfig).join(', ')}`);
+const missingChannelKeys = requiredChannelKeys.filter((key) => !publicConfig[key]);
+if (missingChannelKeys.length) {
+  throw new Error(`Root chooser must expose ${requiredChannelKeys.join(', ')}; missing ${missingChannelKeys.join(', ')}`);
+}
+// Additional channels are ALLOWED, and are the point: the owner keeps every published pass
+// selectable, so this set grows with each release. The exact-equality check this replaces is
+// what let a published PASS 80 sit in the live config while the chooser refused to draw it.
+// What is still forbidden - and was never checked before - is a channel the chooser would
+// offer that the deploy never staged. A card that 404s is worse than no card.
+for (const [key, channel] of Object.entries(publicConfig)) {
+  if (!channel?.path) throw new Error(`Root chooser channel ${key} has no path`);
+  if (!existsSync(join(dist, channel.path))) {
+    throw new Error(`Root chooser channel ${key} points at ${channel.path}, which is not staged`);
+  }
+}
+
+// A release must never REMOVE a pass the owner can currently select.
+//
+// `stage-release-topology.mjs` rebuilds this config from a closed set of keys, so a
+// production release would drop `pass80` - and every future extra pass - from the chooser
+// without a word. The owner's standing instruction is the opposite: "keeping historical
+// selectable passes on that available".
+//
+// Compared against what is ACTUALLY LIVE rather than against a list in this file, because a
+// list in this file is the same mistake one layer up: the four-key expectation that agreed
+// with a chooser hiding a shipped build was itself a hardcoded list.
+//
+// Skipped, not failed, when origin/gh-pages is unreachable - a first deploy and a local dry
+// run both legitimately have no live config, and a verifier that cannot run must not be
+// mistaken for one that passed. It says which case it is.
+let liveChannelKeys = null;
+try {
+  const liveConfigSource = execFileSync('git', ['show', 'origin/gh-pages:release-channel-config.js'], {
+    encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 8 * 1024 * 1024,
+  });
+  liveChannelKeys = Object.keys(JSON.parse(
+    liveConfigSource.slice(liveConfigSource.indexOf('=') + 1).replace(/;\s*$/, ''),
+  ));
+} catch {
+  console.warn('[release-topology] origin/gh-pages has no readable release-channel-config.js; '
+    + 'cannot check for dropped channels. NOT a pass - fetch gh-pages to enable this check.');
+}
+if (liveChannelKeys) {
+  const droppedChannelKeys = liveChannelKeys.filter((key) => !publicConfig[key]);
+  if (droppedChannelKeys.length) {
+    throw new Error(`This release would remove live channel(s) ${droppedChannelKeys.join(', ')} `
+      + `from the chooser. Currently live: ${liveChannelKeys.join(', ')}; staged: `
+      + `${Object.keys(publicConfig).join(', ')}. Carry them forward in `
+      + 'scripts/release/stage-release-topology.mjs, or drop them deliberately with the owner.');
+  }
 }
 if (publicConfig.experimental.pass !== config.experimental.pass || publicConfig.experimental.label !== config.experimental.label
-  || publicConfig.experimental.path !== 'channels/the-big-one') {
+  || publicConfig.experimental.path !== config.experimental.path) {
   throw new Error(`Root chooser is missing live ${config.experimental.pass}`);
 }
 if (publicConfig.previous.pass !== config.previous.pass
@@ -54,9 +121,13 @@ const stagedChannelDirectories = readdirSync(join(dist, 'channels'), { withFileT
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
-const expectedDirectories = rollbackStaged
-  ? ['pass63-rollback', 'pass69-retained', 'pass70-retained', 'pass72-retained', 'recent-stable', 'the-big-one']
-  : ['pass69-retained', 'pass70-retained', 'pass72-retained', 'recent-stable', 'the-big-one'];
+// Exactly as strict as the literal array it replaces - still a full-set equality, so an
+// extra staged tree and a missing one both fail - but every name now comes from the config
+// key that stage-release-topology.mjs stages under it.
+const stagedChannelConfigKeys = rollbackStaged
+  ? ['experimental', 'previous', 'retained', 'historical', 'stable', 'rollback']
+  : ['experimental', 'previous', 'retained', 'historical', 'stable'];
+const expectedDirectories = [...new Set(stagedChannelConfigKeys.map(channelDirectory))].sort();
 if (JSON.stringify(stagedChannelDirectories) !== JSON.stringify(expectedDirectories)) {
   throw new Error(`Unexpected staged channels: ${stagedChannelDirectories.join(', ')}`);
 }
@@ -202,7 +273,7 @@ if (!experimentalAssets.some((name) => readFileSync(join(experimentalRoot, 'asse
 }
 const experimentalProvenance = JSON.parse(readFileSync(join(experimentalRoot, 'channel-provenance.json'), 'utf8'));
 if (experimentalProvenance.schemaVersion !== 5
-  || experimentalProvenance.channel !== 'the-big-one'
+  || experimentalProvenance.channel !== liveChannelId
   || experimentalProvenance.releasePass !== config.experimental.pass
   || experimentalProvenance.path !== config.experimental.path
   || !/^[0-9a-f]{40}$/.test(experimentalProvenance.sourceSha ?? '')) {

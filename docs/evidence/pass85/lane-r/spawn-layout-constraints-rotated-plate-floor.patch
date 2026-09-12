@@ -1,0 +1,40 @@
+diff --git a/src/spawn-layout-constraints.ts b/src/spawn-layout-constraints.ts
+index f4837066..f4631911 100644
+--- a/src/spawn-layout-constraints.ts
++++ b/src/spawn-layout-constraints.ts
+@@ -56,7 +56,7 @@ import { buildFarcrysis } from './farcrysis';
+ import { buildHighSeas } from './high-seas';
+ import { buildTest1, buildTest2 } from './test-maps';
+ import { buildMap3 } from './map3-arena';
+-import { isBlocked, pointInsideBounds, segmentIntersectsBox, type Box2, type Point3 } from './collision';
++import { isBlocked, pointInsideBounds, segmentBoxHitTime, segmentIntersectsBox, type Box2, type Point3 } from './collision';
+ import { validArenaSpawnPoint } from './spawn-safety';
+ 
+ export type ArenaBuilder = (scene: THREE.Scene) => ArenaMap;
+@@ -252,7 +252,25 @@ export function floorBeneath(
+   raycaster.far = SPAWN_EYE_HEIGHT + FLOOR_DROP_TOLERANCE_M + 0.01;
+   for (const hit of raycaster.intersectObjects(arena.raycastMeshes, true)) consider(point.y - hit.distance, 'raycast');
+   for (const box of [...arena.colliders, ...arena.physicsColliders]) {
+-    if (box.rotation || box.maxY === undefined) continue;
++    if (box.maxY === undefined) continue;
++    if (box.rotation) {
++      // Lane R (PASS 85): a ROTATED box has no axis-aligned top face, and
++      // skipping it made a tangent-plane heightfield invisible to this check.
++      // farcrysis registers its ground as 5,474 rotated plate slabs in
++      // `physicsColliders` (farcrysisTerrainPhysicsTiles), so before this
++      // branch existed only 7 of 1,244 dry cells on that island reported a
++      // floor - all of them prop tops - and every authored spawn read
++      // 'no-floor'. Probe it with the same downward segment the raycast branch
++      // uses; `segmentBoxHitTime` already honours `box.rotation`.
++      const time = segmentBoxHitTime(
++        { x: point.x, y: point.y, z: point.z },
++        { x: point.x, y: point.y - raycaster.far, z: point.z },
++        box,
++        0,
++      );
++      if (time !== null) consider(point.y - time * raycaster.far, 'collider');
++      continue;
++    }
+     if (point.x < box.minX || point.x > box.maxX || point.z < box.minZ || point.z > box.maxZ) continue;
+     consider(box.maxY, 'collider');
+   }

@@ -236,6 +236,34 @@ export function consumeDeathDropWeapon(
   };
 }
 
+/**
+ * Owner requirement (HF-315a): after an accepted weapon swap the gun you
+ * dropped lands at YOUR feet with a fresh 30-second lifetime so you can swap
+ * straight back — and the host must record EXACTLY the same placement as the
+ * guest. The guest previously did this inline while the host kept the drop's
+ * original position and expiry, so the two drop records diverged after every
+ * accepted swap and later legitimate re-swaps were silently rejected. Both
+ * roles call this single pure placement for `consumeDeathDropWeapon` results
+ * in 'pickup' mode (a 'replenish' keeps the same gun, fully consumes the drop
+ * and never repositions).
+ */
+export function placeSwappedDeathDrop(
+  drop: DeathDrop,
+  pickerPosition: DropPoint,
+  floorY: number,
+  now: number,
+): DeathDrop {
+  return {
+    ...drop,
+    position: {
+      x: Number.isFinite(pickerPosition.x) ? pickerPosition.x : 0,
+      y: Number.isFinite(floorY) ? floorY : 0,
+      z: Number.isFinite(pickerPosition.z) ? pickerPosition.z : 0,
+    },
+    expiresAt: now + DEATH_DROP_LIFETIME_MS,
+  };
+}
+
 export function pruneDeathDrops(drops: readonly DeathDrop[], now: number, maximum = MAX_DEATH_DROPS): DeathDrop[] {
   return drops.filter((drop) => deathDropAvailable(drop, now)).slice(0, Math.max(0, maximum));
 }

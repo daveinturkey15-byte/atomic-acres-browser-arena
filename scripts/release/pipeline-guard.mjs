@@ -3,6 +3,18 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { verifyCapabilityHandoff } from './capability-handoff.mjs';
+import { readCompleteAncestry } from './ancestry-inventory.mjs';
+import {
+  createGitProbe,
+  evaluateLaneClosure,
+  evaluateLaneRoute,
+  loadRegistry,
+  legacyRoutingPolicy,
+  observeWorktree,
+  readProjectIdentity,
+  resolveRegistryPath,
+} from './project-routing.mjs';
 
 const ANCESTRY_ROOTS_RELATIVE_PATH = '.github/ancestry-roots.json';
 const SHA40 = /^[0-9a-f]{40}$/;
@@ -55,7 +67,7 @@ function slug(value, label) {
 }
 
 function git(repo, ...args) {
-  return run('git', ['-C', repo, ...args]).stdout;
+  return run('git', ['--no-replace-objects', '-C', repo, ...args]).stdout;
 }
 
 function repositoryName(remote) {
@@ -123,10 +135,47 @@ function writeReceipt(repo, kind, receipt) {
   return path;
 }
 
-const { mode, values } = parseArgs(process.argv.slice(2));
-if (!['doctor', 'contribute', 'release'].includes(mode)) {
-  throw new Error('Usage: pipeline-guard.mjs <doctor|contribute|release> [options]');
+// Project routing (2026-09-11). `contribute --project <id> --lane <id>` binds
+// the launch to the committed project identity and the machine-local registry
+// (docs/PROJECT_ROUTING.md). Without those flags the call is LEGACY: accepted
+// while enforcement is `warn`, stamped as legacy in the receipt and on stderr,
+// refused once root sets registry enforcement to `refuse` or exports
+// ATOMIC_ACRES_ROUTING_REQUIRED=1. `lane-close` verifies an explicit
+// integrated/rejected closure record with preservation proof and removes nothing.
+function routingIdentityRequested(values) {
+  return values.project !== undefined || values.lane !== undefined;
 }
+
+function legacyRoutingDecision(values) {
+  return {
+    mode: 'legacy',
+    ...legacyRoutingPolicy(readProjectIdentity(repo)),
+    warning: 'LEGACY ROUTE: no --project/--lane identity was supplied, so this run was NOT checked against the machine routing registry (worktree, branch, Git database, base/head, scope, lane lifetime). It proves only branch shape and ancestry. See docs/PROJECT_ROUTING.md.',
+  };
+}
+
+function resolveRoute(values, machine, harness) {
+  if (typeof values.project !== 'string' || typeof values.lane !== 'string') {
+    throw new Error('Routed contribution needs both --project <id> and --lane <id>; omit both for a legacy call');
+  }
+  const identity = readProjectIdentity(repo);
+  const registry = loadRegistry(resolveRegistryPath(), identity);
+  const observed = observeWorktree(repo);
+  return evaluateLaneRoute({
+    registry, identity, projectId: values.project, laneId: values.lane, machine, harness,
+    observed, probe: createGitProbe(repo), originMainSha: receipt.originMainSha,
+  });
+}
+
+const { mode, values } = parseArgs(process.argv.slice(2));
+if (!['doctor', 'contribute', 'handoff', 'release', 'lane-close'].includes(mode)) {
+  throw new Error('Usage: pipeline-guard.mjs <doctor|contribute|handoff|release|lane-close> [options]');
+}
+
+if (values.offline !== undefined && (mode !== 'doctor' || values.offline !== true)) {
+  throw new Error('--offline is a doctor-only flag; contribution, handoff, release and closure require normal verification');
+}
+const offline = values.offline === true;
 
 const repo = run('git', ['rev-parse', '--show-toplevel']).stdout;
 const remote = git(repo, 'remote', 'get-url', 'origin');
@@ -135,7 +184,7 @@ const timestamp = new Date().toISOString();
 const branch = git(repo, 'branch', '--show-current') || 'DETACHED';
 const headSha = git(repo, 'rev-parse', 'HEAD');
 const dirty = git(repo, 'status', '--porcelain=v1').split(/\r?\n/).filter(Boolean);
-const ghStatus = run('gh', ['auth', 'status'], { allowFailure: true });
+const ghStatus = offline ? { status: null, stdout: '', stderr: '' } : run('gh', ['auth', 'status'], { allowFailure: true });
 const authText = `${ghStatus.stdout}\n${ghStatus.stderr}`;
 
 const receipt = {
@@ -147,28 +196,32 @@ const receipt = {
   headSha,
   clean: dirty.length === 0,
   dirtyPathCount: dirty.length,
-  tools: {
+  offline,
+  tools: offline ? { status: 'skipped-offline', reason: 'Doctor offline inspects Git ancestry only; tool versions were not probed' } : {
     git: toolVersion('git'),
     node: toolVersion(process.execPath),
     npm: npmVersion(),
     gh: toolVersion('gh'),
   },
   githubAuth: {
+    status: offline ? 'skipped-offline' : 'checked',
     authenticated: ghStatus.status === 0,
     repoScope: /(?:^|[,\s'])repo(?:[,\s']|$)/.test(authText),
     workflowScope: /(?:^|[,\s'])workflow(?:[,\s']|$)/.test(authText),
   },
 };
 
-const headRoots = git(repo, 'rev-list', '--max-parents=0', 'HEAD').split(/\r?\n/).filter(Boolean);
-receipt.rootCommitCount = headRoots.length;
+receipt.shallow = git(repo, 'rev-parse', '--is-shallow-repository') === 'true';
+const headRoots = mode === 'doctor' && receipt.shallow ? null : readCompleteAncestry(repo);
+receipt.rootCommitCount = headRoots?.length ?? null;
+if (headRoots === null) receipt.ancestryUnavailable = 'Shallow boundaries are not actual roots; complete history is required before contribution or reconciliation.';
 
 if (mode !== 'doctor') {
   run('git', ['-C', repo, 'fetch', 'origin', 'main', '--prune']);
   receipt.originMainSha = git(repo, 'rev-parse', 'origin/main');
   receipt.containsOriginMain = run(
     'git',
-    ['-C', repo, 'merge-base', '--is-ancestor', 'origin/main', 'HEAD'],
+    ['--no-replace-objects', '-C', repo, 'merge-base', '--is-ancestor', 'origin/main', 'HEAD'],
     { allowFailure: true },
   ).status === 0;
   if (!receipt.clean) throw new Error(`Refusing ${mode}: worktree has ${dirty.length} changed path(s)`);
@@ -176,7 +229,10 @@ if (mode !== 'doctor') {
   // Was recorded but never enforced, and enforced only in `contribute`. A line
   // that does not contain origin/main must not reach ANY non-doctor mode:
   // publishing from one is how 21 passes shipped without main ever moving.
-  if (!receipt.containsOriginMain) {
+  // `lane-close` is the one exception: a REJECTED lane is by definition allowed
+  // to be behind main, and closing it (with preservation proof) is how it stops
+  // being a trap. It still cannot contribute or release from here.
+  if (!receipt.containsOriginMain && mode !== 'lane-close') {
     throw new Error(`Refusing ${mode}: HEAD ${headSha} does not contain current origin/main ${receipt.originMainSha}; reconcile through a pull request into main and rerun checks`);
   }
 
@@ -196,7 +252,10 @@ if (mode !== 'doctor') {
   }
 }
 
-if (mode === 'contribute') {
+if (mode === 'contribute' || mode === 'handoff') {
+  if (mode === 'handoff' && (typeof values.project !== 'string' || typeof values.lane !== 'string')) {
+    throw new Error('handoff requires --project <id> and --lane <id>');
+  }
   const machine = slug(values.machine, 'machine');
   const harness = slug(values.harness, 'harness');
   const prefix = `contrib/${machine}/${harness}/`;
@@ -206,6 +265,29 @@ if (mode === 'contribute') {
   // containsOriginMain is now enforced above for every non-doctor mode.
   receipt.machine = machine;
   receipt.harness = harness;
+  if (routingIdentityRequested(values)) {
+    receipt.routing = resolveRoute(values, machine, harness);
+  } else {
+    receipt.routing = legacyRoutingDecision(values);
+    if (receipt.routing.required) {
+      throw new Error(`Refusing contribute: project routing is required on this machine (${receipt.routing.registryPresent ? 'registry enforcement=refuse' : `${ROUTING_REQUIRED_ENV}=1`}) but no --project/--lane identity was supplied. ${receipt.routing.registryError ?? ''}`.trim());
+    }
+    console.error(`WARNING: ${receipt.routing.warning}`);
+  }
+}
+
+if (mode === 'lane-close') {
+  if (typeof values.project !== 'string' || typeof values.lane !== 'string') {
+    throw new Error('lane-close needs --project <id> and --lane <id>');
+  }
+  const identity = readProjectIdentity(repo);
+  const registry = loadRegistry(resolveRegistryPath(), identity);
+  receipt.closure = evaluateLaneClosure({
+    registry, identity, projectId: values.project, laneId: values.lane,
+    observed: observeWorktree(repo), probe: createGitProbe(repo), originMainSha: receipt.originMainSha,
+  });
+  receipt.grantsAcceptance = false;
+  receipt.removedAnything = false;
 }
 
 if (mode === 'release') {
@@ -227,6 +309,17 @@ if (mode === 'release') {
   if (failures.length) {
     throw new Error(`Required checks are not green: ${failures.map((check) => `${check.name}=${check.conclusion}`).join(', ')}`);
   }
+}
+
+// Final candidate delivery requires a fresh live proof. CI release remains portable.
+// Contribution, backup, and rejected/historical lane closure remain independent.
+if (mode === 'handoff') {
+  const identity = readProjectIdentity(repo);
+  const registry = loadRegistry(resolveRegistryPath(), identity);
+  receipt.capabilityHandoff = verifyCapabilityHandoff({
+    candidateRoot: repo, headSha, policy: identity.capabilityHandoff, config: registry.capabilityHandoff,
+  });
+  receipt.grantsAcceptance = false;
 }
 
 const receiptPath = writeReceipt(repo, mode, receipt);

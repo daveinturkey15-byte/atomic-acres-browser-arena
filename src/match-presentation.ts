@@ -13,9 +13,23 @@ export function formatMatchClock(milliseconds: number, ceil = false): string {
   return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
+const DURATION_WORD_LABELS_MS: Readonly<Record<number, string>> = Object.freeze({
+  120_000: 'TWO',
+  180_000: 'THREE',
+  300_000: 'FIVE',
+  600_000: 'TEN',
+  900_000: 'FIFTEEN',
+});
+
 function rulesSummary(rules: MatchRules): string {
   if (rules.durationMs === null && rules.scoreLimit === null) return 'UNTIMED SCORE PRACTICE';
-  if (rules.scoreLimit === null) return 'FIVE MINUTES · MOST KILLS WINS';
+  if (rules.scoreLimit === null) {
+    // HF-377: hosts can publish 2/3/5/10/15-minute matches, so the label is
+    // derived from the contract instead of assuming the five-minute default.
+    const minutes = Math.round((rules.durationMs ?? DEFAULT_MATCH_RULES.durationMs ?? 0) / 60_000);
+    const word = DURATION_WORD_LABELS_MS[rules.durationMs ?? -1];
+    return `${word ?? minutes} MINUTE${minutes === 1 ? '' : 'S'} · MOST KILLS WINS`;
+  }
   return `FIRST SQUAD TO ${rules.scoreLimit}`;
 }
 

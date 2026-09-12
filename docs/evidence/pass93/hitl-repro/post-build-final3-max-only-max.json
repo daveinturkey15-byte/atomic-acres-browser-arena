@@ -1,0 +1,309 @@
+{
+  "schemaVersion": 1,
+  "runLabel": "post-build-final3-max-only",
+  "profile": "max",
+  "requestedPreset": "max",
+  "baseUrl": "http://127.0.0.1:4300/",
+  "browser": {
+    "channel": "chrome",
+    "headless": true,
+    "args": [
+      "--mute-audio",
+      "--enable-unsafe-webgpu",
+      "--disable-background-timer-throttling",
+      "--disable-renderer-backgrounding",
+      "--disable-backgrounding-occluded-windows",
+      "--window-position=-32000,-32000",
+      "--window-size=2640,1520"
+    ],
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "deviceScaleFactor": 1
+  },
+  "startedAt": "2026-09-04T06:45:32.086Z",
+  "finishedAt": "2026-09-04T06:46:35.344Z",
+  "deployClickedAt": "2026-09-04T06:45:35.087Z",
+  "ok": false,
+  "liveFrame": false,
+  "fatalError": "page.waitForFunction: Timeout 60000ms exceeded.",
+  "initialMarker": {
+    "url": "http://127.0.0.1:4300/",
+    "title": "Nuke Town — Browser Arena FPS",
+    "releaseText": "PASS 92",
+    "releaseFooter": "PASS 92",
+    "documentData": {
+      "uiContract": "pass64-command-v2",
+      "renderProfile": "blender",
+      "graphicsPreset": "high",
+      "graphicsLiveProfile": "blender",
+      "graphicsFrameRateLimit": "uncapped",
+      "graphicsAntialiasSamples": "4",
+      "graphicsToneMapping": "aces",
+      "reducedSensory": "false",
+      "reducedMotion": "false",
+      "tintSwizzleShim": "true",
+      "tslNodeBuildErrors": "0",
+      "renderBackend": "webgpu",
+      "webglShadowSampler": "pcf-soft",
+      "atomicSignalRenderer": "hardware",
+      "atomicSignal": "tsl-hdr",
+      "webglContext": "ready",
+      "adaptiveShadows": "on",
+      "arenaId": "atomic-acres",
+      "inputScheme": "keyboard",
+      "graphicsRegistryCount": "41",
+      "menuLifecycle": "pre-match",
+      "pointerLockLifecycle": "unlocked",
+      "menuPreview": "prerecorded-video",
+      "gameplayArena": "deferred-until-deployment"
+    },
+    "menuVisible": true,
+    "selectedArena": "atomic-acres",
+    "graphicsPreset": "high"
+  },
+  "finalMarker": {
+    "url": "http://127.0.0.1:4300/",
+    "documentData": {
+      "uiContract": "pass64-command-v2",
+      "renderProfile": "blender",
+      "graphicsPreset": "max",
+      "graphicsLiveProfile": "blender",
+      "graphicsFrameRateLimit": "uncapped",
+      "graphicsAntialiasSamples": "4",
+      "graphicsToneMapping": "aces",
+      "reducedSensory": "false",
+      "reducedMotion": "false",
+      "tintSwizzleShim": "true",
+      "tslNodeBuildErrors": "0",
+      "renderBackend": "webgpu",
+      "webglShadowSampler": "pcf-soft",
+      "atomicSignalRenderer": "hardware",
+      "atomicSignal": "tsl-hdr",
+      "webglContext": "ready",
+      "adaptiveShadows": "on",
+      "arenaId": "nuketown2",
+      "inputScheme": "keyboard",
+      "graphicsRegistryCount": "41",
+      "menuLifecycle": "hidden",
+      "pointerLockLifecycle": "denied",
+      "menuPreview": "inactive",
+      "gameplayArena": "nuketown2",
+      "menuArenaId": "nuketown2",
+      "killstreakPossession": "none",
+      "combatAudioPrewarm": "ready",
+      "glassImpactAudioPrewarm": "ready",
+      "grenadeEffectsAudioPrewarm": "ready",
+      "rayTracedLayer": "reflections",
+      "overdrive": "charging",
+      "rayTracedProxy": "24/146:8",
+      "bakedIndirect": "24x12x24:2902a7dc:24:0.500"
+    },
+    "menuHidden": true,
+    "transitionHidden": true,
+    "hudHidden": false,
+    "snapshot": {
+      "gameStarted": true,
+      "matchPhase": "warmup",
+      "matchAdmissionProfile": {
+        "arenaId": "nuketown2",
+        "mode": "solo",
+        "durationMs": 56683.9,
+        "steps": [
+          {
+            "name": "admission-open",
+            "durationMs": 44261.1
+          },
+          {
+            "name": "bot-spawn",
+            "durationMs": 2111
+          },
+          {
+            "name": "corpse-pool",
+            "durationMs": 506.7
+          },
+          {
+            "name": "bot-presentations",
+            "durationMs": 1816.1
+          },
+          {
+            "name": "rest-composition-compile",
+            "durationMs": 203.6
+          },
+          {
+            "name": "weapon-switch-rehearsal",
+            "durationMs": 633.4
+          },
+          {
+            "name": "match-bound-first-shots",
+            "durationMs": 1637.1
+          },
+          {
+            "name": "initial-match-settle",
+            "durationMs": 343.2
+          },
+          {
+            "name": "stable-cadence-wait",
+            "durationMs": 5171.7
+          }
+        ],
+        "admissionWeaponIds": [
+          "carbine",
+          "pistol",
+          "railgun",
+          "crimson-flamethrower"
+        ],
+        "rehearsedWeaponIds": [
+          "carbine",
+          "pistol",
+          "railgun",
+          "crimson-flamethrower"
+        ],
+        "deferredWeaponIds": [
+          "smg",
+          "lmg",
+          "scattergun",
+          "sniper",
+          "mini-uzi",
+          "mp5",
+          "m4a1",
+          "ak-47",
+          "minigun",
+          "m14-ebr",
+          "slug-shotgun",
+          "machine-pistol",
+          "magnum",
+          "flashlight-pistol",
+          "explosive-crossbow",
+          "flamethrower",
+          "flare-gun"
+        ],
+        "achievedWaitMs": 5007.400000047681,
+        "exitReason": "ceiling-timeout"
+      },
+      "matchAdmissionCadence": {
+        "backend": "webgpu",
+        "waitedMs": 5007.400000047681,
+        "stableWindowMs": 55.599999999998545,
+        "samples": 87,
+        "resets": 83,
+        "maximumGapMs": 72.19999999999709,
+        "startingSubmissionSequence": 52,
+        "startingCompletedSequence": 52,
+        "admittedDegraded": true,
+        "visibilityState": "visible",
+        "documentHasFocus": true,
+        "exitReason": "ceiling-timeout",
+        "consecutiveStableFrames": 0,
+        "endingSubmissionSequence": 139,
+        "endingCompletedSequence": 139,
+        "submissionAdvances": 87,
+        "completionAdvances": 87,
+        "maximumSubmissionGapMs": 101.89999997615814,
+        "maximumCompletionGapMs": 58.799999952316284,
+        "maximumPendingForMs": 58.799999952316284,
+        "maximumCompletionLatencyMs": 58.799999952316284,
+        "drained": false
+      },
+      "presentedGameplayFrame": 35
+    }
+  },
+  "consoleMessages": [
+    {
+      "at": "2026-09-04T06:45:32.872Z",
+      "type": "warning",
+      "text": "The powerPreference option is currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127",
+      "location": {
+        "url": "http://127.0.0.1:4300/assets/webgpu-tint-swizzle-shim-Dz5rrnev.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "at": "2026-09-04T06:45:34.557Z",
+      "type": "warning",
+      "text": "The powerPreference option is currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127",
+      "location": {
+        "url": "http://127.0.0.1:4300/assets/webgpu-tint-swizzle-shim-Dz5rrnev.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    }
+  ],
+  "pageErrors": [],
+  "failedRequests": [],
+  "badResponses": [],
+  "steps": [
+    {
+      "at": "2026-09-04T06:45:32.087Z",
+      "action": "goto-root"
+    },
+    {
+      "at": "2026-09-04T06:45:33.955Z",
+      "action": "menu-ready",
+      "marker": {
+        "url": "http://127.0.0.1:4300/",
+        "title": "Nuke Town — Browser Arena FPS",
+        "releaseText": "PASS 92",
+        "releaseFooter": "PASS 92",
+        "documentData": {
+          "uiContract": "pass64-command-v2",
+          "renderProfile": "blender",
+          "graphicsPreset": "high",
+          "graphicsLiveProfile": "blender",
+          "graphicsFrameRateLimit": "uncapped",
+          "graphicsAntialiasSamples": "4",
+          "graphicsToneMapping": "aces",
+          "reducedSensory": "false",
+          "reducedMotion": "false",
+          "tintSwizzleShim": "true",
+          "tslNodeBuildErrors": "0",
+          "renderBackend": "webgpu",
+          "webglShadowSampler": "pcf-soft",
+          "atomicSignalRenderer": "hardware",
+          "atomicSignal": "tsl-hdr",
+          "webglContext": "ready",
+          "adaptiveShadows": "on",
+          "arenaId": "atomic-acres",
+          "inputScheme": "keyboard",
+          "graphicsRegistryCount": "41",
+          "menuLifecycle": "pre-match",
+          "pointerLockLifecycle": "unlocked",
+          "menuPreview": "prerecorded-video",
+          "gameplayArena": "deferred-until-deployment"
+        },
+        "menuVisible": true,
+        "selectedArena": "atomic-acres",
+        "graphicsPreset": "high"
+      }
+    },
+    {
+      "at": "2026-09-04T06:45:33.955Z",
+      "action": "select-max-graphics-profile"
+    },
+    {
+      "at": "2026-09-04T06:45:35.085Z",
+      "action": "select-nuketown2-card"
+    },
+    {
+      "at": "2026-09-04T06:45:35.087Z",
+      "action": "visitor-callsign-observed",
+      "value": "OPERATOR"
+    },
+    {
+      "at": "2026-09-04T06:45:35.087Z",
+      "action": "click-deploy",
+      "selector": "#solo"
+    },
+    {
+      "at": "2026-09-04T06:46:35.267Z",
+      "action": "probe-failed",
+      "error": "page.waitForFunction: Timeout 60000ms exceeded."
+    }
+  ]
+}

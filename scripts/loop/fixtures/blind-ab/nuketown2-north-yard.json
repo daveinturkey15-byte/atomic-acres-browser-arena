@@ -1,0 +1,17 @@
+{
+  "contract": "blind-ab-v1",
+  "station": "nuketown2-north-yard",
+  "probes": "ECHO",
+  "winner": "left",
+  "confidence": 0.7,
+  "why": "LEFT keeps the two-storey siding split and the stepping-stone grid seen in the references at r1c1 and r2c1.",
+  "leftCloser": [
+    "siding split r1c1",
+    "stepping stones r2c1"
+  ],
+  "rightCloser": [],
+  "largestDifference": {
+    "region": "r1c1",
+    "what": "massing"
+  }
+}

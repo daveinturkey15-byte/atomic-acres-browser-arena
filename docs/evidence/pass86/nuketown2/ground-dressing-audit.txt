@@ -1,0 +1,6 @@
+ground dressing pieces: 3, building footprints: 2 (each mirrored)
+street driveway            x[-19.5, -12.5] z[-4.5, -2.1]  worst overlap with any building: 0.000 m2
+street lawn front          x[4, 20] z[-9.3, -4.5]  worst overlap with any building: 0.000 m2
+yard lawn                  x[-29, 29] z[-22, -14.5]  worst overlap with any building: 0.000 m2
+
+WORST OVERLAP ANYWHERE: 0.000 m2  (was 38.400 m2 of lawn inside each house's front room before the repair)

@@ -380,6 +380,8 @@ describe('shared sky backdrop', () => {
     const generated = scene.background as THREE.Texture;
     const generatedDispose = vi.spyOn(generated, 'dispose');
 
+    // Called once per page exit; a second invocation must not re-dispose or
+    // throw on the already-cleared caches.
     disposeSkyBackdrops();
 
     expect(fallbackDispose).toHaveBeenCalledTimes(1);
@@ -415,6 +417,33 @@ describe('shared sky backdrop', () => {
       disposition: expect.stringContaining('admitted'),
     });
     expect(provenance.generationStages.every((stage: { prompt: string }) => stage.prompt.length > 200)).toBe(true);
+  });
+
+  it('wires exactly one terminal-teardown call site into legacy-main', () => {
+    const main = readFileSync(new URL('../legacy-main.ts', import.meta.url), 'utf8');
+    expect(main)
+      .toContain("import { applySkyBackdrop, disposeSkyBackdrops, waitForSkyBackdropAdmission } from './rendering/sky-backdrop';");
+    // Exactly one live call in the entire entry module.
+    expect(main.match(/\bdisposeSkyBackdrops\(\)/g)).toHaveLength(1);
+    // ...and it sits between the page-exit flag (which stops the frame loop
+    // from sampling) and the renderer's own disposal.
+    const teardownStart = main.indexOf('gameplayRuntimeDisposing = true;');
+    const rendererDisposal = main.indexOf('renderRuntime.dispose();', teardownStart);
+    const callSite = main.indexOf('disposeSkyBackdrops();');
+    expect(teardownStart).toBeGreaterThanOrEqual(0);
+    expect(callSite).toBeGreaterThan(teardownStart);
+    expect(callSite).toBeLessThan(rendererDisposal);
+  });
+
+  it('never disposes sky backdrops during per-arena retirement', () => {
+    const main = readFileSync(new URL('../legacy-main.ts', import.meta.url), 'utf8');
+    // Shared textures stay alive across arena switches by design; only the
+    // page-exit teardown owns them.
+    const retireBlock = main.slice(
+      main.indexOf('function disposeRetiredArena('),
+      main.indexOf('function disposeArenaPresentationRoot('),
+    );
+    expect(retireBlock).not.toContain('disposeSkyBackdrops');
   });
 
   it('pins object-free RustRig and Terminal panoramas to source, runtime and provenance hashes', () => {

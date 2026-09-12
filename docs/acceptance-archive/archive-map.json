@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "baselineSha": "089cb13a4d3e23d9f3c6ff499eda43f32670a04a",
+  "activeManifest": "acceptance/pass-96.json",
+  "grantsAcceptance": false,
+  "archives": [
+    {
+      "from": "acceptance/pass-80.json",
+      "to": "docs/acceptance-archive/pass-80.json",
+      "blobSha": "407b694a408f76a679d0427988ab7ee1ccc0447a",
+      "requirementIds": [
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+      ],
+      "originalStatus": "published-awaiting-owner-hitl"
+    },
+    {
+      "from": "acceptance/pass-94.json",
+      "to": "docs/acceptance-archive/pass-94.json",
+      "blobSha": "07ec0ceb9cf06e1a4c9b979dfec24ee8094b4a9c",
+      "requirementIds": [
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R5",
+        "R6",
+        "R7",
+        "R8",
+        "R9",
+        "R10",
+        "R11",
+        "R12",
+        "R13",
+        "R14"
+      ],
+      "originalStatus": "candidate"
+    },
+    {
+      "from": "acceptance/pass-95.json",
+      "to": "docs/acceptance-archive/pass-95.json",
+      "blobSha": "57a501c13524bda0478eb8cad6f2a6b46aee3749",
+      "requirementIds": [
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+      ],
+      "originalStatus": "candidate"
+    }
+  ]
+}

@@ -267,5 +267,5 @@ export function rustworksQualityTelemetry(profile: RenderProfile, arenaId: Arena
 export function rustworksQualityLightOcclusion(): ReturnType<typeof auditLocalLightOcclusion> {
   return qualityState.lightsRoot
     ? auditLocalLightOcclusion(qualityState.lightsRoot)
-    : { activeLocalLights: 0, shadowedLocalLights: 0, emissiveOnlySources: 0, violations: [] };
+    : { activeLocalLights: 0, shadowedLocalLights: 0, clusteredLocalLights: 0, emissiveOnlySources: 0, violations: [] };
 }

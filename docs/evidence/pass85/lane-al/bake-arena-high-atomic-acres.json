@@ -1,0 +1,25 @@
+{
+  "tier": "high",
+  "scene": "atomic-acres (extracted)",
+  "proxy": "artifacts/proxy/atomic-acres.json",
+  "digest": "104e394b",
+  "digestStable": true,
+  "coefficientsIdentical": true,
+  "probes": 6912,
+  "grid": "24x12x24",
+  "repeats": 3,
+  "bakeMs": [
+    3072,
+    2662,
+    3007
+  ],
+  "bakeMsMedian": 3007,
+  "bakeMsMin": 2662,
+  "bakeMsMax": 3072,
+  "cacheDecodeMs": 41.47,
+  "cacheDecodeMatches": true,
+  "occluderShapes": 24,
+  "filledProbes": 1449,
+  "serialisedBytes": 442729,
+  "at": "2026-09-03T02:43:32.758Z"
+}

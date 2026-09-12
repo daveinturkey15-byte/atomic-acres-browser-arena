@@ -1,0 +1,642 @@
+{
+  "label": "after-repair-quiet",
+  "arena": "atomic-acres",
+  "capturedAt": "2026-09-02T17:36:00.667Z",
+  "droppedAtMs": 206.80000007152557,
+  "proneBlendAtDrop": 0.00792967463988965,
+  "finalProneBlend": 1,
+  "fivePercentAfterMs": 43.3,
+  "ninetyFivePercentAfterMs": 279.2,
+  "biggestSingleFrameBlendStep": 0.178,
+  "biggestStepFrameMs": 40,
+  "worstSampleFrameMs": 40,
+  "medianSampleFrameMs": 13.7,
+  "sampleCount": 62,
+  "snapped": false,
+  "samples": [
+    {
+      "t": 0,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999,
+      "blendProgress": 1
+    },
+    {
+      "t": 13.8,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999,
+      "blendProgress": 1
+    },
+    {
+      "t": 27.9,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999,
+      "blendProgress": 1
+    },
+    {
+      "t": 41.7,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999,
+      "blendProgress": 1
+    },
+    {
+      "t": 55.2,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999,
+      "blendProgress": 1
+    },
+    {
+      "t": 66.8,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999,
+      "blendProgress": 1
+    },
+    {
+      "t": 81.2,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999,
+      "blendProgress": 1
+    },
+    {
+      "t": 93.6,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999,
+      "blendProgress": 1
+    },
+    {
+      "t": 108.5,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999,
+      "blendProgress": 1
+    },
+    {
+      "t": 123.1,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999,
+      "blendProgress": 1
+    },
+    {
+      "t": 139.8,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999,
+      "blendProgress": 1
+    },
+    {
+      "t": 150.6,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999,
+      "blendProgress": 1
+    },
+    {
+      "t": 163.3,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999,
+      "blendProgress": 1
+    },
+    {
+      "t": 175.6,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999,
+      "blendProgress": 1
+    },
+    {
+      "t": 190.7,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999,
+      "blendProgress": 1
+    },
+    {
+      "t": 206.8,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999,
+      "blendProgress": 1
+    },
+    {
+      "t": 220.8,
+      "stance": "prone",
+      "proneBlend": 0.00792967463988965,
+      "crouchBlend": 0,
+      "pivotHeight": 0.836748833397645,
+      "blendProgress": 0.05233333349227906
+    },
+    {
+      "t": 239.1,
+      "stance": "prone",
+      "proneBlend": 0.03442535521208186,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8258856043630463,
+      "blendProgress": 0.1113333332538605
+    },
+    {
+      "t": 250.1,
+      "stance": "prone",
+      "proneBlend": 0.06410427046812422,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8137172491080689,
+      "blendProgress": 0.15433333317438763
+    },
+    {
+      "t": 266.4,
+      "stance": "prone",
+      "proneBlend": 0.10368019999787559,
+      "crouchBlend": 0,
+      "pivotHeight": 0.7974911180008708,
+      "blendProgress": 0.19966666658719384
+    },
+    {
+      "t": 278.5,
+      "stance": "prone",
+      "proneBlend": 0.153633191896378,
+      "crouchBlend": 0,
+      "pivotHeight": 0.7770103913224847,
+      "blendProgress": 0.24766666650772098
+    },
+    {
+      "t": 290.5,
+      "stance": "prone",
+      "proneBlend": 0.1998271940975757,
+      "crouchBlend": 0,
+      "pivotHeight": 0.7580708504199937,
+      "blendProgress": 0.2870000000794729
+    },
+    {
+      "t": 302.5,
+      "stance": "prone",
+      "proneBlend": 0.2543839133020328,
+      "crouchBlend": 0,
+      "pivotHeight": 0.7357025955461662,
+      "blendProgress": 0.32966666658719385
+    },
+    {
+      "t": 313.8,
+      "stance": "prone",
+      "proneBlend": 0.30381220777870555,
+      "crouchBlend": 0,
+      "pivotHeight": 0.7154369948107304,
+      "blendProgress": 0.3659999998410543
+    },
+    {
+      "t": 325.6,
+      "stance": "prone",
+      "proneBlend": 0.3563253458852772,
+      "crouchBlend": 0,
+      "pivotHeight": 0.6939066081870361,
+      "blendProgress": 0.40299999992052715
+    },
+    {
+      "t": 339,
+      "stance": "prone",
+      "proneBlend": 0.4242601336899555,
+      "crouchBlend": 0,
+      "pivotHeight": 0.666053345187118,
+      "blendProgress": 0.4493333331743876
+    },
+    {
+      "t": 350.6,
+      "stance": "prone",
+      "proneBlend": 0.4795051051401391,
+      "crouchBlend": 0,
+      "pivotHeight": 0.6434029068925429,
+      "blendProgress": 0.48633333325386047
+    },
+    {
+      "t": 363.9,
+      "stance": "prone",
+      "proneBlend": 0.5444477799552847,
+      "crouchBlend": 0,
+      "pivotHeight": 0.6167764102183333,
+      "blendProgress": 0.5296666665871939
+    },
+    {
+      "t": 377.3,
+      "stance": "prone",
+      "proneBlend": 0.6111674499575235,
+      "crouchBlend": 0,
+      "pivotHeight": 0.5894213455174153,
+      "blendProgress": 0.5746666665871939
+    },
+    {
+      "t": 390.2,
+      "stance": "prone",
+      "proneBlend": 0.6737139358874304,
+      "crouchBlend": 0,
+      "pivotHeight": 0.5637772862861534,
+      "blendProgress": 0.6179999999205272
+    },
+    {
+      "t": 423.4,
+      "stance": "prone",
+      "proneBlend": 0.7596405177928249,
+      "crouchBlend": 0,
+      "pivotHeight": 0.5285473877049416,
+      "blendProgress": 0.6809999998410544
+    },
+    {
+      "t": 463.4,
+      "stance": "prone",
+      "proneBlend": 0.9374535919509281,
+      "crouchBlend": 0,
+      "pivotHeight": 0.4556440273001194,
+      "blendProgress": 0.847666666507721
+    },
+    {
+      "t": 486,
+      "stance": "prone",
+      "proneBlend": 0.9847910338709278,
+      "crouchBlend": 0,
+      "pivotHeight": 0.4362356761129196,
+      "blendProgress": 0.9269999996821087
+    },
+    {
+      "t": 504.6,
+      "stance": "prone",
+      "proneBlend": 0.999839455400465,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43006582328580933,
+      "blendProgress": 0.9926666665077211
+    },
+    {
+      "t": 521,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 536.9,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 554.8,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 578.6,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 603,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 625.5,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 649.2,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 667.1,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 692.8,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 711.9,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 734.2,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 752.1,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 767.9,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 785.3,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 801.6,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 819,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 832.7,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 844.8,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 859.9,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 874.4,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 887.5,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 898.4,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 909.5,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 923,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 935.4,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 945.9,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 957.7,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 969.8,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 982.2,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 993.1,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 1005.4,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 1017.3,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 1029.7,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 1044.2,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 1056.8,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 1070.5,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 1082.2,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 1096.8,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 1108.8,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 1123.2,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 1138.6,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 1152.2,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 1170,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    },
+    {
+      "t": 1186.3,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43,
+      "blendProgress": 1
+    }
+  ]
+}

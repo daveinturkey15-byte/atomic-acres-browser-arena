@@ -24,9 +24,9 @@ export const ARENA_ROUTE_IDENTITIES: ReadonlyArray<ArenaRouteIdentity> = Object.
     secondaryColor: 0x7c3fa0,
     landmark: 'hydroponics-greenhouse',
     cuePositions: Object.freeze([
-      Object.freeze([-27, -11] as const),
-      Object.freeze([-25.5, 16] as const),
-      Object.freeze([-21, 28] as const),
+      Object.freeze([-29.5, -14] as const),
+      Object.freeze([-26, 21] as const),
+      Object.freeze([-27, -21] as const),
     ]),
   }),
   Object.freeze({
@@ -37,9 +37,9 @@ export const ARENA_ROUTE_IDENTITIES: ReadonlyArray<ArenaRouteIdentity> = Object.
     secondaryColor: 0xe4bd64,
     landmark: 'civil-defence-transit',
     cuePositions: Object.freeze([
-      Object.freeze([-3.8, 7] as const),
-      Object.freeze([4.2, -9] as const),
-      Object.freeze([0, 31] as const),
+      Object.freeze([0, 0] as const),
+      Object.freeze([-16, 0] as const),
+      Object.freeze([16, 0] as const),
     ]),
   }),
   Object.freeze({
@@ -50,9 +50,9 @@ export const ARENA_ROUTE_IDENTITIES: ReadonlyArray<ArenaRouteIdentity> = Object.
     secondaryColor: 0x8b59ba,
     landmark: 'solar-battery-yard',
     cuePositions: Object.freeze([
-      Object.freeze([26, -16] as const),
-      Object.freeze([27, -1.5] as const),
-      Object.freeze([25.5, 21] as const),
+      Object.freeze([26.75, -19.5] as const),
+      Object.freeze([27, -20] as const),
+      Object.freeze([25.5, 9] as const),
     ]),
   }),
 ]);

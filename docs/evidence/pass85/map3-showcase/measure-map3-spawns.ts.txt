@@ -1,0 +1,17 @@
+/**
+ * MAP3 (HF-409 repair): measure Map 3's spawn table on the SHIPPED tree.
+ *
+ * `scripts/qa/measure-spawn-layouts.ts --arenas map3` derives its roster from
+ * SELECTABLE_ARENA_BUILDERS(), which filters `selectable !== false`, so on the
+ * shipped tree it prints NOTHING for map3 and exits 0. That is why the lane's
+ * original spawn receipt was not reproducible. This calls the same measure
+ * directly on the same builder, so the numbers are the repo's own.
+ */
+import * as THREE from 'three/webgpu';
+import { buildMap3 } from './src/map3-arena';
+import { measureSpawnLayout } from './src/spawn-layout-constraints';
+
+const scene = new THREE.Scene();
+const arena = buildMap3(scene);
+const report = measureSpawnLayout('map3' as never, arena);
+console.log(JSON.stringify(report, null, 2));

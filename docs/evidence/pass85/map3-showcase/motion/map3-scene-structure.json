@@ -1,0 +1,156 @@
+{
+  "arenaRootChildren": [
+    "map3-ground-terrain",
+    "map3-hub-paving",
+    "map3-hub-kerb-0--1",
+    "map3-hub-kerb-1-0",
+    "map3-hub-kerb-0-1",
+    "map3-hub-kerb--1-0",
+    "map3-hub-plinth",
+    "map3-hub-plinth-step-1-0",
+    "map3-hub-plinth-step--1-0",
+    "map3-hub-plinth-step-0-1",
+    "map3-hub-plinth-step-0--1",
+    "map3-hub-waymarker-0",
+    "map3-hub-waymarker-1",
+    "map3-hub-waymarker-2",
+    "map3-hub-waymarker-3",
+    "map3-hub-waymarker-4",
+    "map3-hub-waymarker-5",
+    "map3-hub-waymarker-6",
+    "map3-hub-waymarker-7",
+    "map3-hub-waymarker-8",
+    "map3-hub-waymarker-9",
+    "map3-hub-waymarker-10",
+    "map3-hub-waymarker-11",
+    "map3-hub-waymarker-12",
+    "map3-hub-waymarker-13",
+    "map3-hub-waymarker-14",
+    "map3-hub-waymarker-15",
+    "map3-lane-shoreline",
+    "map3-lane-colosseum",
+    "map3-lane-raymarch",
+    "map3-lane-grammar",
+    "map3-lane-vegetation",
+    "map3-lane-godrays",
+    "map3-lane-seasons",
+    "Map3 arena-render-batches"
+  ],
+  "lanes": {
+    "map3-lane-shoreline": {
+      "meshes": 34,
+      "triangles": 35826,
+      "names": [
+        "map3-shoreline-water-surface",
+        "map3-shoreline-sand-terrain",
+        "map3-shoreline-pier",
+        "map3-shoreline-marram-grass",
+        "map3-shoreline-floating-barrel",
+        "map3-shoreline-floating-barrel-hoop",
+        "map3-shoreline-floating-crate",
+        "map3-shoreline-floating-buoy",
+        "map3-shoreline-floating-buoy-ring",
+        "map3-shoreline-floating-buoy-mast",
+        "map3-shoreline-floating-driftwood",
+        "map3-shoreline-spray-particles",
+        "map3-shoreline-rover-body",
+        "map3-shoreline-rover-tyre",
+        "map3-shoreline-rover-rim"
+      ]
+    },
+    "map3-lane-colosseum": {
+      "meshes": 10,
+      "triangles": 23669,
+      "names": [
+        "map3-colosseum-cavity-depth-eraser",
+        "map3-colosseum-cavea-terrain",
+        "map3-colosseum-arena-sand-terrain",
+        "map3-colosseum-hypogeum",
+        "map3-colosseum-apron-ground",
+        "map3-colosseum-arcade",
+        "map3-colosseum-overlook-terrace-ground",
+        "map3-colosseum-distant-skyline-backdrop",
+        "map3-colosseum-atmosphere-haze",
+        "map3-colosseum-light-shaft-volume"
+      ]
+    },
+    "map3-lane-raymarch": {
+      "meshes": 7,
+      "triangles": 308,
+      "names": [
+        "map3-raymarch-floor",
+        "map3-raymarch-sdf-block",
+        "map3-raymarch-drum"
+      ]
+    },
+    "map3-lane-grammar": {
+      "meshes": 15,
+      "triangles": 3092,
+      "names": [
+        "map3-grammar-floor",
+        "map3-grammar-cluster-0",
+        "map3-grammar-cluster-1",
+        "map3-grammar-cluster-2",
+        "map3-grammar-cluster-3",
+        "map3-grammar-cluster-4",
+        "map3-grammar-cluster-5",
+        "map3-grammar-cluster-6",
+        "map3-grammar-cluster-7",
+        "map3-grammar-cluster-8",
+        "map3-grammar-cluster-9",
+        "map3-grammar-cluster-10",
+        "map3-grammar-cluster-11",
+        "map3-grammar-cluster-12",
+        "map3-grammar-cluster-13"
+      ]
+    },
+    "map3-lane-vegetation": {
+      "meshes": 23,
+      "triangles": 260184,
+      "names": [
+        "map3-forest-floor",
+        "map3-forest-trunk-batch",
+        "map3-forest-trunk-batch-conifer",
+        "map3-forest-canopy-leaves-summer",
+        "map3-forest-canopy-leaves-autumn",
+        "map3-forest-canopy-leaves-spring",
+        "map3-forest-canopy-leaves-flat",
+        "map3-forest-sapling-branch-instances",
+        "map3-forest-sapling-foliage-instances",
+        "map3-forest-shrub-instances",
+        "map3-forest-grass-instances",
+        "map3-forest-rover-body",
+        "map3-forest-rover-frame",
+        "map3-forest-rover-tray",
+        "map3-forest-rover-lamps",
+        "map3-forest-rover-tyre",
+        "map3-forest-rover-rim"
+      ]
+    },
+    "map3-lane-godrays": {
+      "meshes": 6,
+      "triangles": 5838,
+      "names": [
+        "map3-godrays-hall-floor",
+        "map3-godrays-colonnade",
+        "map3-godrays-rolling-body",
+        "map3-godrays-light-shaft-volume",
+        "map3-godrays-dust-mote-particles"
+      ]
+    },
+    "map3-lane-seasons": {
+      "meshes": 8,
+      "triangles": 64316,
+      "names": [
+        "map3-seasons-ground",
+        "map3-seasons-canopy-leaves-0",
+        "map3-seasons-canopy-leaves-1",
+        "map3-seasons-canopy-leaves-2",
+        "map3-seasons-canopy-leaves-3",
+        "map3-seasons-trunk-batch",
+        "map3-seasons-precipitation-particles",
+        "map3-seasons-splash-rings"
+      ]
+    }
+  }
+}

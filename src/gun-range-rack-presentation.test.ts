@@ -89,10 +89,34 @@ describe('Gun Range authored rack presentation', () => {
     expect(qualityGate).toContain("else if (id === 'gun-range')");
     expect(qualityGate).toContain("await loadGunRangeRackPresentation(selectedArenaAuthority('gun-range').root");
     expect(qualityGate).toContain("arenaVisualStream.recordSelectedAssetRequest('gun-range', url)");
-    expect(deployment.indexOf('await ensureSelectedQualityPresentation(selectedArena.id)'))
-      .toBeLessThan(deployment.indexOf('batchSelectedArenaPresentation()'));
-    expect(deployment.indexOf('batchSelectedArenaPresentation()'))
-      .toBeLessThan(deployment.indexOf('await submitForegroundWebGpuFrame()'));
+    // CANDIDATE 8: `cold-path-2` hoisted a SECOND batching call into this
+    // function, ahead of the quality await, to cut fenced cold draws 713 -> 190
+    // - and gated it `selectedArena.id !== 'gun-range'` precisely so the Gun
+    // Range rack still batches only after its authored racks are loaded. A bare
+    // indexOf() finds that early gated call first and reads as a violation, so
+    // the pin below is re-expressed instead of relaxed: it now proves the
+    // exemption exists rather than assuming the first call is the only one.
+    const awaitAt = deployment.indexOf('await ensureSelectedQualityPresentation(selectedArena.id)');
+    expect(awaitAt, 'the quality-presentation await must still be in performArenaSelection')
+      .toBeGreaterThanOrEqual(0);
+    const batchAt: number[] = [];
+    for (let at = deployment.indexOf('batchSelectedArenaPresentation()'); at >= 0;
+      at = deployment.indexOf('batchSelectedArenaPresentation()', at + 1)) batchAt.push(at);
+    expect(batchAt.length, 'performArenaSelection must batch the selected arena').toBeGreaterThan(0);
+
+    // Anything that batches BEFORE the rack load is awaited must skip gun-range.
+    for (const at of batchAt.filter((index) => index < awaitAt)) {
+      expect(
+        deployment.slice(Math.max(0, at - 200), at),
+        'a batching call placed before the quality await must be gated off gun-range, '
+        + 'or the authored racks are batched before they are loaded',
+      ).toContain("selectedArena.id !== 'gun-range'");
+    }
+
+    // And gun-range's own batching still sits between the await and the frame.
+    const ungatedAt = batchAt.find((index) => index > awaitAt);
+    expect(ungatedAt, 'the ungated batching call must follow the quality await').toBeDefined();
+    expect(ungatedAt!).toBeLessThan(deployment.indexOf('await submitForegroundWebGpuFrame()'));
     expect(source).toContain('rackPresentation: arena.root.userData.gunRangeRackPresentation ?? null');
     expect(source).toContain('authored: rackModel?.userData.projectOriginalWeapon === true');
     expect(source).toContain('deliveryVariant: rackModel?.userData.deliveryVariant ?? null');

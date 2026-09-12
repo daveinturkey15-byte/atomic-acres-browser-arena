@@ -1,0 +1,96 @@
+{
+  "policy": "HF-400",
+  "mode": "publish",
+  "ghPagesDir": "C:\\Users\\david\\projects\\aa-claude-release84\\.gh-pages-publish",
+  "channel": "channels/pass95",
+  "backup": "channels/pass94",
+  "treesPresent": [],
+  "treesToDelete": [],
+  "treesKept": [],
+  "treeAdded": "pass95",
+  "postState": [
+    "pass95"
+  ],
+  "chooser": {
+    "keys": [
+      "experimental",
+      "previous"
+    ],
+    "channels": {
+      "experimental": {
+        "label": "PASS 95",
+        "description": "Candidate 8: Nuke Town Rebuild accuracy and interiors, cold-path load work, killstreak awareness and chopper-gunner damage, care-package grant-once, thin-metal perforation, bot prone/crouch animation and multiplayer soak repairs.",
+        "pass": "PASS 95",
+        "path": "channels/pass95",
+        "deploymentState": "live"
+      },
+      "previous": {
+        "label": "PASS 94 \u00b7 SAFE BACKUP",
+        "description": "The build that was live before this one, pinned as the single safe backup (owner, 2026-09-02). Pick this if the newest pass misbehaves.",
+        "pass": "PASS 94",
+        "path": "channels/pass94"
+      }
+    },
+    "droppedLiveKeys": [
+      "experimental",
+      "previous"
+    ]
+  },
+  "fallback": {
+    "key": "pass94Backup",
+    "path": "channels/pass94",
+    "pass": "PASS 94",
+    "ok": false
+  },
+  "generation": "fa874a801d65",
+  "keepGenerations": [
+    "2ff646727518",
+    "fa874a801d65"
+  ],
+  "rootFilesToWrite": [
+    "index.html",
+    "release-shell.fa874a801d65.js",
+    "release-shell.fa874a801d65.css",
+    "release-manifest.fa874a801d65.json",
+    "release-index.json",
+    "release-shell.js",
+    "release-shell.css",
+    "release-channel-config.js"
+  ],
+  "rootAssetsToSweep": [
+    "release-manifest.f45765ee9b4f.json",
+    "release-shell.f45765ee9b4f.css",
+    "release-shell.f45765ee9b4f.js"
+  ],
+  "guards": {
+    "build-present": {
+      "ok": false,
+      "detail": "no build at C:\\Users\\david\\projects\\aa-claude-release84\\dist-pass95"
+    },
+    "backup-present": {
+      "ok": false,
+      "detail": "REFUSING: gh-pages has no ['pass94'] tree to pin as the safe backup (present: ['pass92', 'pass93']). HF-400 pins PASS 94 beside PASS 95; it cannot be pinned if it is not there."
+    },
+    "predecessor-red-test": {
+      "ok": true,
+      "detail": "OK"
+    },
+    "predecessors-offered": {
+      "ok": true,
+      "detail": "OK"
+    },
+    "chooser-matches-post-state": {
+      "ok": false,
+      "detail": "REFUSING: chooser offers trees ['pass94', 'pass95'] but gh-pages would carry ['pass95']; the two must be identical under HF-400"
+    },
+    "post-state-exact": {
+      "ok": false,
+      "detail": "post-state would be ['pass95'], expected ['pass94', 'pass95']"
+    },
+    "in-build-fallback": {
+      "ok": false,
+      "detail": "REFUSING: the in-build fallback channels/pass94 is NOT on gh-pages. Every visitor opening a channel URL directly would be offered PASS 94 and get a 404."
+    }
+  },
+  "wouldPublish": false
+}

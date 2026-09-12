@@ -1,0 +1,63 @@
+{
+  "constants": {
+    "EYE": 1.7,
+    "JUMP": 6.35,
+    "PLAYER_JUMP_GRAVITY": -24.5,
+    "OVERDRIVE_POSITION": {
+      "x": 0,
+      "y": 3.75,
+      "z": 0
+    },
+    "OVERDRIVE_PICKUP_RADIUS": 1.65,
+    "OVERDRIVE_PICKUP_HEIGHT_WINDOW_M": 1.9
+  },
+  "bus": {
+    "floorY": 0.05,
+    "roofY": 3.15
+  },
+  "apexFromFlat": 0.8229081632653061,
+  "roadStand": {
+    "eye": 1.7,
+    "claimed": false
+  },
+  "aisleStand": {
+    "eye": 1.75,
+    "claimed": false
+  },
+  "roofStand": {
+    "eye": 4.85,
+    "claimed": true
+  },
+  "aisleJumpApex": {
+    "eye": 2.572908163265306,
+    "claimed": true
+  },
+  "roadJumpApex": {
+    "eye": 2.5229081632653063,
+    "claimed": true
+  },
+  "climbToRoof": {
+    "peakEye": 5.718088188171387,
+    "peakAt": {
+      "x": 0,
+      "z": 0
+    },
+    "end": {
+      "x": 0,
+      "y": 5.658227958679199,
+      "z": 0
+    }
+  },
+  "jumpAtFlank": {
+    "peakEye": 2.567820587158203,
+    "peakAt": {
+      "x": 1.0000014305114746,
+      "z": 1.6550999879837036
+    },
+    "end": {
+      "x": 0.9998863339424133,
+      "y": 2.4769293451309204,
+      "z": 1.65510892868042
+    }
+  }
+}

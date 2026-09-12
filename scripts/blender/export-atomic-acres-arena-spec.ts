@@ -1,11 +1,109 @@
 // @ts-nocheck -- executed by vite-node as a deterministic Blender authoring tool.
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { ARENA_BOUNDS, COVER_LAYOUT, GARAGE_LAYOUT, HOUSE_LAYOUT } from '../../src/arena-layout';
+import {
+  ARENA_BOUNDS,
+  CENTRAL_BUS,
+  COVER_LAYOUT,
+  KERB_CAR_LAYOUT,
+  KERB_CAR_SIZE,
+  GARAGE_LAYOUT,
+  GARAGE_SIZE,
+  HOUSE_LAYOUT,
+  PARKED_VAN_LAYOUT,
+  PARKED_VAN_SIZE,
+  STREET_CRATE_HEIGHT,
+  STREET_CRATE_LOW_X,
+  STREET_CRATE_TALL_HEIGHT,
+  STREET_CRATE_TALL_X,
+  STREET_HALF_WIDTH,
+} from '../../src/arena-layout';
 import { createHouseArchitecture } from '../../src/house-navigation';
+// Anchors live with the art authority in src/map.ts, not with the layout constants.
+import { AUTHORED_LARGE_COVER_ANCHORS, AUTHORED_LARGE_COVER_HEIGHT, authoredLargeCoverIdAt } from '../../src/map';
 
 const output = resolve(process.argv[2] ?? 'source-assets/blender/atomic-acres-arena-spec.json');
 const houses = HOUSE_LAYOUT.map((house) => createHouseArchitecture(house.team, house.x, house.z, house.facing));
+
+// Pass 81 / HF-383c. The carriageway, kerbs, pavements and boundary fences used
+// to be flat literals here, frozen at the pre-HF-383 62 x 60 m arena with a 10 m
+// road. That made the exporter a dead end: ARENA_BOUNDS and STREET_HALF_WIDTH
+// could move (and did - 62x60 -> 62x63, half width 5 -> 6.5) while re-running
+// the exporter still emitted the old fence line and the old road, so the Quality
+// profile's baked GLB drew an arena 3 m shallower and 3 m narrower-roaded than
+// the one the player collides with. Everything below is now derived. Each
+// formula was checked against the pre-HF-383 checked-in spec: at
+// STREET_HALF_WIDTH = 5 and 62 x 60 m bounds they reproduce 5.6 / 7.5 / 10 m
+// road / +/-30.3 / 61.6 exactly, so these are the authored relationships
+// recovered, not new ones invented.
+const ARENA_WIDTH = ARENA_BOUNDS.maxX - ARENA_BOUNDS.minX; // along the street (X)
+const ARENA_DEPTH = ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ; // across the street (Z)
+const ARENA_CENTRE_X = (ARENA_BOUNDS.minX + ARENA_BOUNDS.maxX) / 2;
+const ARENA_CENTRE_Z = (ARENA_BOUNDS.minZ + ARENA_BOUNDS.maxZ) / 2;
+
+/** Asphalt overruns the end fences by 1 m so no seam shows at either mouth. */
+// v3: the asphalt ends at STREET_END_X (+/-35); the end aprons are lawn.
+const STREET_LENGTH = 70;
+/** Authored kerb section: fixed depth, sitting immediately outside the asphalt. */
+const CURB_DEPTH = 1.2;
+const CURB_Z = STREET_HALF_WIDTH + CURB_DEPTH / 2;
+/**
+ * Outer edge of the walkable concrete band. This is the classifier boundary in
+ * classifyFootstepSurface (src/combat-feedback.ts:79): |z| <= STREET_HALF_WIDTH
+ * reports asphalt, |z| <= 8.8 reports concrete, beyond that soil. The kerb and
+ * pavement together have to tile exactly that band or the art disagrees with the
+ * footstep audio - which is what HF-383c's widened road caused, leaving 1.5 m
+ * strips each side that sounded like asphalt while the GLB drew kerb and grass.
+ * src/blender-arena-surface-binding.test.ts pins the agreement in both directions.
+ */
+const PAVEMENT_OUTER_Z = 8.8;
+/** Derived metres are rounded to micrometres so the checked-in spec stays free
+ * of binary-float tails like 1.1000000000000005 and diffs stay readable. */
+const metres = (value: number) => Number(value.toFixed(6));
+const SIDEWALK_DEPTH = metres(PAVEMENT_OUTER_Z - (STREET_HALF_WIDTH + CURB_DEPTH));
+const SIDEWALK_Z = metres(PAVEMENT_OUTER_Z - SIDEWALK_DEPTH / 2);
+
+/** Boundary fence section, mirroring the procedural runs at src/map.ts:817-820. */
+const BOUNDARY_THICKNESS = 0.6;
+const BOUNDARY_HEIGHT = 3;
+/** Each run overshoots its bound line so the four corners close with no gap. */
+const BOUNDARY_OVERHANG = 0.5;
+const BOUNDARY_SIDE_X = ARENA_WIDTH / 2 + BOUNDARY_THICKNESS / 2;
+const BOUNDARY_END_Z = ARENA_DEPTH / 2 + BOUNDARY_THICKNESS / 2;
+/** Side runs additionally cover the end runs' thickness, so the corners lap. */
+const BOUNDARY_SIDE_LENGTH = ARENA_DEPTH + BOUNDARY_THICKNESS + BOUNDARY_OVERHANG * 2;
+const BOUNDARY_END_LENGTH = ARENA_WIDTH + BOUNDARY_OVERHANG * 2;
+
+/** Plain lane cover; the two street classes and authored anchors override it. */
+const DEFAULT_COVER_HEIGHT = 1.6;
+/**
+ * Owner 2026-08-30, "collision is bad on things like the bench and some crates".
+ * COVER_LAYOUT only carries [x, z, width, depth], so the height a cover box
+ * collides at was re-derived independently in three places and the Blender
+ * generator - the only art the 'blender' render profile shows, since that
+ * profile hides arena.root (src/legacy-main.ts:27418) - had NO height channel
+ * at all and baked a flat 1.6 m block. The 2026-08-29/30 jump-stairway pass
+ * moved the street crates to 0.75 / 1.5 m in src/map.ts:913-915 and
+ * src/environment-assets.ts:635-637 but could not move the GLB, so the crate
+ * the owner actually SEES stood 0.85 m proud of the box he collides with.
+ * Publishing the height makes the spec authority-carrying instead of a hint.
+ * (This ternary is still a fourth copy of the rule; hoisting a shared
+ * coverHeightAt() into src/arena-layout.ts is the real cure and is filed as a
+ * follow-up - both owning files belong to other lanes this pass.)
+ */
+const coverHeightAt = (x: number, z: number): number => (
+  authoredLargeCoverIdAt(x, z) ? AUTHORED_LARGE_COVER_HEIGHT
+    : Math.abs(x) === STREET_CRATE_LOW_X ? STREET_CRATE_HEIGHT
+      : Math.abs(x) === STREET_CRATE_TALL_X ? STREET_CRATE_TALL_HEIGHT
+        : DEFAULT_COVER_HEIGHT
+);
+
+if (SIDEWALK_DEPTH <= 0) {
+  throw new Error(
+    `STREET_HALF_WIDTH ${STREET_HALF_WIDTH} plus a ${CURB_DEPTH} m kerb leaves no pavement `
+    + `inside the ${PAVEMENT_OUTER_Z} m concrete band; widen the band or narrow the road.`,
+  );
+}
 
 const spec = {
   schema: 'atomic-acres-blender-arena-v1',
@@ -23,35 +121,84 @@ const spec = {
   bounds: ARENA_BOUNDS,
   houses,
   garages: GARAGE_LAYOUT,
-  cover: COVER_LAYOUT,
+  garageSize: GARAGE_SIZE,
+  // [x, z, width, depth, HEIGHT] - the height channel is v6 (2026-08-30); see
+  // coverHeightAt above for why the generator must not re-guess it.
+  cover: COVER_LAYOUT.map(([x, z, width, depth]) => [x, z, width, depth, coverHeightAt(x, z)]),
+  // Which lane anchors carry authored art, keyed by COORDINATE not by index.
+  // The generator used to branch on `index == 4..7` and label the marker with
+  // `[index - 4]`. HF-383b cut COVER_LAYOUT to six entries, so indices 6 and 7
+  // stopped existing and the service skip and generator trailer were silently
+  // never BUILT - not merely unlabelled. Publishing the anchors means a future
+  // layout edit either keeps the anchor and the art follows it, or drops it and
+  // src/blender-environment.test.ts fails loudly.
+  authoredLargeCover: AUTHORED_LARGE_COVER_ANCHORS.map(([x, z, id]) => [x, z, id]),
+  // v3 (owner HITL 2026-08-29): hedges, spawn fences and garden cover are
+  // DELETED from the arena; the families stay in the schema as empty lists
+  // so the generator contract is explicit rather than absent.
+  streetHedges: { front: [] },
+  spawnEndFences: [],
+  gardenCover: [],
+  kerbCars: KERB_CAR_LAYOUT.map((car) => ({
+    id: car.id,
+    position: [car.x, KERB_CAR_SIZE[1] / 2, car.z],
+    size: [...KERB_CAR_SIZE],
+  })),
+  parkedVans: PARKED_VAN_LAYOUT.map((van) => ({
+    id: van.id,
+    position: [van.x, PARKED_VAN_SIZE[1] / 2, van.z],
+    size: [...PARKED_VAN_SIZE],
+  })),
   roadway: {
-    ground: { position: [0, -0.09, 0], size: [86, 0.18, 98] },
-    road: { position: [0, 0.015, 0], size: [19, 0.03, 88] },
-    curbs: [-10.25, 10.25].map((x) => ({ position: [x, 0.12, 0], size: [1.4, 0.24, 88] })),
-    sidewalks: [-12.6, 12.6].map((x) => ({ position: [x, 0.07, 0], size: [3.2, 0.14, 88] })),
-    // Pull the two centre-line segments away from the crosswalk footprints;
-    // stacking them a few millimetres below the white bars shimmered at range.
-    laneMarkers: [-36, -28, -22, -12, -4, 4, 12, 22, 28, 36]
-      .map((z) => ({ position: [0, 0.055, z], size: [0.18, 0.03, 3.6] })),
-    crosswalks: [-18, 18].flatMap((z) => Array.from({ length: 7 }, (_, index) => ({
-      position: [-7.5 + index * 2.5, 0.062, z], size: [1.4, 0.025, 3.2],
+    ground: { position: [0, -0.09, 0], size: [ARENA_BOUNDS.maxX - ARENA_BOUNDS.minX + 2, 0.18, ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ + 2] },
+    road: {
+      position: [ARENA_CENTRE_X, 0.015, ARENA_CENTRE_Z],
+      size: [STREET_LENGTH, 0.03, STREET_HALF_WIDTH * 2],
+    },
+    curbs: [-CURB_Z, CURB_Z].map((z) => ({
+      position: [ARENA_CENTRE_X, 0.12, ARENA_CENTRE_Z + z], size: [STREET_LENGTH, 0.24, CURB_DEPTH],
+    })),
+    sidewalks: [-SIDEWALK_Z, SIDEWALK_Z].map((z) => ({
+      position: [ARENA_CENTRE_X, 0.07, ARENA_CENTRE_Z + z], size: [STREET_LENGTH, 0.14, SIDEWALK_DEPTH],
+    })),
+    // Centre-line dashes run along the street; the two crosswalk bands sit
+    // clear of them so nothing stacks a few millimetres under the white bars.
+    laneMarkers: [-32, -24, -16, -8, 8, 16, 24, 32]
+      .map((x) => ({ position: [x, 0.055, 0], size: [3.6, 0.03, 0.18] })),
+    crosswalks: [-16, 16].flatMap((x) => [-4.5, -3, -1.5, 0, 1.5, 3, 4.5].map((z) => ({
+      position: [x, 0.062, z], size: [3.2, 0.025, 1.4],
     }))),
   },
+  // One bus, parked broadside in the middle of the street. It is the map's
+  // single central hard-cover anchor and the first contested object.
   vehicles: [
-    { id: 'armored-transit', position: [-3.8, 0, 7], facing: 1 },
-    { id: 'agritech-carrier', position: [4.2, 0, -8], facing: -1 },
+    { id: 'armored-transit', position: [CENTRAL_BUS.x, 0, CENTRAL_BUS.z], facing: 1, length: CENTRAL_BUS.assetLength },
   ],
-  routeStructures: [
-    { id: 'west-hydroponics', position: [-25.5, 0, 16] },
-    { id: 'east-service-channel', position: [25.5, 0, 9] },
-    { id: 'east-solar-canopy', position: [26, 0, -16] },
-    { id: 'atomic-beacon', position: [27, 0, -1.5] },
-  ],
+  yardFences: [],
+  // DECLUTTER 2026-08-29: the campus routeStructures (hydroponics, service
+  // channel, solar canopy, beacon) left the playable area entirely.
+  routeStructures: [],
   boundaries: [
-    { id: 'west', position: [-34.3, 1.5, 0], size: [0.6, 3, 86] },
-    { id: 'east', position: [34.3, 1.5, 0], size: [0.6, 3, 86] },
-    { id: 'north', position: [0, 1.5, -43.3], size: [69, 3, 0.6] },
-    { id: 'south', position: [0, 1.5, 43.3], size: [69, 3, 0.6] },
+    {
+      id: 'west',
+      position: [ARENA_CENTRE_X - BOUNDARY_SIDE_X, BOUNDARY_HEIGHT / 2, ARENA_CENTRE_Z],
+      size: [BOUNDARY_THICKNESS, BOUNDARY_HEIGHT, BOUNDARY_SIDE_LENGTH],
+    },
+    {
+      id: 'east',
+      position: [ARENA_CENTRE_X + BOUNDARY_SIDE_X, BOUNDARY_HEIGHT / 2, ARENA_CENTRE_Z],
+      size: [BOUNDARY_THICKNESS, BOUNDARY_HEIGHT, BOUNDARY_SIDE_LENGTH],
+    },
+    {
+      id: 'north',
+      position: [ARENA_CENTRE_X, BOUNDARY_HEIGHT / 2, ARENA_CENTRE_Z - BOUNDARY_END_Z],
+      size: [BOUNDARY_END_LENGTH, BOUNDARY_HEIGHT, BOUNDARY_THICKNESS],
+    },
+    {
+      id: 'south',
+      position: [ARENA_CENTRE_X, BOUNDARY_HEIGHT / 2, ARENA_CENTRE_Z + BOUNDARY_END_Z],
+      size: [BOUNDARY_END_LENGTH, BOUNDARY_HEIGHT, BOUNDARY_THICKNESS],
+    },
   ],
 };
 

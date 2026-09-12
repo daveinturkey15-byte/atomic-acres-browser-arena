@@ -1,0 +1,62 @@
+farcrysis art first pass - FRAME TONE, before vs after (PASS 87 Lane R, HF-423)
+
+Instrument: scripts/qa/measure-farcrysis-frame-tone.mjs over
+scripts/qa/capture-arena-viewpoints.mjs runs (installed Chrome headless, real
+WebGPU on nvidia, 3 samples per viewpoint). Regenerated 2026-09-03 over the SAME
+two capture directories with the `--exclude` aggregate added:
+
+  node scripts/qa/measure-farcrysis-frame-tone.mjs --exclude farcrysis-core-interior \
+    artifacts/viewpoint-regression/laneR-art-before \
+    artifacts/viewpoint-regression/laneR-art-after4
+
+READ BOTH AGGREGATE ROWS. They point different ways and both are honest:
+
+  ALL VIEWS (6)   crushed 20.59% -> 20.02%.  The arena's whole review set. Barely
+                  moved, because farcrysis-core-interior went 21.31% -> 42.88%.
+  EXCL core (5)   crushed 20.45% -> 15.45% (-5.0 pp, -24.6% relative), p05 luma
+                  0.0075 -> 0.0113 (+52%; it was literally 0.0000 on three
+                  frames before), p50 0.2300 -> 0.2342 (+1.8%, so the lift did
+                  not wash the frame out), chroma 0.6672 -> 0.7093 (+6.1%).
+
+WHY THE SUBSET EXISTS, and why it is not the headline on its own: the
+farcrysis-core-interior camera MOVED in this same pass. Before, it sat inside
+farcrysis-core-catwalk - nearest opaque surface 0.01 m, the catwalk filling
+64.3% of the frame - so its 21.31% "before" is the crushed share of a plank
+against the lens, not of the interior. After the move ([-4.3,1.65,0] ->
+[3.4,1.9,2.4]) it is the first honest look into the core building: nearest
+surface 1.24 m, 32 distinct surfaces against 23. That honest view measures
+42.88% crushed, and that is a REAL finding about the arena, not an artefact:
+the research station declares three practicals and none of them carries a
+`light`, and the building has no authored interior floor or enclosing walls on
+its exposed sides. Both are recorded as open items.
+
+So: the five unchanged cameras measure the lighting change (clearly better);
+the six-camera aggregate measures the review set (roughly a wash, because one
+camera stopped lying). Neither number is the whole answer alone.
+
+Instrument noise floor, measured from the three samples per viewpoint in these
+same captures: worst single-view spread 0.01 pp. Every delta above is real.
+
+--- raw output ---
+
+artifacts/viewpoint-regression/laneR-art-before
+  farcrysis-beach-golden           crushed=36.76% p05=0.0000 p50=0.1942 chroma=0.6763 [n=3 spread 0.00pp]
+  farcrysis-core-interior          crushed=21.31% p05=0.0000 p50=0.0584 chroma=0.7262 [n=3 spread 0.00pp]
+  farcrysis-island-topdown         crushed=2.38% p05=0.0270 p50=0.3187 chroma=0.6035 [n=3 spread 0.00pp]
+  farcrysis-jungle-dapple          crushed=8.54% p05=0.0098 p50=0.1334 chroma=0.7292 [n=3 spread 0.00pp]
+  farcrysis-seaplane-throwback     crushed=33.19% p05=0.0000 p50=0.1632 chroma=0.6593 [n=3 spread 0.01pp]
+  farcrysis-west-shoreline         crushed=21.38% p05=0.0005 p50=0.3406 chroma=0.6676 [n=3 spread 0.01pp]
+  ALL VIEWS (6)                    crushed=20.59% p05=0.0062 p50=0.2014 chroma=0.6770
+  EXCL farcrysis-core-interior (5) crushed=20.45% p05=0.0075 p50=0.2300 chroma=0.6672
+  ALL SAMPLES                      crushed=20.59% (n=18); worst single-view sample spread 0.01pp
+
+artifacts/viewpoint-regression/laneR-art-after4
+  farcrysis-beach-golden           crushed=33.32% p05=0.0011 p50=0.2040 chroma=0.7682 [n=3 spread 0.00pp]
+  farcrysis-core-interior          crushed=42.88% p05=0.0002 p50=0.0312 chroma=0.8251 [n=3 spread 0.00pp]
+  farcrysis-island-topdown         crushed=0.59% p05=0.0313 p50=0.3181 chroma=0.6115 [n=3 spread 0.00pp]
+  farcrysis-jungle-dapple          crushed=7.13% p05=0.0139 p50=0.1339 chroma=0.7344 [n=3 spread 0.00pp]
+  farcrysis-seaplane-throwback     crushed=19.78% p05=0.0040 p50=0.1733 chroma=0.7579 [n=3 spread 0.01pp]
+  farcrysis-west-shoreline         crushed=16.45% p05=0.0060 p50=0.3416 chroma=0.6746 [n=3 spread 0.01pp]
+  ALL VIEWS (6)                    crushed=20.02% p05=0.0094 p50=0.2003 chroma=0.7286
+  EXCL farcrysis-core-interior (5) crushed=15.45% p05=0.0113 p50=0.2342 chroma=0.7093
+  ALL SAMPLES                      crushed=20.03% (n=18); worst single-view sample spread 0.01pp

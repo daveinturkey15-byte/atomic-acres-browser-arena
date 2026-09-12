@@ -10,7 +10,7 @@ const weapons = ['carbine', 'smg', 'lmg', 'scattergun', 'sniper', 'pistol', 'mac
 const results = [];
 
 (async () => {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, args: ['--mute-audio'] });
   try {
     for (const viewport of viewports) {
       const page = await browser.newPage({ viewport });

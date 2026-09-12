@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { HOUSE_LAYOUT } from './arena-layout';
 import { arenaLightingProfile } from './blender-lighting';
 import {
   ATOMIC_INTERIOR_LIGHT_MAX_DISTANCE,
@@ -57,9 +58,8 @@ describe('Pass 29 practical and interior presentation', () => {
     expect(boundedInteriorLights.filter((light) => light.name.endsWith('-portal-light'))
       .every((light) => light.distance === ATOMIC_UPPER_PORTAL_LIGHT_DISTANCE && light.intensity <= 1.1)).toBe(true);
     for (const light of boundedInteriorLights) {
-      const houseOrigin = light.name.includes('aqua-irrigation-workshop')
-        ? new THREE.Vector2(-9, -28)
-        : new THREE.Vector2(9, 28);
+      const layout = HOUSE_LAYOUT[light.name.includes('aqua-irrigation-workshop') ? 0 : 1];
+      const houseOrigin = new THREE.Vector2(layout.x, layout.z);
       const world = light.getWorldPosition(new THREE.Vector3());
       expect(Math.abs(world.x - houseOrigin.x) + light.distance).toBeLessThan(10.1);
       expect(Math.abs(world.z - houseOrigin.y) + light.distance).toBeLessThan(8.2);

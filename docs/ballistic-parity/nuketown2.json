@@ -1,0 +1,1758 @@
+{
+ "arena": "nuketown2",
+ "contract": "every substantial visible mesh is rated for gunfire, excluded by a stated rule, or accepted below with a reason; unrated is the honest remainder",
+ "completionPercent": 100,
+ "ratchet": {
+  "unratedAfterLedger": 0,
+  "ceiling": 0,
+  "withinCeiling": true
+ },
+ "census": {
+  "total": 205,
+  "ratedDirect": 198,
+  "ratedByFootprint": 6,
+  "dynamicTargets": 0,
+  "excludedByRule": 1,
+  "unrated": 0,
+  "acceptedByLedger": 0,
+  "unratedAfterLedger": 0
+ },
+ "shotSurfaceStats": {
+  "total": 274,
+  "byMaterial": {
+   "earth": 78,
+   "concrete": 21,
+   "interior-wall": 82,
+   "wood": 36,
+   "glass": 11,
+   "structural-metal": 16,
+   "thin-metal": 6,
+   "fence": 6,
+   "vehicle": 18
+  },
+  "byClassification": {
+   "rule": 203,
+   "explicit": 71
+  }
+ },
+ "excludedByRule": {
+  "above the standing combat volume (canopy/eaves/overhead dressing)": 1
+ },
+ "footprintExplained": [
+  {
+   "name": "nuketown2-presentation-presentation-batch-3",
+   "centre": [
+    0,
+    3.1,
+    0
+   ],
+   "surfaceId": "Nuketown2 arena:81:nuketown2 north house wall east 1",
+   "surfaceMaterial": "interior-wall",
+   "share": 0
+  },
+  {
+   "name": "nuketown2-presentation-presentation-batch-4",
+   "centre": [
+    0,
+    3.1,
+    0
+   ],
+   "surfaceId": "Nuketown2 arena:79:nuketown2 north house wall east 0",
+   "surfaceMaterial": "interior-wall",
+   "share": 0
+  },
+  {
+   "name": "nuketown2-presentation-presentation-batch-5",
+   "centre": [
+    0,
+    1.65,
+    0
+   ],
+   "surfaceId": "Nuketown2 arena:81:nuketown2 north house wall east 1",
+   "surfaceMaterial": "interior-wall",
+   "share": 0
+  },
+  {
+   "name": "nuketown2-presentation-presentation-batch-9",
+   "centre": [
+    -0.59,
+    1.19,
+    0
+   ],
+   "surfaceId": "Nuketown2 arena:87:nuketown2 north house front pier 0",
+   "surfaceMaterial": "interior-wall",
+   "share": 0
+  },
+  {
+   "name": "nuketown2-presentation-presentation-batch-22",
+   "centre": [
+    0.21,
+    1.89,
+    0
+   ],
+   "surfaceId": "Nuketown2 arena:87:nuketown2 north house front pier 0",
+   "surfaceMaterial": "interior-wall",
+   "share": 0
+  },
+  {
+   "name": "nuketown2-presentation-presentation-batch-28",
+   "centre": [
+    -6.4,
+    2.25,
+    -2.65
+   ],
+   "surfaceId": "Nuketown2 arena:266:nuketown2 street-vehicle coach body",
+   "surfaceMaterial": "vehicle",
+   "share": 0.94
+  }
+ ],
+ "acceptedShootThrough": [],
+ "unratedMeshes": [],
+ "staleLedgerRows": [],
+ "shotSurfaces": [
+  {
+   "id": "Nuketown2 arena:0:nuketown2 ground tile 0",
+   "name": "nuketown2 ground tile 0",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:1:nuketown2 ground tile 1",
+   "name": "nuketown2 ground tile 1",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:2:nuketown2 ground tile 2",
+   "name": "nuketown2 ground tile 2",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:3:nuketown2 ground tile 3",
+   "name": "nuketown2 ground tile 3",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:4:nuketown2 ground tile 4",
+   "name": "nuketown2 ground tile 4",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:5:nuketown2 ground tile 5",
+   "name": "nuketown2 ground tile 5",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:6:nuketown2 ground tile 6",
+   "name": "nuketown2 ground tile 6",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:7:nuketown2 ground tile 7",
+   "name": "nuketown2 ground tile 7",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:8:nuketown2 ground tile 8",
+   "name": "nuketown2 ground tile 8",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:9:nuketown2 ground tile 9",
+   "name": "nuketown2 ground tile 9",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:10:nuketown2 ground tile 10",
+   "name": "nuketown2 ground tile 10",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:11:nuketown2 ground tile 11",
+   "name": "nuketown2 ground tile 11",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:12:nuketown2 ground tile 12",
+   "name": "nuketown2 ground tile 12",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:13:nuketown2 ground tile 13",
+   "name": "nuketown2 ground tile 13",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:14:nuketown2 ground tile 14",
+   "name": "nuketown2 ground tile 14",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:15:nuketown2 ground tile 15",
+   "name": "nuketown2 ground tile 15",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:16:nuketown2 ground tile 16",
+   "name": "nuketown2 ground tile 16",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:17:nuketown2 ground tile 17",
+   "name": "nuketown2 ground tile 17",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:18:nuketown2 ground tile 18",
+   "name": "nuketown2 ground tile 18",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:19:nuketown2 ground tile 19",
+   "name": "nuketown2 ground tile 19",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:20:nuketown2 ground tile 20",
+   "name": "nuketown2 ground tile 20",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:21:nuketown2 ground tile 21",
+   "name": "nuketown2 ground tile 21",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:22:nuketown2 ground tile 22",
+   "name": "nuketown2 ground tile 22",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:23:nuketown2 ground tile 23",
+   "name": "nuketown2 ground tile 23",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:24:nuketown2 ground tile 24",
+   "name": "nuketown2 ground tile 24",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:25:nuketown2 ground tile 25",
+   "name": "nuketown2 ground tile 25",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:26:nuketown2 ground tile 26",
+   "name": "nuketown2 ground tile 26",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:27:nuketown2 ground tile 27",
+   "name": "nuketown2 ground tile 27",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:28:nuketown2 ground tile 28",
+   "name": "nuketown2 ground tile 28",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:29:nuketown2 ground tile 29",
+   "name": "nuketown2 ground tile 29",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:30:nuketown2 ground tile 30",
+   "name": "nuketown2 ground tile 30",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:31:nuketown2 ground tile 31",
+   "name": "nuketown2 ground tile 31",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:32:nuketown2 ground tile 32",
+   "name": "nuketown2 ground tile 32",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:33:nuketown2 ground tile 33",
+   "name": "nuketown2 ground tile 33",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:34:nuketown2 ground tile 34",
+   "name": "nuketown2 ground tile 34",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:35:nuketown2 ground tile 35",
+   "name": "nuketown2 ground tile 35",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:36:nuketown2 ground tile 36",
+   "name": "nuketown2 ground tile 36",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:37:nuketown2 ground tile 37",
+   "name": "nuketown2 ground tile 37",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:38:nuketown2 ground tile 38",
+   "name": "nuketown2 ground tile 38",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:39:nuketown2 ground tile 39",
+   "name": "nuketown2 ground tile 39",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:40:nuketown2 ground tile 40",
+   "name": "nuketown2 ground tile 40",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:41:nuketown2 ground tile 41",
+   "name": "nuketown2 ground tile 41",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:42:nuketown2 ground tile 42",
+   "name": "nuketown2 ground tile 42",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:43:nuketown2 ground tile 43",
+   "name": "nuketown2 ground tile 43",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:44:nuketown2 ground tile 44",
+   "name": "nuketown2 ground tile 44",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:45:nuketown2 ground tile 45",
+   "name": "nuketown2 ground tile 45",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:46:nuketown2 ground tile 46",
+   "name": "nuketown2 ground tile 46",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:47:nuketown2 ground tile 47",
+   "name": "nuketown2 ground tile 47",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:48:nuketown2 ground tile 48",
+   "name": "nuketown2 ground tile 48",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:49:nuketown2 ground tile 49",
+   "name": "nuketown2 ground tile 49",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:50:nuketown2 ground tile 50",
+   "name": "nuketown2 ground tile 50",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:51:nuketown2 ground tile 51",
+   "name": "nuketown2 ground tile 51",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:52:nuketown2 ground tile 52",
+   "name": "nuketown2 ground tile 52",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:53:nuketown2 ground tile 53",
+   "name": "nuketown2 ground tile 53",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:54:nuketown2 ground tile 54",
+   "name": "nuketown2 ground tile 54",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:55:nuketown2 ground tile 55",
+   "name": "nuketown2 ground tile 55",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:56:nuketown2 ground tile 56",
+   "name": "nuketown2 ground tile 56",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:57:nuketown2 ground tile 57",
+   "name": "nuketown2 ground tile 57",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:58:nuketown2 ground tile 58",
+   "name": "nuketown2 ground tile 58",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:59:nuketown2 ground tile 59",
+   "name": "nuketown2 ground tile 59",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:60:nuketown2 ground tile 60",
+   "name": "nuketown2 ground tile 60",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:61:nuketown2 ground tile 61",
+   "name": "nuketown2 ground tile 61",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:62:nuketown2 ground tile 62",
+   "name": "nuketown2 ground tile 62",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:63:nuketown2 ground tile 63",
+   "name": "nuketown2 ground tile 63",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:64:nuketown2 ground tile 64",
+   "name": "nuketown2 ground tile 64",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:65:nuketown2 ground tile 65",
+   "name": "nuketown2 ground tile 65",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:66:nuketown2 street asphalt 0",
+   "name": "nuketown2 street asphalt 0",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:67:nuketown2 street asphalt 1",
+   "name": "nuketown2 street asphalt 1",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:68:nuketown2 street turning head",
+   "name": "nuketown2 street turning head",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:69:nuketown2 north street kerb 0",
+   "name": "nuketown2 north street kerb 0",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:70:nuketown2 south street kerb 0",
+   "name": "nuketown2 south street kerb 0",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:71:nuketown2 north street kerb 1",
+   "name": "nuketown2 north street kerb 1",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:72:nuketown2 south street kerb 1",
+   "name": "nuketown2 south street kerb 1",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:73:nuketown2 north house floor",
+   "name": "nuketown2 north house floor",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:74:nuketown2 south house floor",
+   "name": "nuketown2 south house floor",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:75:nuketown2 north house roof deck",
+   "name": "nuketown2 north house roof deck",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:76:nuketown2 south house roof deck",
+   "name": "nuketown2 south house roof deck",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:77:nuketown2 north house wall west",
+   "name": "nuketown2 north house wall west",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:78:nuketown2 south house wall west",
+   "name": "nuketown2 south house wall west",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:79:nuketown2 north house wall east 0",
+   "name": "nuketown2 north house wall east 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:80:nuketown2 south house wall east 0",
+   "name": "nuketown2 south house wall east 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:81:nuketown2 north house wall east 1",
+   "name": "nuketown2 north house wall east 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:82:nuketown2 south house wall east 1",
+   "name": "nuketown2 south house wall east 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:83:nuketown2 north house wall east lintel",
+   "name": "nuketown2 north house wall east lintel",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:84:nuketown2 south house wall east lintel",
+   "name": "nuketown2 south house wall east lintel",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:85:nuketown2 north house wall east upper",
+   "name": "nuketown2 north house wall east upper",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:86:nuketown2 south house wall east upper",
+   "name": "nuketown2 south house wall east upper",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:87:nuketown2 north house front pier 0",
+   "name": "nuketown2 north house front pier 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:88:nuketown2 south house front pier 0",
+   "name": "nuketown2 south house front pier 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:89:nuketown2 north house front pier 1",
+   "name": "nuketown2 north house front pier 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:90:nuketown2 south house front pier 1",
+   "name": "nuketown2 south house front pier 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:91:nuketown2 north house front pier 2",
+   "name": "nuketown2 north house front pier 2",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:92:nuketown2 south house front pier 2",
+   "name": "nuketown2 south house front pier 2",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:93:nuketown2 north house front pier 3",
+   "name": "nuketown2 north house front pier 3",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:94:nuketown2 south house front pier 3",
+   "name": "nuketown2 south house front pier 3",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:95:nuketown2 north house front window sill 0",
+   "name": "nuketown2 north house front window sill 0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:96:nuketown2 south house front window sill 0",
+   "name": "nuketown2 south house front window sill 0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:97:nuketown2 north house front window glass 0",
+   "name": "nuketown2 north house front window glass 0",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:98:nuketown2 south house front window glass 0",
+   "name": "nuketown2 south house front window glass 0",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:99:nuketown2 north house front window head 0",
+   "name": "nuketown2 north house front window head 0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:100:nuketown2 south house front window head 0",
+   "name": "nuketown2 south house front window head 0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:101:nuketown2 north house front window sill 1",
+   "name": "nuketown2 north house front window sill 1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:102:nuketown2 south house front window sill 1",
+   "name": "nuketown2 south house front window sill 1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:103:nuketown2 north house front window glass 1",
+   "name": "nuketown2 north house front window glass 1",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:104:nuketown2 south house front window glass 1",
+   "name": "nuketown2 south house front window glass 1",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:105:nuketown2 north house front window head 1",
+   "name": "nuketown2 north house front window head 1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:106:nuketown2 south house front window head 1",
+   "name": "nuketown2 south house front window head 1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:107:nuketown2 north house front door lintel",
+   "name": "nuketown2 north house front door lintel",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:108:nuketown2 south house front door lintel",
+   "name": "nuketown2 south house front door lintel",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:109:nuketown2 north house upper front pier 0",
+   "name": "nuketown2 north house upper front pier 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:110:nuketown2 south house upper front pier 0",
+   "name": "nuketown2 south house upper front pier 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:111:nuketown2 north house upper front pier 1",
+   "name": "nuketown2 north house upper front pier 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:112:nuketown2 south house upper front pier 1",
+   "name": "nuketown2 south house upper front pier 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:113:nuketown2 north house upper window sill",
+   "name": "nuketown2 north house upper window sill",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:114:nuketown2 south house upper window sill",
+   "name": "nuketown2 south house upper window sill",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:115:nuketown2 north house upper front window glass",
+   "name": "nuketown2 north house upper front window glass",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:116:nuketown2 south house upper front window glass",
+   "name": "nuketown2 south house upper front window glass",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:117:nuketown2 north house back pier 0",
+   "name": "nuketown2 north house back pier 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:118:nuketown2 south house back pier 0",
+   "name": "nuketown2 south house back pier 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:119:nuketown2 north house back pier 1",
+   "name": "nuketown2 north house back pier 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:120:nuketown2 south house back pier 1",
+   "name": "nuketown2 south house back pier 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:121:nuketown2 north house back door lintel",
+   "name": "nuketown2 north house back door lintel",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:122:nuketown2 south house back door lintel",
+   "name": "nuketown2 south house back door lintel",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:123:nuketown2 north house upper back pier 0",
+   "name": "nuketown2 north house upper back pier 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:124:nuketown2 south house upper back pier 0",
+   "name": "nuketown2 south house upper back pier 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:125:nuketown2 north house upper back pier 1",
+   "name": "nuketown2 north house upper back pier 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:126:nuketown2 south house upper back pier 1",
+   "name": "nuketown2 south house upper back pier 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:127:nuketown2 north house upper back sill",
+   "name": "nuketown2 north house upper back sill",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:128:nuketown2 south house upper back sill",
+   "name": "nuketown2 south house upper back sill",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:129:nuketown2 north house upper back window glass",
+   "name": "nuketown2 north house upper back window glass",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:130:nuketown2 south house upper back window glass",
+   "name": "nuketown2 south house upper back window glass",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:131:nuketown2 north house stair ramp",
+   "name": "nuketown2 north house stair ramp",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:132:nuketown2 south house stair ramp",
+   "name": "nuketown2 south house stair ramp",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:133:nuketown2 north house stair landing",
+   "name": "nuketown2 north house stair landing",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:134:nuketown2 south house stair landing",
+   "name": "nuketown2 south house stair landing",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:135:nuketown2 north house upper floor east",
+   "name": "nuketown2 north house upper floor east",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:136:nuketown2 south house upper floor east",
+   "name": "nuketown2 south house upper floor east",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:137:nuketown2 north house upper floor west back",
+   "name": "nuketown2 north house upper floor west back",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:138:nuketown2 south house upper floor west back",
+   "name": "nuketown2 south house upper floor west back",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:139:nuketown2 north house upper floor west front",
+   "name": "nuketown2 north house upper floor west front",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:140:nuketown2 south house upper floor west front",
+   "name": "nuketown2 south house upper floor west front",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:141:nuketown2 north house ground partition 0",
+   "name": "nuketown2 north house ground partition 0",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:142:nuketown2 south house ground partition 0",
+   "name": "nuketown2 south house ground partition 0",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:143:nuketown2 north house ground partition 1",
+   "name": "nuketown2 north house ground partition 1",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:144:nuketown2 south house ground partition 1",
+   "name": "nuketown2 south house ground partition 1",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:145:nuketown2 north house upper partition 0",
+   "name": "nuketown2 north house upper partition 0",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:146:nuketown2 south house upper partition 0",
+   "name": "nuketown2 south house upper partition 0",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:147:nuketown2 north house upper partition 1",
+   "name": "nuketown2 north house upper partition 1",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:148:nuketown2 south house upper partition 1",
+   "name": "nuketown2 south house upper partition 1",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:149:nuketown2 north house front room counter",
+   "name": "nuketown2 north house front room counter",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:150:nuketown2 south house front room counter",
+   "name": "nuketown2 south house front room counter",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:151:nuketown2 north house back room bench",
+   "name": "nuketown2 north house back room bench",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:152:nuketown2 south house back room bench",
+   "name": "nuketown2 south house back room bench",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:153:nuketown2 north house upper crate",
+   "name": "nuketown2 north house upper crate",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:154:nuketown2 south house upper crate",
+   "name": "nuketown2 south house upper crate",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:155:nuketown2 north garage floor",
+   "name": "nuketown2 north garage floor",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:156:nuketown2 south garage floor",
+   "name": "nuketown2 south garage floor",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:157:nuketown2 north garage roof",
+   "name": "nuketown2 north garage roof",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:158:nuketown2 south garage roof",
+   "name": "nuketown2 south garage roof",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:159:nuketown2 north garage wall outboard",
+   "name": "nuketown2 north garage wall outboard",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:160:nuketown2 south garage wall outboard",
+   "name": "nuketown2 south garage wall outboard",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:161:nuketown2 north garage link pier 0",
+   "name": "nuketown2 north garage link pier 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:162:nuketown2 south garage link pier 0",
+   "name": "nuketown2 south garage link pier 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:163:nuketown2 north garage link pier 1",
+   "name": "nuketown2 north garage link pier 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:164:nuketown2 south garage link pier 1",
+   "name": "nuketown2 south garage link pier 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:165:nuketown2 north garage front pier 0",
+   "name": "nuketown2 north garage front pier 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:166:nuketown2 south garage front pier 0",
+   "name": "nuketown2 south garage front pier 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:167:nuketown2 north garage front pier 1",
+   "name": "nuketown2 north garage front pier 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:168:nuketown2 south garage front pier 1",
+   "name": "nuketown2 south garage front pier 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:169:nuketown2 north garage door head",
+   "name": "nuketown2 north garage door head",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:170:nuketown2 south garage door head",
+   "name": "nuketown2 south garage door head",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:171:nuketown2 north garage back pier 0",
+   "name": "nuketown2 north garage back pier 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:172:nuketown2 south garage back pier 0",
+   "name": "nuketown2 south garage back pier 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:173:nuketown2 north garage back pier 1",
+   "name": "nuketown2 north garage back pier 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:174:nuketown2 south garage back pier 1",
+   "name": "nuketown2 south garage back pier 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:175:nuketown2 north garage back head",
+   "name": "nuketown2 north garage back head",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:176:nuketown2 south garage back head",
+   "name": "nuketown2 south garage back head",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:177:nuketown2 north garage bench",
+   "name": "nuketown2 north garage bench",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:178:nuketown2 south garage bench",
+   "name": "nuketown2 south garage bench",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:179:nuketown2 north verge mailbox post",
+   "name": "nuketown2 north verge mailbox post",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:180:nuketown2 south verge mailbox post",
+   "name": "nuketown2 south verge mailbox post",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:181:nuketown2 north verge mailbox",
+   "name": "nuketown2 north verge mailbox",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:182:nuketown2 south verge mailbox",
+   "name": "nuketown2 south verge mailbox",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:183:nuketown2 north verge parcel mailbox pedestal",
+   "name": "nuketown2 north verge parcel mailbox pedestal",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:184:nuketown2 south verge parcel mailbox pedestal",
+   "name": "nuketown2 south verge parcel mailbox pedestal",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:185:nuketown2 north verge parcel mailbox",
+   "name": "nuketown2 north verge parcel mailbox",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:186:nuketown2 south verge parcel mailbox",
+   "name": "nuketown2 south verge parcel mailbox",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:187:nuketown2 north verge wheelie bin 0",
+   "name": "nuketown2 north verge wheelie bin 0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:188:nuketown2 south verge wheelie bin 0",
+   "name": "nuketown2 south verge wheelie bin 0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:189:nuketown2 north verge wheelie bin 1",
+   "name": "nuketown2 north verge wheelie bin 1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:190:nuketown2 south verge wheelie bin 1",
+   "name": "nuketown2 south verge wheelie bin 1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:191:nuketown2 north verge street bin",
+   "name": "nuketown2 north verge street bin",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:192:nuketown2 south verge street bin",
+   "name": "nuketown2 south verge street bin",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:193:nuketown2 north verge hydrant body",
+   "name": "nuketown2 north verge hydrant body",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:194:nuketown2 south verge hydrant body",
+   "name": "nuketown2 south verge hydrant body",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:195:nuketown2 north verge street sign post",
+   "name": "nuketown2 north verge street sign post",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:196:nuketown2 south verge street sign post",
+   "name": "nuketown2 south verge street sign post",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:197:nuketown2 north verge street name blade",
+   "name": "nuketown2 north verge street name blade",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:198:nuketown2 south verge street name blade",
+   "name": "nuketown2 south verge street name blade",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:199:nuketown2 north verge speed limit sign",
+   "name": "nuketown2 north verge speed limit sign",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:200:nuketown2 south verge speed limit sign",
+   "name": "nuketown2 south verge speed limit sign",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:201:nuketown2 north verge drive edge",
+   "name": "nuketown2 north verge drive edge",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:202:nuketown2 south verge drive edge",
+   "name": "nuketown2 south verge drive edge",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:203:nuketown2 north verge front hedge",
+   "name": "nuketown2 north verge front hedge",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:204:nuketown2 south verge front hedge",
+   "name": "nuketown2 south verge front hedge",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:205:nuketown2 north verge planter",
+   "name": "nuketown2 north verge planter",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:206:nuketown2 south verge planter",
+   "name": "nuketown2 south verge planter",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:207:nuketown2 north verge low wall",
+   "name": "nuketown2 north verge low wall",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:208:nuketown2 south verge low wall",
+   "name": "nuketown2 south verge low wall",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:209:nuketown2 north verge kerb planter",
+   "name": "nuketown2 north verge kerb planter",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:210:nuketown2 south verge kerb planter",
+   "name": "nuketown2 south verge kerb planter",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:211:nuketown2 north verge front planter",
+   "name": "nuketown2 north verge front planter",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:212:nuketown2 south verge front planter",
+   "name": "nuketown2 south verge front planter",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:213:nuketown2 north verge entry planter urn",
+   "name": "nuketown2 north verge entry planter urn",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:214:nuketown2 south verge entry planter urn",
+   "name": "nuketown2 south verge entry planter urn",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:215:nuketown2 north verge sign post 0",
+   "name": "nuketown2 north verge sign post 0",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:216:nuketown2 south verge sign post 0",
+   "name": "nuketown2 south verge sign post 0",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:217:nuketown2 north verge sign post 1",
+   "name": "nuketown2 north verge sign post 1",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:218:nuketown2 south verge sign post 1",
+   "name": "nuketown2 south verge sign post 1",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:219:nuketown2 north verge sign board",
+   "name": "nuketown2 north verge sign board",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:220:nuketown2 south verge sign board",
+   "name": "nuketown2 south verge sign board",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:221:nuketown2 north yard fence run 0",
+   "name": "nuketown2 north yard fence run 0",
+   "material": "fence",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:222:nuketown2 south yard fence run 0",
+   "name": "nuketown2 south yard fence run 0",
+   "material": "fence",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:223:nuketown2 north yard fence run 1",
+   "name": "nuketown2 north yard fence run 1",
+   "material": "fence",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:224:nuketown2 south yard fence run 1",
+   "name": "nuketown2 south yard fence run 1",
+   "material": "fence",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:225:nuketown2 north yard fence run 2",
+   "name": "nuketown2 north yard fence run 2",
+   "material": "fence",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:226:nuketown2 south yard fence run 2",
+   "name": "nuketown2 south yard fence run 2",
+   "material": "fence",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:227:nuketown2 north yard porch",
+   "name": "nuketown2 north yard porch",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:228:nuketown2 south yard porch",
+   "name": "nuketown2 south yard porch",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:229:nuketown2 north yard cover crate",
+   "name": "nuketown2 north yard cover crate",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:230:nuketown2 south yard cover crate",
+   "name": "nuketown2 south yard cover crate",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:231:nuketown2 north yard cover wall",
+   "name": "nuketown2 north yard cover wall",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:232:nuketown2 south yard cover wall",
+   "name": "nuketown2 south yard cover wall",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:233:nuketown2 north yard patio table",
+   "name": "nuketown2 north yard patio table",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:234:nuketown2 south yard patio table",
+   "name": "nuketown2 south yard patio table",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:235:nuketown2 north yard side store",
+   "name": "nuketown2 north yard side store",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:236:nuketown2 south yard side store",
+   "name": "nuketown2 south yard side store",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:237:nuketown2 north yard alley planter",
+   "name": "nuketown2 north yard alley planter",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:238:nuketown2 south yard alley planter",
+   "name": "nuketown2 south yard alley planter",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:239:nuketown2 north yard far store",
+   "name": "nuketown2 north yard far store",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:240:nuketown2 south yard far store",
+   "name": "nuketown2 south yard far store",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:241:nuketown2 north yard far crate",
+   "name": "nuketown2 north yard far crate",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:242:nuketown2 south yard far crate",
+   "name": "nuketown2 south yard far crate",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:243:nuketown2 north path buttress west",
+   "name": "nuketown2 north path buttress west",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:244:nuketown2 south path buttress west",
+   "name": "nuketown2 south path buttress west",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:245:nuketown2 north path buttress east",
+   "name": "nuketown2 north path buttress east",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:246:nuketown2 south path buttress east",
+   "name": "nuketown2 south path buttress east",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:247:nuketown2 north yard butt",
+   "name": "nuketown2 north yard butt",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:248:nuketown2 south yard butt",
+   "name": "nuketown2 south yard butt",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:249:nuketown2 north perimeter wall long",
+   "name": "nuketown2 north perimeter wall long",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:250:nuketown2 south perimeter wall long",
+   "name": "nuketown2 south perimeter wall long",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:251:nuketown2 north perimeter wall end",
+   "name": "nuketown2 north perimeter wall end",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:252:nuketown2 south perimeter wall end",
+   "name": "nuketown2 south perimeter wall end",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:253:nuketown2 street-vehicle truck cab",
+   "name": "nuketown2 street-vehicle truck cab",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:254:nuketown2 street-vehicle truck deck",
+   "name": "nuketown2 street-vehicle truck deck",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:255:nuketown2 street-vehicle truck box bulkhead",
+   "name": "nuketown2 street-vehicle truck box bulkhead",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:256:nuketown2 street-vehicle truck box flank 0 pier 0",
+   "name": "nuketown2 street-vehicle truck box flank 0 pier 0",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:257:nuketown2 street-vehicle truck box flank 0 pier 1",
+   "name": "nuketown2 street-vehicle truck box flank 0 pier 1",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:258:nuketown2 street-vehicle truck box flank 0 header",
+   "name": "nuketown2 street-vehicle truck box flank 0 header",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:259:nuketown2 street-vehicle truck box flank 1 pier 0",
+   "name": "nuketown2 street-vehicle truck box flank 1 pier 0",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:260:nuketown2 street-vehicle truck box flank 1 pier 1",
+   "name": "nuketown2 street-vehicle truck box flank 1 pier 1",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:261:nuketown2 street-vehicle truck box flank 1 header",
+   "name": "nuketown2 street-vehicle truck box flank 1 header",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:262:nuketown2 street-vehicle truck box roof",
+   "name": "nuketown2 street-vehicle truck box roof",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:263:nuketown2 street-vehicle truck roof step 0",
+   "name": "nuketown2 street-vehicle truck roof step 0",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:264:nuketown2 street-vehicle truck roof step 1",
+   "name": "nuketown2 street-vehicle truck roof step 1",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:265:nuketown2 street-vehicle truck roof step 2",
+   "name": "nuketown2 street-vehicle truck roof step 2",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:266:nuketown2 street-vehicle coach body",
+   "name": "nuketown2 street-vehicle coach body",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:267:nuketown2 street-vehicle coach roof cap",
+   "name": "nuketown2 street-vehicle coach roof cap",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Nuketown2 arena:268:nuketown2 street-vehicle head car body",
+   "name": "nuketown2 street-vehicle head car body",
+   "material": "vehicle",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:269:nuketown2 street-vehicle head car cabin",
+   "name": "nuketown2 street-vehicle head car cabin",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:270:nuketown2 north car body",
+   "name": "nuketown2 north car body",
+   "material": "vehicle",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:271:nuketown2 south car body",
+   "name": "nuketown2 south car body",
+   "material": "vehicle",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:272:nuketown2 north car cabin",
+   "name": "nuketown2 north car cabin",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Nuketown2 arena:273:nuketown2 south car cabin",
+   "name": "nuketown2 south car cabin",
+   "material": "glass",
+   "classification": "explicit"
+  }
+ ]
+}

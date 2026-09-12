@@ -1,0 +1,82 @@
+HF-509 before-fix run of src/care-package-grant-once.test.ts (trimmed: the raw
+source-pin diffs were 3.6 MB of legacy-main.ts and are not evidence).
+
+ RUN  v4.1.9 C:/Users/david/projects/aa-v-care-package-grant-once
+     × redeems the crimson care reward through the redemption function, not a bare grant 64ms
+     × claims the package instance before granting, and grants only once admitted 1ms
+     × consumes the reward host-authoritatively and rolls the claim back if the host refuses 1ms
+     × keeps the local queue tracker fed from the replicated snapshot 76ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/care-package-grant-once.test.ts > HF-509 legacy-main redemption wiring > redeems the crimson care reward through the redemption function, not a bare grant
+AssertionError: expected 'import * as THREE from \'three\';\nim…' to contain 'redeemCarePackageWeaponReward(CRIMSON…'
++   hostedArenaDurationMs,
++   firstRenderDurationMs: number;
++   finalRenderDurationMs: number;
++       firstRenderDurationMs: Number((firstRenderedAt - firstRenderStartedAt).toFixed(3)),
++       finalRenderDurationMs: Number((finalRenderedAt - finalRenderStartedAt).toFixed(3)),
++   remainingDurationMs: number;
++   if (weapon === 'flare-gun') return FLARE_PROJECTILE_EFFECT.maximumFlightMs + FLARE_PROJECTILE_EFFECT.burnDurationMs + 1_000;
++     durationMs: WEAPONS[message.weapon].reload * 1_000 * killstreakActorModifiers(message.by, now).reloadDuration,
++ function gunRangeMatchClockDurationMs(): number | null {
++   const durationMs = gunRangeMatchClockDurationMs();
++   const durationMs = gunRangeMatchClockDurationMs();
++   const durationMs = gunRangeMatchClockDurationMs();
++   const durationMs = gunRangeMatchClockDurationMs();
++       effect.remainingMs + (effect.phase === 'flight' ? FLARE_PROJECTILE_EFFECT.burnDurationMs + 1_000 : 1_000),
++   const reloadDuration = killstreakActorModifiers(player.id, reloadStartedAt).reloadDuration;
++     seatAt: reloadStartedAt + (reloadState.seatAt - reloadStartedAt) * reloadDuration,
++     endsAt: reloadStartedAt + (reloadState.endsAt - reloadStartedAt) * reloadDuration,
++       + FLARE_PROJECTILE_EFFECT.burnDurationMs + 1_000,
++   const effectiveRemainingMs = Math.min(admission.remainingDurationMs, presentation.recoveryMs);
++     remainingDurationMs: effectiveRemainingMs,
++ function killstreakActorModifiers(actorId: string, now: number): Readonly<{ damage: number; movement: number; reloadDuration: number }> {
++   if (matchState.phase !== 'active') return { damage: 1, movement: 1, reloadDuration: 1 };
++   return { damage: active ? 1.1 : 1, movement: active ? 1.1 : 1, reloadDuration: active ? 0.9 : 1 };
++   // controls. Every hostedArenaDurationMs value is a published select option,
++     timeLimitSelect.value = String(hostedArenaDurationMs(arenaSelection(arenaId)));
++     durationMs: rangeLobby ? hostedArenaDurationMs(arenaSelection(arenaId)) : Number(timeLimitSelect.value),
++       remainingDurationMs: Math.max(0, flashExposureUntilHostTimeMs - currentHostTimeMs()),
++     const phaseDurations = new Map<string, number>();
++       phaseDurations.set(name, Number((performance.now() - phaseStartedAt).toFixed(3)));
++       const durationMs = phaseDurations.get(name);
++  * Closes the open marker and publishes the block. Durations are mark-to-mark, so
+ FAIL  src/care-package-grant-once.test.ts > HF-509 legacy-main redemption wiring > claims the package instance before granting, and grants only once admitted
+AssertionError: expected -1 to be greater than -1
+ FAIL  src/care-package-grant-once.test.ts > HF-509 legacy-main redemption wiring > consumes the reward host-authoritatively and rolls the claim back if the host refuses
+AssertionError: expected -1 to be greater than -1
+ FAIL  src/care-package-grant-once.test.ts > HF-509 legacy-main redemption wiring > keeps the local queue tracker fed from the replicated snapshot
+AssertionError: expected 'import * as THREE from \'three\';\nim…' to contain 'careRewardQueueTracker = advanceCareR…'
++   hostedArenaDurationMs,
++   firstRenderDurationMs: number;
++   finalRenderDurationMs: number;
++       firstRenderDurationMs: Number((firstRenderedAt - firstRenderStartedAt).toFixed(3)),
++       finalRenderDurationMs: Number((finalRenderedAt - finalRenderStartedAt).toFixed(3)),
++   remainingDurationMs: number;
++   if (weapon === 'flare-gun') return FLARE_PROJECTILE_EFFECT.maximumFlightMs + FLARE_PROJECTILE_EFFECT.burnDurationMs + 1_000;
++     durationMs: WEAPONS[message.weapon].reload * 1_000 * killstreakActorModifiers(message.by, now).reloadDuration,
++ function gunRangeMatchClockDurationMs(): number | null {
++   const durationMs = gunRangeMatchClockDurationMs();
++   const durationMs = gunRangeMatchClockDurationMs();
++   const durationMs = gunRangeMatchClockDurationMs();
++   const durationMs = gunRangeMatchClockDurationMs();
++       effect.remainingMs + (effect.phase === 'flight' ? FLARE_PROJECTILE_EFFECT.burnDurationMs + 1_000 : 1_000),
++   const reloadDuration = killstreakActorModifiers(player.id, reloadStartedAt).reloadDuration;
++     seatAt: reloadStartedAt + (reloadState.seatAt - reloadStartedAt) * reloadDuration,
++     endsAt: reloadStartedAt + (reloadState.endsAt - reloadStartedAt) * reloadDuration,
++       + FLARE_PROJECTILE_EFFECT.burnDurationMs + 1_000,
++   const effectiveRemainingMs = Math.min(admission.remainingDurationMs, presentation.recoveryMs);
++     remainingDurationMs: effectiveRemainingMs,
++ function killstreakActorModifiers(actorId: string, now: number): Readonly<{ damage: number; movement: number; reloadDuration: number }> {
++   if (matchState.phase !== 'active') return { damage: 1, movement: 1, reloadDuration: 1 };
++   return { damage: active ? 1.1 : 1, movement: active ? 1.1 : 1, reloadDuration: active ? 0.9 : 1 };
++   // controls. Every hostedArenaDurationMs value is a published select option,
++     timeLimitSelect.value = String(hostedArenaDurationMs(arenaSelection(arenaId)));
++     durationMs: rangeLobby ? hostedArenaDurationMs(arenaSelection(arenaId)) : Number(timeLimitSelect.value),
++       remainingDurationMs: Math.max(0, flashExposureUntilHostTimeMs - currentHostTimeMs()),
++     const phaseDurations = new Map<string, number>();
++       phaseDurations.set(name, Number((performance.now() - phaseStartedAt).toFixed(3)));
++       const durationMs = phaseDurations.get(name);
++  * Closes the open marker and publishes the block. Durations are mark-to-mark, so
+ Test Files  1 failed (1)
+      Tests  4 failed | 22 passed (26)
+   Duration  1.20s (transform 389ms, setup 0ms, import 503ms, tests 189ms, environment 0ms)

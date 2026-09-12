@@ -7,6 +7,7 @@ import {
   SMOKE_CORRIDOR_LIFETIME_MS,
   SMOKE_CORRIDOR_RADIUS_M,
   SMOKE_VOLUME_LIFETIME_MS,
+  SMOKE_VOLUME_RADIUS_M,
 } from './smoke-authority';
 
 export const SMOKE_PRESENTATION_CARD_COUNT = 3;
@@ -522,10 +523,10 @@ export class SmokeVolumePresentationPool {
         .addScaledVector(right, (column - 1.5) * 3)
         .addScaledVector(up, (row - 1) * 3);
       const localTarget = this.root.worldToLocal(target);
-      // Exercise the live 4.2 m envelope, including non-zero alpha and the
+      // Exercise the canonical live envelope, including non-zero alpha and the
       // current instanced-card count. An inactive transparent slot can compile
       // successfully while leaving its first useful fragment work deferred.
-      presentation.activate(localTarget, 0, SMOKE_PRESENTATION_LIFETIME_MS, 4.2);
+      presentation.activate(localTarget, 0, SMOKE_PRESENTATION_LIFETIME_MS, SMOKE_VOLUME_RADIUS_M);
       presentation.disturb(
         localTarget.clone().addScaledVector(forward, -5),
         localTarget.clone().addScaledVector(forward, 5),

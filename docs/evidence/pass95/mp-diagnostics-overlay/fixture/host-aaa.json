@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "generatedAtEpochMs": 1757020000000,
+  "windowMs": 120000,
+  "roomCode": "FIXTURE1",
+  "localPeerId": "host-aaa",
+  "localRole": "host",
+  "protocolVersion": 18,
+  "pass": "pass95",
+  "traces": [
+    {
+      "t": 10,
+      "dir": "in",
+      "kind": "state",
+      "peer": "guest-bbb",
+      "seq": 120,
+      "bytes": 214
+    },
+    {
+      "t": 35,
+      "dir": "out",
+      "kind": "state",
+      "peer": "guest-bbb",
+      "seq": 121,
+      "bytes": 238
+    },
+    {
+      "t": 48,
+      "dir": "in",
+      "kind": "state",
+      "peer": "guest-ccc",
+      "seq": 77,
+      "bytes": 214
+    },
+    {
+      "t": 52,
+      "dir": "in",
+      "kind": "shot",
+      "peer": "guest-ccc",
+      "seq": -1,
+      "bytes": 186
+    }
+  ],
+  "diffs": [],
+  "requests": [],
+  "peers": [
+    {
+      "peer": "guest-bbb",
+      "role": "guest",
+      "rttMs": 38.0,
+      "jitterMs": 4.2,
+      "lossFraction": 0.0,
+      "inboundRateHz": 39.6,
+      "outboundRateHz": 39.8,
+      "disagreementMeanM": 0.041,
+      "disagreementP95M": 0.092,
+      "disagreementMaxM": 0.18,
+      "desync": 0.046,
+      "sampleCount": 480,
+      "desyncSessionP95": 0.333
+    },
+    {
+      "peer": "guest-ccc",
+      "role": "guest",
+      "rttMs": 141.0,
+      "jitterMs": 31.5,
+      "lossFraction": 0.062,
+      "inboundRateHz": 22.4,
+      "outboundRateHz": 39.7,
+      "disagreementMeanM": 0.31,
+      "disagreementP95M": 0.74,
+      "disagreementMaxM": 1.91,
+      "desync": 0.37,
+      "sampleCount": 268,
+      "desyncSessionP95": 1.0
+    }
+  ],
+  "dropped": {
+    "traces": 0,
+    "diffs": 0,
+    "requests": 0,
+    "byBytes": 0
+  }
+}

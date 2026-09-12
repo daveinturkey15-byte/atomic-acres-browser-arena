@@ -1,0 +1,25 @@
+{
+  "tier": "low",
+  "scene": "high-seas (extracted)",
+  "proxy": "artifacts/proxy/high-seas.json",
+  "digest": "ff21f3c8",
+  "digestStable": true,
+  "coefficientsIdentical": true,
+  "probes": 6912,
+  "grid": "24x12x24",
+  "repeats": 3,
+  "bakeMs": [
+    1027,
+    1140,
+    984
+  ],
+  "bakeMsMedian": 1027,
+  "bakeMsMin": 984,
+  "bakeMsMax": 1140,
+  "cacheDecodeMs": 31.05,
+  "cacheDecodeMatches": true,
+  "occluderShapes": 24,
+  "filledProbes": 1940,
+  "serialisedBytes": 442728,
+  "at": "2026-09-03T02:44:00.906Z"
+}

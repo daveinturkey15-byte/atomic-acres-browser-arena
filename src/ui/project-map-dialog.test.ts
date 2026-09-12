@@ -24,7 +24,10 @@ describe('menu documentation dialogs', () => {
     expect(markup).toContain('data-changelog-id="pass62"');
     expect(markup).toContain('LOCAL CANDIDATE');
     expect(markup).toContain('NOT PUBLISHED');
-    expect(markup).toContain('AWAITING OWNER HITL');
+    // HF-406: the unpublished state is stated as a release state, not as an internal
+    // review acronym on a player-facing panel.
+    expect(markup).toContain('RELEASE CANDIDATE');
+    expect(markup).not.toContain('AWAITING OWNER HITL');
   });
 
   it('renders timestamped production history without candidate copy', () => {

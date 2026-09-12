@@ -249,7 +249,14 @@ describe('railgun presentation', () => {
       materialBudgetExceeded: false,
       completeOperatorModels: true,
       incompleteTargets: 0,
-      maxBodyLayers: 12,
+      // Re-pinned 2026-08-30 (owner): the exact-layer bound was re-derived from
+      // the whole shipped operator corpus (Pass 74 skins reach 46 primitives),
+      // not the pass65 operator alone, so 12 no longer describes the pool.
+      maxBodyLayers: 62,
+      maxTotalBodyLayers: 992,
+      maxObservedBodyLayers: 6,
+      bodyLayerBudgetExceeded: false,
+      oversizedBodyRejections: 0,
       evidenceControlHidden: false,
     });
     expect(presentation.telemetry()).toMatchObject({
@@ -283,7 +290,10 @@ describe('railgun presentation', () => {
       haloDepthTestDisabled: true, haloDepthWriteDisabled: true,
       orangeHalo: true, proxyMeshes: 0, maxTargets: 16,
       exactModelMaterials: 4, haloMaterials: 1, ownedMaterials: 5, maxOwnedMaterials: 81,
-      materialBudgetExceeded: false, completeOperatorModels: false, incompleteTargets: 1, maxBodyLayers: 12,
+      materialBudgetExceeded: false, completeOperatorModels: false, incompleteTargets: 1,
+      // Re-pinned 2026-08-30 (owner) with the corpus-derived bound; see above.
+      maxBodyLayers: 62, maxTotalBodyLayers: 992, maxObservedBodyLayers: 6,
+      bodyLayerBudgetExceeded: false, oversizedBodyRejections: 0,
       evidenceControlHidden: false,
     });
     expect(presentation.telemetry()).toMatchObject({

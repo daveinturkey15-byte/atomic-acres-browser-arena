@@ -1,0 +1,73 @@
+{
+  "contract": "pipeline-compile-stall-probe-v1",
+  "measuredAt": "2026-09-03T04:30:17.437Z",
+  "label": "laneab-cycle-nuketown2",
+  "arena": "nuketown2",
+  "idle": false,
+  "dist": "C:\\Users\\david\\projects\\aa-claude-lighting\\dist-lane-ab",
+  "seconds": 75,
+  "tod": "cycle",
+  "hooked": true,
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "window": {
+    "windowS": 74.986,
+    "rafCallbacks": 5335,
+    "stallCount": 0,
+    "stallsPerMinute": 0,
+    "frozenFractionPercent": 0,
+    "medianStallMs": null,
+    "maxStallMs": null
+  },
+  "pipelines": {
+    "beforeWindow": 218,
+    "inWindow": 0,
+    "perMinuteInWindow": 0,
+    "inStall": 0,
+    "inStallSharePercent": null,
+    "expectedIfUnrelatedPercent": 0,
+    "enrichment": null
+  },
+  "shaderModules": {
+    "beforeWindow": 250,
+    "inWindow": 0,
+    "perMinuteInWindow": 0,
+    "inStall": 0,
+    "inStallSharePercent": null,
+    "expectedIfUnrelatedPercent": 0,
+    "enrichment": null
+  },
+  "stateTransitions": [
+    {
+      "atMs": 57886,
+      "alive": true,
+      "weapon": "carbine"
+    }
+  ],
+  "cacheKeyDiffs": [],
+  "cacheKeyDiffCount": 0,
+  "determinantFlips": [
+    {
+      "atMs": 57644,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:9.28e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    }
+  ],
+  "determinantFlipCount": 1,
+  "samplePipelineLabels": [],
+  "stalls": []
+}

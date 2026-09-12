@@ -1,0 +1,21 @@
+12:24:31 free=825 queue={"queue_running": [], "queue_pending": []}
+12:25:31 free=828 queue={"queue_running": [], "queue_pending": []}
+12:26:31 free=762 queue={"queue_running": [], "queue_pending": []}
+12:27:32 free=1040 queue={"queue_running": [], "queue_pending": []}
+12:28:33 free=1011 queue={"queue_running": [], "queue_pending": []}
+12:29:33 free=1011 queue={"queue_running": [], "queue_pending": []}
+12:30:33 free=1011 queue={"queue_running": [], "queue_pending": []}
+12:31:35 free=1004 queue={"queue_running": [], "queue_pending": []}
+12:32:35 free=990 queue={"queue_running": [], "queue_pending": []}
+12:33:37 free=1023 queue={"queue_running": [], "queue_pending": []}
+12:34:37 free=1014 queue={"queue_running": [], "queue_pending": []}
+12:35:39 free=991 queue={"queue_running": [], "queue_pending": []}
+12:36:40 free=1000 queue={"queue_running": [], "queue_pending": []}
+12:37:40 free=1016 queue={"queue_running": [], "queue_pending": []}
+12:38:41 free=1016 queue={"queue_running": [], "queue_pending": []}
+12:39:42 free=913 queue={"queue_running": [], "queue_pending": []}
+12:40:44 free=1050 queue={"queue_running": [], "queue_pending": []}
+12:41:44 free=975 queue={"queue_running": [], "queue_pending": []}
+12:42:45 free=739 queue={"queue_running": [], "queue_pending": []}
+12:43:47 free=776 queue={"queue_running": [], "queue_pending": []}
+GPU-WAIT-DONE

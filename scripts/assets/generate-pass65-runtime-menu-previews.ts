@@ -6,6 +6,21 @@ import process from 'node:process';
 import { chromium, type Browser, type Page } from '@playwright/test';
 import { createServer, type ViteDevServer } from 'vite';
 import choreographyJson from '../../source-assets/menu/pass65-preview-masters/choreography.json';
+import highSeasChoreographyJson from '../../source-assets/menu/pass75-high-seas-preview/choreography.json';
+import farcrysisChoreographyJson from '../../source-assets/menu/pass77-farcrysis-preview/choreography.json';
+import testArenaChoreographyJson from '../../source-assets/menu/pass79-test-arena-previews/choreography.json';
+// MAP3 (owner 2026-09-02, HF-405): the fifth recipe file, merged for exactly
+// the reason the comment below records for test1/test2 — an arena that reaches
+// ARENA_SELECTIONS but not this merge makes the roster assertion reject EVERY
+// capture, which is how test1/test2 came to ship byte-copied placeholder media.
+import map3ChoreographyJson from '../../source-assets/menu/pass84-map3-preview/choreography.json';
+// NUKETOWN2 (owner 2026-09-02, HF-407): the sixth extension recipe, merged for
+// the same reason - the rebuild reached ARENA_SELECTIONS as the tenth arena on
+// the day it was authored, and an arena in that list but not in this merge makes
+// the roster assertion reject EVERY capture.
+import nuketown2ChoreographyJson from '../../source-assets/menu/pass85-nuketown2-preview/choreography.json';
+// RAID2: HF-408.
+import raid2ChoreographyJson from '../../source-assets/menu/pass87-raid2-preview/choreography.json';
 import { menuPreviewDefinition, menuPreviewPose } from '../../src/ui/menu-preview-camera';
 import type { ArenaId } from '../../src/map-selection';
 import { canonicalPass65PreviewArenaDependencies } from './pass65-menu-preview-arena-dependencies';
@@ -16,8 +31,67 @@ const frameRoot = path.join(root, 'artifacts/pass65/menu-preview-master-frames')
 const receiptPath = path.join(root, 'source-assets/menu/pass65-preview-masters/runtime-capture-receipt.json');
 const reviewReceiptPath = path.join(root, 'artifacts/pass65/menu-preview-rotor-review/runtime-capture-receipt.json');
 const port = Number(process.env.AA_PREVIEW_PORT ?? '44166');
-const reviewOnly = process.env.AA_PREVIEW_REVIEW_ONLY === '1';
-const choreography = choreographyJson;
+const reviewOnlyRequested = process.env.AA_PREVIEW_REVIEW_ONLY === '1';
+// HF-372/HF-374: farcrysis cannot currently reach `gameStarted` on the WebGPU
+// route at all — its prewarm stalls with "WebGPU queue completion exceeded
+// 12000 ms" and the arena root is torn down again — so a genuine capture of that
+// authoritative arena is only reachable through the compat renderer today.
+// This escape hatch ADDS a route, it does not relax the canonical one: WebGPU
+// stays the default and the only backend allowed to write the canonical receipt,
+// a compat run must name its reason, and it is forced into review-only output so
+// it can never be mistaken for accepted Pass 66 evidence.
+const captureBackend = process.env.AA_PREVIEW_BACKEND ?? 'webgpu';
+const compatReason = process.env.AA_PREVIEW_COMPAT_REASON ?? '';
+if (captureBackend !== 'webgpu' && captureBackend !== 'webgl2') {
+  throw new Error(`AA_PREVIEW_BACKEND must be webgpu or webgl2, got: ${captureBackend}`);
+}
+if (captureBackend !== 'webgpu' && compatReason.trim().length < 24) {
+  throw new Error('A non-WebGPU capture must declare AA_PREVIEW_COMPAT_REASON explaining why the authoritative WebGPU route is unavailable');
+}
+const reviewOnly = reviewOnlyRequested || captureBackend !== 'webgpu';
+// WebGPU presents asynchronously and reports 'healthy' once the queue drains;
+// the WebGL2 compat route submits inline and reports 'synchronous'. Both mean
+// "this renderer is presenting"; neither list admits 'stalled' or 'warming'.
+const PRESENTATION_READY_STATES: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  webgpu: Object.freeze(['healthy']),
+  webgl2: Object.freeze(['synchronous']),
+});
+// HF-372: the Pass 66 masters file is digest-pinned by the retained production
+// gate, so the two arenas added after it (high-seas, farcrysis) carry their own
+// extension recipe files and are merged here exactly the way the runtime camera
+// evaluator merges them. Without this the roster assertion below rejected EVERY
+// capture — including the four already-accepted arenas — because ARENA_SELECTIONS
+// had grown to six while this recipe still described four.
+const choreography = {
+  ...choreographyJson,
+  arenas: {
+    // HF-495 (owner, 2026-09-04): this object is compared against
+    // ARENA_SELECTIONS order by runtimeInputReceipt(). Put the two moved
+    // preview families first, then retain the relative order of every other
+    // family below them.
+    ...nuketown2ChoreographyJson.arenas,
+    ...raid2ChoreographyJson.arenas,
+    ...choreographyJson.arenas,
+    // Key order is load-bearing: the roster assertion below compares this
+    // against ARENA_SELECTIONS order, where farcrysis is seventh and high-seas
+    // eighth, and test1/test2 are ninth and tenth. `pass79-test-arena-previews`
+    // declares those two in that order in one file, so spreading it last places
+    // both keys correctly.
+    //
+    // 2026-08-30: test1/test2 were merged into src/ui/menu-preview-camera.ts
+    // when their recipes were authored, but NOT here, so this capture tool still
+    // described six arenas while ARENA_SELECTIONS had grown to eight. The roster
+    // assertion below therefore rejected every run, which is why the two arenas
+    // shipped byte-copied placeholder media instead of a capture.
+    ...farcrysisChoreographyJson.arenas,
+    ...highSeasChoreographyJson.arenas,
+    ...testArenaChoreographyJson.arenas,
+    // MAP3 is eleventh in ARENA_SELECTIONS and is spread last, so its key lands
+    // eleventh here too and the roster assertion in runtimeInputReceipt() compares
+    // equal.
+    ...map3ChoreographyJson.arenas,
+  },
+} as unknown as typeof choreographyJson;
 const generatedAt = choreography.generatedAt;
 const canonicalArenas = Object.keys(choreography.arenas) as ArenaId[];
 const captureToolPaths = [
@@ -278,29 +352,29 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
   await page.route('https://fonts.googleapis.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
   await page.route('**/v1/leaderboard?*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"entries":[]}' }));
   await page.route('**/v1/streak', (route) => route.fulfill({ status: 202, contentType: 'application/json', body: '{"accepted":true}' }));
-  await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&render=blender&seed=${definition.seed}&menuPreviewCapture=1`);
+  await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=${captureBackend}&render=blender&seed=${definition.seed}&menuPreviewCapture=1`);
   // TSX names nested helpers during transpilation. Playwright serializes this
   // callback into the page realm, so provide the inert helper explicitly.
   await page.evaluate('globalThis.__name = globalThis.__name || ((target) => target);');
-  await page.waitForFunction(() => {
+  await page.waitForFunction((backend) => {
     const snapshot = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot(): any } }).__ATOMIC_ACRES_DEBUG__?.snapshot();
     return ['menu-video-ready', 'ready'].includes(snapshot?.bootstrap.stage)
-      && snapshot?.render.runtime.actualBackend === 'webgpu'
+      && snapshot?.render.runtime.actualBackend === backend
       && snapshot?.render.runtime.softwareAdapter === false
       && document.querySelector<HTMLButtonElement>('#solo')?.disabled === false;
-  }, undefined, { timeout: 75_000 });
+  }, captureBackend, { timeout: 75_000 });
   await page.locator(`.map-card[data-arena-id="${arenaId}"]`).click();
   await page.locator('#player-name').fill(`PASS65 ${arenaId} CAPTURE`);
   await page.locator('#solo').click();
   await page.waitForFunction((expected) => {
     const snapshot = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot(): any } }).__ATOMIC_ACRES_DEBUG__.snapshot();
     return snapshot.gameStarted === true
-      && snapshot.arenaSelection.id === expected
-      && snapshot.arenaSelection.streaming.constructionHistory[0] === expected
+      && snapshot.arenaSelection.id === expected.arenaId
+      && snapshot.arenaSelection.streaming.constructionHistory[0] === expected.arenaId
       && snapshot.arenaSelection.streaming.residentArenaRoots === 1
-      && snapshot.render.runtime.actualBackend === 'webgpu'
-      && snapshot.render.runtime.presentation.status === 'healthy';
-  }, arenaId, { timeout: 90_000 });
+      && snapshot.render.runtime.actualBackend === expected.backend
+      && expected.healthyPresentationStates.includes(snapshot.render.runtime.presentation.status);
+  }, { arenaId, backend: captureBackend, healthyPresentationStates: PRESENTATION_READY_STATES[captureBackend] }, { timeout: 90_000 });
   await page.evaluate(() => {
     const debug = (window as unknown as { __ATOMIC_ACRES_DEBUG__: any }).__ATOMIC_ACRES_DEBUG__;
     debug.setCaptureViewmodelHidden(true);
@@ -400,10 +474,18 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
     try {
       await page.waitForFunction((minimum) => {
         const snapshot = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot(): any } }).__ATOMIC_ACRES_DEBUG__.snapshot();
+        // submissionSequence counts WebGPU queue submissions and stays at 0 on
+        // the compat route, which has no submission queue to count. Proving the
+        // pose reached the screen there means the frame loop advanced AND the
+        // renderer still reports its inline presentation state — the WebGPU
+        // submission requirement itself is untouched.
+        const presented = minimum.backend === 'webgpu'
+          ? snapshot.render.runtime.presentation.submissionSequence >= minimum.submissionSequence + 3
+          : snapshot.render.runtime.presentation.status === 'synchronous';
         return snapshot.frameCount >= minimum.frameCount + 4
-          && snapshot.render.runtime.presentation.submissionSequence >= minimum.submissionSequence + 3
+          && presented
           && snapshot.sniperScope.viewmodelVisible === false;
-      }, before, { timeout: 60_000 });
+      }, { ...before, backend: captureBackend }, { timeout: 60_000 });
     } catch (error) {
       const stalled = await page.evaluate(() => {
         const snapshot = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot(): any } }).__ATOMIC_ACRES_DEBUG__.snapshot();
@@ -684,7 +766,17 @@ async function main(): Promise<void> {
   const evidence: CaptureEvidence[] = [];
   const runtimeInputs = await runtimeInputReceipt();
   try {
-    server = await createServer({ root, server: { host: '127.0.0.1', port, strictPort: true }, logLevel: 'error' });
+    // A capture run is a frozen inner loop. With the file watcher and HMR live,
+    // any edit anywhere in the repo during the run makes Vite re-optimize deps
+    // and reload the page mid-capture — which surfaces as "Failed to fetch" on
+    // in-flight GLB loads, an arena selection fatal, and a lost debug bridge.
+    // The run already fails closed on input drift afterwards; it must not also
+    // corrupt itself while it is still going.
+    server = await createServer({
+      root,
+      server: { host: '127.0.0.1', port, strictPort: true, hmr: false, watch: null },
+      logLevel: 'error',
+    });
     await server.listen();
     for (const arenaId of selectedArenas) {
       // A fresh browser owns each 1440p arena capture. This prevents delayed
@@ -693,7 +785,12 @@ async function main(): Promise<void> {
       browser = await chromium.launch({
         headless: true,
         executablePath,
-        args: ['--enable-unsafe-webgpu', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'],
+        // --mute-audio is a standing owner rule on this machine (the owner sits at
+        // this PC): a capture drives a live match for minutes at a time and must
+        // never make a sound. It is a playback flag only - the encoded audio bed
+        // is synthesised by ffmpeg in the finalizer, so muting the capture browser
+        // cannot change a single output byte.
+        args: ['--mute-audio', '--enable-unsafe-webgpu', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'],
       });
       const page = await browser.newPage({
         viewport: { width: choreography.capture.viewport[0], height: choreography.capture.viewport[1] },
@@ -708,9 +805,15 @@ async function main(): Promise<void> {
       }
     }
     const finalRuntimeInputs = await runtimeInputReceipt();
-    if (JSON.stringify(finalRuntimeInputs) !== JSON.stringify(runtimeInputs)) {
-      throw new Error('Runtime capture inputs changed during authoring; all staged frames are rejected as stale');
-    }
+    // Same fail-closed verdict as before, but it now names the files that moved.
+    // On a repository several agents are working in at once, "inputs changed"
+    // with no list left no way to tell an accidental stomp from a real rebuild.
+    const beforeDigests = new Map(runtimeInputs.dependencyClosure.files.map((file) => [file.path, file.sha256]));
+    const afterDigests = new Map(finalRuntimeInputs.dependencyClosure.files.map((file) => [file.path, file.sha256]));
+    const drifted = [...new Set([...beforeDigests.keys(), ...afterDigests.keys()])]
+      .filter((filePath) => beforeDigests.get(filePath) !== afterDigests.get(filePath))
+      .sort();
+    const inputsStable = drifted.length === 0;
     const receipt = {
       schemaVersion: 4,
       captureId: choreography.captureId,
@@ -719,6 +822,10 @@ async function main(): Promise<void> {
       recipeDigest: sha256(JSON.stringify(choreography)),
       source: choreography.capture.source,
       backendRequired: choreography.capture.backend,
+      // Recorded so a reader can never mistake a compat-route capture for the
+      // canonical WebGPU evidence: a mismatch here is forced review-only above.
+      backendUsed: captureBackend,
+      ...(captureBackend === choreography.capture.backend ? {} : { compatReason }),
       viewport: choreography.capture.viewport,
       overlay: {
         scale: choreography.capture.overlayScale,
@@ -729,13 +836,24 @@ async function main(): Promise<void> {
         liveLoadingRenderer: false,
       },
       frameRoster: requestedFrames,
+      // The frames themselves come from ONE loaded module graph — the capture
+      // server runs with the watcher and HMR off — so a drift recorded here means
+      // the tree moved around the run, not that the frames disagree with each
+      // other. Recording it keeps that distinction visible to whoever consumes
+      // the staged frames; the canonical receipt still refuses to exist unless
+      // the tree held still, immediately below.
+      inputsStable,
+      driftedInputPaths: drifted,
       runtimeInputs,
       arenas: evidence,
     };
+    if (!inputsStable && !reviewOnly) {
+      throw new Error(`Runtime capture inputs changed during authoring; all staged frames are rejected as stale. Drifted paths (${drifted.length}): ${drifted.slice(0, 40).join(', ')}`);
+    }
     const outputReceiptPath = reviewOnly ? reviewReceiptPath : receiptPath;
     await mkdir(path.dirname(outputReceiptPath), { recursive: true });
     await writeFile(outputReceiptPath, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
-    console.log(JSON.stringify({ capture: 'passed', reviewOnly, receipt: path.relative(root, outputReceiptPath), arenas: evidence }, null, 2));
+    console.log(JSON.stringify({ capture: 'passed', reviewOnly, inputsStable, driftedInputPaths: drifted, receipt: path.relative(root, outputReceiptPath), arenas: evidence }, null, 2));
   } finally {
     await browser?.close();
     await server?.close();

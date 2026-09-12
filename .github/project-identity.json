@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "projectId": "atomic-acres-browser-arena",
+  "repository": "daveinturkey15-byte/atomic-acres-browser-arena",
+  "registrySchemaVersion": 1,
+  "routingRequired": true,
+  "registryExample": "docs/PROJECT_ROUTING.example.json",
+  "documentation": "docs/PROJECT_ROUTING.md",
+  "purpose": "The one stable identity a launcher must name before scripts/release/pipeline-guard.mjs will route a worktree. The machine-local registry that binds this identity to a Git database, worktrees, integration, preview, production and rollback is never committed; see documentation.",
+  "capabilityHandoff": {
+    "requiredIds": [
+      "nuketown-facade-kit"
+    ],
+    "checkerSha256": "af4d27211e2a0a99d010e38c37f079b91a84865f47371786898363f361058af5"
+  }
+}
