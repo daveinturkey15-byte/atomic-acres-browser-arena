@@ -26,12 +26,72 @@ function ribbon(side: number, inner: number, outer: number, y: number): THREE.Bu
   geometry.setIndex(indices); geometry.computeVertexNormals(); return geometry;
 }
 
+const KERB_TREAD = 0.18, KERB_TOP = 0.10, KERB_CHAMFER = 0.045, KERB_STONE = 0.915, KERB_JOINT = 0.006, KERB_JOINT_DEPTH = 0.009;
+
+/** Continuous kerb: the road-side profile (face, 45-degree chamfer, top, kerb-side
+ * face) extruded along the curved road edge with a recessed joint every stone, so
+ * the run follows studioRoadHalfWidth instead of stepping in detached boxes. */
+function kerbGeometry(side: number): THREE.BufferGeometry {
+  const profile: ReadonlyArray<readonly [number, number]> = [
+    [0, 0], [0, KERB_TOP - KERB_CHAMFER], [KERB_CHAMFER, KERB_TOP], [KERB_TREAD, KERB_TOP], [KERB_TREAD, 0],
+  ];
+  const joints: number[] = [];
+  for (let j = -34 + KERB_STONE; j < 34; j += KERB_STONE) joints.push(j);
+  const stations: Array<{ z: number; scale: number }> = [];
+  for (let z = -34; z <= 34; z += 1) stations.push({ z, scale: 1 });
+  for (const j of joints) stations.push({ z: j - KERB_JOINT, scale: 1 }, { z: j, scale: 1 - KERB_JOINT_DEPTH / KERB_TOP }, { z: j + KERB_JOINT, scale: 1 });
+  stations.sort((a, b) => a.z - b.z);
+  const positions: number[] = [], uvs: number[] = [], indices: number[] = [];
+  const segments = profile.length - 1;
+  for (let i = 0; i < stations.length; i += 1) {
+    const { z, scale } = stations[i];
+    const w = studioRoadHalfWidth(z);
+    for (let s = 0; s < segments; s += 1) {
+      for (const [off, h] of [profile[s], profile[s + 1]]) {
+        positions.push(side * (w + off), h * scale, z);
+        uvs.push(z / 2, off / 2);
+      }
+    }
+    if (i > 0) for (let s = 0; s < segments; s += 1) {
+      const a = (i - 1) * segments * 2 + s * 2, b = a + 1, c = i * segments * 2 + s * 2, d = c + 1;
+      if (side > 0) indices.push(a, c, b, c, d, b);
+      else indices.push(a, b, c, b, d, c);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices); geometry.computeVertexNormals(); return geometry;
+}
+
+/** One oriented collision proxy per visible kerb stone; boundaries match the
+ * joints drawn by kerbGeometry and the tread band stays out of the road. */
+function kerbStoneBounds(side: number): Box2[] {
+  const boxes: Box2[] = [];
+  const count = Math.ceil(68 / KERB_STONE);
+  for (let k = 0; k < count; k += 1) {
+    const za = -34 + k * KERB_STONE, zb = Math.min(za + KERB_STONE, 34);
+    const ax = side * studioRoadHalfWidth(za), bx = side * studioRoadHalfWidth(zb);
+    const len = Math.hypot(bx - ax, zb - za);
+    const tx = (bx - ax) / len, tz = (zb - za) / len;
+    const nx = side * tz, nz = -side * tx;
+    const cx = (ax + bx) / 2 + nx * KERB_TREAD / 2, cz = (za + zb) / 2 + nz * KERB_TREAD / 2;
+    const halfRun = len / 2 + 0.004;
+    boxes.push({
+      minX: cx - halfRun, maxX: cx + halfRun, minY: 0, maxY: KERB_TOP,
+      minZ: cz - KERB_TREAD / 2, maxZ: cz + KERB_TREAD / 2,
+      rotation: [0, Math.atan2(-tz, tx), 0],
+    });
+  }
+  return boxes;
+}
+
 export function createStudioGround(): { root: THREE.Group; solids: StudioSolid[]; surfaces: THREE.MeshStandardMaterial[] } {
   const root = new THREE.Group(); root.name = 'world-studio-ground-and-street';
   const solids: StudioSolid[] = [];
   const asphalt = createStudioSurface('asphalt'), concrete = createStudioSurface('concrete');
   const soil = createStudioSurface('soil'), wood = createStudioSurface('timber');
-  const grass = new THREE.MeshStandardMaterial({ color: 0x5b683b, roughness: .97, map: soil.map, normalMap: soil.normalMap });
+  const grass = createStudioSurface('grass');
   const stone = new THREE.MeshStandardMaterial({ color: 0xb9b19d, roughness: .95, map: concrete.map, normalMap: concrete.normalMap });
   const metal = new THREE.MeshStandardMaterial({ color: 0x666b62, roughness: .46, metalness: .65 });
   const globe = new THREE.MeshStandardMaterial({ color: 0xf5efdc, roughness: .3, emissive: 0xffd4a1, emissiveIntensity: .12 });
@@ -59,11 +119,11 @@ export function createStudioGround(): { root: THREE.Group; solids: StudioSolid[]
   road.userData.presentationOnly = true;
   for (const side of [-1, 1]) {
     const walk = new THREE.Mesh(ribbon(side, .05, 1.95, .038), concrete); walk.name = `street-sidewalk-${side}`; walk.receiveShadow = true; root.add(walk); walk.userData.presentationOnly = true;
-    // Continuous low kerb, with realistic joints rather than oversized blocks.
-    for (let z = -33; z < 34; z += 2) {
-      const w = studioRoadHalfWidth(z);
-      box(`kerb-${side}-${z}`, [.18, .1, 1.96], [side * (w + .09), .05, z], stone, 'concrete');
-    }
+    // One continuous kerb surface per side; every visible stone keeps its own
+    // oriented collision proxy on the same visible mesh (no detached witnesses).
+    const kerb = new THREE.Mesh(kerbGeometry(side), stone);
+    kerb.name = `street-kerb-${side}`; kerb.receiveShadow = true; root.add(kerb);
+    kerbStoneBounds(side).forEach((proxy, k) => solids.push({ id: `kerb-${side}-stone-${k}`, mesh: kerb, material: 'concrete', bounds: proxy }));
     box(`garage-drive-${side}`, [12, .06, 12], [side * 22, .028, 22], concrete, 'concrete', false);
     box(`yard-crosspath-${side}`, [24, .06, 1.75], [side * 25, .03, -13], concrete, 'concrete', false);
     box(`yard-sidepath-${side}`, [1.7, .06, 38], [side * 29, .03, 0], concrete, 'concrete', false);
