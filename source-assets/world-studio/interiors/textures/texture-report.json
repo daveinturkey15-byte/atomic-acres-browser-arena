@@ -1,0 +1,113 @@
+{
+  "seed": 20260912,
+  "textures": {
+    "sage-weave": {
+      "size": 512,
+      "albedo": {
+        "file": "interior-sage-weave-albedo.png",
+        "sha256": "e5a905942c6f8ab629d374d56e732af4a0a8916ea039afbb475c95b0feea3db1",
+        "bytes": 284892,
+        "albedoSpread": 0.3811,
+        "albedoMean": 0.3809
+      },
+      "roughness": {
+        "file": "interior-sage-weave-roughness.png",
+        "sha256": "528aa93ba9d9f4ed3fabc4fb8dcb8f400380e504261573fdbd762e5fb071c91d",
+        "bytes": 164605,
+        "mean": 0.8603,
+        "min": 0.7876,
+        "max": 0.9328
+      }
+    },
+    "walnut": {
+      "size": 512,
+      "albedo": {
+        "file": "interior-walnut-albedo.png",
+        "sha256": "cf4b7d08b74e936cf05dddc78d2a371230fd6577c005e3478ed0a8a73eeb33ed",
+        "bytes": 260281,
+        "albedoSpread": 0.4539,
+        "albedoMean": 0.2045
+      },
+      "roughness": {
+        "file": "interior-walnut-roughness.png",
+        "sha256": "a12ff091bea9b8a4f5c19fe8e9dccdcef1e33ba1a9ab62bf5858a6b2cf55cb3f",
+        "bytes": 139009,
+        "mean": 0.3432,
+        "min": 0.29,
+        "max": 0.5236
+      }
+    },
+    "carpet": {
+      "size": 512,
+      "albedo": {
+        "file": "interior-carpet-albedo.png",
+        "sha256": "c70d9c8945c4af637fe821b734fbe6828a1ba6d177361b826aaaf4019f7d207a",
+        "bytes": 391975,
+        "albedoSpread": 0.569,
+        "albedoMean": 0.4405
+      },
+      "roughness": {
+        "file": "interior-carpet-roughness.png",
+        "sha256": "146f6abd407350e65c8b96fa49f73c9d0aebff5c9c5816152fd965848e466bd8",
+        "bytes": 99663,
+        "mean": 0.9402,
+        "min": 0.9154,
+        "max": 0.9647
+      }
+    },
+    "rug": {
+      "size": 512,
+      "albedo": {
+        "file": "interior-rug-albedo.png",
+        "sha256": "ba8b4020ac34c25618673e8ed3c4a7ae31ffc77a6ef7391e73b855db741b5fdc",
+        "bytes": 301063,
+        "albedoSpread": 0.8427,
+        "albedoMean": 0.6248
+      },
+      "roughness": {
+        "file": "interior-rug-roughness.png",
+        "sha256": "eb871e8967e11c7b0d3c33aa43f20de72e3599e3d8fb24845934e0fddc87a2af",
+        "bytes": 133573,
+        "mean": 0.9199,
+        "min": 0.892,
+        "max": 0.9476
+      }
+    },
+    "tile": {
+      "size": 512,
+      "albedo": {
+        "file": "interior-tile-albedo.png",
+        "sha256": "00e9a0aa5f176bf4e8958c83575034295b8f6a7dfb03db5208edff3c971c7e35",
+        "bytes": 84041,
+        "albedoSpread": 0.6413,
+        "albedoMean": 0.8242
+      },
+      "roughness": {
+        "file": "interior-tile-roughness.png",
+        "sha256": "8ee501f4a1f92a72f4f9ce9b35d9b231a700cba6988deb53622a8ce5950bcaa2",
+        "bytes": 52829,
+        "mean": 0.2032,
+        "min": 0.1134,
+        "max": 0.82
+      }
+    },
+    "counter": {
+      "size": 512,
+      "albedo": {
+        "file": "interior-counter-albedo.png",
+        "sha256": "20b68ae55f6af1ec4cb224db7a1edf0fb8e52e7ef1517b42868d1c05b68b7437",
+        "bytes": 234428,
+        "albedoSpread": 0.6368,
+        "albedoMean": 0.7498
+      },
+      "roughness": {
+        "file": "interior-counter-roughness.png",
+        "sha256": "29f409697255e0a867548f407ef18fb5afdf65db040187d5f9d0060d3d47ddfe",
+        "bytes": 154841,
+        "mean": 0.28,
+        "min": 0.2409,
+        "max": 0.3197
+      }
+    }
+  }
+}
