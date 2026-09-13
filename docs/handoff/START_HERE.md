@@ -6,6 +6,8 @@ This is the original Git worktree moved intact, not a new clone. The former
 
 **[Open the readable handoff](index.html)** · **[Play Build 19](http://127.0.0.1:41996/updates/slice19/)**
 
+[Current cross-harness adoption and remaining parity issues](PARITY_STATUS.md).
+
 The game menu contains both Nuke Town New World and Skills Lab. Build 19 remains frozen
 at source `82677da2c8e910f4bcdebcc804c434e874439c9e`; documentation commits after it are
 not new game builds. Visual quality, long-duration performance and release acceptance

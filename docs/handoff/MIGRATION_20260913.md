@@ -18,8 +18,9 @@ local output and served response. This was a migration, not a runtime rebuild.
 Recheck current process identity before stopping/restarting anything; the migration
 server was PID46136. AETHERIS and game-worker stop state were preserved.
 
-VERIFIED: shared bootstrap verifier passes; seven filesystem routes expose the same
-169 skills (Codex, Claude Code, OMP, Antigravity, Hermes, Continue and dsh).
+VERIFIED early snapshot: seven filesystem routes exposed the same 169 skills
+(Codex, Claude Code, OMP, Antigravity, Hermes, Continue and dsh). Concurrent changes
+subsequently introduced a new mismatch; see [current parity status](PARITY_STATUS.md).
 Codex completed its own native challenge/attestation after the rule change.
 OPEN: other harnesses must reload the changed rules and renew their own receipts.
 Existing catalogue/regression/adoption issues were not cleared by this task.
