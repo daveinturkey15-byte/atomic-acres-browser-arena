@@ -1,5 +1,19 @@
 # Atomic Acres agent contract
 
+## Shared workspace and handoff entry point (owner directive 2026-09-13)
+
+All harnesses start at `docs/handoff/START_HERE.md` and `docs/handoff/CURRENT.json`.
+Use `docs/handoff/CONTRACT.md` for every takeover, build checkpoint and outgoing handoff.
+On dave-gaming-pc the shared project home is `C:/Users/david/Desktop/stuff/atomic-acres`.
+Resolve the machine routing record before writing; a remembered path, build number,
+handoff snapshot or compatibility junction is not routing authority. Do not create a
+Codex/Claude/OMP-private copy. Reuse the registered lane or explicitly transfer its
+ownership and renew its bounded lease before a new harness writes. One writer per lane.
+The current game checkpoint is stopped for handoff; these documents do not authorize
+resuming workers. Keep build/source identity separate from later documentation commits.
+Unchanged historical worktrees and the common Git database are registered exceptions;
+never delete their backing directories merely because this project home has moved.
+
 These rules apply to Codex, Hermes, Gemini/AGY, and any future human or automated contributor.
 
 ## Sources of truth

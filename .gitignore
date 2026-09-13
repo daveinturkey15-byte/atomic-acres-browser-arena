@@ -64,3 +64,7 @@ project-routing.local.json
 # them in a finally block, but a killed or timed-out run leaves one behind - and
 # on this machine other agents commit under you with `git add -A`.
 .eye-clearance-probe-*/
+
+# Local handoff screenshots, concept originals and recovery archives. The portable
+# contract/current pointer live in docs/handoff; never silently upload this bundle.
+.handoff-evidence/
