@@ -15,6 +15,7 @@ import {
   apertureContainsPanelPoint,
   applyShedExplosion,
   applyShedSheetImpact,
+  applyShedStructuralBlast,
   blockShedDoor,
   createInitialShedState,
   createWorldCollisionSnapshot,
@@ -459,6 +460,19 @@ describe('Pass 65 destructible-world authority', () => {
       isHost: true, matchEpoch: 11, expectedRevision: damaged.state.revision, surfaceId: 'wall-west', damageQ: 220,
     }).reason).toBe('already-detached');
 
+    // Re-pinned 2026-08-30 (owner: "its physics to destruction and push need
+    // some help"): a detached panel is no longer born at rest, and an impulse
+    // now accumulates instead of replacing the velocity, so the expected value
+    // is the birth kick plus the shot rather than the shot alone. Nothing was
+    // loosened - the arithmetic over both is asserted exactly, and the birth
+    // kick and the second-shot accumulation are new assertions.
+    const born = damaged.state.majorDebris[0]!.velocityQ;
+    const bornSpin = damaged.state.majorDebris[0]!.angularVelocityQ;
+    // wall-west faces -x, so the panel leaves the frame outward and slumping.
+    expect(born.xQ).toBeLessThan(-1_000);
+    expect(born.yQ).toBe(-600);
+    expect(Math.abs(bornSpin.zQ)).toBeGreaterThan(0);
+
     const flat: ShedState = {
       ...damaged.state,
       majorDebris: [{ ...damaged.state.majorDebris[0]!, flat: true, sleeping: true }],
@@ -471,7 +485,67 @@ describe('Pass 65 destructible-world authority', () => {
       isHost: true, expectedRevision: flat.revision, chunkId: 'chunk-west', source: 'bullet',
       impulseQ: { xQ: 1_000, yQ: 200, zQ: 0 },
     });
-    expect(shot.state.majorDebris[0]).toMatchObject({ sleeping: false, velocityQ: { xQ: 1_000, yQ: 200, zQ: 0 } });
+    expect(shot.state.majorDebris[0]).toMatchObject({
+      sleeping: false,
+      velocityQ: { xQ: born.xQ + 1_000, yQ: born.yQ + 200, zQ: born.zQ },
+    });
+    // A second push adds to the first instead of cancelling it, and each one
+    // spins the panel about the axis it acts around so it tumbles.
+    const secondShot = impulseMajorShedDebris(shot.state, {
+      isHost: true, expectedRevision: shot.state.revision, chunkId: 'chunk-west', source: 'bullet',
+      impulseQ: { xQ: 1_000, yQ: 0, zQ: 0 },
+    });
+    expect(secondShot.state.majorDebris[0]!.velocityQ.xQ).toBe(born.xQ + 2_000);
+    expect(secondShot.state.majorDebris[0]!.angularVelocityQ.zQ).toBe(bornSpin.zQ - 1_000);
+    expect(isShedState(secondShot.state)).toBe(true);
+  });
+
+  it('throws every chunk a blast brings down, hardest under the bomber', () => {
+    const grenade = applyShedStructuralBlast(definition, initial(), {
+      isHost: true,
+      matchEpoch: 11,
+      expectedRevision: 0,
+      blastId: 'grenade-11-1',
+      blastClass: 'grenade-major-collapse',
+      originLocal: { x: 0, y: 1.1, z: 2.1 },
+    });
+    expect(grenade.accepted).toBe(true);
+    // Owner 2026-08-30: the grenade collapse used to detach panels and leave
+    // them at rest, so a frag looked weaker than one bullet. Every body it
+    // brings down now carries an outward throw away from the blast origin.
+    const grenadeSpeeds = grenade.state.majorDebris.map((body) => Math.hypot(
+      body.velocityQ.xQ, body.velocityQ.yQ, body.velocityQ.zQ,
+    ) / 1_000);
+    expect(grenadeSpeeds).toHaveLength(3);
+    expect(Math.min(...grenadeSpeeds)).toBeGreaterThan(0.9);
+    expect(Math.max(...grenadeSpeeds)).toBeLessThan(4);
+
+    const bomber = applyShedStructuralBlast(definition, initial(), {
+      isHost: true,
+      matchEpoch: 11,
+      expectedRevision: 0,
+      blastId: 'carpet-11-1',
+      blastClass: 'carpet-bomber-obliteration',
+      originLocal: { x: 0, y: 1.5, z: 0 },
+    });
+    expect(bomber.accepted).toBe(true);
+    const bomberSpeeds = bomber.state.majorDebris.map((body) => Math.hypot(
+      body.velocityQ.xQ, body.velocityQ.yQ, body.velocityQ.zQ,
+    ) / 1_000);
+    expect(bomberSpeeds).toHaveLength(SHED_MAX_MAJOR_CHUNKS);
+    expect(Math.min(...bomberSpeeds)).toBeGreaterThan(Math.max(...grenadeSpeeds));
+    expect(bomberSpeeds.every((speed) => speed <= 9 * Math.sqrt(3))).toBe(true);
+    expect(bomber.state.majorDebris.every((body) => !body.sleeping && !body.flat)).toBe(true);
+    // Determinism: the same blast on the same state replays byte-identically.
+    expect(applyShedStructuralBlast(definition, initial(), {
+      isHost: true,
+      matchEpoch: 11,
+      expectedRevision: 0,
+      blastId: 'carpet-11-1',
+      blastClass: 'carpet-bomber-obliteration',
+      originLocal: { x: 0, y: 1.5, z: 0 },
+    }).state.majorDebris).toEqual(bomber.state.majorDebris);
+    expect(isShedState(bomber.state)).toBe(true);
   });
 
   it('hashes late-join state deterministically, rejects unknown keys, and resets by epoch', () => {

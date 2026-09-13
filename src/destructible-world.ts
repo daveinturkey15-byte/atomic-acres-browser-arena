@@ -1,5 +1,6 @@
 import { canonicalSha256 } from './canonical-state';
 import type { Point3 } from './collision';
+import { isArenaId, type ArenaId } from './arena-identity';
 
 export const SHED_MAX_APERTURES = 96;
 export const SHED_MAX_DENTS = 64;
@@ -27,7 +28,7 @@ export const WORLD_COLLISION_CONSUMERS = Object.freeze([
 ] as const);
 
 export type WorldCollisionConsumer = typeof WORLD_COLLISION_CONSUMERS[number];
-export type ShedArenaId = 'atomic-acres' | 'skyline-terminal' | 'rustworks-1v1' | 'gun-range';
+export type ShedArenaId = ArenaId;
 export type DamageableSheetRole = 'wall' | 'roof' | 'door' | 'detached-chunk';
 export type ShedDoorBlockerKind = 'player' | 'major-debris' | 'bullet';
 
@@ -123,6 +124,15 @@ export type SheetSurfaceDefinition = Readonly<{
     vAxis: Point3;
     halfU: number;
     halfV: number;
+    /**
+     * Owner 2026-08-30 ("i keep seeing through its walls"): a surface whose
+     * RENDERED outline is not its bounding rectangle. Points are in frame
+     * units quantised by SHED_PANEL_COORD_Q (+/-Q maps to +/-halfU / +/-halfV),
+     * matching how apertures are already quantised. Ballistics and movement
+     * keep using the bounding frame - only presentation clips - so a gable
+     * triangle cannot become a hole you can shoot through.
+     */
+    outlineUVQ?: readonly Readonly<{ uQ: number; vQ: number }>[];
   }>;
   detachableChunkId: string | null;
 }>;
@@ -196,6 +206,28 @@ export type ShedMutationResult = Readonly<{
     | 'flat-contact-rejected';
   state: ShedState;
 }>;
+
+/** Shared physical bounds for every authored debris throw, push and birth kick. */
+const SHED_DEBRIS_MAX_SPEED = 9;
+const SHED_DEBRIS_MAX_ANGULAR = 9;
+/** Velocity/impulse quantisation: one Q unit is a millimetre (or milliradian) per second. */
+const SHED_DEBRIS_VELOCITY_Q = 1_000;
+/** Bound the impulse request is validated against, and therefore the bound it accumulates into. */
+export const SHED_DEBRIS_IMPULSE_MAX_Q = 50_000;
+/**
+ * Detach kick (owner 2026-08-30, "its physics to destruction and push need some
+ * help"): a panel that lets go leaves the frame along its own outward normal
+ * with a slight downward bias. Small enough to read as a slump off the shell,
+ * not a launch.
+ */
+const SHED_DEBRIS_DETACH_MIN_SPEED = 1.2;
+const SHED_DEBRIS_DETACH_SPEED_SPREAD = 0.8;
+const SHED_DEBRIS_DETACH_SLUMP = 0.6;
+const SHED_DEBRIS_DETACH_SPIN = 1.8;
+/** A grenade collapse throws with the same shape as the bomber, at under half the speed. */
+const SHED_GRENADE_THROW_SCALE = 0.45;
+/** Radians per second of tumble per metre per second of push. Panels are ~1-2 m half-extents. */
+const SHED_DEBRIS_IMPULSE_SPIN = 0.5;
 
 const ZERO_VECTOR: QuantizedVector = Object.freeze({ xQ: 0, yQ: 0, zQ: 0 });
 const IDENTITY_POSE: QuantizedPose = Object.freeze({
@@ -281,6 +313,54 @@ export function shedSurfaceNormal(frame: SheetSurfaceDefinition['frame']): Point
   });
 }
 
+/**
+ * Deterministic per-chunk noise. Host and guest replay the same detach and
+ * throw maths from replicated state, so every "random" component has to come
+ * from the chunk id instead of a PRNG. FNV-1a over the id, sampled as 16-bit
+ * windows; offsets at or above 32 alias back onto the low windows because JS
+ * shifts are taken modulo 32, which the authored throw offsets already rely on.
+ */
+function chunkNoise(chunkId: string): (bitOffset: number) => number {
+  let hash = 0x811c9dc5 ^ (chunkId.length + 1);
+  for (let index = 0; index < chunkId.length; index += 1) {
+    hash = Math.imul(hash ^ chunkId.charCodeAt(index), 0x01000193);
+  }
+  hash >>>= 0;
+  return (bitOffset: number): number => ((hash >>> bitOffset) & 0xffff) / 0xffff;
+}
+
+function clampSpeed(value: number, maximum: number): number {
+  return Math.max(-maximum, Math.min(maximum, value));
+}
+
+/**
+ * Quantise to an integer that is never negative zero. Canonical state is JSON
+ * round-tripped on every join and JSON writes -0 as 0, so a host holding -0
+ * would never deep-equal the guest that parsed the host's own envelope. An axis
+ * component of exactly zero times a negative spin produces -0, so this is
+ * reachable from ordinary authored geometry.
+ */
+function roundQ(value: number): number {
+  const rounded = Math.round(value);
+  return rounded === 0 ? 0 : rounded;
+}
+
+function quantizedVelocity(vector: Point3, maximum = SHED_DEBRIS_MAX_SPEED): QuantizedVector {
+  return Object.freeze({
+    xQ: roundQ(clampSpeed(vector.x, maximum) * SHED_DEBRIS_VELOCITY_Q),
+    yQ: roundQ(clampSpeed(vector.y, maximum) * SHED_DEBRIS_VELOCITY_Q),
+    zQ: roundQ(clampSpeed(vector.z, maximum) * SHED_DEBRIS_VELOCITY_Q),
+  });
+}
+
+function accumulateVelocityQ(base: QuantizedVector, delta: QuantizedVector, maximumQ: number): QuantizedVector {
+  return Object.freeze({
+    xQ: roundQ(clampSpeed(base.xQ + delta.xQ, maximumQ)),
+    yQ: roundQ(clampSpeed(base.yQ + delta.yQ, maximumQ)),
+    zQ: roundQ(clampSpeed(base.zQ + delta.zQ, maximumQ)),
+  });
+}
+
 function validFrame(frame: SheetSurfaceDefinition['frame']): boolean {
   const uLength = magnitude(frame.uAxis);
   const vLength = magnitude(frame.vAxis);
@@ -320,6 +400,15 @@ export function validateDestructibleShedDefinition(definition: DestructibleShedD
     }
     if (surface.detachableChunkId !== null && !definition.preauthoredChunkIds.includes(surface.detachableChunkId)) {
       errors.push(`${surface.id}: unknown detachable chunk`);
+    }
+    const outline = surface.frame.outlineUVQ;
+    if (outline !== undefined) {
+      if (outline.length < 3) {
+        errors.push(`${surface.id}: outlineUVQ needs at least three points`);
+      } else if (!outline.every((point) => Number.isSafeInteger(point.uQ) && Number.isSafeInteger(point.vQ)
+        && Math.abs(point.uQ) <= SHED_PANEL_COORD_Q && Math.abs(point.vQ) <= SHED_PANEL_COORD_Q)) {
+        errors.push(`${surface.id}: outlineUVQ points must be integers within +/-${SHED_PANEL_COORD_Q}`);
+      }
     }
   }
   const usedChunkIds = definition.surfaces
@@ -701,6 +790,18 @@ function detachSurfaceUpdate(
   const surfaceDefinition = definition.surfaces.find((candidate) => candidate.id === surfaceId);
   if (!surfaceDefinition) return null;
   const chunkId = surface.attachedChunkId;
+  // Owner 2026-08-30 ("the shed is buggy ... its physics to destruction and
+  // push need some help"): a blasted panel used to be born at rest, so it
+  // dropped straight down as if it had been placed there rather than shot off.
+  // It now leaves the frame along its own outward normal with a downward bias,
+  // rolling about its long axis. Everything derives from the chunk id through
+  // the same FNV noise the blast throws use, so the replicated host state stays
+  // deterministic and a guest reconstructs the identical body.
+  const noise = chunkNoise(chunkId);
+  const normal = shedSurfaceNormal(surfaceDefinition.frame);
+  const speed = SHED_DEBRIS_DETACH_MIN_SPEED + noise(0) * SHED_DEBRIS_DETACH_SPEED_SPREAD;
+  const spin = (noise(16) * 2 - 1) * SHED_DEBRIS_DETACH_SPIN;
+  const uAxis = surfaceDefinition.frame.uAxis;
   return Object.freeze({
     surfaces: Object.freeze(surfaces.map((candidate) => candidate.surfaceId === surfaceId
       ? Object.freeze({ ...candidate, healthQ, stage: 'detached' as const, attachedChunkId: null })
@@ -717,8 +818,16 @@ function detachSurfaceUpdate(
         }),
         rotation: frameRotationQ(surfaceDefinition.frame),
       }),
-      velocityQ: ZERO_VECTOR,
-      angularVelocityQ: ZERO_VECTOR,
+      velocityQ: quantizedVelocity({
+        x: normal.x * speed,
+        y: normal.y * speed - SHED_DEBRIS_DETACH_SLUMP,
+        z: normal.z * speed,
+      }),
+      angularVelocityQ: quantizedVelocity({
+        x: uAxis.x * spin,
+        y: uAxis.y * spin,
+        z: uAxis.z * spin,
+      }, SHED_DEBRIS_MAX_ANGULAR),
       sleeping: false,
       flat: false,
     })]),
@@ -884,6 +993,45 @@ function openedDetachedDoor(door: ShedDoorState): ShedDoorState {
 }
 
 /**
+ * Owner requirement: a blast must knock the shed over by itself. Detached
+ * panels get an outward throw from the blast origin plus a pitch so they
+ * visibly fly out and settle flat as wreckage instead of standing upright
+ * waiting for a player push. All values derive from the chunk id so the
+ * replicated host state stays deterministic; `scale` is the only difference
+ * between a grenade collapse and a Carpet Bomber obliteration.
+ */
+function throwDetachedChunks(
+  bodies: readonly MajorDebrisState[],
+  originLocal: Point3,
+  scale: number,
+  thrown: (chunkId: string) => boolean,
+): readonly MajorDebrisState[] {
+  return Object.freeze(bodies.map((body) => {
+    if (!thrown(body.chunkId)) return body;
+    const noise = chunkNoise(body.chunkId);
+    const awayX = body.poseQ.position.xQ / SHED_DEBRIS_VELOCITY_Q - originLocal.x;
+    const awayZ = body.poseQ.position.zQ / SHED_DEBRIS_VELOCITY_Q - originLocal.z;
+    const away = Math.hypot(awayX, awayZ);
+    const outward = away > 0.05 ? 1 / away : 0;
+    return Object.freeze({
+      ...body,
+      velocityQ: quantizedVelocity({
+        x: awayX * outward * (3.0 + noise(0) * 1.4) * scale,
+        y: (2.2 + noise(8) * 1.8) * scale,
+        z: awayZ * outward * (3.0 + noise(16) * 1.4) * scale,
+      }),
+      angularVelocityQ: quantizedVelocity({
+        x: (noise(24) * 2 - 1) * 4.2 * scale,
+        y: (noise(32) * 2 - 1) * 1.6 * scale,
+        z: (noise(40) * 2 - 1) * 4.2 * scale,
+      }, SHED_DEBRIS_MAX_ANGULAR),
+      flat: false,
+      sleeping: false,
+    });
+  }));
+}
+
+/**
  * One host mutation owns door, supports, panels and debris. A grenade admits a
  * major three-chunk collapse; Carpet Bomber removes the entire shell while the
  * preauthored six-body cap keeps persistent debris bounded.
@@ -935,6 +1083,14 @@ export function applyShedStructuralBlast(
     return { accepted: false, reason: 'already-detached', state };
   }
 
+  // A panel is born with its own detach kick now, so "already moving" can no
+  // longer stand in for "not part of this blast". Track the two body sets the
+  // throw is allowed to overwrite explicitly: the chunks this call detached,
+  // and wreckage that was already lying still when the blast arrived.
+  const restingBeforeBlast = new Set(state.majorDebris
+    .filter((body) => body.velocityQ.xQ === 0 && body.velocityQ.yQ === 0 && body.velocityQ.zQ === 0)
+    .map((body) => body.chunkId));
+  const detachedByBlast = new Set<string>();
   let surfaces = state.surfaces;
   let detachedChunkIds = state.detachedChunkIds;
   let majorDebris = state.majorDebris;
@@ -945,44 +1101,16 @@ export function applyShedStructuralBlast(
     surfaces = detached.surfaces;
     detachedChunkIds = detached.detachedChunkIds;
     majorDebris = detached.majorDebris;
+    if (target.detachableChunkId !== null) detachedByBlast.add(target.detachableChunkId);
   }
 
   if (request.blastClass === 'carpet-bomber-obliteration') {
-    // Owner requirement: a bomb must knock the shed over by itself. Blast-
-    // detached panels get an outward throw from the blast origin plus a pitch
-    // so they visibly fly out and settle flat as wreckage instead of standing
-    // upright waiting for a player push. All values derive from the chunk id
-    // so the replicated host state stays deterministic.
-    const clampSpeed = (value: number, maximum: number): number => Math.max(-maximum, Math.min(maximum, value));
-    const thrown = majorDebris.map((body) => {
-      if (body.velocityQ.xQ !== 0 || body.velocityQ.yQ !== 0 || body.velocityQ.zQ !== 0) return body;
-      let hash = 0x811c9dc5 ^ (body.chunkId.length + 1);
-      for (let index = 0; index < body.chunkId.length; index += 1) {
-        hash = Math.imul(hash ^ body.chunkId.charCodeAt(index), 0x01000193);
-      }
-      hash >>>= 0;
-      const unit = (n: number): number => ((hash >>> n) & 0xffff) / 0xffff;
-      const awayX = body.poseQ.position.xQ / 1_000 - request.originLocal.x;
-      const awayZ = body.poseQ.position.zQ / 1_000 - request.originLocal.z;
-      const away = Math.hypot(awayX, awayZ);
-      const outward = away > 0.05 ? 1 / away : 0;
-      return Object.freeze({
-        ...body,
-        velocityQ: Object.freeze({
-          xQ: Math.round(clampSpeed(awayX * outward * (3.0 + unit(0) * 1.4), 9) * 1_000),
-          yQ: Math.round(clampSpeed(2.2 + unit(8) * 1.8, 9) * 1_000),
-          zQ: Math.round(clampSpeed(awayZ * outward * (3.0 + unit(16) * 1.4), 9) * 1_000),
-        }),
-        angularVelocityQ: Object.freeze({
-          xQ: Math.round((unit(24) * 2 - 1) * 4.2 * 1_000),
-          yQ: Math.round((unit(32) * 2 - 1) * 1.6 * 1_000),
-          zQ: Math.round((unit(40) * 2 - 1) * 4.2 * 1_000),
-        }),
-        flat: false,
-        sleeping: false,
-      });
-    });
-    majorDebris = Object.freeze(thrown);
+    majorDebris = throwDetachedChunks(
+      majorDebris,
+      request.originLocal,
+      1,
+      (chunkId) => detachedByBlast.has(chunkId) || restingBeforeBlast.has(chunkId),
+    );
     // Every remaining surface (including non-detachable fixed panels) is
     // forced to detached so the intact shell cannot linger beside the
     // thrown wreckage.
@@ -993,6 +1121,18 @@ export function applyShedStructuralBlast(
       attachedChunkId: null,
     })));
   } else {
+    // Owner 2026-08-30: the grenade collapse detached its three panels and then
+    // let them fall at rest, so a frag looked weaker than a single bullet. It
+    // throws with the bomber's shape at under half the speed - a shed that
+    // buckles outward, not one that is obliterated. Only the chunks this
+    // grenade brought down are thrown; wreckage already settled on the ground
+    // stays where the physics left it.
+    majorDebris = throwDetachedChunks(
+      majorDebris,
+      request.originLocal,
+      SHED_GRENADE_THROW_SCALE,
+      (chunkId) => detachedByBlast.has(chunkId),
+    );
     // Fixed frame/support pieces share the same lifecycle revision and retain
     // visible damage without creating unbounded arbitrary rigid bodies.
     surfaces = Object.freeze(surfaces.map((surface) => surface.stage === 'intact' ? Object.freeze({
@@ -1029,11 +1169,32 @@ export function impulseMajorShedDebris(
   if (!debris) return { accepted: false, reason: 'unknown-surface', state };
   if (request.source === 'player-contact' && debris.flat) return { accepted: false, reason: 'flat-contact-rejected', state };
   const components = [request.impulseQ.xQ, request.impulseQ.yQ, request.impulseQ.zQ];
-  if (!components.every((value) => finiteInteger(value, -50_000, 50_000))) {
+  if (!components.every((value) => finiteInteger(value, -SHED_DEBRIS_IMPULSE_MAX_Q, SHED_DEBRIS_IMPULSE_MAX_Q))) {
     return { accepted: false, reason: 'invalid-impact', state };
   }
+  // Owner 2026-08-30 ("push need some help"): this used to REPLACE the
+  // velocity, so a second shove - or a shot landing while the panel was already
+  // sliding - cancelled the first instead of adding to it. Accumulate into the
+  // same bound the request is validated against. The spin is derived from the
+  // impulse rather than hashed: a push acts about the axis perpendicular to it
+  // and to local up (placements are yaw-only, so local Y is world up), which is
+  // what topples a panel instead of skating it flat across the ground.
+  const spinQ: QuantizedVector = Object.freeze({
+    xQ: roundQ(request.impulseQ.zQ * SHED_DEBRIS_IMPULSE_SPIN),
+    yQ: 0,
+    zQ: roundQ(-request.impulseQ.xQ * SHED_DEBRIS_IMPULSE_SPIN),
+  });
   const majorDebris = Object.freeze(state.majorDebris.map((candidate) => candidate.chunkId === request.chunkId
-    ? Object.freeze({ ...candidate, sleeping: false, velocityQ: Object.freeze({ ...request.impulseQ }) })
+    ? Object.freeze({
+      ...candidate,
+      sleeping: false,
+      velocityQ: accumulateVelocityQ(candidate.velocityQ, request.impulseQ, SHED_DEBRIS_IMPULSE_MAX_Q),
+      angularVelocityQ: accumulateVelocityQ(
+        candidate.angularVelocityQ,
+        spinQ,
+        SHED_DEBRIS_MAX_ANGULAR * SHED_DEBRIS_VELOCITY_Q,
+      ),
+    })
     : candidate));
   return { accepted: true, reason: 'accepted', state: withRevision(state, { majorDebris }) };
 }
@@ -1271,7 +1432,7 @@ export function isShedState(value: unknown): value is ShedState {
   ])) return false;
   if (value.schemaVersion !== 1 || typeof value.shedId !== 'string' || !validId(value.shedId)
     || typeof value.placementId !== 'string' || !validId(value.placementId)
-    || !['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'].includes(String(value.arenaId))
+    || !isArenaId(value.arenaId)
     || !finiteInteger(Number(value.matchEpoch), 1) || !finiteInteger(Number(value.revision))
     || !finiteInteger(Number(value.nextApertureId), 1) || !finiteInteger(Number(value.nextDentId), 1)
     || !Array.isArray(value.surfaces) || !Array.isArray(value.detachedChunkIds)

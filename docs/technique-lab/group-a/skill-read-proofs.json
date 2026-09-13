@@ -1,0 +1,119 @@
+{
+  "generatedAt": "2026-09-12",
+  "lane": "technique-a-20260912",
+  "harness": "claude",
+  "machine": "dave-gaming-pc",
+  "whatThisFileClaims": "Which canonical carrier SKILL.md bodies were actually opened and read during this pass, and which were not. File identity was verified for all ten by recomputing sha256 against the packet's recorded value; identity verification is NOT a read, and the two are reported separately on purpose.",
+  "packet": {
+    "path": "C:/Users/david/Documents/Codex/2026-09-11/p-le/work/technique-lab-20260912/sources-group-a.json",
+    "registerPath": "C:/Users/david/AppData/Local/hermes/.akephalos/references/ai-3d-technique-register.md",
+    "registerSha256": "30b61cbe85bae1fc8ed59eb6d416bfe4e79608651a86ba7f1fee3d433f160c39",
+    "registerSectionsRead": "All 17 assigned registerSection bodies were read in full from the packet (the packet embeds the verbatim register text for rows 1-17).",
+    "carrierHashVerification": "All 10 carrier SKILL.md files recomputed on disk 2026-09-12: every actualSha256 equals the recordedSha256 in the packet. No drift."
+  },
+  "carrierSkills": [
+    {
+      "skill": "threejs-source-prop-ingestion",
+      "path": "C:/Users/david/Documents/desky-bootstrap-clone/Skills/game-development/threejs-source-prop-ingestion/SKILL.md",
+      "sha256": "c98a730f53327ff7c7ea0e9f9a9be5da0bc9a0d70b5c1915381a26fc4fee7fbe",
+      "bytes": 4348,
+      "hashVerified": true,
+      "bodyRead": true,
+      "readDepth": "full body, lines 1-55",
+      "sourceIds": [10],
+      "consumer": "src/map3/technique-lab/demos/group-a/source-10.ts",
+      "methodToConsumer": "Skill lines 42-46 ('Adapt to the actual game') are implemented directly as the ingest() gate: measure world bounds rather than trust declared metres; exclude preview lights from integration; treat imported collider metadata as a proposal and not gameplay authority; decide who disposes shared geometry and materials. Skill line 14's 'resolve factory imports to the project's existing Three instance' is made structural by injecting the host THREE namespace into every factory rather than relying on a peer dependency resolving once."
+    },
+    {
+      "skill": "game-animation-asset-pipeline",
+      "path": "C:/Users/david/Documents/desky-bootstrap-clone/Skills/game-development/game-animation-asset-pipeline/SKILL.md",
+      "sha256": "f6dafcfe8063b2c85c8cf82a0664a7998ac62a7a30a11bbbd029f54a5fbb902d",
+      "bytes": 31855,
+      "hashVerified": true,
+      "bodyRead": false,
+      "notReadReason": "Call budget. Method extraction for sources 1, 5, 6 and 16 came from the primary upstream files instead (mixamo-llm-mocap docs/RIG.md, the H3 post and model pages, img2threejs docs/ARCHITECTURE.md, kimodo.cpp src/skeleton.hpp and src/sequence.cpp), each cited with file and line in the demo header and in SOURCE_RESEARCH.json.",
+      "sourceIds": [1, 5, 6, 16]
+    },
+    {
+      "skill": "threejs-webgpu-water",
+      "path": "C:/Users/david/Documents/desky-bootstrap-clone/Skills/game-development/threejs-webgpu-water/SKILL.md",
+      "sha256": "11eeed4772af20f42e78535dc505168f794b8c35928f1920ae8e98e8dde290b0",
+      "bytes": 27370,
+      "hashVerified": true,
+      "bodyRead": false,
+      "notReadReason": "Call budget. Sources 2, 3 and 4 were implemented from the primary sources directly (abyssal-ocean index.html passes 1-3 and the repository README; the two owner-shared posts as served by x.com).",
+      "sourceIds": [2, 3, 4]
+    },
+    {
+      "skill": "img2threejs",
+      "path": "C:/Users/david/Documents/desky-bootstrap-clone/Skills/game-development/img2threejs/SKILL.md",
+      "sha256": "c0ae7cdb98c991e0f6f08483c955e22f65eea83cf2386222157c58e903e5dc95",
+      "bytes": 48766,
+      "hashVerified": true,
+      "bodyRead": false,
+      "notReadReason": "Call budget. Note this installed skill is byte-identical in size to the upstream repository's own SKILL.md at the pinned revision, and the upstream docs/ARCHITECTURE.md WAS fetched and read for source 6.",
+      "sourceIds": [6]
+    },
+    {
+      "skill": "threejs-game-development",
+      "path": "C:/Users/david/Documents/desky-bootstrap-clone/Skills/software-development/threejs-game-development/SKILL.md",
+      "sha256": "707888880f11fe498e5233417ba0b2a808f943c27954881fa19ca239798e2ce9",
+      "bytes": 8463,
+      "hashVerified": true,
+      "bodyRead": false,
+      "notReadReason": "Call budget. Sources 7 and 8 were implemented from night-street docs/TECHNIQUE.md and PROMPTS.md and jungle-trail PROMPT.md, fetched at their pins.",
+      "sourceIds": [7, 8]
+    },
+    {
+      "skill": "threejs-frame-loop-audit",
+      "path": "C:/Users/david/Documents/desky-bootstrap-clone/Skills/software-development/threejs-frame-loop-audit/SKILL.md",
+      "sha256": "6f71e2021bb8c603329bfbac7f39e362e6c97c0de43beb59412cb2f37be8c6ae",
+      "bytes": 10355,
+      "hashVerified": true,
+      "bodyRead": false,
+      "notReadReason": "Call budget. Source 9 was implemented from the upstream skill body itself, millionco/react-doctor@e183c351 skills/improve-threejs/SKILL.md, which was fetched and read in full (103 lines).",
+      "sourceIds": [9]
+    },
+    {
+      "skill": "ai-3d-asset-generation-loop",
+      "path": "C:/Users/david/Documents/desky-bootstrap-clone/Skills/game-development/ai-3d-asset-generation-loop/SKILL.md",
+      "sha256": "c411b9d7d50a1dcc4c5e5b41e1f7f9a99558f6f75b208287182b73aaa8c22bc0",
+      "bytes": 12101,
+      "hashVerified": true,
+      "bodyRead": false,
+      "notReadReason": "Call budget. Sources 10, 11 and 12 were implemented from the owner-shared post bodies as served by x.com plus the vibe3d and thaikit repositories at their pins.",
+      "sourceIds": [10, 11, 12]
+    },
+    {
+      "skill": "visual-gauntlet-loop",
+      "path": "C:/Users/david/Documents/desky-bootstrap-clone/Skills/quality/visual-gauntlet-loop/SKILL.md",
+      "sha256": "6b546fc4d1e367ce1f2d892b874521a4d77484921f3c49a216b19c5774b22434",
+      "bytes": 5523,
+      "hashVerified": true,
+      "bodyRead": false,
+      "notReadReason": "Call budget. Source 13 was implemented from the article's own published HowTo steps and from Claude-of-Duty prompt.md and ARCHITECTURE.md at the pin.",
+      "sourceIds": [13]
+    },
+    {
+      "skill": "atomic-acres-asset-authoring",
+      "path": "C:/Users/david/Documents/desky-bootstrap-clone/Skills/game-development/atomic-acres-asset-authoring/SKILL.md",
+      "sha256": "57c1bb9e333ad99cd428f5cd03090d997ed0647d7b1be24581cd01b38dfd79c4",
+      "bytes": 12091,
+      "hashVerified": true,
+      "bodyRead": false,
+      "notReadReason": "Call budget. Sources 14 and 17 are comparator-only rows whose rubric text is carried verbatim in the packet's register sections, which were read in full.",
+      "sourceIds": [14, 17]
+    },
+    {
+      "skill": "threejs-rtx-runtime-route",
+      "path": "C:/Users/david/Documents/desky-bootstrap-clone/Skills/game-development/threejs-rtx-runtime-route/SKILL.md",
+      "sha256": "b514a675ed2aff79a6294e3a7363db0b9c9fd52639b075cd7ebe38dc85f42271",
+      "bytes": 49171,
+      "hashVerified": true,
+      "bodyRead": false,
+      "notReadReason": "Call budget. Source 15 is BLOCKED regardless: the register section (read in full) and the upstream repository's own LICENSE and sample tree establish that the method is a native runtime replacing the browser, which no in-browser demo can honestly show.",
+      "sourceIds": [15]
+    }
+  ],
+  "honestSummary": "1 of 10 carrier SKILL.md bodies was read in full this pass (threejs-source-prop-ingestion). The other 9 were identity-verified by hash but NOT read, and every method they carry was instead extracted from the primary upstream file cited per source in SOURCE_RESEARCH.json. Do not record this pass as full skill adoption."
+}

@@ -1,0 +1,69 @@
+{
+  "id": "pass74-operator-skin-navalops",
+  "title": "Tidewrack Operative - original operator archetype skin (navalops)",
+  "creator": "Atomic Acres project",
+  "created": "2026-08-22",
+  "license": "Project-original; no third-party assets",
+  "inspirationBoundary": "Project-original operator archetypes authored for Atomic Acres. Broad archetype spirit only (adventurous explorer, bulky symbiote-like composite, naval special operations); no franchise likeness, trademarked names, copied characters, extracted assets, or licensed geometry.",
+  "blenderVersion": "5.1.2",
+  "generator": "scripts/blender/create-pass74-operator-archetype-skins.py",
+  "sourceSpec": "source-assets/blender/pass74-operator-skin-specs.json",
+  "sourceBlend": "source-assets/blender/pass74-operator-skin-navalops.blend",
+  "sourceBlendSha256": "7617232596faf80a4e1ccce6178dc864883339b748be2afe776534f1f570b592",
+  "sourceGltf": "public/assets/third-party/quaternius/ultimate-modular-males/Swat.gltf",
+  "canonicalRig": {
+    "animationClipCount": 24,
+    "jointCount": 62,
+    "materialNames": [
+      "Skin",
+      "Swat",
+      "Swat_Black",
+      "Visor"
+    ],
+    "rigId": "pass65-third-person-operator-family-v1",
+    "skeletonAndClipsUntouched": true
+  },
+  "silhouette": {
+    "accessoryScale": 1.0,
+    "clamped": false,
+    "maxSilhouetteScale": 1.0,
+    "measuredScale": 1.0
+  },
+  "requestedProportions": {
+    "limbThicknessMultiplier": 0.95,
+    "shoulderWidthMultiplier": 0.98,
+    "torsoBulkMultiplier": 0.97
+  },
+  "effectiveProportions": {
+    "limbThicknessMultiplier": 0.95,
+    "shoulderWidthMultiplier": 0.98,
+    "torsoBulkMultiplier": 0.97
+  },
+  "accessories": [
+    "low-profile-swim-harness",
+    "weight-belt-with-dive-pouches",
+    "wrist-gauge-strap",
+    "shin-cargo-pocket-straps",
+    "anti-fog-sealed-visor-variant",
+    "ankle-tether-straps"
+  ],
+  "deliveries": [
+    {
+      "path": "artifacts/blender-operator-skins/raw/pass74-operator-skin-navalops-lod0.glb",
+      "sha256": "39c502fddc16a79ed4dc147459fdc6b2248d4856294a8c3f58ea9eaf7ea6a47c",
+      "bytes": 5775664
+    },
+    {
+      "path": "artifacts/blender-operator-skins/raw/pass74-operator-skin-navalops-lod1.glb",
+      "sha256": "ac3ceb178d1931df1ebf88ffdf7f4dfe412b9b0c329f16c46ca54117f5bb28f1",
+      "bytes": 4912156
+    },
+    {
+      "path": "artifacts/blender-operator-skins/raw/pass74-operator-skin-navalops-lod2.glb",
+      "sha256": "edccbe3152395aba85ce2569d369f2a3c75ba9b3e0fbef1d521a4c2c2335f597",
+      "bytes": 4612232
+    }
+  ],
+  "integrationStatus": "STAGED, NOT WIRED. No runtime importer, protocol field, lobby affordance or replication path consumes these GLBs. They are deliverable assets awaiting an integration lane, and must not be read as a closed defect (HF-364).",
+  "licenceNote": "Authored from the vendored CC0 source operator with procedural Blender geometry. MiniMax H3 was available locally for texture/concept assistance and is NOT for distribution; if a published build ever ships assets derived from it, revisit the licence position at release time."
+}

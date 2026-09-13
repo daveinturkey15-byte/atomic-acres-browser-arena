@@ -502,9 +502,17 @@ await writeFile(gameSeedPath, '<!doctype html><title>Pass 66 game tab seed</titl
 await writeFile(coverSeedPath, '<!doctype html><title>Pass 66 hidden-tab cover</title><main>Pass 66 background-throttling probe</main>', 'utf8');
 const seedUrls = [pathToFileURL(gameSeedPath).href, pathToFileURL(coverSeedPath).href];
 const port = await availablePort();
+// DECLARED VISIBLE LANE - do not park this off-screen. What is under test here
+// is Chrome's own background/occlusion throttling of a hidden tab, so the real
+// on-screen visibility of these two windows IS the measurement. A window at
+// -32000,-32000 changes the occlusion state this lane exists to observe, and
+// the contract above already forbids every throttling-bypass flag for the same
+// reason. It mutes, which is the half that can be fixed without lying.
+// See scripts/qa/browser-visibility-contract.test.mjs.
 const chromeArgs = [
   `--remote-debugging-port=${port}`,
   `--user-data-dir=${profile}`,
+  '--mute-audio',
   '--enable-unsafe-webgpu',
   '--no-first-run',
   '--no-default-browser-check',

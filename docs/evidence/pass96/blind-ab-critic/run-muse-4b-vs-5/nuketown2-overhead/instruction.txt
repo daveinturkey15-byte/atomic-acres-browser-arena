@@ -1,0 +1,40 @@
+FIRST INSTRUCTION, before anything else.
+The last two attached images are two renders called LEFT and RIGHT (LEFT is attached before RIGHT). Each one has a small white box in its bottom-right corner containing four large black characters drawn in a blocky pixel font, from this set only: A C D E H J K M N R T U W X Y. Read LEFT's four characters and report them as probes.left; read RIGHT's and report them as probes.right. The two codes are different. If you cannot see a box, write "NONE" for that side. Do not guess a plausible code: a wrong code makes this round invalid, which is the correct outcome when you did not receive pixels.
+
+WHAT YOU HAVE BEEN GIVEN, in order:
+  1..4. THE REFERENCE SET: 4 image(s) of the target this scene is meant to agree with.
+  5. LEFT  - a render of the scene from a fixed review camera.
+  6. RIGHT - a render of the SAME scene from the SAME camera, produced differently.
+You are not told which render is older, newer, ours or anyone else's, and that is deliberate. Judge the pixels.
+
+THE QUESTION. Which of LEFT and RIGHT is CLOSER TO THE REFERENCE SET, and why? Judge agreement with the references on:
+  - structure and layout: are the same volumes, openings and objects present, in the same places?
+  - proportion: do the ratios agree?
+  - material read: does each surface read as the same material class the reference shows?
+  - value and lighting relationships: which plane is brightest, where shadows fall, how deep the contact shadow is. Absolute colour grade is NOT a criterion.
+Do NOT judge resolution, sharpness, the corner box, image order, or which one you find prettier. If the two are indistinguishable on every criterion, answer "tie": a tie is an honest answer, not a failure.
+
+EVERY CLAIM NAMES A REGION. Regions are the 3x3 grid ids r0c0 (top-left) through r2c2 (bottom-right) of the render.
+
+REPLY WITH ONE JSON OBJECT AND NOTHING ELSE. Shape:
+{
+  "contract": "blind-ab-v1",
+  "station": "nuketown2-overhead",
+  "probes": {
+    "left": "<four characters from LEFT, or NONE>",
+    "right": "<four characters from RIGHT, or NONE>"
+  },
+  "winner": "left | right | tie",
+  "confidence": 0,
+  "why": "One paragraph: the decisive differences against the reference set, each with a region id.",
+  "leftCloser": [
+    "things LEFT does that agree with the references better, with region ids"
+  ],
+  "rightCloser": [
+    "things RIGHT does that agree with the references better, with region ids"
+  ],
+  "largestDifference": {
+    "region": "r1c1",
+    "what": "the single biggest disagreement between LEFT and RIGHT"
+  }
+}

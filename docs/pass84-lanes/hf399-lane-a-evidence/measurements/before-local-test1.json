@@ -1,0 +1,190 @@
+{
+  "contract": "hf399-fps-phase-probe-v1",
+  "measuredAt": "2026-09-02T06:39:47.380Z",
+  "label": "before-local",
+  "arena": "test1",
+  "base": "http://127.0.0.1:41941/",
+  "requestedProfile": "high",
+  "viewport": {
+    "width": 2560,
+    "height": 1440
+  },
+  "secondsPerPhase": 8,
+  "phases": [
+    {
+      "phase": "menu",
+      "frames": 9181,
+      "elapsedMs": 8025,
+      "fps": 1144,
+      "frameMs": {
+        "p50": 0.7,
+        "p95": 1.9,
+        "p99": 3.4,
+        "max": 16.5,
+        "mean": 0.87
+      },
+      "perFrame": {
+        "draws": 0,
+        "triangles": 0,
+        "instances": 0,
+        "renderPasses": 0,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 0
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 0,
+        "shaderModulesTotal": 0
+      },
+      "longTasks": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0
+      },
+      "heap": {
+        "startBytes": 99590019,
+        "endBytes": 122805103,
+        "deltaMbPerMinute": 165.53
+      },
+      "activeClipPlanes": 5,
+      "pose": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0,
+        "alive": true,
+        "phase": "warmup"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-hf399\\artifacts\\qa\\hf399\\before-local-test1-menu.png"
+    },
+    {
+      "phase": "deployed-idle",
+      "frames": 364,
+      "elapsedMs": 8040,
+      "fps": 45.3,
+      "frameMs": {
+        "p50": 22,
+        "p95": 30.7,
+        "p99": 33.9,
+        "max": 65.4,
+        "mean": 22.03
+      },
+      "perFrame": {
+        "draws": 107.3,
+        "triangles": 83249.1,
+        "instances": 1093,
+        "renderPasses": 23.1,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 23.1
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 214,
+        "shaderModulesTotal": 239
+      },
+      "longTasks": {
+        "count": 1,
+        "totalMs": 72,
+        "maxMs": 72
+      },
+      "heap": {
+        "startBytes": 270308075,
+        "endBytes": 177604002,
+        "deltaMbPerMinute": -659.78
+      },
+      "activeClipPlanes": 5,
+      "pose": {
+        "position": [
+          20,
+          1.6983986282348633,
+          -20.799999237060547
+        ],
+        "yaw": 2.3757998210495495,
+        "alive": true,
+        "phase": "active"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-hf399\\artifacts\\qa\\hf399\\before-local-test1-deployed-idle.png"
+    },
+    {
+      "phase": "move",
+      "frames": 312,
+      "elapsedMs": 8031,
+      "fps": 38.8,
+      "frameMs": {
+        "p50": 25.6,
+        "p95": 31.7,
+        "p99": 36.6,
+        "max": 45.1,
+        "mean": 25.64
+      },
+      "perFrame": {
+        "draws": 104.5,
+        "triangles": 82214.4,
+        "instances": 1090.6,
+        "renderPasses": 23.1,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 23.1
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 214,
+        "shaderModulesTotal": 239
+      },
+      "longTasks": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0
+      },
+      "heap": {
+        "startBytes": 204268373,
+        "endBytes": 206111646,
+        "deltaMbPerMinute": 13.13
+      },
+      "activeClipPlanes": 5,
+      "pose": {
+        "position": [
+          14.637932777404785,
+          1.7257460737228394,
+          -17.019432067871094
+        ],
+        "yaw": 2.3757998210495495,
+        "alive": true,
+        "phase": "active"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-hf399\\artifacts\\qa\\hf399\\before-local-test1-move.png"
+    }
+  ],
+  "profileSelection": {
+    "before": "high",
+    "after": "high",
+    "options": [
+      "high=QUALITY",
+      "performance=PERFORMANCE",
+      "raytraced=RAY TRACED",
+      "max=MAX",
+      "custom=CUSTOM"
+    ]
+  },
+  "profileState": {
+    "graphicsPreset": "high",
+    "renderBackend": "webgpu",
+    "effective": "EFFECTIVE: HIGH",
+    "devicePixelRatio": 1,
+    "hardwareConcurrency": 16,
+    "deviceMemory": 32
+  }
+}

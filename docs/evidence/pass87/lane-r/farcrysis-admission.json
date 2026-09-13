@@ -1,0 +1,184 @@
+{
+  "contract": "farcrysis-admission-evidence-v1",
+  "measuredAt": "2026-09-03T03:22:04.798Z",
+  "sha": "28b2d0a96717052b9a6308a4107f73156395bed5",
+  "shaNote": "informational only - committing this receipt changes HEAD, so a guard must key on bundle.sha256, which names the bytes the probe actually loaded",
+  "bundle": {
+    "sha256": "370770dd911491c2809f1e6a304eccd8dd6a003e6252af4f14b2238241f5e562",
+    "files": 47
+  },
+  "dist": "C:\\Users\\david\\projects\\aa-omp-pass84\\dist",
+  "runs": 3,
+  "arenas": [
+    "farcrysis",
+    "atomic-acres"
+  ],
+  "contended": false,
+  "contendedNote": "no ComfyUI work queued at any launch",
+  "summary": {
+    "allAdmitted": true,
+    "anyCrashed": false,
+    "anyPageErrors": false,
+    "maxMenuPipelines": 0,
+    "farcrysisSelectToAdmittedMs": {
+      "mean": 46072,
+      "max": 48199
+    },
+    "atomicSelectToAdmittedMs": {
+      "mean": 36390,
+      "max": 37160
+    },
+    "pairRatios": [
+      1.2678,
+      1.2971,
+      1.2326
+    ],
+    "worstPairRatio": 1.2971
+  },
+  "runsDetail": [
+    {
+      "run": 1,
+      "arena": "farcrysis",
+      "label": "pass87-admission-farcrysis-run1",
+      "outcome": "admitted",
+      "crashed": false,
+      "pageErrors": [],
+      "consoleErrors": [],
+      "menuPipelines": 0,
+      "selectToAdmittedMs": 45344,
+      "selectToActiveMs": 66226,
+      "totalToActiveMs": 68692,
+      "gpuAtLaunch": {
+        "usedMiB": 4411,
+        "totalMiB": 16303,
+        "freeMiB": 11892
+      },
+      "comfyAtLaunch": {
+        "reachable": true,
+        "running": 0,
+        "pending": 0
+      },
+      "measuredAt": "2026-09-03T03:13:51.781Z"
+    },
+    {
+      "run": 1,
+      "arena": "atomic-acres",
+      "label": "pass87-admission-atomic-acres-run1",
+      "outcome": "admitted",
+      "crashed": false,
+      "pageErrors": [],
+      "consoleErrors": [],
+      "menuPipelines": 0,
+      "selectToAdmittedMs": 35766,
+      "selectToActiveMs": 59458,
+      "totalToActiveMs": 62143,
+      "gpuAtLaunch": {
+        "usedMiB": 5782,
+        "totalMiB": 16303,
+        "freeMiB": 10521
+      },
+      "comfyAtLaunch": {
+        "reachable": true,
+        "running": 0,
+        "pending": 0
+      },
+      "measuredAt": "2026-09-03T03:15:09.043Z"
+    },
+    {
+      "run": 2,
+      "arena": "farcrysis",
+      "label": "pass87-admission-farcrysis-run2",
+      "outcome": "admitted",
+      "crashed": false,
+      "pageErrors": [],
+      "consoleErrors": [],
+      "menuPipelines": 0,
+      "selectToAdmittedMs": 48199,
+      "selectToActiveMs": 69635,
+      "totalToActiveMs": 72017,
+      "gpuAtLaunch": {
+        "usedMiB": 6759,
+        "totalMiB": 16303,
+        "freeMiB": 9544
+      },
+      "comfyAtLaunch": {
+        "reachable": true,
+        "running": 0,
+        "pending": 0
+      },
+      "measuredAt": "2026-09-03T03:16:20.638Z"
+    },
+    {
+      "run": 2,
+      "arena": "atomic-acres",
+      "label": "pass87-admission-atomic-acres-run2",
+      "outcome": "admitted",
+      "crashed": false,
+      "pageErrors": [],
+      "consoleErrors": [],
+      "menuPipelines": 0,
+      "selectToAdmittedMs": 37160,
+      "selectToActiveMs": 60218,
+      "totalToActiveMs": 62584,
+      "gpuAtLaunch": {
+        "usedMiB": 8705,
+        "totalMiB": 16303,
+        "freeMiB": 7598
+      },
+      "comfyAtLaunch": {
+        "reachable": true,
+        "running": 0,
+        "pending": 0
+      },
+      "measuredAt": "2026-09-03T03:17:41.902Z"
+    },
+    {
+      "run": 3,
+      "arena": "farcrysis",
+      "label": "pass87-admission-farcrysis-run3",
+      "outcome": "admitted",
+      "crashed": false,
+      "pageErrors": [],
+      "consoleErrors": [],
+      "menuPipelines": 0,
+      "selectToAdmittedMs": 44674,
+      "selectToActiveMs": 68737,
+      "totalToActiveMs": 71404,
+      "gpuAtLaunch": {
+        "usedMiB": 8692,
+        "totalMiB": 16303,
+        "freeMiB": 7611
+      },
+      "comfyAtLaunch": {
+        "reachable": true,
+        "running": 0,
+        "pending": 0
+      },
+      "measuredAt": "2026-09-03T03:18:50.065Z"
+    },
+    {
+      "run": 3,
+      "arena": "atomic-acres",
+      "label": "pass87-admission-atomic-acres-run3",
+      "outcome": "admitted",
+      "crashed": false,
+      "pageErrors": [],
+      "consoleErrors": [],
+      "menuPipelines": 0,
+      "selectToAdmittedMs": 36244,
+      "selectToActiveMs": 60572,
+      "totalToActiveMs": 66028,
+      "gpuAtLaunch": {
+        "usedMiB": 9309,
+        "totalMiB": 16303,
+        "freeMiB": 6994
+      },
+      "comfyAtLaunch": {
+        "reachable": true,
+        "running": 0,
+        "pending": 0
+      },
+      "measuredAt": "2026-09-03T03:20:30.698Z"
+    }
+  ]
+}

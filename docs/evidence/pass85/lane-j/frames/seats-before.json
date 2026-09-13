@@ -1,0 +1,214 @@
+[
+ {
+  "id": "skyline-nacelle-prone-a",
+  "arena": "skyline-terminal",
+  "triage": "a-real-geometry",
+  "x": -0.63,
+  "z": 13.72,
+  "stance": "prone",
+  "dir": [
+   0,
+   0.6,
+   0.8
+  ],
+  "note": "prone under jetliner engine 1; sweep d=0.067, runtime d=0.035 with the resolve at its 0.34 m push cap",
+  "label": "before",
+  "file": "artifacts/qa/eye-clearance/frames/skyline-nacelle-prone-a-before.png",
+  "requestedStance": "prone",
+  "seat": [
+   -0.63,
+   0.5,
+   13.72
+  ],
+  "resolve": {
+   "x": -0.6299999952316284,
+   "y": 0.5000000000000002,
+   "z": 13.720000267028809,
+   "pushedM": 0.2501000416278837
+  },
+  "nearest": null
+ },
+ {
+  "id": "skyline-nacelle-prone-b",
+  "arena": "skyline-terminal",
+  "triage": "a-real-geometry",
+  "x": 0.75,
+  "z": 12.38,
+  "stance": "prone",
+  "dir": [
+   0,
+   0.6,
+   -0.8
+  ],
+  "note": "prone under jetliner engine 1, opposite flank",
+  "label": "before",
+  "file": "artifacts/qa/eye-clearance/frames/skyline-nacelle-prone-b-before.png",
+  "requestedStance": "prone",
+  "seat": [
+   1.091,
+   1.483,
+   12.38
+  ],
+  "resolve": {
+   "x": 1.0913002157211305,
+   "y": 1.482708330154419,
+   "z": 12.380000114440918,
+   "pushedM": 0.34
+  },
+  "nearest": null
+ },
+ {
+  "id": "skyline-nacelle-prone-c",
+  "arena": "skyline-terminal",
+  "triage": "a-real-geometry",
+  "x": -0.63,
+  "z": -9.72,
+  "stance": "prone",
+  "dir": [
+   0,
+   0.6,
+   -0.8
+  ],
+  "note": "prone under jetliner engine 2",
+  "label": "before",
+  "file": "artifacts/qa/eye-clearance/frames/skyline-nacelle-prone-c-before.png",
+  "requestedStance": "prone",
+  "seat": [
+   -0.97,
+   1.707,
+   -9.72
+  ],
+  "resolve": {
+   "x": -0.9699999952316285,
+   "y": 1.707291717529297,
+   "z": -9.720000267028809,
+   "pushedM": 0.34
+  },
+  "nearest": null
+ },
+ {
+  "id": "gunrange-door-stand",
+  "arena": "gun-range",
+  "triage": "b-probe-artefact",
+  "x": 51.1,
+  "z": 8.64,
+  "stance": "stand",
+  "dir": [
+   1,
+   0,
+   0
+  ],
+  "note": "inside the closed test-bay door leaf (51.15..51.85); a 0.38 m capsule here is 0.33 m into the door",
+  "label": "before",
+  "file": "artifacts/qa/eye-clearance/frames/gunrange-door-stand-before.png",
+  "requestedStance": "stand",
+  "seat": [
+   51,
+   1.84,
+   8.64
+  ],
+  "resolve": {
+   "x": 51,
+   "y": 1.8401240634918214,
+   "z": 8.639982223510742,
+   "pushedM": 0.09994125366210938
+  },
+  "nearest": {
+   "distance": 0.15,
+   "surface": "gun-range-test-bay-secure-door-leaf"
+  }
+ },
+ {
+  "id": "gunrange-door-prone",
+  "arena": "gun-range",
+  "triage": "b-probe-artefact",
+  "x": 51.12,
+  "z": 12,
+  "stance": "prone",
+  "dir": [
+   1,
+   0,
+   0
+  ],
+  "note": "same leaf, prone, mid-door",
+  "label": "before",
+  "file": "artifacts/qa/eye-clearance/frames/gunrange-door-prone-before.png",
+  "requestedStance": "prone",
+  "seat": [
+   51.12,
+   0.75,
+   12
+  ],
+  "resolve": {
+   "x": 51.119998931884766,
+   "y": 0.7501000416278839,
+   "z": 12,
+   "pushedM": 0
+  },
+  "nearest": null
+ },
+ {
+  "id": "gunrange-wallbang-glass",
+  "arena": "gun-range",
+  "triage": "c-intentional-fixture",
+  "x": -17.96,
+  "z": -7.67,
+  "stance": "stand",
+  "dir": [
+   -0.83,
+   0,
+   0.56
+  ],
+  "note": "annotated: wallbang glass panel, authored solid:false shots:true",
+  "label": "before",
+  "file": "artifacts/qa/eye-clearance/frames/gunrange-wallbang-glass-before.png",
+  "requestedStance": "stand",
+  "seat": [
+   -17.96,
+   1.84,
+   -7.67
+  ],
+  "resolve": {
+   "x": -17.959997177124023,
+   "y": 1.840088896751404,
+   "z": -7.669954299926758,
+   "pushedM": 0
+  },
+  "nearest": {
+   "distance": 0.054,
+   "surface": "gun-range-wallbang-panel-glass"
+  }
+ },
+ {
+  "id": "gunrange-wallbang-brick",
+  "arena": "gun-range",
+  "triage": "c-intentional-fixture",
+  "x": -9.04,
+  "z": -7.67,
+  "stance": "stand",
+  "dir": [
+   1,
+   0,
+   0
+  ],
+  "note": "annotated: wallbang brick panel, authored solid:false shots:true",
+  "label": "before",
+  "file": "artifacts/qa/eye-clearance/frames/gunrange-wallbang-brick-before.png",
+  "requestedStance": "stand",
+  "seat": [
+   -9.04,
+   1.84,
+   -7.67
+  ],
+  "resolve": {
+   "x": -9.04010009765625,
+   "y": 1.8400939631462099,
+   "z": -7.670000076293945,
+   "pushedM": 0
+  },
+  "nearest": {
+   "distance": 0,
+   "surface": "gun-range-wallbang-panel-brick"
+  }
+ }
+]

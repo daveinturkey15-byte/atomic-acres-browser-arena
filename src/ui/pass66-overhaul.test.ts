@@ -40,7 +40,10 @@ describe('Pass 66 tactical UI overhaul', () => {
     expect(css).not.toContain('.kit-card .weapon-menu-presentation { display: block; }');
     expect(css).toContain('.custom-kit-grid .kit-card:not(.manage-kit-card)');
     expect(css).toContain('.custom-kit-grid { grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 14px; }');
-    expect(css).toContain('background: linear-gradient(150deg, #16302f, #0d1e20)');
+    // Pass 79 reskin: the ground gradient moved from the rejected cold
+    // blue-black (#16302f/#0d1e20) onto the warm instrument sheet. Same
+    // structural presence check, warmer value.
+    expect(css).toContain('background: linear-gradient(150deg, #26201a, #14100c)');
     expect(css).toContain('.kit-card.selected em { display: inline-flex; align-items: center; }');
     expect(css).toContain('.loadout-save-status[data-kind=\'error\']');
   });

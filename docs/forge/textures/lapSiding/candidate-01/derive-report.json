@@ -1,0 +1,50 @@
+{
+  "family": "lapSiding",
+  "candidate": "candidate-01",
+  "input": "docs/forge/textures/lapSiding/candidate-01-source.png",
+  "route": "codex-built-in-image-generation",
+  "licence": "owner-authorised AI texture 2026-09-07",
+  "allowedUse": "shipped",
+  "resolutions": [
+    {
+      "size": 512,
+      "family": "lapSiding",
+      "metresPerTile": 1.76,
+      "mmPerPixel": 3.4375,
+      "normalStrength": 0.9,
+      "wrapDelta": 0,
+      "fractionMostlyZ": 0.9324989318847656,
+      "roughnessBand": [
+        0.48,
+        0.9
+      ],
+      "detail": {
+        "albedoStddev": 0.15017577548468475,
+        "albedoLaplace": 0.06502155029909318,
+        "normalSlopeMean": 0.13315492101361315,
+        "normalZMean": 0.9907548199348639,
+        "roughnessStddev": 0.047174668480162135
+      }
+    },
+    {
+      "size": 1024,
+      "family": "lapSiding",
+      "metresPerTile": 1.76,
+      "mmPerPixel": 1.71875,
+      "normalStrength": 0.9,
+      "wrapDelta": 0,
+      "fractionMostlyZ": 0.8158645629882812,
+      "roughnessBand": [
+        0.48,
+        0.9
+      ],
+      "detail": {
+        "albedoStddev": 0.1531017370956908,
+        "albedoLaplace": 0.06560283648773435,
+        "normalSlopeMean": 0.2529778310057349,
+        "normalZMean": 0.9738305126155637,
+        "roughnessStddev": 0.043945592071876476
+      }
+    }
+  ]
+}

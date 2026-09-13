@@ -1,0 +1,175 @@
+[
+ {
+  "arena": "atomic-acres",
+  "sweep": 15,
+  "remaining": 8,
+  "unannotated": [
+   {
+    "distance": 0.15,
+    "surface": "exterior-access-ramp",
+    "stance": "stand",
+    "seat": [
+     -29.71,
+     2.085,
+     -16.26
+    ]
+   },
+   {
+    "distance": 0.143,
+    "surface": "interior-access-ramp",
+    "stance": "prone",
+    "seat": [
+     -11.48,
+     0.505,
+     -11.68
+    ]
+   },
+   {
+    "distance": 0.143,
+    "surface": "interior-access-ramp",
+    "stance": "prone",
+    "seat": [
+     -9.82,
+     0.505,
+     -11.68
+    ]
+   },
+   {
+    "distance": 0.15,
+    "surface": "exterior-access-ramp",
+    "stance": "prone",
+    "seat": [
+     29.69,
+     0.956,
+     13.21
+    ]
+   }
+  ],
+  "unverified": [
+   {
+    "surface": "exterior-access-ramp",
+    "stance": "stand",
+    "sweepDistance": 0.053,
+    "note": "stance-blocked:prone"
+   },
+   {
+    "surface": "exterior-access-ramp",
+    "stance": "stand",
+    "sweepDistance": 0.099,
+    "note": "stance-blocked:prone"
+   },
+   {
+    "surface": "exterior-access-ramp",
+    "stance": "crouch",
+    "sweepDistance": 0.057,
+    "note": "stance-blocked:prone"
+   },
+   {
+    "surface": "exterior-access-ramp",
+    "stance": "crouch",
+    "sweepDistance": 0.079,
+    "note": "stance-blocked:prone"
+   }
+  ],
+  "forced": []
+ },
+ {
+  "arena": "skyline-terminal",
+  "sweep": 0,
+  "remaining": 0,
+  "unannotated": [],
+  "unverified": [],
+  "forced": [
+   {
+    "id": "skyline-nacelle-prone-a",
+    "stance": "prone",
+    "achievedStance": "prone",
+    "settled": true,
+    "seat": [
+     -0.63,
+     0.63,
+     13.72
+    ],
+    "pushedM": 0.12010004162788379,
+    "distance": null,
+    "surface": null
+   },
+   {
+    "id": "skyline-nacelle-prone-b",
+    "stance": "prone",
+    "achievedStance": "prone",
+    "settled": true,
+    "seat": [
+     0.75,
+     0.63,
+     12.38
+    ],
+    "pushedM": 0.1457219326496123,
+    "distance": null,
+    "surface": null
+   },
+   {
+    "id": "skyline-nacelle-prone-c",
+    "stance": "prone",
+    "achievedStance": "prone",
+    "settled": true,
+    "seat": [
+     -0.63,
+     0.63,
+     -9.72
+    ],
+    "pushedM": 0.14542495250701892,
+    "distance": null,
+    "surface": null
+   }
+  ]
+ },
+ {
+  "arena": "rustworks-1v1",
+  "sweep": 0,
+  "remaining": 0,
+  "unannotated": [],
+  "unverified": [],
+  "forced": []
+ },
+ {
+  "arena": "gun-range",
+  "sweep": 2,
+  "remaining": 2,
+  "unannotated": [],
+  "unverified": [],
+  "forced": []
+ },
+ {
+  "arena": "high-seas",
+  "sweep": 0,
+  "remaining": 0,
+  "unannotated": [],
+  "unverified": [],
+  "forced": []
+ },
+ {
+  "arena": "test1",
+  "sweep": 0,
+  "remaining": 0,
+  "unannotated": [],
+  "unverified": [],
+  "forced": []
+ },
+ {
+  "arena": "test2",
+  "sweep": 0,
+  "remaining": 0,
+  "unannotated": [],
+  "unverified": [],
+  "forced": []
+ },
+ {
+  "arena": "map3",
+  "sweep": 0,
+  "remaining": 0,
+  "unannotated": [],
+  "unverified": [],
+  "forced": []
+ }
+]

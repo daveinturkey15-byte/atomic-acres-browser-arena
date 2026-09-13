@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { VIEWMODEL_OVERLAY_NEAR_METERS } from './viewmodel-body-fit';
 import {
   graphicsEffectsBudget,
   SELECTIVE_BLOOM_LAYER,
@@ -362,13 +363,39 @@ export function renderSceneOverlayLayer(
   const previousLayerMask = camera.layers.mask;
   const previousAutoClear = renderer.autoClear;
   const previousBackground = scene.background;
+  // HF-410: THE OVERLAY'S OWN NEAR PLANE.
+  //
+  // The first-person rig is fitted inside the player's collision capsule (see
+  // src/viewmodel-body-fit.ts), which is a uniform scale about the eye: every
+  // rig point sits k times closer to the camera than it used to. The gameplay
+  // camera's 0.08 m near plane would cut that rig in half.
+  //
+  // This submission already owns its own depth buffer - it is the whole point
+  // of the depth-cleared overlay - so it takes its own near plane too, and only
+  // for the duration of this draw. A perspective matrix's x/y mapping is
+  // independent of `near` (the frustum extents scale with it), so nothing moves
+  // on screen; only the depth range this one submission resolves against
+  // changes. The gameplay camera's world near plane, and the depth precision
+  // budget every arena shares, are untouched.
+  const perspective = camera as THREE.PerspectiveCamera;
+  const narrowNearPlane = perspective.isPerspectiveCamera === true
+    && perspective.near > VIEWMODEL_OVERLAY_NEAR_METERS;
+  const previousNear = perspective.near;
   try {
+    if (narrowNearPlane) {
+      perspective.near = VIEWMODEL_OVERLAY_NEAR_METERS;
+      perspective.updateProjectionMatrix();
+    }
     renderer.autoClear = false;
     renderer.clearDepth();
     camera.layers.set(overlayLayer);
     scene.background = null;
     renderer.render(scene, camera);
   } finally {
+    if (narrowNearPlane) {
+      perspective.near = previousNear;
+      perspective.updateProjectionMatrix();
+    }
     scene.background = previousBackground;
     camera.layers.mask = previousLayerMask;
     renderer.autoClear = previousAutoClear;

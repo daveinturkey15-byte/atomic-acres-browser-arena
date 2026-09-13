@@ -52,13 +52,31 @@ describe('support flight navigation', () => {
   });
 
   it('declares arena-owned nav data for every stable arena identity', () => {
+    // owner 2026-08-30: Test1/Test2 arenas added.
+    // owner 2026-09-02 (HF-405): Map 3 added.
     expect(Object.keys(PASS65_FLIGHT_NAVIGATION).sort()).toEqual([
-      'atomic-acres', 'gun-range', 'rustworks-1v1', 'skyline-terminal',
+      // NUKETOWN2 (HF-407) added 2026-09-02; the list is sorted, so it lands
+      // between map3 and rustworks-1v1. RAID2 (HF-408) added 2026-09-03; sorted,
+      // it lands between nuketown2 and rustworks-1v1.
+      'atomic-acres', 'farcrysis', 'gun-range', 'high-seas', 'map3', 'nuketown2', 'raid2', 'rustworks-1v1', 'skyline-terminal', 'test1', 'test2',
     ]);
     for (const entry of Object.values(PASS65_FLIGHT_NAVIGATION)) {
       expect(entry.noFlyPolicy).toBe('authoritative-static-and-dynamic-solids');
-      expect(entry.portals.length).toBeGreaterThan(0);
+      // owner 2026-08-30: test1 is a flat open range that deliberately authors
+      // no recovery portals — the collider set alone recovers flight there.
+      // Every other arena keeps at least one authored hint.
+      if (entry.arenaId === 'test1') expect(entry.portals).toHaveLength(0);
+      else expect(entry.portals.length).toBeGreaterThan(0);
       expect(Object.isFrozen(entry)).toBe(true);
     }
+    expect(PASS65_FLIGHT_NAVIGATION['high-seas']).toMatchObject({
+      floorY: 3.2,
+      ceilingY: 50,
+      portals: [
+        { id: 'stern-air-gap', altitudeM: 14 },
+        { id: 'bow-air-gap', altitudeM: 14 },
+        { id: 'yacht-overflight', altitudeM: 26 },
+      ],
+    });
   });
 });

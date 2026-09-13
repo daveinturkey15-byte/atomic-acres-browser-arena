@@ -24,13 +24,14 @@ export type GameplayAction =
   | 'support-3'
   | 'support-4'
   | 'support-5'
-  | 'scoreboard';
+  | 'scoreboard'
+  | 'emote';
 
 export const GAMEPLAY_ACTIONS: readonly GameplayAction[] = Object.freeze([
   'move-forward', 'move-backward', 'move-left', 'move-right', 'jump', 'sprint',
   'crouch', 'prone', 'reload', 'melee', 'grenade', 'interact',
   'weapon-1', 'weapon-2', 'support-1', 'support-2', 'support-3', 'support-4',
-  'support-5', 'scoreboard',
+  'support-5', 'scoreboard', 'emote',
 ]);
 
 export const ACTION_LABELS: Readonly<Record<GameplayAction, string>> = Object.freeze({
@@ -54,6 +55,7 @@ export const ACTION_LABELS: Readonly<Record<GameplayAction, string>> = Object.fr
   'support-4': 'Field Support Slot 4',
   'support-5': 'Field Support Slot 5',
   scoreboard: 'Scoreboard',
+  emote: 'Emote',
 });
 
 /**
@@ -73,6 +75,7 @@ export const DEFAULT_KEY_BINDINGS: KeyBindingProfile = Object.freeze({
   prone: Object.freeze(['KeyZ', 'ControlLeft']),
   reload: Object.freeze(['KeyR']),
   melee: Object.freeze(['KeyV']),
+  emote: Object.freeze(['KeyB']),
   grenade: Object.freeze(['KeyG']),
   interact: Object.freeze(['KeyF']),
   'weapon-1': Object.freeze(['Digit1']),
@@ -108,8 +111,21 @@ export function resolveKeyBindingProfile(storage: Pick<Storage, 'getItem'> = glo
     const raw = storage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_KEY_BINDINGS;
     const parsed: unknown = JSON.parse(raw);
-    if (!validProfile(parsed)) return DEFAULT_KEY_BINDINGS;
-    return parsed;
+    if (validProfile(parsed)) return parsed;
+    // A stored profile from before a NEW action existed is missing that one key,
+    // not corrupt. Rejecting it wholesale silently threw away every custom bind
+    // the first time an action was added ('emote' was the first). Merge instead:
+    // each action keeps its stored codes when valid, else its default.
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const record = parsed as Record<string, unknown>;
+      const merged = Object.fromEntries(GAMEPLAY_ACTIONS.map((action) => {
+        const stored = record[action];
+        const valid = Array.isArray(stored) && stored.length > 0 && stored.every(validCode);
+        return [action, valid ? Object.freeze([...(stored as string[])]) : DEFAULT_KEY_BINDINGS[action]];
+      })) as Record<GameplayAction, readonly string[]>;
+      return Object.freeze(merged);
+    }
+    return DEFAULT_KEY_BINDINGS;
   } catch {
     return DEFAULT_KEY_BINDINGS;
   }

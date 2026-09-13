@@ -2,6 +2,9 @@ import type { WeaponId } from './protocol';
 
 export type WeaponFinishProfile = {
   id: string;
+  /** HF-334: multiplied over the shared albedo to express a livery variant
+   * without shipping a second texture set. Absent means untinted (0xffffff). */
+  tintHex?: number;
   albedo: string;
   normal: string;
   roughness: string;
@@ -59,6 +62,9 @@ export const WEAPON_FINISH_PROFILES: Record<WeaponId, WeaponFinishProfile> = {
   'flashlight-pistol': { id: 'usp45-tactical-v1', albedo: path('pistol'), normal: path('pistol', '-normal'), roughness: path('pistol', '-roughness'), metalness: 0.66, normalScale: 0.28, textureRepeat: 2 },
   'explosive-crossbow': { id: 'tac15-carbon-v1', albedo: path('pistol'), normal: path('pistol', '-normal'), roughness: path('pistol', '-roughness'), metalness: 0.42, normalScale: 0.32, textureRepeat: 2 },
   flamethrower: { id: 'm2-heat-weathered-v1', albedo: path('lmg'), normal: path('lmg', '-normal'), roughness: path('lmg', '-roughness'), metalness: 0.64, normalScale: 0.4, textureRepeat: 2 },
+  // HF-334: crimson care-package variant. Same authored maps; the red livery
+  // is applied as a runtime tint so no second texture set ships.
+  'crimson-flamethrower': { id: 'crimson-lacquer-v1', tintHex: 0xd8342a, albedo: path('lmg'), normal: path('lmg', '-normal'), roughness: path('lmg', '-roughness'), metalness: 0.58, normalScale: 0.4, textureRepeat: 2 },
   'flare-gun': { id: 'orion-signal-red-v1', albedo: path('pistol'), normal: path('pistol', '-normal'), roughness: path('pistol', '-roughness'), metalness: 0.38, normalScale: 0.28, textureRepeat: 2 },
 };
 

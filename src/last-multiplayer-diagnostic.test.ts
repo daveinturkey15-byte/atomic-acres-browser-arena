@@ -67,4 +67,18 @@ describe('last completed multiplayer diagnostic', () => {
     target.setItem(LAST_MULTIPLAYER_DIAGNOSTIC_STORAGE_KEY, JSON.stringify({ ...summary, schemaVersion: 999 }));
     expect(loadLastMultiplayerDiagnostic(target)).toBeNull();
   });
+
+  it('retains every canonical arena ID, including High Seas, and rejects compatibility aliases', () => {
+    const base = {
+      completedAtEpochMs: 120_001,
+      mode: 'ffa', role: 'guest', protocolVersion: 6,
+      durationMs: 100_000, participantCount: 4, localPlayerName: 'Local',
+      local: { kills: 1, deaths: 1, shotsFired: 8, hitShots: 4, damageDealt: 200, damageTaken: 150, headshots: 0 },
+      network: { rttMs: 42, clockOffsetMs: -3, interpolationDelayMs: 85, receiverSequenceGaps: 0, receiverReordered: 0, droppedDamageEvents: 0 },
+      damageTimeline: [],
+    };
+    expect(createLastMultiplayerDiagnostic({ ...base, arena: 'farcrysis' }).arena).toBe('farcrysis');
+    expect(createLastMultiplayerDiagnostic({ ...base, arena: 'high-seas' }).arena).toBe('high-seas');
+    expect(createLastMultiplayerDiagnostic({ ...base, arena: 'nuke-town' }).arena).toBe('atomic-acres');
+  });
 });

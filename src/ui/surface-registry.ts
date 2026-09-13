@@ -1,16 +1,55 @@
 export type UiRenderer = 'main-shell' | 'match-hud';
+export type UiSurfaceKind = 'static' | 'dynamic' | 'diagnostics-overlay';
 
 export type UiSurfaceDefinition = Readonly<{
   id: string;
   rootElementId: string;
   renderer: UiRenderer;
   critical: boolean;
+  kind?: UiSurfaceKind;
+  toggleCode?: string;
+  zIndex?: number;
+  pointerEvents?: 'auto' | 'none';
 }>;
+
+export const HUD_MOTION_PROPERTIES = Object.freeze([
+  '--hud-sway-x', '--hud-sway-y', '--hud-breathe', '--hud-gait', '--hud-health',
+] as const);
+
+export type HudMotionProperty = typeof HUD_MOTION_PROPERTIES[number];
+
+export type HudMotionTargetDefinition = Readonly<{
+  id: string;
+  selector: string;
+  role: 'sway' | 'health';
+  properties: readonly HudMotionProperty[];
+}>;
+
+/**
+ * The frame-driven HUD custom properties are written directly on the elements
+ * whose rules consume them. Keep this registry beside the typed surface
+ * inventory so markup, CSS and the runtime agree on the invalidation boundary.
+ */
+export const HUD_MOTION_TARGETS: readonly HudMotionTargetDefinition[] = Object.freeze([
+  { id: 'mission-console', selector: '.hud-mission-console', role: 'sway', properties: HUD_MOTION_PROPERTIES.slice(0, 4) },
+  { id: 'map-console', selector: '.hud-map-console', role: 'sway', properties: HUD_MOTION_PROPERTIES.slice(0, 4) },
+  { id: 'operator-console', selector: '.hud-operator-console', role: 'sway', properties: HUD_MOTION_PROPERTIES.slice(0, 4) },
+  { id: 'weapon-console', selector: '.hud-weapon-console', role: 'sway', properties: HUD_MOTION_PROPERTIES.slice(0, 4) },
+  { id: 'support-block', selector: '#support-block', role: 'sway', properties: HUD_MOTION_PROPERTIES.slice(0, 4) },
+  { id: 'killfeed', selector: '#killfeed', role: 'sway', properties: HUD_MOTION_PROPERTIES.slice(0, 4) },
+  { id: 'damage-feeds', selector: '#damage-feeds', role: 'sway', properties: HUD_MOTION_PROPERTIES.slice(0, 4) },
+  { id: 'pause-hint', selector: '#pause-hint', role: 'sway', properties: HUD_MOTION_PROPERTIES.slice(0, 4) },
+  { id: 'health-fill', selector: '#health-fill', role: 'health', properties: ['--hud-health'] },
+]);
+
+export const HUD_MOTION_TARGET_COUNT = HUD_MOTION_TARGETS.length;
 
 export const UI_SURFACE_INVENTORY: readonly UiSurfaceDefinition[] = Object.freeze([
   { id: 'deployment-shell', rootElementId: 'menu', renderer: 'main-shell', critical: true },
   { id: 'field-kit-panel', rootElementId: 'menu-panel-kit', renderer: 'main-shell', critical: true },
   { id: 'killstreak-loadout-panel', rootElementId: 'menu-panel-streaks', renderer: 'main-shell', critical: true },
+  { id: 'operator-panel', rootElementId: 'menu-panel-operator', renderer: 'main-shell', critical: true },
+  { id: 'operator-appearance', rootElementId: 'operator-appearance', renderer: 'main-shell', critical: true },
   { id: 'options-panel', rootElementId: 'menu-panel-options', renderer: 'main-shell', critical: true },
   { id: 'graphics-settings', rootElementId: 'graphics-settings', renderer: 'main-shell', critical: true },
   { id: 'audio-settings', rootElementId: 'audio-settings', renderer: 'main-shell', critical: true },
@@ -31,7 +70,18 @@ export const UI_SURFACE_INVENTORY: readonly UiSurfaceDefinition[] = Object.freez
   { id: 'project-map', rootElementId: 'project-map-panel', renderer: 'main-shell', critical: false },
   { id: 'targeting-map', rootElementId: 'strike-map-overlay', renderer: 'match-hud', critical: true },
   { id: 'match-hud', rootElementId: 'hud', renderer: 'match-hud', critical: true },
+  {
+    id: 'netcode-diagnostics-overlay',
+    rootElementId: 'netcode-diagnostics-overlay',
+    renderer: 'match-hud',
+    critical: false,
+    kind: 'diagnostics-overlay',
+    toggleCode: 'F3',
+    zIndex: 70,
+    pointerEvents: 'none',
+  },
   { id: 'damage-direction', rootElementId: 'damage-direction', renderer: 'match-hud', critical: true },
+  { id: 'killstreak-alert', rootElementId: 'killstreak-alert', renderer: 'match-hud', critical: false },
   { id: 'nuke-warning', rootElementId: 'nuke-warning', renderer: 'match-hud', critical: true },
   { id: 'refresh-warning', rootElementId: 'refresh-warning', renderer: 'match-hud', critical: false },
   { id: 'match-bar', rootElementId: 'matchbar', renderer: 'match-hud', critical: true },
@@ -103,6 +153,10 @@ export const UI_MOBILE_REVIEW_VIEWPORTS = Object.freeze([
 
 export function assertUiSurfaceInventory(root: ParentNode): void {
   for (const surface of UI_SURFACE_INVENTORY) {
+    // Diagnostics is deliberately lazy: F3 creates the hidden overlay on first
+    // use, so the initial shell assertion must validate its source contract
+    // rather than force a DOM node and defeat the lazy/off-switch behavior.
+    if (surface.kind === 'diagnostics-overlay') continue;
     if (!root.querySelector(`#${surface.rootElementId}`)) {
       throw new Error(`Missing UI surface ${surface.id} (#${surface.rootElementId})`);
     }

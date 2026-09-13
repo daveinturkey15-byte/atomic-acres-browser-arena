@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "size": 512,
+  "maps": [
+    "albedo",
+    "normal",
+    "orm"
+  ],
+  "families": [
+    {
+      "family": "asphalt",
+      "size": 512,
+      "metresPerTile": 4,
+      "source": "docs/forge/textures/asphalt/candidate-01-source.png",
+      "fractionMostlyZ": 0.9164505004882812,
+      "detail": {
+        "albedoStddev": 0.10630772066244365,
+        "albedoLaplace": 0.21671818848686542,
+        "normalSlopeMean": 0.18606932235596219,
+        "normalZMean": 0.9871425411931796,
+        "roughnessStddev": 0.011180372912600873
+      },
+      "meanLinear": [
+        0.07036722736536717,
+        0.07262707935917381,
+        0.07341128265285594
+      ],
+      "urls": {
+        "albedo": "./textures/nuketown2/asphalt/albedo.png",
+        "normal": "./textures/nuketown2/asphalt/normal.png",
+        "orm": "./textures/nuketown2/asphalt/orm.png"
+      }
+    },
+    {
+      "family": "lapSiding",
+      "size": 512,
+      "metresPerTile": 1.76,
+      "source": "docs/forge/textures/lapSiding/candidate-01-source.png",
+      "fractionMostlyZ": 0.9324989318847656,
+      "detail": {
+        "albedoStddev": 0.15017577548468475,
+        "albedoLaplace": 0.06502155029909318,
+        "normalSlopeMean": 0.13315492101361315,
+        "normalZMean": 0.9907548199348639,
+        "roughnessStddev": 0.047174668480162135
+      },
+      "meanLinear": [
+        0.6339801808999775,
+        0.5860223448394184,
+        0.522000835883977
+      ],
+      "urls": {
+        "albedo": "./textures/nuketown2/lapSiding/albedo.png",
+        "normal": "./textures/nuketown2/lapSiding/normal.png",
+        "orm": "./textures/nuketown2/lapSiding/orm.png"
+      }
+    },
+    {
+      "family": "brick",
+      "size": 512,
+      "metresPerTile": 1.8,
+      "source": "docs/forge/textures/brick/candidate-01-source.png",
+      "fractionMostlyZ": 0.9415855407714844,
+      "detail": {
+        "albedoStddev": 0.08066510838409036,
+        "albedoLaplace": 0.10992189667126695,
+        "normalSlopeMean": 0.17071447340338253,
+        "normalZMean": 0.9887579382323111,
+        "roughnessStddev": 0.010250849454660222
+      },
+      "meanLinear": [
+        0.24526417721746083,
+        0.22915718598407447,
+        0.2123454826820311
+      ],
+      "urls": {
+        "albedo": "./textures/nuketown2/brick/albedo.png",
+        "normal": "./textures/nuketown2/brick/normal.png",
+        "orm": "./textures/nuketown2/brick/orm.png"
+      }
+    },
+    {
+      "family": "concrete",
+      "size": 512,
+      "metresPerTile": 3,
+      "source": "docs/forge/textures/concrete/candidate-01-source.png",
+      "fractionMostlyZ": 0.9956016540527344,
+      "detail": {
+        "albedoStddev": 0.07152488691678698,
+        "albedoLaplace": 0.12106486966138164,
+        "normalSlopeMean": 0.12137962216765175,
+        "normalZMean": 0.9951795244285222,
+        "roughnessStddev": 0.0066905284457613266
+      },
+      "meanLinear": [
+        0.29732353066908274,
+        0.278740465276641,
+        0.2561422313578927
+      ],
+      "urls": {
+        "albedo": "./textures/nuketown2/concrete/albedo.png",
+        "normal": "./textures/nuketown2/concrete/normal.png",
+        "orm": "./textures/nuketown2/concrete/orm.png"
+      }
+    },
+    {
+      "family": "shingle",
+      "size": 512,
+      "metresPerTile": 3,
+      "source": "docs/forge/textures/shingle/candidate-01-source.png",
+      "fractionMostlyZ": 0.9853096008300781,
+      "detail": {
+        "albedoStddev": 0.09084956885363485,
+        "albedoLaplace": 0.14718655500011835,
+        "normalSlopeMean": 0.15215197348419807,
+        "normalZMean": 0.9922756124874468,
+        "roughnessStddev": 0.013147004162942844
+      },
+      "meanLinear": [
+        0.11620284301473768,
+        0.11750246479364759,
+        0.11554757842813089
+      ],
+      "urls": {
+        "albedo": "./textures/nuketown2/shingle/albedo.png",
+        "normal": "./textures/nuketown2/shingle/normal.png",
+        "orm": "./textures/nuketown2/shingle/orm.png"
+      }
+    },
+    {
+      "family": "timber",
+      "size": 512,
+      "metresPerTile": 1.8,
+      "source": "docs/forge/textures/timber/candidate-01-source.png",
+      "fractionMostlyZ": 0.8779449462890625,
+      "detail": {
+        "albedoStddev": 0.16403727543866248,
+        "albedoLaplace": 0.14441324547130474,
+        "normalSlopeMean": 0.2238555033409071,
+        "normalZMean": 0.9809325884048121,
+        "roughnessStddev": 0.025977166087201096
+      },
+      "meanLinear": [
+        0.28754631218144705,
+        0.25516831975266174,
+        0.229701559920953
+      ],
+      "urls": {
+        "albedo": "./textures/nuketown2/timber/albedo.png",
+        "normal": "./textures/nuketown2/timber/normal.png",
+        "orm": "./textures/nuketown2/timber/orm.png"
+      }
+    }
+  ]
+}

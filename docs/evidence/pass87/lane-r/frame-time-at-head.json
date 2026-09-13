@@ -1,0 +1,225 @@
+{
+ "contract": "farcrysis-frame-time-at-head-v1",
+ "why": "The PASS 85 frame-time receipt (docs/evidence/pass85/lane-r/frame-time-before.json, 2026-09-02T15:30Z) predates this lane's PASS 87 changes - 256 invisible terrain-proxy meshes, 256 ballistic surfaces, four crate-lid colliders, three art-prop colliders and a non-zero emissive across many vegetation and structure materials. 'Still 1.85x' was a present-tense claim about a scene that had since changed, so the skeptic refused it. This is the re-measurement at the shipped head, same instrument, same viewport, same paired method.",
+ "measuredAt": "2026-09-02T23:35:10.489Z",
+ "head": "fe897216 (source unchanged since; dist built 2026-09-03T00:03 from it)",
+ "instrument": "scripts/qa/measure-farcrysis-frame-time.mjs via scripts/qa/run-with-preview-server.mjs, installed Chrome headless, 1600x900, WebGPU, 20 s rAF sample after a 5 s settle, --disable-frame-rate-limit --disable-gpu-vsync",
+ "comfyui": "queue empty (queue_running [] / queue_pending []) checked before the first and before run 3",
+ "pairing": "each run measures atomic-acres and farcrysis back to back in ONE browser launch, so a ratio is always same-window",
+ "runs": [
+  {
+   "run": 1,
+   "generatedAt": "2026-09-02T23:25:11.322Z",
+   "seconds": 20,
+   "viewport": [
+    1600,
+    900
+   ],
+   "gpuMemoryAtLaunch": null,
+   "farcrysis": {
+    "p50FrameMs": 18.2,
+    "p95FrameMs": 24.6,
+    "p99FrameMs": 28.1,
+    "meanFps": 54.4,
+    "longFramePercent": 0.09,
+    "worstFrameMs": 81.9,
+    "pipelinesDuringSample": 0,
+    "meshes": 253,
+    "instances": 93194,
+    "triangles": 866727,
+    "shadowCasters": 99,
+    "distinctMaterials": 222,
+    "transparent": 48,
+    "admittedMs": 56206
+   },
+   "atomicAcres": {
+    "p50FrameMs": 13.6,
+    "p95FrameMs": 20.4,
+    "p99FrameMs": 23.6,
+    "meanFps": 71.4,
+    "longFramePercent": 0.07,
+    "worstFrameMs": 100.5,
+    "pipelinesDuringSample": 0,
+    "meshes": 161,
+    "instances": 27133,
+    "triangles": 538735,
+    "shadowCasters": 64,
+    "distinctMaterials": 110,
+    "transparent": 36,
+    "admittedMs": 57597
+   },
+   "p50Ratio": 1.338,
+   "p95Ratio": 1.206
+  },
+  {
+   "run": 2,
+   "generatedAt": "2026-09-02T23:28:12.086Z",
+   "seconds": 20,
+   "viewport": [
+    1600,
+    900
+   ],
+   "gpuMemoryAtLaunch": null,
+   "farcrysis": {
+    "p50FrameMs": 23.3,
+    "p95FrameMs": 29.3,
+    "p99FrameMs": 32.9,
+    "meanFps": 42.7,
+    "longFramePercent": 0.94,
+    "worstFrameMs": 78.2,
+    "pipelinesDuringSample": 0,
+    "meshes": 255,
+    "instances": 93285,
+    "triangles": 866933,
+    "shadowCasters": 99,
+    "distinctMaterials": 224,
+    "transparent": 50,
+    "admittedMs": 58081
+   },
+   "atomicAcres": {
+    "p50FrameMs": 12.7,
+    "p95FrameMs": 17.1,
+    "p99FrameMs": 20.4,
+    "meanFps": 77.4,
+    "longFramePercent": 0.06,
+    "worstFrameMs": 80.8,
+    "pipelinesDuringSample": 0,
+    "meshes": 160,
+    "instances": 27085,
+    "triangles": 538639,
+    "shadowCasters": 64,
+    "distinctMaterials": 109,
+    "transparent": 35,
+    "admittedMs": 51135
+   },
+   "p50Ratio": 1.835,
+   "p95Ratio": 1.713
+  },
+  {
+   "run": 3,
+   "generatedAt": "2026-09-02T23:31:57.758Z",
+   "seconds": 20,
+   "viewport": [
+    1600,
+    900
+   ],
+   "gpuMemoryAtLaunch": "7108 MiB, 16303 MiB",
+   "farcrysis": {
+    "p50FrameMs": 23.4,
+    "p95FrameMs": 33.5,
+    "p99FrameMs": 40,
+    "meanFps": 42,
+    "longFramePercent": 5.13,
+    "worstFrameMs": 47.8,
+    "pipelinesDuringSample": 0,
+    "meshes": 255,
+    "instances": 93287,
+    "triangles": 866937,
+    "shadowCasters": 99,
+    "distinctMaterials": 224,
+    "transparent": 50,
+    "admittedMs": 61502
+   },
+   "atomicAcres": {
+    "p50FrameMs": 16.2,
+    "p95FrameMs": 22.9,
+    "p99FrameMs": 26.5,
+    "meanFps": 59.9,
+    "longFramePercent": 0.33,
+    "worstFrameMs": 81.8,
+    "pipelinesDuringSample": 0,
+    "meshes": 161,
+    "instances": 27133,
+    "triangles": 538735,
+    "shadowCasters": 64,
+    "distinctMaterials": 110,
+    "transparent": 36,
+    "admittedMs": 55472
+   },
+   "p50Ratio": 1.444,
+   "p95Ratio": 1.463
+  },
+  {
+   "run": 4,
+   "generatedAt": "2026-09-02T23:35:10.489Z",
+   "seconds": 20,
+   "viewport": [
+    1600,
+    900
+   ],
+   "gpuMemoryAtLaunch": "8246 MiB, 16303 MiB",
+   "farcrysis": {
+    "p50FrameMs": 27.2,
+    "p95FrameMs": 37.1,
+    "p99FrameMs": 43.3,
+    "meanFps": 36.3,
+    "longFramePercent": 11.31,
+    "worstFrameMs": 75.8,
+    "pipelinesDuringSample": 0,
+    "meshes": 253,
+    "instances": 93194,
+    "triangles": 866727,
+    "shadowCasters": 99,
+    "distinctMaterials": 222,
+    "transparent": 48,
+    "admittedMs": 61988
+   },
+   "atomicAcres": {
+    "p50FrameMs": 14.4,
+    "p95FrameMs": 22.5,
+    "p99FrameMs": 26,
+    "meanFps": 65.4,
+    "longFramePercent": 0.31,
+    "worstFrameMs": 90.6,
+    "pipelinesDuringSample": 0,
+    "meshes": 161,
+    "instances": 27133,
+    "triangles": 538735,
+    "shadowCasters": 64,
+    "distinctMaterials": 110,
+    "transparent": 36,
+    "admittedMs": 60542
+   },
+   "p50Ratio": 1.889,
+   "p95Ratio": 1.649
+  }
+ ],
+ "summary": {
+  "p50Ratios": [
+   1.338,
+   1.835,
+   1.444,
+   1.889
+  ],
+  "p50RatioMin": 1.338,
+  "p50RatioMedian": 1.639,
+  "p50RatioMean": 1.627,
+  "p50RatioMax": 1.889,
+  "farcrysisMeanFpsRange": [
+   36.3,
+   54.4
+  ],
+  "atomicMeanFpsRange": [
+   59.9,
+   77.4
+  ],
+  "inCombatPipelines": [
+   0
+  ],
+  "briefTarget": "within ~1.5x of atomic-acres",
+  "verdict": "NOT MET, and NOT WORSE than the PASS 85 figure either. Four paired runs at head give p50 ratios 1.34 / 1.83 / 1.44 / 1.89 (median 1.64, worst 1.89) against the PASS 85 single pair of 1.85. The spread is the shared workstation, not the arena: the atomic-acres control itself moved 12.7-16.3 ms p50 across the same four launches. The honest statement is a RANGE, not a point."
+ },
+ "drawLoadComparison": {
+  "note": "This is the check the skeptic actually asked for: did this lane's added geometry enter the frame? It did not. The 256 terrain-proxy meshes are visible=false and castShadow=false, so they are in no render list and the scene walk skips them. MEASURED, PASS 85 -> at head: triangles 869,656 -> 866,727-866,937; meshes 253 -> 253-255; instances 93,268 -> 93,194-93,287; shadow casters 99 -> 99; distinct materials 222 -> 222-224; in-combat pipeline creations 0 -> 0 in all four runs. The emissive lift changed material VALUES, not the permutation count.",
+  "pass85": {
+   "triangles": 869656,
+   "meshes": 253,
+   "instances": 93268,
+   "shadowCasters": 99,
+   "distinctMaterials": 222,
+   "p50FrameMs": 26.5,
+   "atomicP50FrameMs": 14.3,
+   "p50Ratio": 1.853
+  }
+ }
+}

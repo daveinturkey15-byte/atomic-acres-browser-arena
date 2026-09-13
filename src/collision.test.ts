@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   circleIntersectsBox,
+  collidersOverlappingVerticalSpan,
   clampPointToBounds,
   damp,
   firstSegmentBoxHit,
@@ -57,6 +58,17 @@ describe('arena collision', () => {
     );
     expect(result.x).toBe(9.5);
     expect(result.z).toBe(-9.5);
+  });
+
+  it('preserves collider identity while isolating stacked-deck capsule spans', () => {
+    const engineWall: Box2 = { minX: -1, maxX: 1, minY: -0.2, maxY: 2.8, minZ: -1, maxZ: 1 };
+    const mainWall: Box2 = { minX: -1, maxX: 1, minY: 3.2, maxY: 5.9, minZ: -1, maxZ: 1 };
+    const upperWall: Box2 = { minX: -1, maxX: 1, minY: 6.2, maxY: 8.92, minZ: -1, maxZ: 1 };
+    const colliders = [engineWall, mainWall, upperWall];
+    expect(collidersOverlappingVerticalSpan(colliders, 0, 1.7)).toEqual([engineWall]);
+    expect(collidersOverlappingVerticalSpan(colliders, 3.2, 4.9)).toEqual([mainWall]);
+    expect(collidersOverlappingVerticalSpan(colliders, 6.2, 7.9)).toEqual([upperWall]);
+    expect(collidersOverlappingVerticalSpan(colliders, 3.2, 4.9)[0]).toBe(mainWall);
   });
 
   it('rejects out-of-bounds combat origins with the actor radius margin', () => {

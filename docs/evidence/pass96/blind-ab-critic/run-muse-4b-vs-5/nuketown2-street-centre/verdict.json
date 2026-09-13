@@ -1,0 +1,82 @@
+{
+  "station": "nuketown2-street-centre",
+  "assignment": {
+    "left": "B",
+    "right": "A"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "left",
+  "winner": "B",
+  "confidence": 0.7,
+  "probes": {
+    "left": {
+      "expected": "MKTA",
+      "answered": "MKTA"
+    },
+    "right": {
+      "expected": "RRMM",
+      "answered": "RRMM"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate5\\nuketown2\\nuketown2-street-centre.png",
+      "sourceSha256": "fc4e80e40481e17c1b29195164851595ceeb1ef25f430a81f93979b2f7e66acf",
+      "shownSha256": "bb5f26ed8d0f1e386537d8059043d3b01052cdf324d1dda4bf7de94be3fb5b04",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate4b\\captures\\nuketown2\\nuketown2-street-centre.png",
+      "sourceSha256": "763a455e4ada6e8b57d34cb119660d69712f99cf6ef5ceff54b18d992dac50c1",
+      "shownSha256": "6871f7dd67394010b7c4d6ba7828aa70ab8e89ff371653eb3e4f3aefb9d16ee6",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.jpg",
+        "sha256": "cba85d16337fce8629b31e3f03dd0946a0de1ffbc34c8890b4d9624f06d3dc82"
+      },
+      {
+        "shownAs": "reference-2.jpg",
+        "sha256": "07fa58a75eeb0ee87244caa7e5255da49b0bc965e182ce7f42d22a84479406da"
+      },
+      {
+        "shownAs": "reference-3.jpg",
+        "sha256": "8a5eab97781e4201d3955063e2d5179f8301d3caf418798e3cb4c2995336fd3d"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "e7cbd0aaf9430d5da85897ba3f9b8ebbb2ffe1148f1ded824dc4846cb4abd07d"
+      }
+    ]
+  },
+  "why": "LEFT is closer to the bright hazy daylight of the reference set: the pale sky and light atmospheric mountains in r0c1, the preserved asphalt detail and visible lane line in r2c0-r2c1, and the matte beige bus rear without blowout in r1c1 agree with the soft-shadow overhead in reference-1 and the bright sunlit sidewalk/grass and pale blue distant mountains in reference-2, while RIGHT crushes the road to pure black in r1c0-r2c1 and blows out the bus roof highlight in r1c1 with navy over-contrasted mountains in r0c1 that the references never show.",
+  "leftCloser": [
+    "preserves road texture and lane line in r2c0-r2c1 versus crushed black, matching overhead asphalt read",
+    "keeps bus rear/roof matte without blown specular in r1c1, matching reference daylight material read",
+    "lighter hazy purple-gray mountains and pale sky in r0c1 matching reference-2 atmospheric perspective",
+    "softer balanced shadows and mid-tone sidewalk in r2c1-r2c2 matching reference-2 concrete brightness"
+  ],
+  "rightCloser": [
+    "slightly more saturated lime-green bins/grass in r2c2 closer to reference-2 vivid lawn green",
+    "deeper red rear fence in r0c1-r0c2 closer to reference warm saturated accent"
+  ],
+  "largestDifference": {
+    "region": "r1c1",
+    "what": "exposure/contrast: RIGHT blows out the bus roof to white and crushes surrounding road/shadow to pure black while LEFT retains bus tone and road detail"
+  },
+  "elapsedMs": 54812,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3",
+  "revalidated": {
+    "at": "2026-09-04T21:41:35.643Z",
+    "previousInvalidReason": "schema-invalid",
+    "previousErrors": [
+      "confidence must be a number in 0..1"
+    ]
+  }
+}

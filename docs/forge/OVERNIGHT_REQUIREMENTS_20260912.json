@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "registerId": "atomic-acres-overnight-20260912",
+  "scope": "Local Blender world and Skills Lab owner overnight pass",
+  "grantsAcceptance": false,
+  "source": "docs/forge/OVERNIGHT_20260912.md",
+  "requirements": [
+    {
+      "id": "NIGHT-01",
+      "feedbackId": "HF-575",
+      "owner": "Fable / skills-lab",
+      "state": "OPEN",
+      "outcomes": [
+        "SKILLS LAB with readable responsive text and panels"
+      ],
+      "falsifier": "Screenshot at1600x1000,1280x720,760x900; no horizontal overflow/clipping, labels legible at100% zoom",
+      "tests": [
+        "scripts/technique-lab/capture.mjs"
+      ],
+      "evidence": [],
+      "planningRequirementMapping": "docs/forge/OVERNIGHT_20260912.md#outcomes-and-falsifiers"
+    },
+    {
+      "id": "NIGHT-02",
+      "feedbackId": "HF-576",
+      "owner": "Fable + Muse / sources",
+      "state": "OPEN",
+      "outcomes": [
+        "URL provided tab, every supplied reference linked and mapping/ingestion state clear"
+      ],
+      "falsifier": "All50 existing IDs preserved; original URL traceable; unsupported embeds have usable link fallback",
+      "tests": [
+        "scripts/technique-lab/capture.mjs"
+      ],
+      "evidence": [],
+      "planningRequirementMapping": "docs/forge/OVERNIGHT_20260912.md#outcomes-and-falsifiers"
+    },
+    {
+      "id": "NIGHT-03",
+      "feedbackId": "HF-577",
+      "owner": "Muse / sources + Fable",
+      "state": "OPEN",
+      "outcomes": [
+        "Every blocker explains cause, actionable unblock, experiment and pass/fail test"
+      ],
+      "falsifier": "Any blocked-only status without next action fails; inaccessible sources remain honestly unresolved",
+      "tests": [
+        "scripts/technique-lab/capture.mjs"
+      ],
+      "evidence": [],
+      "planningRequirementMapping": "docs/forge/OVERNIGHT_20260912.md#outcomes-and-falsifiers"
+    },
+    {
+      "id": "NIGHT-04",
+      "feedbackId": "HF-578",
+      "owner": "Fable + Blender authors",
+      "state": "OPEN",
+      "outcomes": [
+        "Latest demonstration/revision, thumbnail-click asset gallery, best curated items first"
+      ],
+      "falsifier": "Click loads actual GLB, repeat switch/dispose works, no phantom thumbnails, real assets and attribution",
+      "tests": [
+        "scripts/technique-lab/capture.mjs"
+      ],
+      "evidence": [],
+      "planningRequirementMapping": "docs/forge/OVERNIGHT_20260912.md#outcomes-and-falsifiers"
+    },
+    {
+      "id": "NIGHT-05",
+      "feedbackId": "HF-579",
+      "owner": "Opus / houses",
+      "state": "OPEN",
+      "outcomes": [
+        "High quality Blender teal/yellow house shells replacing visible procedural equivalents"
+      ],
+      "falsifier": "Street/backyard captures compared with supplied concepts, actual exported assets/hash/source, unchanged gameplay apertures",
+      "tests": [
+        "src/world-studio/arena.test.ts"
+      ],
+      "evidence": [],
+      "planningRequirementMapping": "docs/forge/OVERNIGHT_20260912.md#outcomes-and-falsifiers"
+    },
+    {
+      "id": "NIGHT-06",
+      "feedbackId": "HF-580",
+      "owner": "Opus / interiors",
+      "state": "OPEN",
+      "outcomes": [
+        "Blender living/kitchen hero view derived from concept and researched GLM source"
+      ],
+      "falsifier": "Actual recovered prompt/followup distinguished from adaptation; close interior render with fabric/wood/ceramic detail and open routes",
+      "tests": [
+        "src/world-studio/arena.test.ts"
+      ],
+      "evidence": [],
+      "planningRequirementMapping": "docs/forge/OVERNIGHT_20260912.md#outcomes-and-falsifiers"
+    },
+    {
+      "id": "NIGHT-07",
+      "feedbackId": "HF-581",
+      "owner": "GLM / nature + Muse / props",
+      "state": "OPEN",
+      "outcomes": [
+        "Detailed usable Blender vegetation/rocks and outdoor props"
+      ],
+      "falsifier": "Actual exports/thumbnails, plausible scale/materials, LOD/resource census and visible in candidate",
+      "tests": [
+        "src/world-studio/arena.test.ts"
+      ],
+      "evidence": [],
+      "planningRequirementMapping": "docs/forge/OVERNIGHT_20260912.md#outcomes-and-falsifiers"
+    },
+    {
+      "id": "NIGHT-08",
+      "feedbackId": "HF-582",
+      "owner": "Qwen / lighting",
+      "state": "OPEN",
+      "outcomes": [
+        "Clear daylight/interior contact depth and material detail with weather compatibility"
+      ],
+      "falsifier": "Browser consumer proof for textures, matched light/weather views, no washed-out finish or render errors",
+      "tests": [
+        "src/world-studio/arena.test.ts"
+      ],
+      "evidence": [],
+      "planningRequirementMapping": "docs/forge/OVERNIGHT_20260912.md#outcomes-and-falsifiers"
+    },
+    {
+      "id": "NIGHT-09",
+      "feedbackId": "HF-583",
+      "owner": "Root",
+      "state": "OPEN",
+      "outcomes": [
+        "Verified cross-provider work and skill adoption"
+      ],
+      "falsifier": "Exact model lifecycle, full skill Read plus actual edit evidence and Foundry receipts; exit0 alone insufficient",
+      "tests": [
+        "src/world-studio/arena.test.ts"
+      ],
+      "evidence": [],
+      "planningRequirementMapping": "docs/forge/OVERNIGHT_20260912.md#outcomes-and-falsifiers"
+    },
+    {
+      "id": "NIGHT-10",
+      "feedbackId": "HF-584",
+      "owner": "Root",
+      "state": "OPEN",
+      "outcomes": [
+        "Bounded accepted local build and regressions guarded"
+      ],
+      "falsifier": "Exact SHA/build stamp, required focused tests/DOM boot/lifecycle, camera captures/performance; failures stay OPEN",
+      "tests": [
+        "src/world-studio/arena.test.ts"
+      ],
+      "evidence": [],
+      "planningRequirementMapping": "docs/forge/OVERNIGHT_20260912.md#outcomes-and-falsifiers"
+    },
+    {
+      "id": "NIGHT-11",
+      "feedbackId": "HF-585",
+      "owner": "Muse skill candidate author and evaluator; root promotion",
+      "state": "OPEN",
+      "outcomes": [
+        "Convert researched source methods into executable shared skills with actual asset fixtures, independent evaluation and next-wave adoption proof."
+      ],
+      "falsifier": "A source mapping or SKILL.md without generated fixture, measured evaluation and worker adoption receipt does not pass.",
+      "tests": [],
+      "evidence": []
+    }
+  ]
+}

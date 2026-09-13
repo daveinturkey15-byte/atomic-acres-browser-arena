@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { retryLoad } from './retry-load';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import type { ArenaMap } from './map';
@@ -88,7 +89,8 @@ export function markBlenderArenaFallback(error: unknown): void {
 }
 
 export function mirrorAtomicCollisionAuditVisuals(proceduralWorld: THREE.Object3D, qualityRoot: THREE.Group): number {
-  const names = ['terrain-mound-west-verge', 'terrain-mound-east-verge', 'east-irrigation-vessel'];
+  // DECLUTTER 2026-08-29: the irrigation vessel left the map; two mounds remain.
+  const names = ['terrain-mound-west-verge', 'terrain-mound-east-verge'];
   let mirrored = 0;
   for (const name of names) {
     const source = proceduralWorld.getObjectByName(name);
@@ -127,9 +129,9 @@ export async function loadBlenderArena(
   telemetry.status = 'loading';
   telemetry.error = null;
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  const gltf = await loader.loadAsync(BLENDER_ARENA_ASSET, (event) => {
+  const gltf = await retryLoad('blender arena glb', () => loader.loadAsync(BLENDER_ARENA_ASSET, (event) => {
     onProgress?.(event.loaded, event.total || event.loaded || 1);
-  });
+  }));
   const root = gltf.scene;
   root.name = 'Atomic Acres Quality Graphics arena';
   const materials = new Set<THREE.Material>();
@@ -227,7 +229,7 @@ export async function loadBlenderArena(
   if (missingRoutes.length > 0) {
     throw new Error(`Blender arena is missing route landmarks: ${missingRoutes.map((route) => route.id).join(', ')}`);
   }
-  if (modeledBuses !== 2 || largeCoverAssets !== 4 || housePropSets !== 2) {
+  if (modeledBuses !== 1 || largeCoverAssets !== 4 || housePropSets !== 2) {
     throw new Error(`Blender arena asset contract failed: buses=${modeledBuses}, largeCoverAssets=${largeCoverAssets}, housePropSets=${housePropSets}`);
   }
   const expectedApertures = arena.houses.flatMap((house) => house.openings.map((opening) => ({
@@ -254,7 +256,7 @@ export async function loadBlenderArena(
   const proceduralWorld = scene.getObjectByName('Atomic Acres arena');
   if (!proceduralWorld) throw new Error('Authoritative procedural arena root is unavailable');
   const collisionAuditVisuals = mirrorAtomicCollisionAuditVisuals(proceduralWorld, root);
-  if (collisionAuditVisuals !== 3) throw new Error('Atomic collision-audit visual mirror failed: ' + collisionAuditVisuals + '/3');
+  if (collisionAuditVisuals !== 2) throw new Error('Atomic collision-audit visual mirror failed: ' + collisionAuditVisuals + '/2');
   for (const pane of arena.breakableWindows) {
     const authored = windows.get(pane.id)!;
     authored.visible = !pane.broken;

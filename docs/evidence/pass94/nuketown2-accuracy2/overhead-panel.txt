@@ -1,0 +1,28 @@
+H house   G garage   T moving truck (open)   C coach (closed)   c car
+= road    o prop     s spawn      (the perimeter wall is the frame, not a prop)
+cell = 1.5 m along the street (rows) x 3 m across it (columns)
+    z -42 -------------------- 42
+  17|..oo.....o..====..o.........|
+  16|..oo.....o..====o.o.........|
+  14|..oo.....o.o==TTo.o.....s...|
+  13|.........o..==TTo.o..s.o....|
+  11|.........o..==TTo.o....o...o|
+  10|....ooo....o==TT.......o...o|
+   8|....ooo....oCCTT.ooGGG.....o|
+   7|......HHHHH.CCTToooGGGooo...|
+   5|.....sHHHHHoCCTT...GGG.oo...|
+   4|o.....HHHHHoCCTToHHHHH.oo...|
+   2|o.....HHHHHoCCTToHHHHH.oo...|
+   1|......HHHHH.CC==oHHHHHs.....|
+  -1|.....sHHHHHoCCcc.HHHHH......|
+  -2|...oo.HHHHHo==ccoHHHHH.....o|
+  -4|...oo.HHHHHo=cccoHHHHH.....o|
+  -5|...oo.GGG...=c==oHHHHHs.....|
+  -7|...oooGGGooo=c==.HHHHH......|
+  -8|o.....GGGoo.====o....ooo....|
+ -10|o...o.......====o....ooo....|
+ -11|o...o....o.o====..o.........|
+ -13|....os...o.o====..o.........|
+ -14|...s.....o.o====o.o.....oo..|
+ -16|.........o.o====..o.....oo..|
+ -17|.........o..====..o.....oo..|

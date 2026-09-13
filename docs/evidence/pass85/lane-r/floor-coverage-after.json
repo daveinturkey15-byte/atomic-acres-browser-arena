@@ -1,0 +1,21 @@
+{
+  "generatedAt": "2026-09-02T20:58:46.167Z",
+  "dryCells": 3136,
+  "cellsWithFloor": 3136,
+  "coverage": 1,
+  "bySource": {
+    "raycast": 2985,
+    "collider": 151
+  },
+  "worstAbsGapM": 0.2226,
+  "raycastMeshes": 293,
+  "shotSurfaces": 293,
+  "terrainProxyMeshes": 64,
+  "terrainProxyTriangles": 73728,
+  "proxyError": {
+    "samples": 3136,
+    "maxAbsM": 0.1086,
+    "meanAbsM": 0.0028,
+    "misses": 0
+  }
+}

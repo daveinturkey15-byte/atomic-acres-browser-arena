@@ -1,0 +1,6 @@
+
+> atomic-acres-browser-arena@1.0.0 qa:pass77:menu-previews
+> node scripts/qa/verify-pass77-arena-menu-preview-production.mjs
+
+Pass 77 arena menu preview verification FAILED (1 issue):
+- pass77 capture generator scripts/assets/generate-pass65-runtime-menu-previews.ts digest mismatch: recorded 80194703903c5c8381ac7ac706b117540885b950242a9293189f224153032d15, got 317469cb997aae817982827bc075641e6ce2de838e20a2d88346a216faae186b

@@ -27,6 +27,7 @@ describe('profile-safe Atomic-house fragment presentation', () => {
       visibleInstances: 10,
       activeDraws: 4,
       externalProfileOwnsStaticFragments: false,
+      prewarmed: false,
     });
     presentation.setExternalProfileOwnsStaticFragments(true);
     expect(presentation.telemetry()).toEqual({
@@ -35,6 +36,7 @@ describe('profile-safe Atomic-house fragment presentation', () => {
       visibleInstances: 2,
       activeDraws: 1,
       externalProfileOwnsStaticFragments: true,
+      prewarmed: false,
     });
     expect(presentation.raycastMeshes().map((mesh) => mesh.name)).toEqual([
       'atomic-house-fragments:storage-locker',
@@ -66,6 +68,73 @@ describe('profile-safe Atomic-house fragment presentation', () => {
     expect(position.z).toBeCloseTo(wall.position.z, 5);
     presentation.setExternalProfileOwnsStaticFragments(false);
     expect(presentation.telemetry()).toMatchObject({ visibleInstances: 10, activeDraws: 4 });
+    presentation.dispose();
+  });
+
+  // HF-332: Prewarms interactive house destruction presentation resources
+  it('prewarms house destruction material pipelines and sets prewarmed telemetry', async () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.1, 100);
+    const initial = createInitialHouseDestructionState(definitions, 33);
+    const presentation = new HouseDestructionPresentation(definitions, initial);
+    scene.add(presentation.root);
+
+    let compileRuns = 0;
+    const runtime = {
+      compileAndRender: async (root: THREE.Object3D) => {
+        compileRuns += 1;
+        expect(root).toBe(presentation.root);
+        for (const name of [
+          'atomic-house-fragments:aqua-wall',
+          'atomic-house-fragments:coral-wall',
+          'atomic-house-fragments:roof-shingles',
+          'atomic-house-fragments:storage-locker',
+        ]) {
+          const mesh = presentation.root.getObjectByName(name) as THREE.InstancedMesh;
+          expect(mesh.visible).toBe(true);
+        }
+      },
+    };
+
+    expect(presentation.telemetry().prewarmed).toBe(false);
+    await presentation.prewarm(runtime, camera, 1);
+    expect(compileRuns).toBe(1);
+    expect(presentation.telemetry().prewarmed).toBe(true);
+
+    // Idempotent for same sceneGeneration
+    await presentation.prewarm(runtime, camera, 1);
+    expect(compileRuns).toBe(1);
+
+    // Runs again for new sceneGeneration
+    await presentation.prewarm(runtime, camera, 2);
+    expect(compileRuns).toBe(2);
+
+    presentation.dispose();
+  });
+
+  it('throws on prewarm when detached and re-arms on failure', async () => {
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.1, 100);
+    const initial = createInitialHouseDestructionState(definitions, 34);
+    const presentation = new HouseDestructionPresentation(definitions, initial);
+
+    await expect(presentation.prewarm({ compileAndRender: async () => undefined }, camera, 1))
+      .rejects.toThrow('House destruction presentation must be attached to a scene before prewarm');
+    expect(presentation.telemetry().prewarmed).toBe(false);
+
+    const scene = new THREE.Scene();
+    scene.add(presentation.root);
+    const failingRuntime = {
+      compileAndRender: async () => {
+        throw new Error('synthetic compile failure');
+      },
+    };
+    await expect(presentation.prewarm(failingRuntime, camera, 1)).rejects.toThrow('synthetic compile failure');
+    // HF-332: Re-armed for retry on next deployment
+    expect(presentation.telemetry().prewarmed).toBe(false);
+
+    // Succeeded retry
+    await presentation.prewarm({ compileAndRender: async () => undefined }, camera, 1);
+    expect(presentation.telemetry().prewarmed).toBe(true);
     presentation.dispose();
   });
 });

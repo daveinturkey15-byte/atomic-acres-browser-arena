@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "recipeId": "world-studio-menu-preview-v1",
+  "generatedAt": "2026-09-12",
+  "inheritsMotionContract": "pass66-authoritative-runtime-menu-preview-v2",
+  "note": "Authoring recipe only. No captured media exists. Bounds follow the new 80 by 68 metre arena; older masters are retained unchanged.",
+  "arenas": {
+    "world-studio": {
+      "kind": "helicopter",
+      "label": "HELO FLYOVER // ATOMIC ACRES - NEW WORLD · PREVIEW",
+      "presentationId": "menu-video-runtime-helo-world-studio-v1",
+      "cockpitAssetId": "pass66-compact-cockpit-overlay-v1",
+      "seed": 9122026,
+      "fovDegrees": 68,
+      "posterFrame": 60,
+      "centre": [
+        0,
+        2.6,
+        0
+      ],
+      "radius": [
+        36,
+        30
+      ],
+      "altitudeM": 32,
+      "lookAt": [
+        0,
+        2,
+        0
+      ],
+      "phaseRadians": 4.35,
+      "safeVolume": {
+        "x": [
+          -39.5,
+          39.5
+        ],
+        "y": [
+          31,
+          33
+        ],
+        "z": [
+          -33.5,
+          33.5
+        ]
+      },
+      "reviewLabel": "New World neighbourhood flyover authoring camera"
+    }
+  }
+}

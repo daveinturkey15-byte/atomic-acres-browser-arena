@@ -697,6 +697,34 @@ export function isBlocked(point: Point3, colliders: readonly Box2[], radius = 0.
   });
 }
 
+/**
+ * Returns the original collider objects whose world-space vertical extent
+ * overlaps a capsule span. Identity is preserved for telemetry and authority
+ * comparisons; this is only a per-movement navigation view.
+ */
+export function collidersOverlappingVerticalSpan(
+  colliders: readonly Box2[],
+  minimumY: number,
+  maximumY: number,
+): readonly Box2[] {
+  if (!Number.isFinite(minimumY) || !Number.isFinite(maximumY) || maximumY < minimumY) return [];
+  return colliders.filter((box) => {
+    if (box.minY === undefined && box.maxY === undefined) return true;
+    if (box.rotation) {
+      const frame = boxFrame(box);
+      const rotation = frame.rotation;
+      const worldHalfY = Math.abs(rotation.yx) * frame.halfExtents.x
+        + Math.abs(rotation.yy) * frame.halfExtents.y
+        + Math.abs(rotation.yz) * frame.halfExtents.z;
+      const boxMinimumY = box.minY === undefined ? Number.NEGATIVE_INFINITY : frame.centre.y - worldHalfY;
+      const boxMaximumY = box.maxY === undefined ? Number.POSITIVE_INFINITY : frame.centre.y + worldHalfY;
+      return maximumY >= boxMinimumY && minimumY <= boxMaximumY;
+    }
+    return maximumY >= (box.minY ?? Number.NEGATIVE_INFINITY)
+      && minimumY <= (box.maxY ?? Number.POSITIVE_INFINITY);
+  });
+}
+
 export function resolveHorizontalMove(
   current: Point3,
   desired: Point3,

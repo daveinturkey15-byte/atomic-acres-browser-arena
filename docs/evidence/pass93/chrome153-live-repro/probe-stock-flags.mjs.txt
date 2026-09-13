@@ -1,0 +1,276 @@
+import { chromium } from 'playwright';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+const BASE_URL = process.env.BASE_URL ?? 'http://127.0.0.1:4300/';
+const RUN_LABEL = process.argv[2] ?? 'initial';
+const OUTPUT_DIR = resolve('artifacts/tmp/stock');
+const PROFILE_CASES = [
+  { id: 'default', preset: null },
+  { id: 'quality', preset: 'high' },
+  { id: 'max', preset: 'max' },
+];
+
+const NATIVE_WEBGPU_ARGS = [
+  '--mute-audio',
+  '--disable-background-timer-throttling',
+  '--disable-renderer-backgrounding',
+  '--disable-backgrounding-occluded-windows',
+  '--window-position=-32000,-32000',
+  '--window-size=2640,1520',
+];
+
+function timestamp() {
+  return new Date().toISOString();
+}
+
+async function visible(page, selector) {
+  return page.locator(selector).isVisible().catch(() => false);
+}
+
+async function dismissStaleUi(page) {
+  // These are real close controls. Escape is the visitor's normal modal escape
+  // route and is harmless while the release chooser or menu is open.
+  for (const selector of [
+    '#changelog-close',
+    '#project-map-close',
+    '#rtx-native-runtime-explainer-close',
+  ]) {
+    if (await visible(page, selector)) await page.locator(selector).click();
+  }
+  await page.keyboard.press('Escape').catch(() => undefined);
+}
+
+async function waitForMenu(page, timeout = 60_000) {
+  await page.waitForSelector('#menu', { state: 'visible', timeout });
+  await page.waitForSelector('.map-card[data-arena-id="nuketown2"]:not([disabled])', {
+    state: 'visible',
+    timeout,
+  });
+}
+
+async function waitForMenuShell(page, timeout = 60_000) {
+  await page.waitForSelector('#menu', { state: 'visible', timeout });
+}
+
+async function readMarker(page) {
+  return page.evaluate(() => ({
+    url: window.location.href,
+    title: document.title,
+    releaseText: document.querySelector('.command-brand span')?.textContent?.trim() ?? null,
+    releaseFooter: document.querySelector('#menu footer small')?.textContent?.trim() ?? null,
+    documentData: { ...document.documentElement.dataset },
+    menuVisible: document.querySelector('#menu')?.hidden === false,
+    selectedArena: document.querySelector('.map-card[aria-pressed="true"]')?.getAttribute('data-arena-id') ?? null,
+    graphicsPreset: document.querySelector('#graphics-profile')?.value ?? null,
+  }));
+}
+
+async function readLiveState(page) {
+  return page.evaluate(() => {
+    const debug = globalThis.__ATOMIC_ACRES_DEBUG__;
+    const snapshot = typeof debug?.snapshot === 'function' ? debug.snapshot() : null;
+    return {
+      url: window.location.href,
+      documentData: { ...document.documentElement.dataset },
+    menuHidden: document.querySelector('#menu')?.classList.contains('hidden') ?? null,
+      transitionHidden: document.querySelector('#deployment-transition')?.hidden ?? null,
+      hudHidden: document.querySelector('#hud')?.hidden ?? null,
+      snapshot: snapshot ? {
+        gameStarted: snapshot.gameStarted ?? null,
+        matchPhase: snapshot.matchPhase ?? null,
+        presentedGameplayFrame: typeof debug?.admissionState === 'function'
+          ? debug.admissionState().presentedGameplayFrame ?? null
+          : null,
+      } : null,
+    };
+  });
+}
+
+async function runProfile(browser, profileCase) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
+  const consoleMessages = [];
+  const pageErrors = [];
+  const failedRequests = [];
+  const badResponses = [];
+  const steps = [];
+  const startedAt = timestamp();
+  let liveFrame = false;
+  let initialMarker = null;
+  let finalMarker = null;
+  let initialFrame = null;
+  let fatalError = null;
+  let deployClickedAt = null;
+
+  page.on('console', (message) => {
+    consoleMessages.push({
+      at: timestamp(),
+      type: message.type(),
+      text: message.text(),
+      location: message.location(),
+    });
+  });
+  page.on('pageerror', (error) => {
+    const entry = { at: timestamp(), name: error.name, message: error.message, stack: error.stack ?? null };
+    pageErrors.push(entry);
+    if (!fatalError) fatalError = entry.message;
+  });
+  page.on('requestfailed', (request) => {
+    failedRequests.push({
+      at: timestamp(),
+      method: request.method(),
+      url: request.url(),
+      failure: request.failure(),
+    });
+  });
+  page.on('response', (response) => {
+    if (response.status() >= 400) {
+      badResponses.push({ at: timestamp(), status: response.status(), url: response.url() });
+    }
+  });
+
+  try {
+    steps.push({ at: timestamp(), action: 'goto-root' });
+    await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await dismissStaleUi(page);
+
+    if (await visible(page, '#release-channel-gate')) {
+      steps.push({ at: timestamp(), action: 'click-latest-release' });
+      await page.locator('[data-release-choice="latest"]').click();
+    }
+
+    await waitForMenu(page);
+    initialMarker = await readMarker(page);
+    steps.push({ at: timestamp(), action: 'menu-ready', marker: initialMarker });
+
+    if (profileCase.preset !== null) {
+      steps.push({ at: timestamp(), action: `select-${profileCase.preset}-graphics-profile` });
+      await page.locator('[data-menu-tab="options"]').click();
+      await page.locator('#graphics-profile').selectOption(profileCase.preset);
+      await page.locator('#graphics-save').click();
+      // MAX changes renderer construction values and therefore legitimately
+      // reloads the menu. The wait observes the existing preview only.
+      await waitForMenuShell(page);
+      await page.locator('[data-menu-tab="deploy"]').click();
+      await waitForMenu(page);
+      await page.waitForFunction(
+        (preset) => document.querySelector('#graphics-profile')?.value === preset,
+        profileCase.preset,
+        { timeout: 60_000 },
+      );
+    }
+
+    await page.locator('.map-card[data-arena-id="nuketown2"]:not([disabled])').click();
+    await page.waitForFunction(
+      () => document.querySelector('.map-card[aria-pressed="true"]')?.getAttribute('data-arena-id') === 'nuketown2',
+      undefined,
+      { timeout: 10_000 },
+    );
+    steps.push({ at: timestamp(), action: 'select-nuketown2-card' });
+
+    const nameValue = await page.locator('#player-name').inputValue();
+    steps.push({ at: timestamp(), action: 'visitor-callsign-observed', value: nameValue });
+    deployClickedAt = timestamp();
+    steps.push({ at: deployClickedAt, action: 'click-deploy', selector: '#solo' });
+    await page.locator('#solo').click();
+
+    initialFrame = await page.evaluate(() => {
+      const debug = globalThis.__ATOMIC_ACRES_DEBUG__;
+      return typeof debug?.admissionState === 'function'
+        ? debug.admissionState().presentedGameplayFrame ?? null
+        : null;
+    });
+    await page.waitForFunction(
+      (beforeFrame) => {
+        const root = document.documentElement;
+        const debug = globalThis.__ATOMIC_ACRES_DEBUG__;
+        const snapshot = typeof debug?.snapshot === 'function' ? debug.snapshot() : null;
+        const presentedGameplayFrame = typeof debug?.admissionState === 'function'
+          ? debug.admissionState().presentedGameplayFrame ?? null
+          : null;
+        const frameAdvanced = snapshot === null
+          || typeof presentedGameplayFrame !== 'number'
+          || typeof beforeFrame !== 'number'
+          || presentedGameplayFrame > beforeFrame;
+        return root.dataset.gameplayArena === 'nuketown2'
+          && root.dataset.renderBackend === 'webgpu'
+          && document.querySelector('#menu')?.classList.contains('hidden') === true
+          && document.querySelector('#deployment-transition')?.hidden === true
+          && document.querySelector('#hud')?.hidden === false
+          && (snapshot === null || (snapshot.gameStarted === true && snapshot.matchPhase === 'active'))
+          && frameAdvanced;
+      },
+      initialFrame,
+      { timeout: 60_000 },
+    );
+    liveFrame = true;
+    finalMarker = await readLiveState(page);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!fatalError) fatalError = message;
+    steps.push({ at: timestamp(), action: 'probe-failed', error: message });
+    try { finalMarker = await readLiveState(page); } catch { /* page may have failed before app mount */ }
+  } finally {
+    const report = {
+      schemaVersion: 1,
+      runLabel: RUN_LABEL,
+      profile: profileCase.id,
+      requestedPreset: profileCase.preset,
+      baseUrl: BASE_URL,
+      browser: {
+        channel: process.env.PASS73_NATIVE_CHROME_PATH ? 'explicit-chrome-path' : 'chrome',
+        headless: true,
+        args: NATIVE_WEBGPU_ARGS,
+        viewport: { width: 1280, height: 720 },
+        deviceScaleFactor: 1,
+      },
+      startedAt,
+      finishedAt: timestamp(),
+      deployClickedAt,
+      ok: liveFrame && pageErrors.length === 0,
+      liveFrame,
+      fatalError,
+      initialMarker,
+      finalMarker,
+      consoleMessages,
+      pageErrors,
+      failedRequests,
+      badResponses,
+      steps,
+    };
+    writeFileSync(resolve(OUTPUT_DIR, `${RUN_LABEL}-${profileCase.id}.json`), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+    await page.close();
+    return report;
+  }
+}
+
+mkdirSync(OUTPUT_DIR, { recursive: true });
+const chromeOptions = {
+  headless: true,
+  args: NATIVE_WEBGPU_ARGS,
+  ...(process.env.PASS73_NATIVE_CHROME_PATH
+    ? { executablePath: process.env.PASS73_NATIVE_CHROME_PATH }
+    : { channel: 'chrome' }),
+};
+const browser = await chromium.launch(chromeOptions);
+const reports = [];
+try {
+  for (const profileCase of PROFILE_CASES) reports.push(await runProfile(browser, profileCase));
+} finally {
+  await browser.close();
+}
+
+const summary = reports.map((report) => ({
+  profile: report.profile,
+  ok: report.ok,
+  liveFrame: report.liveFrame,
+  pageErrors: report.pageErrors.length,
+  consoleErrors: report.consoleMessages.filter((entry) => entry.type === 'error').length,
+  consoleWarnings: report.consoleMessages.filter((entry) => entry.type === 'warning').length,
+  failedRequests: report.failedRequests.length,
+  badResponses: report.badResponses.length,
+  fatalError: report.fatalError,
+}));
+writeFileSync(resolve(OUTPUT_DIR, `${RUN_LABEL}-summary.json`), `${JSON.stringify({ schemaVersion: 1, runLabel: RUN_LABEL, generatedAt: timestamp(), summary }, null, 2)}\n`, 'utf8');
+console.log(JSON.stringify(summary, null, 2));
+if (reports.some((report) => !report.ok)) process.exitCode = 1;

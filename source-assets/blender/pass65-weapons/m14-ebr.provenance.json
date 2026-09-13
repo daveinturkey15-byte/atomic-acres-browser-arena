@@ -14,11 +14,11 @@
   "blenderVersion": "5.1.2",
   "generator": {
     "path": "scripts/blender/create-pass65-weapon-families.py",
-    "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+    "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
   },
   "geometryModule": {
     "path": "scripts/blender/pass65_weapon_production_geometry.py",
-    "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+    "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
   },
   "sourceBlend": {
     "path": "source-assets/blender/pass65-weapon-families.blend",
@@ -36,21 +36,21 @@
     "firstPersonGlbs": [
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/m14-ebr/m14-ebr-fp-lod0.glb",
-        "sha256": "4a841b30a972349174102ec749324acb85fb81581cc69eb32fcbfeb4e4f53aea",
+        "sha256": "8e6c85f4216436eea451344a06b6a76d5da51e742171962f8851cae9b79f2a4b",
         "variant": "first-person-lod0",
         "lod": 0,
-        "triangles": 10296,
-        "bytes": 289784,
+        "triangles": 10484,
+        "bytes": 291556,
         "meshNodes": 7,
         "renderPrimitives": 7
       },
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/m14-ebr/m14-ebr-fp-lod1.glb",
-        "sha256": "1c95056221f747b7ab65026465589336427200a805a528b1e4457a5cdf79f6f6",
+        "sha256": "f225f389f74d6a8bc8b0486a0274e287eb69b5b11aecce6b24e94072943ba836",
         "variant": "first-person-lod1",
         "lod": 1,
-        "triangles": 7466,
-        "bytes": 254108,
+        "triangles": 7620,
+        "bytes": 255716,
         "meshNodes": 7,
         "renderPrimitives": 7
       }
@@ -58,31 +58,31 @@
     "worldGlbs": [
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/m14-ebr/m14-ebr-world-lod0.glb",
-        "sha256": "6cdb8ba67dd3e574c8ad79be01846d8be82dae7d477248623c2a2fa57df1db60",
+        "sha256": "7a7c85aae3f68d651e49762357a57fcb9ad6bdb5af70abe518cdddf4b787a158",
         "variant": "world-lod0",
         "lod": 0,
-        "triangles": 10240,
-        "bytes": 289924,
+        "triangles": 10428,
+        "bytes": 291796,
         "meshNodes": 7,
         "renderPrimitives": 7
       },
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/m14-ebr/m14-ebr-world-lod1.glb",
-        "sha256": "0b5151bac4ff4f0520d61a0d74d9a3db3ef1a61d1514d05d29795153488ab0fe",
+        "sha256": "df199e109551beb8082f56c22cead266dfbab6e6b8653198168d415c633214d1",
         "variant": "world-lod1",
         "lod": 1,
-        "triangles": 8160,
-        "bytes": 267704,
+        "triangles": 8348,
+        "bytes": 269552,
         "meshNodes": 7,
         "renderPrimitives": 7
       },
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/m14-ebr/m14-ebr-world-lod2.glb",
-        "sha256": "a308141eeb0795d90b72ddf0d436cd003cd8d2112528d3247cee8ad1d02c8fa4",
+        "sha256": "e4b7bfad95c6610b969dceba31074dd2a93de20abe7d73177cc0f3d43d60b75a",
         "variant": "world-lod2",
         "lod": 2,
-        "triangles": 5084,
-        "bytes": 223812,
+        "triangles": 5230,
+        "bytes": 224076,
         "meshNodes": 7,
         "renderPrimitives": 7
       }
@@ -90,11 +90,11 @@
     "dropGlbs": [
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/m14-ebr/m14-ebr-drop-lod0.glb",
-        "sha256": "0bd856b4a154c613994b6cedfdc60b0f6af6adb6866b7ab663a8b860b35da066",
+        "sha256": "6a5b7b89b3cb4ef9f024a67adda63d0b3551c155bc91a5c29def259bf81f9772",
         "variant": "drop-lod0",
         "lod": 0,
-        "triangles": 8160,
-        "bytes": 267692,
+        "triangles": 8348,
+        "bytes": 269540,
         "meshNodes": 7,
         "renderPrimitives": 7
       }
@@ -182,7 +182,7 @@
     "renders": [
       {
         "path": "docs/assets/pass65-weapons/firearms/m14-ebr/m14-ebr-hero-quarter.png",
-        "sha256": "8d7ba2d2b1cb6a83cd1b1e7734b9cedb17baea5bba940d71239013a7af77b55f",
+        "sha256": "e13e5968c9df43fb39287e2a8a15a351153c78f44758ecd0b59d5a2bec0498db",
         "width": 480,
         "height": 360,
         "cameraId": "hero-quarter",
@@ -190,7 +190,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/m14-ebr/m14-ebr-side-silhouette.png",
-        "sha256": "52acbccf6b2e2185a8dd5ed4182b2a51879c0cd5d66c5b647a1e6d260b2cab30",
+        "sha256": "42c615b376901160da308682179c00935aa1739ed8833dc3f872b6343f4dabcf",
         "width": 480,
         "height": 360,
         "cameraId": "side-silhouette",
@@ -198,7 +198,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/m14-ebr/m14-ebr-sight-line.png",
-        "sha256": "95f2465f59578b7d9acf1d5d733e9dbb1c3611420f4b4ec06db5359e3b6f6fd0",
+        "sha256": "f062bc21663b1d07170e2be26a22025bb73f193820376d62859a6228dfc0b406",
         "width": 480,
         "height": 360,
         "cameraId": "sight-line",
@@ -206,7 +206,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/m14-ebr/m14-ebr-reload-action.png",
-        "sha256": "0198329c9ac75f4fdb1021e5622061dd0a159141c2d035fd4e69fc1eee452891",
+        "sha256": "32738704596f5ac578f0f2c9a0b21e55484bd44908e57dc530527810098d7e03",
         "width": 480,
         "height": 360,
         "cameraId": "reload-action",
@@ -214,7 +214,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/m14-ebr/m14-ebr-world-lod0-silhouette.png",
-        "sha256": "fb700b000e730e48814de9fc2ada7638ed70a84556f39db8773766a53deafe0b",
+        "sha256": "76d9c0c4a5effa9296afa40c9dea2b6b64c5e9cbc6b576152f56998ddfbf52fb",
         "width": 480,
         "height": 360,
         "cameraId": "world-lod0-silhouette",
@@ -222,7 +222,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/m14-ebr/m14-ebr-world-lod2-silhouette.png",
-        "sha256": "147e871319e2b3796741d59d891968061dc578ca965bafcd22434da687699936",
+        "sha256": "1667293b895ad94a7840038b2b82cff417686eb4ae6ee5ad83a2f871df02d16a",
         "width": 480,
         "height": 360,
         "cameraId": "world-lod2-silhouette",
@@ -230,7 +230,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/m14-ebr/m14-ebr-drop-lod0-silhouette.png",
-        "sha256": "fdc50acf743a06a27a4cced234b8de01503db644c1743d903053ba956bba11c6",
+        "sha256": "f25c77c367cf7e0aa067edbb80a941f206c914b3606f432c38b5b38e2a457a54",
         "width": 480,
         "height": 360,
         "cameraId": "drop-lod0-silhouette",
@@ -239,7 +239,7 @@
     ],
     "contactSheet": {
       "path": "docs/assets/pass65-weapons/firearms/m14-ebr/m14-ebr-contact-sheet.png",
-      "sha256": "e4761c396a459334c2bbb7f705efb214800378fbdfb81424fa9cd91ea8866ec2",
+      "sha256": "873e1393ad1064001e2c3f86f0b6058b09d0c525e111f8850d35ebe210e110e5",
       "width": 1920,
       "height": 720
     }
@@ -248,8 +248,8 @@
     "deliveries": [
       {
         "variant": "first-person-lod0",
-        "triangles": 10296,
-        "bytes": 289784,
+        "triangles": 10484,
+        "bytes": 291556,
         "meshNodes": 7,
         "renderPrimitives": 7,
         "materials": 5,
@@ -275,12 +275,12 @@
         "sightForwardDot": 0.9999999999999962,
         "declaredLength": 1.55,
         "platformAnatomy": "sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail",
-        "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":10296,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
+        "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":10484,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
       },
       {
         "variant": "first-person-lod1",
-        "triangles": 7466,
-        "bytes": 254108,
+        "triangles": 7620,
+        "bytes": 255716,
         "meshNodes": 7,
         "renderPrimitives": 7,
         "materials": 5,
@@ -306,12 +306,12 @@
         "sightForwardDot": 0.9999999999999962,
         "declaredLength": 1.55,
         "platformAnatomy": "sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail",
-        "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":7466,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
+        "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":7620,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
       },
       {
         "variant": "world-lod0",
-        "triangles": 10240,
-        "bytes": 289924,
+        "triangles": 10428,
+        "bytes": 291796,
         "meshNodes": 7,
         "renderPrimitives": 7,
         "materials": 5,
@@ -337,12 +337,12 @@
         "sightForwardDot": 0.9999999999999962,
         "declaredLength": 1.55,
         "platformAnatomy": "sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail",
-        "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":10240,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
+        "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":10428,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
       },
       {
         "variant": "world-lod1",
-        "triangles": 8160,
-        "bytes": 267704,
+        "triangles": 8348,
+        "bytes": 269552,
         "meshNodes": 7,
         "renderPrimitives": 7,
         "materials": 5,
@@ -368,12 +368,12 @@
         "sightForwardDot": 0.9999999999999962,
         "declaredLength": 1.55,
         "platformAnatomy": "sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail",
-        "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":8160,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
+        "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":8348,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
       },
       {
         "variant": "world-lod2",
-        "triangles": 5084,
-        "bytes": 223812,
+        "triangles": 5230,
+        "bytes": 224076,
         "meshNodes": 7,
         "renderPrimitives": 7,
         "materials": 5,
@@ -399,12 +399,12 @@
         "sightForwardDot": 0.9999999999999962,
         "declaredLength": 1.55,
         "platformAnatomy": "sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail",
-        "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":5084,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
+        "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":5230,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
       },
       {
         "variant": "drop-lod0",
-        "triangles": 8160,
-        "bytes": 267692,
+        "triangles": 8348,
+        "bytes": 269540,
         "meshNodes": 7,
         "renderPrimitives": 7,
         "materials": 5,
@@ -430,7 +430,7 @@
         "sightForwardDot": 0.9999999999999962,
         "declaredLength": 1.55,
         "platformAnatomy": "sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail",
-        "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":8160,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
+        "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":8348,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
       }
     ],
     "externalUris": 0

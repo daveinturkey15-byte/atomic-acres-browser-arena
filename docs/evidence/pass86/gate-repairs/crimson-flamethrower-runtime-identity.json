@@ -1,0 +1,47 @@
+{
+  "schema": "pass86/crimson-flamethrower-runtime-identity@1",
+  "rows": [
+    {
+      "asked": "flamethrower",
+      "weapon": "flamethrower",
+      "modelKind": "project-original-blender",
+      "firstPersonSource": "project-original-blender-pass65-firearm",
+      "weaponModelId": "m2-pressure-wand-twin-tank-v1",
+      "weaponFinishId": "flamethrower-project-original-pbr-v1",
+      "detailsReady": true,
+      "importedModelSource": "./assets/original/models/weapons/pass65-firearms/flamethrower/flamethrower-fp-lod0.glb",
+      "importedModelWeapon": "flamethrower",
+      "socketContractReady": true,
+      "meshes": 12,
+      "triangles": 13348
+    },
+    {
+      "asked": "crimson-flamethrower",
+      "weapon": "crimson-flamethrower",
+      "modelKind": "project-original-blender",
+      "firstPersonSource": "project-original-blender-pass65-firearm",
+      "weaponModelId": "pass65-crimson-flamethrower-project-original-v1",
+      "weaponFinishId": "crimson-flamethrower-project-original-pbr-v1",
+      "detailsReady": true,
+      "importedModelSource": "./assets/original/models/weapons/pass65-firearms/flamethrower/flamethrower-fp-lod0.glb",
+      "importedModelWeapon": "crimson-flamethrower",
+      "socketContractReady": true,
+      "meshes": 12,
+      "triangles": 13348
+    },
+    {
+      "asked": "explosive-crossbow",
+      "weapon": "explosive-crossbow",
+      "modelKind": "project-original-blender",
+      "firstPersonSource": "project-original-blender-pass65-crossbow",
+      "weaponModelId": "pass65-explosive-crossbow-project-original-v1",
+      "weaponFinishId": "explosive-crossbow-project-original-pbr-v1",
+      "detailsReady": true,
+      "importedModelSource": "./assets/original/models/weapons/pass65-crossbow/pass65-crossbow-fp-lod0.glb",
+      "importedModelWeapon": "explosive-crossbow",
+      "socketContractReady": true,
+      "meshes": 52,
+      "triangles": 8732
+    }
+  ]
+}

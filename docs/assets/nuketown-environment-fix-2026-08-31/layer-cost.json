@@ -1,0 +1,64 @@
+{
+  "pose": {
+    "x": -27,
+    "y": 1.7,
+    "z": 0,
+    "lx": 34,
+    "lz": 0,
+    "p": -0.02
+  },
+  "budget": {
+    "keys": []
+  },
+  "runs": {
+    "baseline": {
+      "frames": 640,
+      "meanMs": 11.777,
+      "medianMs": 11.6,
+      "p95Ms": 14.6,
+      "fps": 84.9
+    },
+    "without:nuketown-mountain-backdrop": {
+      "frames": 640,
+      "meanMs": 11.439,
+      "medianMs": 11.1,
+      "p95Ms": 14.3,
+      "fps": 87.4
+    },
+    "without:nuketown-forest-surround": {
+      "frames": 640,
+      "meanMs": 11.068,
+      "medianMs": 10.8,
+      "p95Ms": 14,
+      "fps": 90.4
+    },
+    "without:nuketown-yard-vegetation": {
+      "frames": 640,
+      "meanMs": 11.187,
+      "medianMs": 10.8,
+      "p95Ms": 14,
+      "fps": 89.4
+    },
+    "without:nuketown-lawn": {
+      "frames": 640,
+      "meanMs": 10.842,
+      "medianMs": 10.5,
+      "p95Ms": 15,
+      "fps": 92.2
+    },
+    "without:all-four": {
+      "frames": 640,
+      "meanMs": 9.466,
+      "medianMs": 9.3,
+      "p95Ms": 13,
+      "fps": 105.6
+    },
+    "baselineRepeat": {
+      "frames": 640,
+      "meanMs": 7.127,
+      "medianMs": 6.7,
+      "p95Ms": 11,
+      "fps": 140.3
+    }
+  }
+}

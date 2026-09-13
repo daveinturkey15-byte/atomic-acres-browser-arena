@@ -1,0 +1,28 @@
+Publish-candidate full suite, run in the clean worktree
+C:/Users/david/projects/aa-map3-laneV-verify carrying exactly the change set of
+978c7d13 (aa-map3 itself does not typecheck: another lane's uncommitted HF-412
+work there imports ./prone-transition, which does not exist in this worktree).
+
+$ npx vitest run
+
+ RUN  v4.1.9 C:/Users/david/projects/aa-map3-laneV-verify
+
+ Test Files  546 passed | 1 skipped (547)
+      Tests  5168 passed | 2 skipped (5170)
+   Duration  172.45s
+
+[exited with code 0]
+
+Also on the same tree:
+  npx tsc --noEmit                                    exit 0
+  node --test scripts/qa/cross-browser-gate-contract.test.mjs \
+              scripts/qa/eye-clearance-sweep-contract.test.mjs
+                                                      22 tests, 22 pass, 0 fail
+  npx tsx scripts/qa/sweep-eye-clearance-spots.ts     exit 0, 8 arenas derived
+    map3: 225 colliders (2 floor) -> 3013 legal hug spots
+                                    (3 colliders with no legal adjacent stance)
+
+NOT RUN, and owed before the card reaches a player:
+  - the arena boot smoke for map3 (headless, PASS73_NATIVE_WEBGPU=1)
+  - the /channels/passN/map3.html release-topology simulation
+  - a HUD capture proving the EXPLORE framing

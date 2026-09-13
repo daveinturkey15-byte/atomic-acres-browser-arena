@@ -1,0 +1,114 @@
+{
+  "contract": "arena-viewpoint-regression-capture-v1",
+  "verdict": "PASS",
+  "label": "candidate6",
+  "sha": "97de2ecd",
+  "url": "http://127.0.0.1:4189",
+  "renderer": "webgpu",
+  "backend": "webgpu",
+  "adapter": {
+    "gpu": true,
+    "adapter": true,
+    "device": true,
+    "vendor": "nvidia",
+    "architecture": "blackwell"
+  },
+  "bundleAtStart": "/legacy-main-BSK8vibJ.js",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "seed": "viewpoint",
+  "settleMs": 2500,
+  "samples": 1,
+  "capturedAt": "2026-09-05T00:04:09.699Z",
+  "environmentInvalid": null,
+  "arenas": [
+    {
+      "arena": "nuketown2",
+      "ok": true,
+      "shots": [
+        {
+          "cameraId": "nuketown2-overhead",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-overhead.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-overhead.png"
+          ],
+          "committedFrame": 147,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 167
+        },
+        {
+          "cameraId": "nuketown2-north-yard",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-north-yard.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-north-yard.png"
+          ],
+          "committedFrame": 170,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 187
+        },
+        {
+          "cameraId": "nuketown2-street-centre",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-street-centre.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-street-centre.png"
+          ],
+          "committedFrame": 190,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 207
+        },
+        {
+          "cameraId": "nuketown2-garage",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-garage.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-garage.png"
+          ],
+          "committedFrame": 210,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 227
+        },
+        {
+          "cameraId": "nuketown2-vehicle-near",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-vehicle-near.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-vehicle-near.png"
+          ],
+          "committedFrame": 230,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 247
+        },
+        {
+          "cameraId": "nuketown2-nuke-street",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-nuke-street.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-nuke-street.png"
+          ],
+          "committedFrame": 250,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 267
+        }
+      ],
+      "ms": 71052,
+      "errors": []
+    }
+  ]
+}

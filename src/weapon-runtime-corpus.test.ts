@@ -4,6 +4,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { WEAPON_LIVERY_ALIASES } from './weapon-model';
 import { WEAPON_IDS } from './protocol';
 
 function fakeGltf(url: string) {
@@ -80,6 +81,8 @@ afterEach(() => {
   vi.resetModules();
 });
 
+const LIVERY_ALIAS_COUNT = Object.keys(WEAPON_LIVERY_ALIASES).length;
+
 describe('Pass 65 menu-video runtime weapon corpus', () => {
   it('finishes its default cooperative decode lane while hidden animation frames are suspended', async () => {
     vi.resetModules();
@@ -128,7 +131,8 @@ describe('Pass 65 menu-video runtime weapon corpus', () => {
       }
     };
     visit(directory);
-    expect(worldFiles).toHaveLength(WEAPON_IDS.length + 1);
+    // HF-334: livery variants ship no world/drop GLB of their own.
+    expect(worldFiles).toHaveLength(WEAPON_IDS.length - LIVERY_ALIAS_COUNT + 1);
     for (const world of worldFiles) {
       const expected = embeddedImageDigests(world);
       expect(embeddedImageDigests(world.replace('-world-lod0.glb', '-drop-lod0.glb')), world).toEqual(expected);
@@ -167,8 +171,9 @@ describe('Pass 65 menu-video runtime weapon corpus', () => {
       completed: true,
       error: null,
     });
-    expect(afterPrewarm.resident.world.assets).toBe(WEAPON_IDS.length + 1);
-    expect(afterPrewarm.resident.drop.assets).toBe(WEAPON_IDS.length + 1);
+    // HF-334: livery variants add no resident asset of their own.
+    expect(afterPrewarm.resident.world.assets).toBe(WEAPON_IDS.length - LIVERY_ALIAS_COUNT + 1);
+    expect(afterPrewarm.resident.drop.assets).toBe(WEAPON_IDS.length - LIVERY_ALIAS_COUNT + 1);
     expect(afterPrewarm.resident.world.estimatedDecodedBytes).toBeGreaterThan(0);
     expect(afterPrewarm.resident.drop.estimatedDecodedBytes).toBeGreaterThan(0);
     expect(afterPrewarm.runtimeCorpus.residency.textureBytesEstimate).toBe(0);

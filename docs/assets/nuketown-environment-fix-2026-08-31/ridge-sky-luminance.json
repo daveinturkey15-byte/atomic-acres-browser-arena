@@ -1,0 +1,80 @@
+{
+ "measuredAt": "2026-08-31",
+ "arena": "atomic-acres (Nuke Town)",
+ "backend": "webgpu, installed Chrome",
+ "target": "ridge/sky luminance ratio well under 1.0",
+ "method": "Two masks, both derived from the after build at a FIXED camera pose, fixed visual time (42000 ms) and fixed seed (82031), so before and after frames are pixel-comparable.\n  covered   = pixels that change when the nuketown-mountain-backdrop group is DETACHED from the scene. Detaching is the only removal that survives a frame here; setting .visible=false is overwritten by a per-frame presentation pass.\n  ridgeSurface = covered AND repainted between before and after, i.e. the subset where the ridge is the VISIBLE surface rather than sitting behind the forest ring. This is the honest ridge-against-sky measurement; the wider \"covered\" set is diluted by the identical forest pixels in front of the massif and understates the before ratio.\nsky = the same pixels in the backdrop-detached frame. ratio = ridge / sky.\nThe ridge GEOMETRY is unchanged between the two builds (same seed, same radii, same heights); only vertex colours, the material and the ground skirt moved, so one mask is valid for both.",
+ "whyTheBeforeRunCannotMaskItself": "In the before build the massif is not drawn by its own meshes at all. legacy-main re-batches the whole pass31-neighbourhood-life group in palette-lit mode long after this module adds itself to it; art-kit batchStaticMeshes then deletes every attribute outside {position, normal} - the vertex COLOUR attribute with it - and replaces the material with a flat white MeshLambertMaterial keyed on the source material colour (0xffffff for a vertexColors material). The visible massif is a merged white batch under pass31-neighbourhood-life-render-batches while nuketown-mountain-ridge et al sit at visible=false. That is why the before run self-reports a meaningless ~1.0 over a 4% noise mask, and it is the root cause this pass fixes (group.userData.dynamic = true).",
+ "corroboration": {
+  "source": "docs/assets/nuketown-environment-2026-08-31/atomic-acres-8-ridge.png",
+  "note": "Direct region sample on the original diagnosis frame, no masking involved.",
+  "ridgeBox": "y 285-310, x 300-470",
+  "ridgeLuminance": 140.6,
+  "skyBox": "y 240-270, x 300-470",
+  "skyLuminance": 65.5,
+  "ratio": 2.146
+ },
+ "views": {
+  "2-horizon": {
+   "allCoveredPixels": {
+    "pixels": 29691,
+    "coveragePercent": 3.22,
+    "skyLuminance": 104.5,
+    "beforeRidgeLuminance": 102.21,
+    "afterRidgeLuminance": 92.41,
+    "beforeRatio": 0.978,
+    "afterRatio": 0.884
+   },
+   "ridgeSurfacePixels": {
+    "pixels": 8486,
+    "coveragePercent": 0.92,
+    "skyLuminance": 115.22,
+    "beforeRidgeLuminance": 108.88,
+    "afterRidgeLuminance": 75.02,
+    "beforeRatio": 0.945,
+    "afterRatio": 0.651
+   }
+  },
+  "6-ridge-meter": {
+   "allCoveredPixels": {
+    "pixels": 157108,
+    "coveragePercent": 17.05,
+    "skyLuminance": 141.65,
+    "beforeRidgeLuminance": 134.75,
+    "afterRidgeLuminance": 69.36,
+    "beforeRatio": 0.951,
+    "afterRatio": 0.49
+   },
+   "ridgeSurfacePixels": {
+    "pixels": 131277,
+    "coveragePercent": 14.24,
+    "skyLuminance": 151.8,
+    "beforeRidgeLuminance": 143.73,
+    "afterRidgeLuminance": 65.34,
+    "beforeRatio": 0.947,
+    "afterRatio": 0.43
+   }
+  },
+  "7-ridge-meter-south": {
+   "allCoveredPixels": {
+    "pixels": 145526,
+    "coveragePercent": 15.79,
+    "skyLuminance": 155.45,
+    "beforeRidgeLuminance": 126.7,
+    "afterRidgeLuminance": 65.37,
+    "beforeRatio": 0.815,
+    "afterRatio": 0.421
+   },
+   "ridgeSurfacePixels": {
+    "pixels": 120226,
+    "coveragePercent": 13.05,
+    "skyLuminance": 168.35,
+    "beforeRidgeLuminance": 133.72,
+    "afterRidgeLuminance": 59.31,
+    "beforeRatio": 0.794,
+    "afterRatio": 0.352
+   }
+  }
+ },
+ "botsCleared": "Both sets are captured with __ATOMIC_ACRES_DEBUG__.clearBots() called before any frame. The first cut of these captures shipped an after-grass frame with a red damage vignette across it - a bot had shot the player while the capture camera was detached - which made a pure colour re-key look like it had gone dry and olive."
+}

@@ -1,0 +1,297 @@
+{
+  "generatedAt": "2026-08-31T10:06:53.746Z",
+  "base": "http://127.0.0.1:41999",
+  "arenas": {
+    "atomic-acres": {
+      "errors": [],
+      "shots": [
+        {
+          "cameraId": "nuke-town-overview",
+          "applied": true,
+          "heldIntensity": 0.24,
+          "heldName": "pass64-arena-environment-atomic-acres-256",
+          "meanLuminanceBefore": 0.1758,
+          "meanLuminanceAfter": 0.1833,
+          "meanLuminanceDeltaPercent": 4.24,
+          "pixelsMovedPercent": 26.5,
+          "meanAbsDelta": 0.01452
+        },
+        {
+          "cameraId": "nuke-town-plan",
+          "applied": true,
+          "heldIntensity": 0.24,
+          "heldName": "pass64-arena-environment-atomic-acres-256",
+          "meanLuminanceBefore": 0.1204,
+          "meanLuminanceAfter": 0.1277,
+          "meanLuminanceDeltaPercent": 6.03,
+          "pixelsMovedPercent": 25.8,
+          "meanAbsDelta": 0.01305
+        },
+        {
+          "cameraId": "nuke-town-street-axis",
+          "applied": true,
+          "heldIntensity": 0.24,
+          "heldName": "pass64-arena-environment-atomic-acres-256",
+          "meanLuminanceBefore": 0.1262,
+          "meanLuminanceAfter": 0.1333,
+          "meanLuminanceDeltaPercent": 5.61,
+          "pixelsMovedPercent": 26.1,
+          "meanAbsDelta": 0.01514
+        }
+      ],
+      "observation": {
+        "backend": "webgpu",
+        "appliedTslArenaDefinitions": 1,
+        "reviewCameraIds": [
+          "nuke-town-overview",
+          "nuke-town-plan",
+          "nuke-town-street-axis",
+          "nuke-town-west-garden",
+          "nuke-town-aqua-upper-roof",
+          "nuke-town-aqua-wall-closed",
+          "nuke-town-aqua-door-open"
+        ],
+        "sceneEnvironment": "pass64-arena-environment-atomic-acres-256",
+        "sceneEnvironmentIntensity": 0.24,
+        "sceneBackground": "pass66-generated-sky-backdrop-sunset-farmland",
+        "skyBackdropStatus": "asset-ready",
+        "skyBackdropSource": "generated-equirectangular-webp",
+        "publishedArenaEnvironment": {
+          "arenaId": "atomic-acres",
+          "reflectionQuality": "high",
+          "present": true,
+          "environmentName": "pass64-arena-environment-atomic-acres-256",
+          "environmentIntensity": 0.24,
+          "expectedEnvironmentIntensity": 0.24,
+          "matchesIblState": true,
+          "sourceTextureName": "pass66-generated-sky-backdrop-sunset-farmland",
+          "resolutionTier": 256,
+          "generatedCubeSize": 4096
+        }
+      },
+      "temporalNoiseFloor": {
+        "meanLuminanceBefore": 0.1335,
+        "meanLuminanceAfter": 0.1332,
+        "meanLuminanceDeltaPercent": -0.25,
+        "pixelsMovedPercent": 7.7,
+        "meanAbsDelta": 0.00916
+      }
+    },
+    "high-seas": {
+      "errors": [],
+      "shots": [
+        {
+          "cameraId": "high-seas-starboard-overview",
+          "applied": true,
+          "heldIntensity": 0.2,
+          "heldName": "pass64-arena-environment-high-seas-256",
+          "meanLuminanceBefore": 0.3318,
+          "meanLuminanceAfter": 0.3477,
+          "meanLuminanceDeltaPercent": 4.78,
+          "pixelsMovedPercent": 38.5,
+          "meanAbsDelta": 0.02108
+        },
+        {
+          "cameraId": "high-seas-stern-main-deck",
+          "applied": true,
+          "heldIntensity": 0.2,
+          "heldName": "pass64-arena-environment-high-seas-256",
+          "meanLuminanceBefore": 0.2775,
+          "meanLuminanceAfter": 0.3187,
+          "meanLuminanceDeltaPercent": 14.86,
+          "pixelsMovedPercent": 72.4,
+          "meanAbsDelta": 0.0439
+        },
+        {
+          "cameraId": "high-seas-upper-deck-occlusion",
+          "applied": true,
+          "heldIntensity": 0.2,
+          "heldName": "pass64-arena-environment-high-seas-256",
+          "meanLuminanceBefore": 0.3794,
+          "meanLuminanceAfter": 0.4028,
+          "meanLuminanceDeltaPercent": 6.15,
+          "pixelsMovedPercent": 43.6,
+          "meanAbsDelta": 0.02812
+        }
+      ],
+      "observation": {
+        "backend": "webgpu",
+        "appliedTslArenaDefinitions": 1,
+        "reviewCameraIds": [
+          "high-seas-starboard-overview",
+          "high-seas-stern-main-deck",
+          "high-seas-upper-deck-occlusion",
+          "high-seas-bow-lane"
+        ],
+        "sceneEnvironment": "pass64-arena-environment-high-seas-256",
+        "sceneEnvironmentIntensity": 0.2,
+        "sceneBackground": "pass66-sky-backdrop-open-ocean-day",
+        "skyBackdropStatus": "procedural-ready",
+        "skyBackdropSource": "procedural-canvas",
+        "publishedArenaEnvironment": {
+          "arenaId": "high-seas",
+          "reflectionQuality": "high",
+          "present": true,
+          "environmentName": "pass64-arena-environment-high-seas-256",
+          "environmentIntensity": 0.2,
+          "expectedEnvironmentIntensity": 0.2,
+          "matchesIblState": true,
+          "sourceTextureName": "pass66-sky-backdrop-open-ocean-day",
+          "resolutionTier": 256,
+          "generatedCubeSize": 2048
+        }
+      },
+      "temporalNoiseFloor": {
+        "meanLuminanceBefore": 0.4041,
+        "meanLuminanceAfter": 0.4038,
+        "meanLuminanceDeltaPercent": -0.09,
+        "pixelsMovedPercent": 3.2,
+        "meanAbsDelta": 0.00352
+      }
+    },
+    "test2": {
+      "errors": [],
+      "shots": [
+        {
+          "cameraId": "test2-estate-overview",
+          "applied": true,
+          "heldIntensity": 0.22,
+          "heldName": "pass64-arena-environment-test2-256",
+          "meanLuminanceBefore": 0.2164,
+          "meanLuminanceAfter": 0.2356,
+          "meanLuminanceDeltaPercent": 8.9,
+          "pixelsMovedPercent": 53.2,
+          "meanAbsDelta": 0.02315
+        },
+        {
+          "cameraId": "test2-pool-lane",
+          "applied": true,
+          "heldIntensity": 0.22,
+          "heldName": "pass64-arena-environment-test2-256",
+          "meanLuminanceBefore": 0.302,
+          "meanLuminanceAfter": 0.3257,
+          "meanLuminanceDeltaPercent": 7.83,
+          "pixelsMovedPercent": 63.3,
+          "meanAbsDelta": 0.02554
+        },
+        {
+          "cameraId": "test2-garden-occlusion",
+          "applied": true,
+          "heldIntensity": 0.22,
+          "heldName": "pass64-arena-environment-test2-256",
+          "meanLuminanceBefore": 0.3115,
+          "meanLuminanceAfter": 0.3335,
+          "meanLuminanceDeltaPercent": 7.04,
+          "pixelsMovedPercent": 44,
+          "meanAbsDelta": 0.0255
+        }
+      ],
+      "observation": {
+        "backend": "webgpu",
+        "appliedTslArenaDefinitions": 1,
+        "reviewCameraIds": [
+          "test2-estate-overview",
+          "test2-pool-lane",
+          "test2-garden-occlusion",
+          "test2-into-sun-terrace"
+        ],
+        "sceneEnvironment": "pass64-arena-environment-test2-256",
+        "sceneEnvironmentIntensity": 0.22,
+        "sceneBackground": "pass66-sky-backdrop-estate-golden-hour",
+        "skyBackdropStatus": "procedural-ready",
+        "skyBackdropSource": "procedural-canvas",
+        "publishedArenaEnvironment": {
+          "arenaId": "test2",
+          "reflectionQuality": "high",
+          "present": true,
+          "environmentName": "pass64-arena-environment-test2-256",
+          "environmentIntensity": 0.22,
+          "expectedEnvironmentIntensity": 0.22,
+          "matchesIblState": true,
+          "sourceTextureName": "pass66-sky-backdrop-estate-golden-hour",
+          "resolutionTier": 256,
+          "generatedCubeSize": 2048
+        }
+      },
+      "temporalNoiseFloor": {
+        "meanLuminanceBefore": 0.3335,
+        "meanLuminanceAfter": 0.3334,
+        "meanLuminanceDeltaPercent": -0.05,
+        "pixelsMovedPercent": 3.6,
+        "meanAbsDelta": 0.00448
+      }
+    },
+    "test1": {
+      "errors": [],
+      "shots": [
+        {
+          "cameraId": "test1-tower-overview",
+          "applied": true,
+          "heldIntensity": 0.16,
+          "heldName": "pass64-arena-environment-test1-256",
+          "meanLuminanceBefore": 0.237,
+          "meanLuminanceAfter": 0.2474,
+          "meanLuminanceDeltaPercent": 4.38,
+          "pixelsMovedPercent": 38,
+          "meanAbsDelta": 0.0153
+        },
+        {
+          "cameraId": "test1-firing-line",
+          "applied": true,
+          "heldIntensity": 0.16,
+          "heldName": "pass64-arena-environment-test1-256",
+          "meanLuminanceBefore": 0.2033,
+          "meanLuminanceAfter": 0.2123,
+          "meanLuminanceDeltaPercent": 4.45,
+          "pixelsMovedPercent": 38.2,
+          "meanAbsDelta": 0.01091
+        },
+        {
+          "cameraId": "test1-container-occlusion",
+          "applied": true,
+          "heldIntensity": 0.16,
+          "heldName": "pass64-arena-environment-test1-256",
+          "meanLuminanceBefore": 0.1772,
+          "meanLuminanceAfter": 0.1872,
+          "meanLuminanceDeltaPercent": 5.63,
+          "pixelsMovedPercent": 41.6,
+          "meanAbsDelta": 0.01359
+        }
+      ],
+      "observation": {
+        "backend": "webgpu",
+        "appliedTslArenaDefinitions": 1,
+        "reviewCameraIds": [
+          "test1-tower-overview",
+          "test1-firing-line",
+          "test1-container-occlusion",
+          "test1-into-sun-hardpan"
+        ],
+        "sceneEnvironment": "pass64-arena-environment-test1-256",
+        "sceneEnvironmentIntensity": 0.16,
+        "sceneBackground": "pass66-sky-backdrop-range-midmorning",
+        "skyBackdropStatus": "procedural-ready",
+        "skyBackdropSource": "procedural-canvas",
+        "publishedArenaEnvironment": {
+          "arenaId": "test1",
+          "reflectionQuality": "high",
+          "present": true,
+          "environmentName": "pass64-arena-environment-test1-256",
+          "environmentIntensity": 0.16,
+          "expectedEnvironmentIntensity": 0.16,
+          "matchesIblState": true,
+          "sourceTextureName": "pass66-sky-backdrop-range-midmorning",
+          "resolutionTier": 256,
+          "generatedCubeSize": 2048
+        }
+      },
+      "temporalNoiseFloor": {
+        "meanLuminanceBefore": 0.1875,
+        "meanLuminanceAfter": 0.1872,
+        "meanLuminanceDeltaPercent": -0.14,
+        "pixelsMovedPercent": 3.9,
+        "meanAbsDelta": 0.00478
+      }
+    }
+  }
+}

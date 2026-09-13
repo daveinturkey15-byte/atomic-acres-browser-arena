@@ -60,9 +60,27 @@ jobs:
       - run: npm run verify:gameplay-contract
       - run: npm run verify:provenance
       - run: npm run verify:killstreak-catalog
+      # src/audio-offline-render-browser.test.ts launches Playwright's headless
+      # Chromium shell under `npm test`, and `npm ci --ignore-scripts` never
+      # fetches a browser: CI 34643597692 failed on both matrix rows with
+      # "Executable doesn't exist ... chromium_headless_shell-1228". Install
+      # exactly the shell build pinned by the installed playwright package.
+      # The full Chromium provision stays owned by the bounded browser jobs.
+      # Guarded by src/ci-unit-browser-probe-provision.test.ts.
+      - name: Provision Linux native libraries for the unit-level audio probe
+        if: runner.os == 'Linux'
+        run: npx playwright install-deps chromium-headless-shell
+      - name: Provision Playwright headless Chromium shell for the unit-level audio probe
+        run: npx playwright install chromium-headless-shell
+      - name: Verify portable delivery and capture contracts
+        run: npm run qa:delivery-contracts
       - run: npm test
       - name: Verify Pass 73 required browser-group wiring
         run: npm run qa:pass73:ci-wiring-contract
+      - name: Verify Pass 74 Chopper HUD browser-group wiring
+        run: npm run qa:pass74:chopper-hud-wiring-contract
+      - name: Verify Pass 84 gamepad browser-group wiring
+        run: npm run qa:pass84:gamepad-wiring-contract
       - run: npm run leaderboard:check
       - run: npm run build
         env:

@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      REQUIRED. The app resolves every runtime asset relatively ('./assets/...'),
+      so a page served from /scripts/qa/ would ask the dev server for
+      /scripts/qa/assets/... , get index.html back, and hand GLTFLoader HTML to
+      parse as JSON. Pinning the document base to the site root makes those
+      lookups identical to the ones index.html makes.
+    -->
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#10171b" />
+    <title>Nuke Town cross-browser QA probe</title>
+    <!--
+      HF-331 taught the shape of this: no driver, no automation protocol. The
+      PAGE measures itself and POSTs the answer to a local receiver, because
+      Playwright's bundled Firefox hangs in launch() on this machine and stock
+      Firefox/Opera cannot be puppeteered at all. Anything that works in one
+      browser only is not a cross-browser instrument.
+
+      Why a second entry point instead of the app's own qaFpsProbe params: that
+      probe reports fps and the backend dataset attribute and nothing else. The
+      cross-browser row needs adapter identity, the software-fallback verdict,
+      console errors and the HUD legibility audit as well, and those live behind
+      __ATOMIC_ACRES_DEBUG__ and the DOM - reachable only from inside the page.
+      This file is the game's own bootstrap plus that extra instrumentation; it
+      loads /src/bootstrap.ts exactly as index.html does, so it measures the
+      real product and not a stub.
+
+      Served by the dev server from scripts/qa/, therefore SAME ORIGIN as the
+      app - which is the whole reason it can read the debug hook at all.
+
+      ONE ARENA PER PAGE LOAD, and the page navigates ITSELF to the next arena in
+      the list. Booting six arenas inside one document was tried and is not
+      trustworthy: arena teardown leaves the previous scene's state visible to
+      the next boot, so arena five inherits arena four's failures. A reload per
+      arena is what verify-arena-boot-cdp.mjs does for Chrome and it is what the
+      product does when a player picks a different map. Because it is a
+      same-window navigation, the window keeps its focus - which matters more
+      than anything else here, see the FOCUS note below.
+    -->
+    <script>
+      // Classic script, deliberately first: deferred module scripts (including
+      // the app's own bootstrap) all run after this, so this is the only place
+      // from which bootstrap-time console errors are observable.
+      (function () {
+        var captured = [];
+        window.__XB_ERRORS__ = captured;
+        var record = function (text) {
+          if (captured.length >= 40) return;
+          captured.push(String(text).slice(0, 220));
+        };
+        var originalError = console.error;
+        console.error = function () {
+          try { record(Array.prototype.map.call(arguments, String).join(' ')); } catch (ignored) { /* never break the app */ }
+          return originalError.apply(console, arguments);
+        };
+        window.addEventListener('error', function (event) {
+          record('window.error: ' + String((event && event.message) || event));
+        });
+        window.addEventListener('unhandledrejection', function (event) {
+          record('unhandledrejection: ' + String((event && event.reason) || 'unknown'));
+        });
+      }());
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/bootstrap.ts"></script>
+    <script type="module">
+      import { auditLegibility } from '/scripts/qa/hud-legibility-audit.mjs';
+
+      const params = new URLSearchParams(window.location.search);
+      const endpoint = params.get('xbEndpoint');
+      const arenas = (params.get('xbArenas') || params.get('xbArena') || 'atomic-acres')
+        .split(',').map((entry) => entry.trim()).filter(Boolean);
+      const index = Math.max(0, Number(params.get('xbIndex') ?? 0));
+      const arena = arenas[index];
+      const lane = params.get('xbLane') || 'unknown';
+      const sampleMs = Math.min(60_000, Math.max(3_000, Number(params.get('xbSampleMs') ?? 12_000)));
+      const settleMs = Math.max(0, Number(params.get('xbSettleMs') ?? 5_000));
+      const stageTimeoutMs = Math.max(30_000, Number(params.get('xbStageTimeoutMs') ?? 180_000));
+
+      // Same rule the app's own probe enforces: the measurement never leaves
+      // this machine, and an absent endpoint means this page was opened by a
+      // human, so it must stay an ordinary playable build.
+      if (endpoint && /^http:\/\/127\.0\.0\.1(?::\d+)?\//.test(endpoint)) {
+        const post = (payload) => {
+          const body = JSON.stringify({ lane, arena, index, ...payload });
+          try {
+            // text/plain keeps this a CORS "simple request" - no preflight, so
+            // the POST lands even though the response is opaque.
+            void fetch(endpoint, {
+              method: 'POST',
+              headers: { 'content-type': 'text/plain' },
+              body,
+              keepalive: true,
+              mode: 'no-cors',
+            });
+          } catch (ignored) {
+            // Some engines refuse keepalive on large bodies; a beacon still gets
+            // the verdict home, and losing it would read as a browser wedge.
+            try { navigator.sendBeacon?.(endpoint, body); } catch (alsoIgnored) { /* receiver gone */ }
+          }
+        };
+
+        const waitFor = (condition, timeoutMs) => new Promise((settle) => {
+          const startedAt = performance.now();
+          const tick = () => {
+            let met = false;
+            try { met = Boolean(condition()); } catch (ignored) { met = false; }
+            if (met) { settle(true); return; }
+            if (performance.now() - startedAt > timeoutMs) { settle(false); return; }
+            window.setTimeout(tick, 250);
+          };
+          tick();
+        });
+
+        const debug = () => window.__ATOMIC_ACRES_DEBUG__;
+        const snapshot = () => { try { return debug()?.snapshot() ?? null; } catch (ignored) { return null; } };
+        const errors = () => [...new Set(window.__XB_ERRORS__ ?? [])].slice(0, 12);
+        const dataset = (key) => document.documentElement.dataset[key] ?? null;
+        const focused = () => (typeof document.hasFocus === 'function' ? document.hasFocus() : null);
+
+        // ------------------------------------------------------------------
+        // FOCUS. The game's match-admission loop pauses itself unless
+        // `visibilityState === 'visible' && document.hasFocus()`, so a window
+        // without content focus does not produce a slow frame rate - it produces
+        // NO frame rate, and reads as a browser that cannot run the game. That
+        // is the entire content of the "Firefox does ~10 FPS" report. So focus
+        // is pulled from inside the page as well as pushed from outside by the
+        // harness, and every number below is stamped with the fraction of its
+        // samples that actually had focus. A number measured without focus is
+        // not a slow number, it is not a number at all.
+        // ------------------------------------------------------------------
+        let focusPulls = 0;
+        const pullFocus = () => {
+          if (focused()) return;
+          focusPulls += 1;
+          try { window.focus(); } catch (ignored) { /* popup-blocked */ }
+          try {
+            if (!document.body.hasAttribute('tabindex')) document.body.setAttribute('tabindex', '-1');
+            document.body.focus({ preventScroll: true });
+          } catch (ignored) { /* nothing else to try from in here */ }
+        };
+        pullFocus();
+        window.setInterval(pullFocus, 1_000);
+
+        /** Sample rAF cadence, reporting how much of the sample owned focus. */
+        const sampleFrames = (durationMs) => new Promise((done) => {
+          const deltas = [];
+          let focusedSamples = 0;
+          let hiddenSamples = 0;
+          const startedAt = performance.now();
+          let previous = startedAt;
+          const frame = () => {
+            const now = performance.now();
+            deltas.push(now - previous);
+            previous = now;
+            if (focused()) focusedSamples += 1;
+            if (document.visibilityState !== 'visible') hiddenSamples += 1;
+            if (now - startedAt >= durationMs) { done({ deltas, focusedSamples, hiddenSamples }); return; }
+            requestAnimationFrame(frame);
+          };
+          requestAnimationFrame(frame);
+        });
+
+        const summarise = (sample) => {
+          const deltas = sample.deltas.slice().sort((left, right) => left - right);
+          if (deltas.length === 0) return { frames: 0 };
+          const at = (fraction) => deltas[Math.min(deltas.length - 1, Math.floor(deltas.length * fraction))] ?? 0;
+          const fps = (delta) => Number((1_000 / Math.max(0.001, delta)).toFixed(1));
+          return {
+            frames: deltas.length,
+            medianFrameMs: Number(at(0.5).toFixed(2)),
+            p90FrameMs: Number(at(0.9).toFixed(2)),
+            p99FrameMs: Number(at(0.99).toFixed(2)),
+            medianFps: fps(at(0.5)),
+            p90WorstFps: fps(at(0.9)),
+            p99WorstFps: fps(at(0.99)),
+            focusedFraction: Number((sample.focusedSamples / Math.max(1, sample.deltas.length)).toFixed(3)),
+            hiddenFraction: Number((sample.hiddenSamples / Math.max(1, sample.deltas.length)).toFixed(3)),
+          };
+        };
+
+        // Adapter identity read straight from the context, not from the app's
+        // telemetry: on a browser where the renderer failed to initialise the
+        // app has nothing to report, and "which GPU was this" is exactly the
+        // question that still needs an answer there.
+        const contextAdapter = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl2') ?? canvas.getContext('webgl');
+            if (!gl) return { available: false };
+            const unmasked = gl.getExtension('WEBGL_debug_renderer_info');
+            const identity = {
+              available: true,
+              version: String(gl.getParameter(gl.VERSION)),
+              renderer: String(gl.getParameter(gl.RENDERER)),
+              vendor: String(gl.getParameter(gl.VENDOR)),
+              unmaskedRenderer: unmasked ? String(gl.getParameter(unmasked.UNMASKED_RENDERER_WEBGL)) : null,
+              unmaskedVendor: unmasked ? String(gl.getParameter(unmasked.UNMASKED_VENDOR_WEBGL)) : null,
+            };
+            gl.getExtension('WEBGL_lose_context')?.loseContext();
+            return identity;
+          } catch (error) {
+            return { available: false, error: String(error).slice(0, 160) };
+          }
+        };
+
+        /** Hand the window to the next arena, or declare the sweep finished. */
+        const advance = (delayMs) => {
+          window.setTimeout(() => {
+            if (index + 1 >= arenas.length) { post({ stage: 'sweep-complete' }); return; }
+            const next = new URL(window.location.href);
+            next.searchParams.set('xbIndex', String(index + 1));
+            window.location.replace(next.toString());
+          }, delayMs);
+        };
+
+        void (async () => {
+          try {
+            post({ stage: 'armed', userAgent: navigator.userAgent, arenaCount: arenas.length });
+
+            // The browser's OWN ceiling, measured in this window, in this run,
+            // before the game is asked for anything. Without it a game frame
+            // rate cannot be read: 60 fps against a 60 Hz vsync cap is perfect
+            // and 60 fps against a 166 Hz ceiling is a third of the machine
+            // thrown away, and the two are indistinguishable from the game
+            // number alone. This desktop has been observed presenting at both.
+            const ceiling = summarise(await sampleFrames(1_500));
+
+            const heartbeat = window.setInterval(() => post({
+              stage: 'heartbeat',
+              backend: dataset('renderBackend'),
+              webglContext: dataset('webglContext'),
+              hasFocus: focused(),
+              visibility: document.visibilityState,
+              status: (document.getElementById('network-status')?.textContent ?? '').slice(0, 90),
+              errors: errors(),
+            }), 10_000);
+            try {
+              if (!await waitFor(() => Boolean(debug()), stageTimeoutMs)) {
+                post({ stage: 'arena-result', ok: false, error: 'bootstrap-timeout', ceiling, errors: errors(), backend: dataset('renderBackend') });
+                advance(500);
+                return;
+              }
+              post({ stage: 'debug-ready' });
+              await debug().selectArena(arena);
+              // selectArena resolving is NOT the arena being committed: on the
+              // WebGPU route the scene is still building, and starting the match
+              // in that gap makes the app refuse with "Selected arena ... did not
+              // commit before match start". Wait for the selection the app itself
+              // reports, and for the weapon view, before asking it to deploy.
+              const committed = await waitFor(() => {
+                const state = snapshot();
+                return state?.arenaSelection?.id === arena && state?.weaponReady === true;
+              }, stageTimeoutMs);
+              post({ stage: 'arena-selected', committed });
+
+              let active = false;
+              // A refused deployment is recoverable - the app returns to the menu
+              // and can be asked again - so retry a bounded number of times rather
+              // than reporting a race as a browser failure.
+              for (let attempt = 0; attempt < 3 && !active; attempt += 1) {
+                debug().startSolo();
+                active = await waitFor(() => {
+                  const state = snapshot();
+                  return state?.gameStarted === true && state?.matchPhase === 'active';
+                }, Math.min(stageTimeoutMs, 60_000));
+                if (!active) post({ stage: `deploy-retry-${attempt + 1}`, status: (document.getElementById('network-status')?.textContent ?? '').slice(0, 120) });
+              }
+              if (!active) {
+                post({
+                  stage: 'arena-result',
+                  ok: false,
+                  error: 'match-start-timeout',
+                  ceiling,
+                  errors: errors(),
+                  backend: dataset('renderBackend'),
+                  hasFocus: focused(),
+                  visibility: document.visibilityState,
+                  matchPhase: snapshot()?.matchPhase ?? null,
+                  status: (document.getElementById('network-status')?.textContent ?? '').slice(0, 200),
+                });
+                advance(500);
+                return;
+              }
+              post({ stage: 'match-active' });
+            } finally {
+              window.clearInterval(heartbeat);
+            }
+
+            // Steady state is the number worth reporting: let streaming and
+            // first-use shader compilation drain before the first sample.
+            await new Promise((settle) => window.setTimeout(settle, settleMs));
+            const inMatch = summarise(await sampleFrames(sampleMs));
+
+            const state = snapshot();
+            const runtime = state?.render?.runtime ?? null;
+            post({
+              stage: 'arena-result',
+              ok: true,
+              userAgent: navigator.userAgent,
+              sampleMs,
+              ceiling,
+              inMatch,
+              // Flat aliases so a reader never has to know which nesting this
+              // number came from; the table prints these.
+              medianFps: inMatch.medianFps,
+              p90WorstFps: inMatch.p90WorstFps,
+              p99WorstFps: inMatch.p99WorstFps,
+              medianFrameMs: inMatch.medianFrameMs,
+              ceilingMedianFps: ceiling.medianFps,
+              backendDataset: dataset('renderBackend'),
+              atomicSignalRenderer: dataset('atomicSignalRenderer'),
+              webglContext: dataset('webglContext'),
+              webgpuAvailable: Boolean(navigator.gpu),
+              runtime: runtime ? {
+                requestedBackend: runtime.requestedBackend ?? null,
+                actualBackend: runtime.actualBackend ?? null,
+                initialized: runtime.initialized ?? null,
+                failClosed: runtime.failClosed ?? null,
+                adapterLabel: runtime.adapterLabel ?? null,
+                adapterClass: runtime.adapterClass ?? null,
+                deviceClass: runtime.deviceClass ?? null,
+                softwareAdapter: runtime.softwareAdapter ?? null,
+                deviceLost: runtime.deviceLost ?? null,
+                uncapturedErrors: runtime.uncapturedErrors ?? null,
+              } : null,
+              context: contextAdapter(),
+              hudAudit: (() => { try { return auditLegibility(); } catch (error) { return { error: String(error).slice(0, 160) }; } })(),
+              viewport: {
+                innerWidth: window.innerWidth,
+                innerHeight: window.innerHeight,
+                devicePixelRatio: window.devicePixelRatio,
+                maxTouchPoints: navigator.maxTouchPoints ?? 0,
+                coarsePointer: Boolean(window.matchMedia?.('(pointer: coarse)')?.matches),
+                screenX: window.screenX,
+                screenY: window.screenY,
+              },
+              contentFocusPulls: focusPulls,
+              matchPhase: state?.matchPhase ?? null,
+              gameStarted: state?.gameStarted ?? null,
+              consoleErrors: errors(),
+            });
+            advance(1_200);
+          } catch (error) {
+            post({ stage: 'arena-result', ok: false, error: `probe-threw: ${String(error).slice(0, 200)}`, errors: errors() });
+            advance(500);
+          }
+        })();
+      }
+    </script>
+  </body>
+</html>

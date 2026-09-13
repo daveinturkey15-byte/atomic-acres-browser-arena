@@ -1,0 +1,191 @@
+{
+  "contract": "hf399-fps-phase-probe-v1",
+  "measuredAt": "2026-09-02T13:14:03.302Z",
+  "label": "r10a-head",
+  "arena": "test1",
+  "base": "http://127.0.0.1:41941/",
+  "requestedProfile": "high",
+  "viewport": {
+    "width": 2560,
+    "height": 1440
+  },
+  "secondsPerPhase": 8,
+  "phases": [
+    {
+      "phase": "menu",
+      "frames": 11327,
+      "elapsedMs": 8005,
+      "fps": 1415,
+      "frameMs": {
+        "p50": 0.6,
+        "p95": 1.1,
+        "p99": 1.8,
+        "max": 10.1,
+        "mean": 0.71
+      },
+      "perFrame": {
+        "draws": 0,
+        "triangles": 0,
+        "instances": 0,
+        "renderPasses": 0,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 0
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 0,
+        "shaderModulesTotal": 0
+      },
+      "longTasks": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0
+      },
+      "heap": {
+        "startBytes": 115518844,
+        "endBytes": 118648052,
+        "deltaMbPerMinute": 22.37
+      },
+      "activeClipPlanes": 5,
+      "pose": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0,
+        "alive": true,
+        "phase": "warmup"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-hf399\\artifacts\\qa\\hf399\\r10a-head-test1-menu.png"
+    },
+    {
+      "phase": "deployed-idle",
+      "frames": 627,
+      "elapsedMs": 8010,
+      "fps": 78.3,
+      "frameMs": {
+        "p50": 12.6,
+        "p95": 16.8,
+        "p99": 30.7,
+        "max": 33.3,
+        "mean": 12.75
+      },
+      "perFrame": {
+        "draws": 106.2,
+        "triangles": 86370.5,
+        "instances": 1090.7,
+        "renderPasses": 23,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 23
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 214,
+        "shaderModulesTotal": 239
+      },
+      "longTasks": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0
+      },
+      "heap": {
+        "startBytes": 199850406,
+        "endBytes": 183913086,
+        "deltaMbPerMinute": -113.86
+      },
+      "activeClipPlanes": 5,
+      "pose": {
+        "position": [
+          2.5999999046325684,
+          1.6983986282348633,
+          -20
+        ],
+        "yaw": 3.01231764954165,
+        "alive": true,
+        "phase": "active"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-hf399\\artifacts\\qa\\hf399\\r10a-head-test1-deployed-idle.png"
+    },
+    {
+      "phase": "move",
+      "frames": 595,
+      "elapsedMs": 8006,
+      "fps": 74.3,
+      "frameMs": {
+        "p50": 12.6,
+        "p95": 26.7,
+        "p99": 32.5,
+        "max": 97.8,
+        "mean": 13.43
+      },
+      "perFrame": {
+        "draws": 100.2,
+        "triangles": 85370,
+        "instances": 1084.8,
+        "renderPasses": 23,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 23
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 214,
+        "shaderModulesTotal": 239
+      },
+      "longTasks": {
+        "count": 1,
+        "totalMs": 100,
+        "maxMs": 100
+      },
+      "heap": {
+        "startBytes": 185076307,
+        "endBytes": 194166628,
+        "deltaMbPerMinute": 64.97
+      },
+      "activeClipPlanes": 5,
+      "pose": {
+        "position": [
+          1.3050991296768188,
+          1.7250633025169373,
+          -4.629893779754639
+        ],
+        "yaw": 3.01231764954165,
+        "alive": true,
+        "phase": "active"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-hf399\\artifacts\\qa\\hf399\\r10a-head-test1-move.png"
+    }
+  ],
+  "profileSelection": {
+    "before": "high",
+    "after": "high",
+    "options": [
+      "high=QUALITY",
+      "performance=PERFORMANCE",
+      "raytraced=RAY TRACED",
+      "max=MAX",
+      "custom=CUSTOM"
+    ]
+  },
+  "profileState": {
+    "graphicsPreset": "high",
+    "renderBackend": "webgpu",
+    "effective": "EFFECTIVE: HIGH",
+    "advanced": null,
+    "devicePixelRatio": 1,
+    "hardwareConcurrency": 16,
+    "deviceMemory": 32
+  }
+}

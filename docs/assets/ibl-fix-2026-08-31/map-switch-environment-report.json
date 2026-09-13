@@ -1,0 +1,82 @@
+{
+  "generatedAt": "2026-08-31T10:19:21.467Z",
+  "steps": [
+    {
+      "step": "first arena: atomic-acres",
+      "environment": "pass64-arena-environment-atomic-acres-256",
+      "environmentIntensity": 0.24,
+      "background": "pass66-generated-sky-backdrop-sunset-farmland",
+      "published": {
+        "arenaId": "atomic-acres",
+        "reflectionQuality": "high",
+        "present": true,
+        "environmentName": "pass64-arena-environment-atomic-acres-256",
+        "environmentIntensity": 0.24,
+        "expectedEnvironmentIntensity": 0.24,
+        "matchesIblState": true,
+        "sourceTextureName": "pass66-generated-sky-backdrop-sunset-farmland",
+        "resolutionTier": 256,
+        "generatedCubeSize": 4096
+      },
+      "appliedTslArenaDefinitions": 1
+    },
+    {
+      "step": "switch 2: high-seas",
+      "environment": "pass64-arena-environment-high-seas-256",
+      "environmentIntensity": 0.2,
+      "background": "pass66-sky-backdrop-open-ocean-day",
+      "published": {
+        "arenaId": "high-seas",
+        "reflectionQuality": "high",
+        "present": true,
+        "environmentName": "pass64-arena-environment-high-seas-256",
+        "environmentIntensity": 0.2,
+        "expectedEnvironmentIntensity": 0.2,
+        "matchesIblState": true,
+        "sourceTextureName": "pass66-sky-backdrop-open-ocean-day",
+        "resolutionTier": 256,
+        "generatedCubeSize": 2048
+      },
+      "appliedTslArenaDefinitions": 2
+    },
+    {
+      "step": "switch 3: test1",
+      "environment": "pass64-arena-environment-test1-256",
+      "environmentIntensity": 0.16,
+      "background": "pass66-sky-backdrop-range-midmorning",
+      "published": {
+        "arenaId": "test1",
+        "reflectionQuality": "high",
+        "present": true,
+        "environmentName": "pass64-arena-environment-test1-256",
+        "environmentIntensity": 0.16,
+        "expectedEnvironmentIntensity": 0.16,
+        "matchesIblState": true,
+        "sourceTextureName": "pass66-sky-backdrop-range-midmorning",
+        "resolutionTier": 256,
+        "generatedCubeSize": 2048
+      },
+      "appliedTslArenaDefinitions": 3
+    },
+    {
+      "step": "switch 4: back to atomic-acres",
+      "environment": "pass64-arena-environment-atomic-acres-256",
+      "environmentIntensity": 0.24,
+      "background": "pass66-generated-sky-backdrop-sunset-farmland",
+      "published": {
+        "arenaId": "atomic-acres",
+        "reflectionQuality": "high",
+        "present": true,
+        "environmentName": "pass64-arena-environment-atomic-acres-256",
+        "environmentIntensity": 0.24,
+        "expectedEnvironmentIntensity": 0.24,
+        "matchesIblState": true,
+        "sourceTextureName": "pass66-generated-sky-backdrop-sunset-farmland",
+        "resolutionTier": 256,
+        "generatedCubeSize": 4096
+      },
+      "appliedTslArenaDefinitions": 4
+    }
+  ],
+  "errors": []
+}

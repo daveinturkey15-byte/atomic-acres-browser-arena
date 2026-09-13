@@ -1,0 +1,50 @@
+{
+  "family": "timber",
+  "candidate": "candidate-01",
+  "input": "docs/forge/textures/timber/candidate-01-source.png",
+  "route": "codex-built-in-image-generation",
+  "licence": "owner-authorised AI texture 2026-09-07",
+  "allowedUse": "shipped",
+  "resolutions": [
+    {
+      "size": 512,
+      "family": "timber",
+      "metresPerTile": 1.8,
+      "mmPerPixel": 3.515625,
+      "normalStrength": 0.85,
+      "wrapDelta": 0,
+      "fractionMostlyZ": 0.8779449462890625,
+      "roughnessBand": [
+        0.62,
+        0.96
+      ],
+      "detail": {
+        "albedoStddev": 0.16403727543866248,
+        "albedoLaplace": 0.14441324547130474,
+        "normalSlopeMean": 0.2238555033409071,
+        "normalZMean": 0.9809325884048121,
+        "roughnessStddev": 0.025977166087201096
+      }
+    },
+    {
+      "size": 1024,
+      "family": "timber",
+      "metresPerTile": 1.8,
+      "mmPerPixel": 1.7578125,
+      "normalStrength": 0.85,
+      "wrapDelta": 0,
+      "fractionMostlyZ": 0.48515892028808594,
+      "roughnessBand": [
+        0.62,
+        0.96
+      ],
+      "detail": {
+        "albedoStddev": 0.17192347505710084,
+        "albedoLaplace": 0.13712368315812618,
+        "normalSlopeMean": 0.4150023010092285,
+        "normalZMean": 0.9385380875065721,
+        "roughnessStddev": 0.023819557115776834
+      }
+    }
+  ]
+}

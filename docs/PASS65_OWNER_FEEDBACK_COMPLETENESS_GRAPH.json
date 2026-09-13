@@ -1,5 +1,7 @@
 {
   "schemaVersion": 1,
+  "continuationRegisters": ["docs/OWNER_FEEDBACK_CONTINUATION.json", "docs/forge/WORLD_STUDIO_REQUIREMENTS.json",
+    "docs/forge/OVERNIGHT_REQUIREMENTS_20260912.json"],
   "releasePass": "PASS 65",
   "graphId": "pass65-owner-feedback-round1",
   "candidateEvidenceSourceSha": null,

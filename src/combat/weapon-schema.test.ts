@@ -64,6 +64,7 @@ function validWeapon(): any {
       calibreLabel: '5.56 mm',
       power: 5.8,
       fmjMultiplier: 1.12,
+      wallPenetrationMultiplier: 1,
       materialPolicyId: 'pass64-ballistic-materials-v1',
       energyFalloffStartM: 20,
       energyFalloffEndM: 76,
@@ -134,6 +135,9 @@ describe('weapon schema valid definitions', () => {
     const migratedV2 = manifest.weapons.map((weapon) => ({
       ...weapon,
       effects: { ...weapon.effects, muzzleFlashScale: 1, reportGain: 1, flashlight: null },
+      // HF-368: the B1 oracle predates the per-weapon wallbang term. Fill the
+      // documented 1.0 default rather than editing the independent fixture.
+      penetration: { ...weapon.penetration, wallPenetrationMultiplier: 1 },
     }));
     const parsed = parseWeaponDefinitions(migratedV2);
 
@@ -286,6 +290,7 @@ describe('weapon schema strict object parsing', () => {
     ['$.recoil.deterministicPatternId', (weapon: any) => { delete weapon.recoil.deterministicPatternId; }],
     ['$.ammo.emptyReloadSeconds', (weapon: any) => { delete weapon.ammo.emptyReloadSeconds; }],
     ['$.penetration.materialPolicyId', (weapon: any) => { delete weapon.penetration.materialPolicyId; }],
+    ['$.penetration.wallPenetrationMultiplier', (weapon: any) => { delete weapon.penetration.wallPenetrationMultiplier; }],
     ['$.effects.tracerColorHex', (weapon: any) => { delete weapon.effects.tracerColorHex; }],
     ['$.policies.range', (weapon: any) => { delete weapon.policies.range; }],
     ['$.policies.stance.prone', (weapon: any) => { delete weapon.policies.stance.prone; }],
@@ -465,6 +470,7 @@ describe('weapon schema bounds and cross-field rules', () => {
     ['$.ammo.magazine', (weapon: any) => { weapon.ammo.magazine = 2_001; }],
     ['$.penetration.power', (weapon: any) => { weapon.penetration.power = 100_001; }],
     ['$.penetration.maximumSurfaces', (weapon: any) => { weapon.penetration.maximumSurfaces = 65; }],
+    ['$.penetration.wallPenetrationMultiplier', (weapon: any) => { weapon.penetration.wallPenetrationMultiplier = 4.5; }],
     ['$.effects.tracerColorHex', (weapon: any) => { weapon.effects.tracerColorHex = 0x1000000; }],
   ])('rejects the bounded field %s outside its contract', (path, mutate) => {
     const weapon = validWeapon();

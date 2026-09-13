@@ -1,0 +1,1707 @@
+{
+  "contract": "hf399-frame-anatomy-v1",
+  "measuredAt": "2026-09-02T12:39:56.195Z",
+  "label": "r7-before",
+  "arena": "atomic-acres",
+  "base": "http://127.0.0.1:41941/",
+  "pose": "lawn-idle",
+  "viewport": {
+    "width": 2560,
+    "height": 1440
+  },
+  "profileState": {
+    "graphicsPreset": "high",
+    "renderBackend": "webgpu",
+    "effective": "EFFECTIVE: HIGH"
+  },
+  "frame": [
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "colorBuffer",
+          "size": [
+            2560,
+            1440,
+            1
+          ],
+          "format": "bgra8unorm",
+          "samples": 4,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": true
+        }
+      ],
+      "depth": {
+        "label": "depthBuffer",
+        "size": [
+          2560,
+          1440,
+          1
+        ],
+        "format": "depth24plus",
+        "samples": 4,
+        "mips": 1,
+        "depthLoadOp": "clear"
+      },
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "output-msaa",
+          "size": [
+            2560,
+            1440,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 4,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": true
+        },
+        {
+          "label": "normal-msaa",
+          "size": [
+            2560,
+            1440,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 4,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": true
+        },
+        {
+          "label": "material-msaa",
+          "size": [
+            2560,
+            1440,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 4,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": true
+        }
+      ],
+      "depth": {
+        "label": "depth",
+        "size": [
+          2560,
+          1440,
+          1
+        ],
+        "format": "depth24plus",
+        "samples": 4,
+        "mips": 1,
+        "depthLoadOp": "clear"
+      },
+      "draws": 113,
+      "instances": 26773,
+      "triangles": 531001,
+      "pipelines": 59
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "SSRNode.SSR",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "SSRNode.Blur",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 5,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "SSRNode.Blur",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 5,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "SSRNode.Blur",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 5,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "SSRNode.Blur",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 5,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "SSRNode.Blur",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 5,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.bright",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.h0",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.v0",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.h1",
+          "size": [
+            640,
+            360,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.v1",
+          "size": [
+            640,
+            360,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.h2",
+          "size": [
+            320,
+            180,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.v2",
+          "size": [
+            320,
+            180,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.h3",
+          "size": [
+            160,
+            90,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.v3",
+          "size": [
+            160,
+            90,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.h4",
+          "size": [
+            80,
+            45,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.v4",
+          "size": [
+            80,
+            45,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.h0",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "Godrays",
+          "size": [
+            896,
+            504,
+            1
+          ],
+          "format": "rgba8unorm",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "BilateralBlurNode.horizontal",
+          "size": [
+            896,
+            504,
+            1
+          ],
+          "format": "rgba8unorm",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "BilateralBlurNode.vertical",
+          "size": [
+            896,
+            504,
+            1
+          ],
+          "format": "rgba8unorm",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "colorBuffer",
+          "size": [
+            2560,
+            1440,
+            1
+          ],
+          "format": "bgra8unorm",
+          "samples": 4,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": true
+        }
+      ],
+      "depth": {
+        "label": "depthBuffer",
+        "size": [
+          2560,
+          1440,
+          1
+        ],
+        "format": "depth24plus",
+        "samples": 4,
+        "mips": 1,
+        "depthLoadOp": "clear"
+      },
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "output-msaa",
+          "size": [
+            2560,
+            1440,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 4,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": true
+        },
+        {
+          "label": "normal-msaa",
+          "size": [
+            2560,
+            1440,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 4,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": true
+        },
+        {
+          "label": "material-msaa",
+          "size": [
+            2560,
+            1440,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 4,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": true
+        }
+      ],
+      "depth": {
+        "label": "depth",
+        "size": [
+          2560,
+          1440,
+          1
+        ],
+        "format": "depth24plus",
+        "samples": 4,
+        "mips": 1,
+        "depthLoadOp": "clear"
+      },
+      "draws": 113,
+      "instances": 26773,
+      "triangles": 531001,
+      "pipelines": 59
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "SSRNode.SSR",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "SSRNode.Blur",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 5,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "SSRNode.Blur",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 5,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "SSRNode.Blur",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 5,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "SSRNode.Blur",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 5,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "SSRNode.Blur",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 5,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.bright",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.h0",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.v0",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.h1",
+          "size": [
+            640,
+            360,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.v1",
+          "size": [
+            640,
+            360,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.h2",
+          "size": [
+            320,
+            180,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.v2",
+          "size": [
+            320,
+            180,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.h3",
+          "size": [
+            160,
+            90,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.v3",
+          "size": [
+            160,
+            90,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.h4",
+          "size": [
+            80,
+            45,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.v4",
+          "size": [
+            80,
+            45,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "UnrealBloomPass.h0",
+          "size": [
+            1280,
+            720,
+            1
+          ],
+          "format": "rgba16float",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "Godrays",
+          "size": [
+            896,
+            504,
+            1
+          ],
+          "format": "rgba8unorm",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "BilateralBlurNode.horizontal",
+          "size": [
+            896,
+            504,
+            1
+          ],
+          "format": "rgba8unorm",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    },
+    {
+      "label": "",
+      "color": [
+        {
+          "label": "BilateralBlurNode.vertical",
+          "size": [
+            896,
+            504,
+            1
+          ],
+          "format": "rgba8unorm",
+          "samples": 1,
+          "mips": 1,
+          "loadOp": "clear",
+          "resolve": false
+        }
+      ],
+      "depth": null,
+      "draws": 1,
+      "instances": 1,
+      "triangles": 1,
+      "pipelines": 1
+    }
+  ],
+  "frameCaptureIntervals": 2,
+  "census": {
+    "nodes": 10280,
+    "auto": 2677,
+    "visible": 6419,
+    "meshes": 6614,
+    "instanced": 108,
+    "frozen": 106,
+    "frames": 10,
+    "perFrame": {
+      "updateWorldMatrix": 16214.2,
+      "updateMatrixWorld": 3138.4,
+      "getObjectByProperty": 9293.6,
+      "traverse": 4615.6,
+      "updateMatrix": 18542.3
+    },
+    "topCallers": [
+      {
+        "sampled": 2943,
+        "perFrame": 3825.9,
+        "key": "traverse: Mg legacy-main-CV7r44o2.js:114:5108 <- e.applyModelMatrixFreeze legacy-main-CV7r44o2.js:685:58313"
+      },
+      {
+        "sampled": 1474,
+        "perFrame": 1916.2,
+        "key": "updateMatrixWorld: e.submitFrame legacy-main-CV7r44o2.js:2:74872 <- yV legacy-main-CV7r44o2.js:685:216033"
+      },
+      {
+        "sampled": 1465,
+        "perFrame": 1904.5,
+        "key": "updateMatrix: e.submitFrame legacy-main-CV7r44o2.js:2:74872 <- yV legacy-main-CV7r44o2.js:685:216033"
+      },
+      {
+        "sampled": 1464,
+        "perFrame": 1903.2,
+        "key": "getObjectByProperty: G2 legacy-main-CV7r44o2.js:685:353844 <- jbe legacy-main-CV7r44o2.js:685:610247"
+      },
+      {
+        "sampled": 1464,
+        "perFrame": 1903.2,
+        "key": "getObjectByProperty: G2 legacy-main-CV7r44o2.js:685:353886 <- jbe legacy-main-CV7r44o2.js:685:610247"
+      },
+      {
+        "sampled": 1458,
+        "perFrame": 1895.4,
+        "key": "getObjectByProperty: G2 legacy-main-CV7r44o2.js:685:353844 <- K2 legacy-main-CV7r44o2.js:685:354146"
+      },
+      {
+        "sampled": 1458,
+        "perFrame": 1895.4,
+        "key": "getObjectByProperty: G2 legacy-main-CV7r44o2.js:685:353886 <- K2 legacy-main-CV7r44o2.js:685:354146"
+      },
+      {
+        "sampled": 1157,
+        "perFrame": 1504.1,
+        "key": "updateWorldMatrix: e.orientRiggedBone legacy-main-CV7r44o2.js:685:82860 <- e.poseRiggedArmToWristTarget legacy-main-CV7r44o2.js:685:87157"
+      },
+      {
+        "sampled": 1155,
+        "perFrame": 1501.5,
+        "key": "updateMatrix: e.orientRiggedBone legacy-main-CV7r44o2.js:685:82860 <- e.poseRiggedArmToWristTarget legacy-main-CV7r44o2.js:685:87157"
+      },
+      {
+        "sampled": 1132,
+        "perFrame": 1471.6,
+        "key": "updateWorldMatrix: e.orientRiggedBone legacy-main-CV7r44o2.js:685:82860 <- e.poseRiggedArmToWristTarget legacy-main-CV7r44o2.js:685:87201"
+      },
+      {
+        "sampled": 1127,
+        "perFrame": 1465.1,
+        "key": "updateMatrix: e.orientRiggedBone legacy-main-CV7r44o2.js:685:82860 <- e.poseRiggedArmToWristTarget legacy-main-CV7r44o2.js:685:87201"
+      },
+      {
+        "sampled": 1099,
+        "perFrame": 1428.7,
+        "key": "updateMatrix: e.orientRiggedBone legacy-main-CV7r44o2.js:685:82860 <- e.poseRiggedArmToWristTarget legacy-main-CV7r44o2.js:685:87301"
+      },
+      {
+        "sampled": 1092,
+        "perFrame": 1419.6,
+        "key": "updateWorldMatrix: e.orientRiggedBone legacy-main-CV7r44o2.js:685:82860 <- e.poseRiggedArmToWristTarget legacy-main-CV7r44o2.js:685:87301"
+      },
+      {
+        "sampled": 903,
+        "perFrame": 1173.9,
+        "key": "updateWorldMatrix: e.alignRiggedPalmWorld legacy-main-CV7r44o2.js:685:83561 <- e.solveRiggedArms legacy-main-CV7r44o2.js:685:95090"
+      },
+      {
+        "sampled": 873,
+        "perFrame": 1134.9,
+        "key": "updateMatrix: e.alignRiggedPalmWorld legacy-main-CV7r44o2.js:685:83561 <- e.solveRiggedArms legacy-main-CV7r44o2.js:685:95090"
+      },
+      {
+        "sampled": 806,
+        "perFrame": 1047.8,
+        "key": "updateMatrixWorld: e.solveRiggedArms legacy-main-CV7r44o2.js:685:92425 <- e.update legacy-main-CV7r44o2.js:685:107742"
+      },
+      {
+        "sampled": 805,
+        "perFrame": 1046.5,
+        "key": "updateMatrix: e.solveRiggedArms legacy-main-CV7r44o2.js:685:92425 <- e.update legacy-main-CV7r44o2.js:685:107742"
+      },
+      {
+        "sampled": 733,
+        "perFrame": 952.9,
+        "key": "updateMatrix: e.alignRiggedPalmWorld legacy-main-CV7r44o2.js:685:83963 <- e.solveRiggedArms legacy-main-CV7r44o2.js:685:95090"
+      },
+      {
+        "sampled": 730,
+        "perFrame": 949,
+        "key": "updateWorldMatrix: e.alignRiggedPalmWorld legacy-main-CV7r44o2.js:685:83963 <- e.solveRiggedArms legacy-main-CV7r44o2.js:685:95090"
+      },
+      {
+        "sampled": 453,
+        "perFrame": 588.9,
+        "key": "updateWorldMatrix: e.alignRiggedPalmWorld legacy-main-CV7r44o2.js:685:83561 <- e.solveRiggedArms legacy-main-CV7r44o2.js:685:95408"
+      },
+      {
+        "sampled": 441,
+        "perFrame": 573.3,
+        "key": "updateMatrix: e.alignRiggedPalmWorld legacy-main-CV7r44o2.js:685:83561 <- e.solveRiggedArms legacy-main-CV7r44o2.js:685:95408"
+      },
+      {
+        "sampled": 418,
+        "perFrame": 543.4,
+        "key": "traverse: e.update legacy-main-CV7r44o2.js:685:99985 <- jbe legacy-main-CV7r44o2.js:685:609797"
+      },
+      {
+        "sampled": 381,
+        "perFrame": 495.3,
+        "key": "updateMatrix: e.placeRiggedShoulderEntryBelowFrame legacy-main-CV7r44o2.js:685:84717 <- e.solveRiggedArms legacy-main-CV7r44o2.js:685:93143"
+      },
+      {
+        "sampled": 380,
+        "perFrame": 494,
+        "key": "updateWorldMatrix: e.placeRiggedShoulderEntryBelowFrame legacy-main-CV7r44o2.js:685:84717 <- e.solveRiggedArms legacy-main-CV7r44o2.js:685:93143"
+      },
+      {
+        "sampled": 380,
+        "perFrame": 494,
+        "key": "updateWorldMatrix: e.applyRiggedArmCarriage legacy-main-CV7r44o2.js:685:85549 <- e.solveRiggedArms legacy-main-CV7r44o2.js:685:93190"
+      },
+      {
+        "sampled": 379,
+        "perFrame": 492.7,
+        "key": "updateMatrix: e.applyRiggedArmCarriage legacy-main-CV7r44o2.js:685:85549 <- e.solveRiggedArms legacy-main-CV7r44o2.js:685:93190"
+      },
+      {
+        "sampled": 368,
+        "perFrame": 478.4,
+        "key": "updateWorldMatrix: e.alignRiggedPalmWorld legacy-main-CV7r44o2.js:685:83963 <- e.solveRiggedArms legacy-main-CV7r44o2.js:685:95408"
+      },
+      {
+        "sampled": 363,
+        "perFrame": 471.9,
+        "key": "updateMatrix: e.alignRiggedPalmWorld legacy-main-CV7r44o2.js:685:83963 <- e.solveRiggedArms legacy-main-CV7r44o2.js:685:95408"
+      },
+      {
+        "sampled": 270,
+        "perFrame": 351,
+        "key": "updateWorldMatrix: e.orientRiggedBone legacy-main-CV7r44o2.js:685:82465 <- e.poseRiggedArmToWristTarget legacy-main-CV7r44o2.js:685:87301"
+      },
+      {
+        "sampled": 258,
+        "perFrame": 335.4,
+        "key": "getObjectByProperty: e.update legacy-main-CV7r44o2.js:685:99802 <- jbe legacy-main-CV7r44o2.js:685:609797"
+      }
+    ],
+    "byTop": [
+      {
+        "name": "pass65-killstreak-presentations",
+        "nodes": 4233,
+        "auto": 280
+      },
+      {
+        "name": "PerspectiveCamera",
+        "nodes": 905,
+        "auto": 198
+      },
+      {
+        "name": "grenade-world-presentation-pool",
+        "nodes": 817,
+        "auto": 1
+      },
+      {
+        "name": "retained-bot-weapon-gpu-vocabulary (hidden)",
+        "nodes": 620,
+        "auto": 0
+      },
+      {
+        "name": "Atomic Acres arena (hidden)",
+        "nodes": 352,
+        "auto": 352
+      },
+      {
+        "name": "bot-operator",
+        "nodes": 192,
+        "auto": 174
+      },
+      {
+        "name": "prewarmed-fallen-operator (hidden)",
+        "nodes": 186,
+        "auto": 0
+      },
+      {
+        "name": "bot-operator (hidden)",
+        "nodes": 171,
+        "auto": 171
+      },
+      {
+        "name": "railgun-replicated-beams",
+        "nodes": 115,
+        "auto": 115
+      },
+      {
+        "name": "pass31-neighbourhood-life",
+        "nodes": 112,
+        "auto": 112
+      },
+      {
+        "name": "explosive-bolt-presentation-pool",
+        "nodes": 97,
+        "auto": 97
+      },
+      {
+        "name": "Atomic Acres Quality Graphics arena",
+        "nodes": 89,
+        "auto": 89
+      },
+      {
+        "name": "timed-map-weapon-pickups",
+        "nodes": 85,
+        "auto": 85
+      },
+      {
+        "name": "smoke-grenade-volume-presentation-pool",
+        "nodes": 49,
+        "auto": 49
+      },
+      {
+        "name": "death-drop-presentation-pool",
+        "nodes": 49,
+        "auto": 49
+      },
+      {
+        "name": "signal-flare-projectile-pool",
+        "nodes": 38,
+        "auto": 38
+      },
+      {
+        "name": "pass27-world-identity-presentation",
+        "nodes": 29,
+        "auto": 29
+      },
+      {
+        "name": "support-explosion-pool",
+        "nodes": 25,
+        "auto": 25
+      },
+      {
+        "name": "interactive-world:atomic-acres",
+        "nodes": 24,
+        "auto": 24
+      },
+      {
+        "name": "Pass 64 WebGPU TSL presentation systems",
+        "nodes": 24,
+        "auto": 24
+      },
+      {
+        "name": "grenade-explosion-pool",
+        "nodes": 17,
+        "auto": 17
+      },
+      {
+        "name": "overdrive-core-pickup",
+        "nodes": 7,
+        "auto": 7
+      },
+      {
+        "name": "hf371-particles",
+        "nodes": 5,
+        "auto": 5
+      },
+      {
+        "name": "pass76-weather-rain",
+        "nodes": 5,
+        "auto": 5
+      },
+      {
+        "name": "pass64-atomic-acres-definition-practicals",
+        "nodes": 5,
+        "auto": 5
+      },
+      {
+        "name": "railgun-world-pickup (hidden)",
+        "nodes": 4,
+        "auto": 4
+      },
+      {
+        "name": "flamethrower-stream-pool",
+        "nodes": 4,
+        "auto": 4
+      },
+      {
+        "name": "surface-impact-presentation-pool",
+        "nodes": 3,
+        "auto": 3
+      },
+      {
+        "name": "window-debris:aqua-irrigation-workshop:rear-ground-window-glass (hidden)",
+        "nodes": 2,
+        "auto": 2
+      },
+      {
+        "name": "window-debris:aqua-irrigation-workshop:ground-window-glass (hidden)",
+        "nodes": 2,
+        "auto": 2
+      }
+    ]
+  },
+  "cpu": {
+    "profileSeconds": 5,
+    "frames": 212,
+    "frameMsP50": 27.1,
+    "frameMsMean": 27.35,
+    "idlePercent": 0.22,
+    "programPercent": 33.11,
+    "gcPercent": 0.54,
+    "busyMsPerFrame": 27.03,
+    "jsMsPerFrame": 17.91,
+    "topSelf": [
+      {
+        "name": "multiplyMatrices vendor-three-DMMu-fsD.js:0",
+        "ms": 448.1,
+        "sharePercent": 7.8
+      },
+      {
+        "name": "updateMatrix vendor-three-DMMu-fsD.js:0",
+        "ms": 387.7,
+        "sharePercent": 6.75
+      },
+      {
+        "name": "updateWorldMatrix vendor-three-DMMu-fsD.js:0",
+        "ms": 213.6,
+        "sharePercent": 3.72
+      },
+      {
+        "name": "Fbe legacy-main-CV7r44o2.js:684",
+        "ms": 174.6,
+        "sharePercent": 3.04
+      },
+      {
+        "name": "_renderObjectDirect vendor-three-DMMu-fsD.js:4135",
+        "ms": 154.5,
+        "sharePercent": 2.69
+      },
+      {
+        "name": "updateMatrixWorld vendor-three-DMMu-fsD.js:0",
+        "ms": 146,
+        "sharePercent": 2.54
+      },
+      {
+        "name": "writeBuffer :-1",
+        "ms": 87.4,
+        "sharePercent": 1.52
+      },
+      {
+        "name": "updateByType vendor-three-DMMu-fsD.js:4135",
+        "ms": 86.2,
+        "sharePercent": 1.5
+      },
+      {
+        "name": "traverse vendor-three-DMMu-fsD.js:0",
+        "ms": 84.8,
+        "sharePercent": 1.48
+      },
+      {
+        "name": "getObjectByProperty vendor-three-DMMu-fsD.js:0",
+        "ms": 77.8,
+        "sharePercent": 1.36
+      },
+      {
+        "name": "Vr gameplay-D9gTpvjL.js:0",
+        "ms": 73,
+        "sharePercent": 1.27
+      },
+      {
+        "name": "submit :-1",
+        "ms": 62,
+        "sharePercent": 1.08
+      },
+      {
+        "name": "_projectObject vendor-three-DMMu-fsD.js:4135",
+        "ms": 61.5,
+        "sharePercent": 1.07
+      },
+      {
+        "name": "update vendor-three-DMMu-fsD.js:4135",
+        "ms": 55.4,
+        "sharePercent": 0.97
+      },
+      {
+        "name": "NW legacy-main-CV7r44o2.js:684",
+        "ms": 41.9,
+        "sharePercent": 0.73
+      },
+      {
+        "name": "updateForRender vendor-three-DMMu-fsD.js:4135",
+        "ms": 38.9,
+        "sharePercent": 0.68
+      },
+      {
+        "name": "get vendor-three-DMMu-fsD.js:4129",
+        "ms": 37,
+        "sharePercent": 0.64
+      },
+      {
+        "name": "update vendor-three-DMMu-fsD.js:4123",
+        "ms": 33.5,
+        "sharePercent": 0.58
+      },
+      {
+        "name": "S9 legacy-main-CV7r44o2.js:690",
+        "ms": 32.1,
+        "sharePercent": 0.56
+      },
+      {
+        "name": "decompose vendor-three-DMMu-fsD.js:0",
+        "ms": 32,
+        "sharePercent": 0.56
+      },
+      {
+        "name": "setVertexBuffer :-1",
+        "ms": 30.6,
+        "sharePercent": 0.53
+      },
+      {
+        "name": "_renderScene vendor-three-DMMu-fsD.js:4135",
+        "ms": 28.5,
+        "sharePercent": 0.5
+      },
+      {
+        "name": "_update vendor-three-DMMu-fsD.js:4129",
+        "ms": 28.2,
+        "sharePercent": 0.49
+      },
+      {
+        "name": "createCommandEncoder :-1",
+        "ms": 26.7,
+        "sharePercent": 0.46
+      },
+      {
+        "name": "jbe legacy-main-CV7r44o2.js:684",
+        "ms": 26.6,
+        "sharePercent": 0.46
+      },
+      {
+        "name": "_draw vendor-three-DMMu-fsD.js:4644",
+        "ms": 26.3,
+        "sharePercent": 0.46
+      },
+      {
+        "name": "wasm-function[338] 005fccd2:0",
+        "ms": 26.3,
+        "sharePercent": 0.46
+      },
+      {
+        "name": "mi gameplay-D9gTpvjL.js:0",
+        "ms": 23.2,
+        "sharePercent": 0.4
+      },
+      {
+        "name": "needsRenderUpdate vendor-three-DMMu-fsD.js:4644",
+        "ms": 23.1,
+        "sharePercent": 0.4
+      },
+      {
+        "name": "draw vendor-three-DMMu-fsD.js:4644",
+        "ms": 22.7,
+        "sharePercent": 0.4
+      },
+      {
+        "name": "(anonymous) legacy-main-CV7r44o2.js:1",
+        "ms": 22.7,
+        "sharePercent": 0.4
+      },
+      {
+        "name": "invert vendor-three-DMMu-fsD.js:0",
+        "ms": 22.4,
+        "sharePercent": 0.39
+      },
+      {
+        "name": "getCacheKey vendor-three-DMMu-fsD.js:4109",
+        "ms": 22,
+        "sharePercent": 0.38
+      },
+      {
+        "name": "patched :23",
+        "ms": 20.5,
+        "sharePercent": 0.36
+      },
+      {
+        "name": "beginRender vendor-three-DMMu-fsD.js:4644",
+        "ms": 20.3,
+        "sharePercent": 0.35
+      },
+      {
+        "name": "equals vendor-three-DMMu-fsD.js:4107",
+        "ms": 20.2,
+        "sharePercent": 0.35
+      },
+      {
+        "name": "solveRiggedArms legacy-main-CV7r44o2.js:684",
+        "ms": 20.1,
+        "sharePercent": 0.35
+      },
+      {
+        "name": "updateNumber vendor-three-DMMu-fsD.js:4135",
+        "ms": 18.9,
+        "sharePercent": 0.33
+      },
+      {
+        "name": "beginRenderPass :-1",
+        "ms": 18.6,
+        "sharePercent": 0.32
+      },
+      {
+        "name": "compose vendor-three-DMMu-fsD.js:0",
+        "ms": 17.8,
+        "sharePercent": 0.31
+      }
+    ]
+  }
+}

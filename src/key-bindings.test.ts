@@ -54,8 +54,28 @@ describe('key-bindings', () => {
     const storage = new FakeStorage();
     storage.setItem('atomic-acres.key-bindings.v1', '{not-json');
     expect(resolveKeyBindingProfile(storage)).toBe(DEFAULT_KEY_BINDINGS);
+    // A parseable object with an invalid entry now MERGES per action rather than
+    // resetting wholesale (see below), so equality here is by value, not reference.
     storage.setItem('atomic-acres.key-bindings.v1', JSON.stringify({ 'move-forward': [] }));
-    expect(resolveKeyBindingProfile(storage)).toBe(DEFAULT_KEY_BINDINGS);
+    expect(resolveKeyBindingProfile(storage)).toEqual(DEFAULT_KEY_BINDINGS);
+  });
+
+  it('keeps stored binds when a NEW action appears, instead of resetting everything', () => {
+    // The emote action was the first ever added to a live profile schema. The old
+    // resolver rejected any stored profile missing one action, silently discarding
+    // every custom bind a player had made. Now each action keeps its stored codes
+    // when valid and takes its default only where absent.
+    const storage = new FakeStorage();
+    const legacy = Object.fromEntries(
+      GAMEPLAY_ACTIONS.filter((action) => action !== 'emote')
+        .map((action) => [action, [...DEFAULT_KEY_BINDINGS[action]]]),
+    ) as Record<string, string[]>;
+    legacy.reload = ['KeyE']; // the player's one customisation
+    storage.setItem('atomic-acres.key-bindings.v1', JSON.stringify(legacy));
+    const resolved = resolveKeyBindingProfile(storage);
+    expect(resolved.reload).toEqual(['KeyE']);          // customisation survives
+    expect(resolved.emote).toEqual(['KeyB']);           // new action gets its default
+    expect(resolved.melee).toEqual(DEFAULT_KEY_BINDINGS.melee);
   });
 
   it('clearKeyBindingProfile restores the default profile', () => {

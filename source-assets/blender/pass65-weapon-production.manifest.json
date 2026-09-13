@@ -121,15 +121,15 @@
     },
     "sourceScript": {
       "path": "scripts/blender/export-pass69-3-first-person-operator-arms.py",
-      "sha256": "04239b76c587cb8e1b6cb8619c81e07be84081d907ec77a79a385cde7183a5d3"
+      "sha256": "6b7a7a383bfd3af9ece2596137324d434104a10d4fa6fdcec2d00b623a64a7a8"
     },
     "firstPersonGlbs": [
       {
         "path": "public/assets/original/models/operators/pass65-first-person-arms-lod0.glb",
-        "sha256": "c17b3fb653a161fe3fecad81235e3c1c70c7fc5037b83cfd5078d02533359574",
+        "sha256": "962b8658b7f350e750bf92ee9c81a38af602fadbbd8d54115191b4d2a3d3aac3",
         "lod": 0,
         "triangles": 9744,
-        "bytes": 343688,
+        "bytes": 427020,
         "skinnedMeshNodes": 4,
         "renderPrimitives": 4,
         "skins": 4,
@@ -141,10 +141,10 @@
       },
       {
         "path": "public/assets/original/models/operators/pass65-first-person-arms-lod1.glb",
-        "sha256": "552fb405b761b7e8fd899370f4c8bf8993fcad3f627a6ec41ceb00fc8a08f0f0",
+        "sha256": "dd4cadc1ed9826b62b537b2b29c3aa86f742780977c3856cc33f7e22582e6b39",
         "lod": 1,
         "triangles": 7703,
-        "bytes": 327720,
+        "bytes": 411052,
         "skinnedMeshNodes": 4,
         "renderPrimitives": 4,
         "skins": 4,
@@ -183,7 +183,7 @@
     },
     "provenance": {
       "path": "source-assets/blender/pass69-3-first-person-operator-arms.provenance.json",
-      "sha256": "0b9acc1d8b657eb90c424b9f4fcb718563e446868958e83bb4d3522411512089"
+      "sha256": "bc52950d32a09283dae892e3bc5b55f2eaf90f389d730db1fe3a11bb1bcac794"
     },
     "bones": [
       "Root",
@@ -293,14 +293,14 @@
         },
         {
           "path": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-reload-cuff-flex.png",
-          "sha256": "d9b391cb34c19bcdf7d696de6e9d096314dada69357af4e94ea6efe60f47e765",
+          "sha256": "f617486eea4472e8d79ec31a32ba8eb0671d74de40109920fb89ad22afda9f7d",
           "width": 800,
           "height": 800,
           "cameraId": "reload-cuff-flex"
         },
         {
           "path": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-firing-digit-separation.png",
-          "sha256": "8e29c26c3ad10f5458c2a9ab1808dd616c9824859386730cf81566310c1565a6",
+          "sha256": "7bcf7bae64de46f39dd76608dcd8e9b1ad39e0e101fb2acdad4f27d606ad22a2",
           "width": 800,
           "height": 800,
           "cameraId": "firing-digit-separation"
@@ -308,13 +308,13 @@
       ],
       "contactSheet": {
         "path": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-review-sheet.png",
-        "sha256": "cf13c04bde929b5726980d7ae08eaa92641a0d4e5064e5122ff00918da92df17",
+        "sha256": "5946a1bd741fcba672ba56b28d2b8f64e1819fd924d4c4f2f1bad6b7bdbd048e",
         "width": 2400,
         "height": 1708
       },
       "contactReceipt": {
         "path": "source-assets/blender/pass69-3-first-person-operator-arms-contact-receipt.json",
-        "sha256": "651db7d32c5506f2f1f8f85e3f6acc2b4bce82b005e2204a26b4238df3961314"
+        "sha256": "4cfa4f3996603fe9bdc698c3d63bef354ad7fc67cc7690a06261abeaa2cd61ab"
       }
     },
     "technicalAudit": {
@@ -322,7 +322,7 @@
         {
           "lod": 0,
           "triangles": 9744,
-          "bytes": 343688,
+          "bytes": 427020,
           "meshNodes": 4,
           "skinnedMeshNodes": 4,
           "renderPrimitives": 4,
@@ -436,7 +436,7 @@
         {
           "lod": 1,
           "triangles": 7703,
-          "bytes": 327720,
+          "bytes": 411052,
           "meshNodes": 4,
           "skinnedMeshNodes": 4,
           "renderPrimitives": 4,
@@ -1730,11 +1730,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -1743,21 +1743,21 @@
       "firstPersonGlbs": [
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/carbine/carbine-fp-lod0.glb",
-          "sha256": "5e015b68b554d78a619bebbc29a0079bedb8b15f55abdeb7ec4788ce05fa129e",
+          "sha256": "3e181f006a102150a64bfe22ea88f96d3525dcc96fa7edf0056f32ce8d58594e",
           "variant": "first-person-lod0",
           "lod": 0,
-          "triangles": 11892,
-          "bytes": 336652,
+          "triangles": 12080,
+          "bytes": 338312,
           "meshNodes": 7,
           "renderPrimitives": 7
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/carbine/carbine-fp-lod1.glb",
-          "sha256": "1c998f772831293ea1d251d3ea781c912f2c08966d10b8e3ecd60182cd3f9868",
+          "sha256": "5f593e1d238f2773ecd63821dd507c8c2cab77fa4151976ffc4a2b51f61beac1",
           "variant": "first-person-lod1",
           "lod": 1,
-          "triangles": 9118,
-          "bytes": 299328,
+          "triangles": 9272,
+          "bytes": 300768,
           "meshNodes": 7,
           "renderPrimitives": 7
         }
@@ -1765,31 +1765,31 @@
       "worldGlbs": [
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/carbine/carbine-world-lod0.glb",
-          "sha256": "c0d005b370a863804b8ecba76f51a40305870dd3e987627858cf7788de98f320",
+          "sha256": "206ce89361c48630b229db419d51e5b3ca4667e98a446fb110655dbcd303d9cb",
           "variant": "world-lod0",
           "lod": 0,
-          "triangles": 12252,
-          "bytes": 341036,
+          "triangles": 12440,
+          "bytes": 342716,
           "meshNodes": 7,
           "renderPrimitives": 7
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/carbine/carbine-world-lod1.glb",
-          "sha256": "8798adddea9c942ca0b6f9b129e27c875fb6045a2e0c845f531d521f514c701b",
+          "sha256": "eabb90877b9f7adf5107630fff4f690a95ecea627ba490641fa7b5d7053f3f76",
           "variant": "world-lod1",
           "lod": 1,
-          "triangles": 10588,
-          "bytes": 324396,
+          "triangles": 10776,
+          "bytes": 326104,
           "meshNodes": 7,
           "renderPrimitives": 7
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/carbine/carbine-world-lod2.glb",
-          "sha256": "6e6e4dcf960ea8eb1744b04bd6e16a1fc6ab85bf8816c045e597d3c52dbac135",
+          "sha256": "6b9786352af9a1336d1ba6f5f2aa9768c27513d693e2723a452a367be2beffd8",
           "variant": "world-lod2",
           "lod": 2,
-          "triangles": 5972,
-          "bytes": 249008,
+          "triangles": 6118,
+          "bytes": 249900,
           "meshNodes": 7,
           "renderPrimitives": 7
         }
@@ -1797,11 +1797,11 @@
       "dropGlbs": [
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/carbine/carbine-drop-lod0.glb",
-          "sha256": "3a2bd14ef59bd4116665c0490032537a303428a34f0d115f7dbd5779cc6401a9",
+          "sha256": "a26bbc9b851c0687914492caf9be94f93fe33b4daba7e67f9d80fd8df94f9a43",
           "variant": "drop-lod0",
           "lod": 0,
-          "triangles": 10588,
-          "bytes": 324388,
+          "triangles": 10776,
+          "bytes": 326096,
           "meshNodes": 7,
           "renderPrimitives": 7
         }
@@ -1852,7 +1852,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/carbine.provenance.json",
-        "sha256": "6c5a97de3fdd09dc01e79ba7279fe8da2aa2e7751ae090a933d3c95ea96ad2a2"
+        "sha256": "008c08bcca6f92353411bdeea7bb438b2f5cf0fe9c748ce2695006f29bb40286"
       },
       "sockets": [
         "rightGrip",
@@ -1895,7 +1895,7 @@
         "renders": [
           {
             "path": "docs/assets/pass65-weapons/firearms/carbine/carbine-hero-quarter.png",
-            "sha256": "53b6bdaa482077afa02cda5209deb41f1ba042fc2ac24d0dd7ba0634c24c81e0",
+            "sha256": "1d26f2c74a3411deffcb7f845d2dfdea917ee3ec21ccd0af15233e700d20f8cb",
             "width": 480,
             "height": 360,
             "cameraId": "hero-quarter",
@@ -1903,7 +1903,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/carbine/carbine-side-silhouette.png",
-            "sha256": "eaa93326e81eee6ad4aa80ae6df7a67bbe3d1c379d31169dbcd4670f6c5d3ace",
+            "sha256": "bce95fd897201c37f31811756d53cd2db77fb6ba6ae71e2571b77687eca64b2c",
             "width": 480,
             "height": 360,
             "cameraId": "side-silhouette",
@@ -1911,7 +1911,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/carbine/carbine-sight-line.png",
-            "sha256": "f47a15cfe8446a5640a0300ccf0e28e65e2a9b21af7889b7fc36d5dfc450f8dc",
+            "sha256": "ca5dc088f48491100ef81fda7cc629e2c92601b13d9afd649a4d0b498c91daea",
             "width": 480,
             "height": 360,
             "cameraId": "sight-line",
@@ -1919,7 +1919,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/carbine/carbine-reload-action.png",
-            "sha256": "051c1a69cfcc687b7cc3e13aad49ce59b91abb49275b35b44dd94a60cfeaff00",
+            "sha256": "e49a2a072d7addf06214d3bee029feae56c74a4829463879c77a6bf99266bab8",
             "width": 480,
             "height": 360,
             "cameraId": "reload-action",
@@ -1927,7 +1927,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/carbine/carbine-world-lod0-silhouette.png",
-            "sha256": "2438b3ed3faf8914c5c296e3697f6ae566b36c1418c9d3b7e1488bffdcb51b41",
+            "sha256": "426ff9c8cf9f6f544524d0d51682b6ab09ff812b9979afeb47f3cd73c73a392e",
             "width": 480,
             "height": 360,
             "cameraId": "world-lod0-silhouette",
@@ -1935,7 +1935,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/carbine/carbine-world-lod2-silhouette.png",
-            "sha256": "557cab8351e04af822fd4b819b25f6df85306b75ee3cfe32007c99614595420b",
+            "sha256": "ba32a5b08e4b7f3d72c59563221bf8d9bd66a8eef4a2091acea89399d2a73c1a",
             "width": 480,
             "height": 360,
             "cameraId": "world-lod2-silhouette",
@@ -1943,7 +1943,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/carbine/carbine-drop-lod0-silhouette.png",
-            "sha256": "c1a91faa24542c5b236822ab5a453eeed8776b0ac8f40bc863dd50f8e0906be4",
+            "sha256": "bd4c40290aa83a23f6901c285f88e67075678421fe75a8ad78dab1d98c0bd9d5",
             "width": 480,
             "height": 360,
             "cameraId": "drop-lod0-silhouette",
@@ -1952,7 +1952,7 @@
         ],
         "contactSheet": {
           "path": "docs/assets/pass65-weapons/firearms/carbine/carbine-contact-sheet.png",
-          "sha256": "1fe14ce051778b808c270734a1c8809f23a69ad5a1d789e58e873763250e261f",
+          "sha256": "6b8f0abf870a18e7df7c3a7ec706728704318dcedb3b47dfb8f55d9e07e2189a",
           "width": 1920,
           "height": 720
         }
@@ -1961,8 +1961,8 @@
         "deliveries": [
           {
             "variant": "first-person-lod0",
-            "triangles": 11892,
-            "bytes": 336652,
+            "triangles": 12080,
+            "bytes": 338312,
             "meshNodes": 7,
             "renderPrimitives": 7,
             "materials": 5,
@@ -1988,12 +1988,12 @@
             "sightForwardDot": 0.9999999999999962,
             "declaredLength": 1.36,
             "platformAnatomy": "forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock",
-            "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":11892,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
+            "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":12080,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
           },
           {
             "variant": "first-person-lod1",
-            "triangles": 9118,
-            "bytes": 299328,
+            "triangles": 9272,
+            "bytes": 300768,
             "meshNodes": 7,
             "renderPrimitives": 7,
             "materials": 5,
@@ -2019,12 +2019,12 @@
             "sightForwardDot": 0.9999999999999962,
             "declaredLength": 1.36,
             "platformAnatomy": "forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock",
-            "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":9118,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
+            "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":9272,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
           },
           {
             "variant": "world-lod0",
-            "triangles": 12252,
-            "bytes": 341036,
+            "triangles": 12440,
+            "bytes": 342716,
             "meshNodes": 7,
             "renderPrimitives": 7,
             "materials": 5,
@@ -2050,12 +2050,12 @@
             "sightForwardDot": 0.9999999999999962,
             "declaredLength": 1.36,
             "platformAnatomy": "forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock",
-            "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":12252,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
+            "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":12440,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
           },
           {
             "variant": "world-lod1",
-            "triangles": 10588,
-            "bytes": 324396,
+            "triangles": 10776,
+            "bytes": 326104,
             "meshNodes": 7,
             "renderPrimitives": 7,
             "materials": 5,
@@ -2081,12 +2081,12 @@
             "sightForwardDot": 0.9999999999999962,
             "declaredLength": 1.36,
             "platformAnatomy": "forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock",
-            "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":10588,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
+            "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":10776,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
           },
           {
             "variant": "world-lod2",
-            "triangles": 5972,
-            "bytes": 249008,
+            "triangles": 6118,
+            "bytes": 249900,
             "meshNodes": 7,
             "renderPrimitives": 7,
             "materials": 5,
@@ -2112,12 +2112,12 @@
             "sightForwardDot": 0.9999999999999962,
             "declaredLength": 1.36,
             "platformAnatomy": "forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock",
-            "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":5972,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
+            "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":6118,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
           },
           {
             "variant": "drop-lod0",
-            "triangles": 10588,
-            "bytes": 324388,
+            "triangles": 10776,
+            "bytes": 326096,
             "meshNodes": 7,
             "renderPrimitives": 7,
             "materials": 5,
@@ -2143,7 +2143,7 @@
             "sightForwardDot": 0.9999999999999962,
             "declaredLength": 1.36,
             "platformAnatomy": "forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock",
-            "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":10588,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
+            "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":10776,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
           }
         ]
       }
@@ -2170,11 +2170,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -2292,7 +2292,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/smg.provenance.json",
-        "sha256": "30444ff1f7f46f87aaa0ff83100736150c02f54063c272f116167bd481aead78"
+        "sha256": "bf906d6a9fbccb0520416ded368a7ae9546d3c64cb6a1c30c4d64cd37aee226e"
       },
       "sockets": [
         "rightGrip",
@@ -2610,11 +2610,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -2732,7 +2732,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/lmg.provenance.json",
-        "sha256": "871e469c14d2f4ef5c214210a9ca4f8f6eabe67ab65a152ca3b19db89694e121"
+        "sha256": "b39581bf281f7d43b699ac194429f9e70c73567775adf5f687f24cf176c4c5ac"
       },
       "sockets": [
         "rightGrip",
@@ -3050,11 +3050,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -3172,7 +3172,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/scattergun.provenance.json",
-        "sha256": "276720e41be32ff24b34746054331ca514f228b01978e16d12bc40a99207f6d9"
+        "sha256": "dae0f17775686aa780264ad2c75c71d5f2d9abf1dfd610feffe519b6e14913b0"
       },
       "sockets": [
         "rightGrip",
@@ -3490,11 +3490,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -3612,7 +3612,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/sniper.provenance.json",
-        "sha256": "07512c86a2f367b0bf28c094c0602c9aeed45b93592d014f292fdd1b9e2c4fcc"
+        "sha256": "19f39560c782b70dd47689f83bbac72e12075b120f3723cf87d69273bc2bb832"
       },
       "sockets": [
         "rightGrip",
@@ -3930,11 +3930,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -3943,21 +3943,21 @@
       "firstPersonGlbs": [
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/railgun/railgun-fp-lod0.glb",
-          "sha256": "1fe88eb8442d23e15a387d756735017a15976ea73b08d7a0acbd52aef84a4c5c",
+          "sha256": "c2a1fa7938f381934beee29e8165d4c9a8631ac7e5931b14a813180296639eb2",
           "variant": "first-person-lod0",
           "lod": 0,
-          "triangles": 19352,
-          "bytes": 342360,
+          "triangles": 19728,
+          "bytes": 346004,
           "meshNodes": 9,
           "renderPrimitives": 9
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/railgun/railgun-fp-lod1.glb",
-          "sha256": "b3437426529154819b68b61bbb6cfb4ea1cedc3c3868db29f47a0c1a136f200d",
+          "sha256": "cd6345847f60fd65121994397b50bfe7fd720aabaf1b1ea533e91004fdc6a682",
           "variant": "first-person-lod1",
           "lod": 1,
-          "triangles": 11732,
-          "bytes": 280060,
+          "triangles": 12042,
+          "bytes": 282992,
           "meshNodes": 9,
           "renderPrimitives": 9
         }
@@ -3965,31 +3965,31 @@
       "worldGlbs": [
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/railgun/railgun-world-lod0.glb",
-          "sha256": "bafe9ba42593858cf8c5b3c71e9a94b80d689b792011652fe98a49d3b3ac776b",
+          "sha256": "a842a3e2eead21a9fe9d222e6ff31ab03b6d4aea836d61547e909f2375186a22",
           "variant": "world-lod0",
           "lod": 0,
-          "triangles": 17072,
-          "bytes": 334660,
+          "triangles": 17448,
+          "bytes": 338384,
           "meshNodes": 9,
           "renderPrimitives": 9
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/railgun/railgun-world-lod1.glb",
-          "sha256": "d5b9c14cf2fbd0b5e460b67494de4a22f7de2e177f32fb7a4a1b619ab3c6831f",
+          "sha256": "08da2f7a7741491a8b05bcd93aa2843c903cc28fb57579363a9018b3984bfd92",
           "variant": "world-lod1",
           "lod": 1,
-          "triangles": 11752,
-          "bytes": 277516,
+          "triangles": 12128,
+          "bytes": 281084,
           "meshNodes": 9,
           "renderPrimitives": 9
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/railgun/railgun-world-lod2.glb",
-          "sha256": "2cf7abe947d5ece078eb70066a107a03da54ae9c2e7e1aff3fdea8c28442efaf",
+          "sha256": "abab20ad50707e1fa0c58911ac2b0d17726b6d6cebbe8ea9d97037a7a02dc42a",
           "variant": "world-lod2",
           "lod": 2,
-          "triangles": 7824,
-          "bytes": 235408,
+          "triangles": 8118,
+          "bytes": 235700,
           "meshNodes": 9,
           "renderPrimitives": 9
         }
@@ -3997,11 +3997,11 @@
       "dropGlbs": [
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/railgun/railgun-drop-lod0.glb",
-          "sha256": "87c1959b8c45d21de0f2b082cb6a70dd574c3d798f2a96f60c22da5836c7604e",
+          "sha256": "db7a888d5f09e60014a952b1b42a9b128001fe7d2eaf6ac702cfc7d25983a3ba",
           "variant": "drop-lod0",
           "lod": 0,
-          "triangles": 11752,
-          "bytes": 277480,
+          "triangles": 12128,
+          "bytes": 281036,
           "meshNodes": 9,
           "renderPrimitives": 9
         }
@@ -4052,7 +4052,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/railgun.provenance.json",
-        "sha256": "b7b95e5ebcee0435e7d96eb05fe5d51fdd9289471ae338b3f98a449ff79f77ef"
+        "sha256": "7b688e883ad2ae7a03d9a2af995b66634c3e51bc69a5d2c91d4bb6d68064d14d"
       },
       "sockets": [
         "rightGrip",
@@ -4096,7 +4096,7 @@
         "renders": [
           {
             "path": "docs/assets/pass65-weapons/firearms/railgun/railgun-hero-quarter.png",
-            "sha256": "b8281669c5807edd02968ca33c08df778ad178c914385e73095916abd8cecffe",
+            "sha256": "165d43c9c11000bb4d7815a6cf65002a4aabf3084a54ab228d8a39408bee4403",
             "width": 480,
             "height": 360,
             "cameraId": "hero-quarter",
@@ -4104,7 +4104,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/railgun/railgun-side-silhouette.png",
-            "sha256": "bd5a4c95f16efe50ebf9c01d9ada9541882c9488c848e838bdbffedd3c6725d9",
+            "sha256": "0dc4f7b0757f5a4923d8e96dbd4804b8a52ea4770438a39e5d1fde7809ed3689",
             "width": 480,
             "height": 360,
             "cameraId": "side-silhouette",
@@ -4112,7 +4112,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/railgun/railgun-sight-line.png",
-            "sha256": "c598b7ac84606986f43240677d89a3aa9d487f84e92fc1c167374e7695092c8b",
+            "sha256": "c743f7eb4d34171bf3f24d51e6e1a067c13d4d9b7140f16a1738e916732c2a80",
             "width": 480,
             "height": 360,
             "cameraId": "sight-line",
@@ -4120,7 +4120,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/railgun/railgun-reload-action.png",
-            "sha256": "1aedf8394916775ca80c5eef69347d3a0693e47ae70ece4fe6499171b1a0bff2",
+            "sha256": "240f64a4834bf461668d8309c739b89a71d28e005636aee06842e8d533fac14c",
             "width": 480,
             "height": 360,
             "cameraId": "reload-action",
@@ -4128,7 +4128,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/railgun/railgun-world-lod0-silhouette.png",
-            "sha256": "e864425b1ab0851c4b1b60adf07c99eff0ebadc39beab2f518b75eba9a86ab7b",
+            "sha256": "5e87752ca16ae3323887fd5abee4a50bcb706d746bb61b5b7ff79e46c689e0d8",
             "width": 480,
             "height": 360,
             "cameraId": "world-lod0-silhouette",
@@ -4136,7 +4136,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/railgun/railgun-world-lod2-silhouette.png",
-            "sha256": "2ee80c1eac90971557224c0bf718392102296aa228d67e735485a9213bc7a620",
+            "sha256": "05888e3c8b1df16a417e9eff3d1d06473172a0d359e3bd0ae0689d4a79e9ee5d",
             "width": 480,
             "height": 360,
             "cameraId": "world-lod2-silhouette",
@@ -4144,7 +4144,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/railgun/railgun-drop-lod0-silhouette.png",
-            "sha256": "f8ab22b6136bf675548cbf64c8a9718a3f691708bfb6b0e71fa294fcaa66c1f9",
+            "sha256": "c1538e48f278eafead1226e9c61c9749e1b8f429a0b3a5764d24a4f6d3066a14",
             "width": 480,
             "height": 360,
             "cameraId": "drop-lod0-silhouette",
@@ -4153,7 +4153,7 @@
         ],
         "contactSheet": {
           "path": "docs/assets/pass65-weapons/firearms/railgun/railgun-contact-sheet.png",
-          "sha256": "9496d215a848869d2cb358f303e19cfdf6d9bfaa63db6993a00c78ed4553cdff",
+          "sha256": "79cc85ffbe11aad6f1a1decb5e0fc2b28ab683768e96dc751178487154965b0f",
           "width": 1920,
           "height": 720
         }
@@ -4162,8 +4162,8 @@
         "deliveries": [
           {
             "variant": "first-person-lod0",
-            "triangles": 19352,
-            "bytes": 342360,
+            "triangles": 19728,
+            "bytes": 346004,
             "meshNodes": 9,
             "renderPrimitives": 9,
             "materials": 6,
@@ -4189,12 +4189,12 @@
             "sightForwardDot": 0.9999999999999962,
             "declaredLength": 1.78,
             "platformAnatomy": "twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic",
-            "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":19352,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
+            "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":19728,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
           },
           {
             "variant": "first-person-lod1",
-            "triangles": 11732,
-            "bytes": 280060,
+            "triangles": 12042,
+            "bytes": 282992,
             "meshNodes": 9,
             "renderPrimitives": 9,
             "materials": 6,
@@ -4220,12 +4220,12 @@
             "sightForwardDot": 0.9999999999999962,
             "declaredLength": 1.78,
             "platformAnatomy": "twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic",
-            "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":11732,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
+            "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":12042,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
           },
           {
             "variant": "world-lod0",
-            "triangles": 17072,
-            "bytes": 334660,
+            "triangles": 17448,
+            "bytes": 338384,
             "meshNodes": 9,
             "renderPrimitives": 9,
             "materials": 6,
@@ -4251,12 +4251,12 @@
             "sightForwardDot": 0.9999999999999962,
             "declaredLength": 1.78,
             "platformAnatomy": "twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic",
-            "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":17072,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
+            "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":17448,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
           },
           {
             "variant": "world-lod1",
-            "triangles": 11752,
-            "bytes": 277516,
+            "triangles": 12128,
+            "bytes": 281084,
             "meshNodes": 9,
             "renderPrimitives": 9,
             "materials": 6,
@@ -4282,12 +4282,12 @@
             "sightForwardDot": 0.9999999999999962,
             "declaredLength": 1.78,
             "platformAnatomy": "twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic",
-            "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":11752,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
+            "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":12128,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
           },
           {
             "variant": "world-lod2",
-            "triangles": 7824,
-            "bytes": 235408,
+            "triangles": 8118,
+            "bytes": 235700,
             "meshNodes": 9,
             "renderPrimitives": 9,
             "materials": 6,
@@ -4313,12 +4313,12 @@
             "sightForwardDot": 0.9999999999999962,
             "declaredLength": 1.78,
             "platformAnatomy": "twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic",
-            "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":7824,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
+            "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":8118,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
           },
           {
             "variant": "drop-lod0",
-            "triangles": 11752,
-            "bytes": 277480,
+            "triangles": 12128,
+            "bytes": 281036,
             "meshNodes": 9,
             "renderPrimitives": 9,
             "materials": 6,
@@ -4344,7 +4344,7 @@
             "sightForwardDot": 0.9999999999999962,
             "declaredLength": 1.78,
             "platformAnatomy": "twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic",
-            "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":11752,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
+            "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":12128,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
           }
         ]
       }
@@ -4371,11 +4371,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -4493,7 +4493,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/pistol.provenance.json",
-        "sha256": "b77361c8c944843e6ddb5aead39cc177dc86b7d1876e59e6b12b579e012bbd65"
+        "sha256": "38b141140b3262917782f3858558f62ac90a7d2052e28c2a0cc1dfc0decd8670"
       },
       "sockets": [
         "rightGrip",
@@ -4811,11 +4811,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -4933,7 +4933,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/magnum.provenance.json",
-        "sha256": "b91b76f33089951b4bff0146bdcfe5113ab538497d07974f219a27986ae3ca85"
+        "sha256": "ecce170131c63c3cabeb68df84c8fd7ed1d1e4fc0cab15980308162633808731"
       },
       "sockets": [
         "rightGrip",
@@ -5251,11 +5251,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -5373,7 +5373,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/machine-pistol.provenance.json",
-        "sha256": "a18be6b0733d8d9d2bb1606ec3e6595d654d595d242bc03a855c7eeca2cf59f5"
+        "sha256": "1b30a15c7b260dab40d4af8ac7ce82804af779bc1499e4ed5ab722d75e122580"
       },
       "sockets": [
         "rightGrip",
@@ -5691,11 +5691,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -5813,7 +5813,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/mini-uzi.provenance.json",
-        "sha256": "44441cc749f4b644082aa11a3516df2d6a6421b41256e8cb3610a84ecad7a752"
+        "sha256": "ae7d08f5dd7675357fb58b04e1448ff988f802db4405342019119193faaa3b63"
       },
       "sockets": [
         "rightGrip",
@@ -6131,11 +6131,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -6253,7 +6253,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/mp5.provenance.json",
-        "sha256": "c5b39849763b4e3ad83c18601afa3dfc4ddf1ee14602d961fb595b430b935669"
+        "sha256": "11dc92f9bd2d0f79a3adff9ca73bb7fcfe19c364b7fc6d1918042e727ed3ad4b"
       },
       "sockets": [
         "rightGrip",
@@ -6571,11 +6571,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -6584,21 +6584,21 @@
       "firstPersonGlbs": [
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/m4a1/m4a1-fp-lod0.glb",
-          "sha256": "e6a458085e5ea33b02372cd6ae8baf022773cc25e36e06297d608c9849203090",
+          "sha256": "9b52f1e02d9aa73f3141d4640eb4034cae25540e281141f06895f0fb94226e35",
           "variant": "first-person-lod0",
           "lod": 0,
-          "triangles": 32112,
-          "bytes": 533360,
+          "triangles": 32300,
+          "bytes": 535112,
           "meshNodes": 8,
           "renderPrimitives": 8
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/m4a1/m4a1-fp-lod1.glb",
-          "sha256": "646f184ca11677336b3c63eb1caa163337837cfddddbd794f17d4077f092cecb",
+          "sha256": "418de36cb53d68e1bd7e0ece539845fb97ebc7a09d01a1f51ceb6f3b6d23529b",
           "variant": "first-person-lod1",
           "lod": 1,
-          "triangles": 30324,
-          "bytes": 517692,
+          "triangles": 30512,
+          "bytes": 519448,
           "meshNodes": 8,
           "renderPrimitives": 8
         }
@@ -6606,31 +6606,31 @@
       "worldGlbs": [
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/m4a1/m4a1-world-lod0.glb",
-          "sha256": "ca237f9049de72fa4abdf7c306cb0c7295ddf21c61e4c58d142bd062c4ea184d",
+          "sha256": "2091e247a428f331da0a7581ec413eba5df2a2ab85729b159d41a72765f85c96",
           "variant": "world-lod0",
           "lod": 0,
-          "triangles": 30324,
-          "bytes": 517716,
+          "triangles": 30512,
+          "bytes": 519476,
           "meshNodes": 8,
           "renderPrimitives": 8
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/m4a1/m4a1-world-lod1.glb",
-          "sha256": "6c13c1fad80ad08e16ab486cc311587480cb66b297f426dcf92cf3106b786de1",
+          "sha256": "e17d6627ea903e5421ae62f8fabe8bfc5dd1f93c421c5fdd384b2b9f41c435aa",
           "variant": "world-lod1",
           "lod": 1,
-          "triangles": 22940,
-          "bytes": 444260,
+          "triangles": 23128,
+          "bytes": 446036,
           "meshNodes": 8,
           "renderPrimitives": 8
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/m4a1/m4a1-world-lod2.glb",
-          "sha256": "419a68d272dc95e4e099d66ab62155142d0cf55224d1fd75f0ffc2fda496271f",
+          "sha256": "e08b160ab75eefb809f3b8888fa0190ecd7efad9b3927db929d1afedf2b3063a",
           "variant": "world-lod2",
           "lod": 2,
-          "triangles": 17016,
-          "bytes": 382532,
+          "triangles": 17204,
+          "bytes": 384328,
           "meshNodes": 7,
           "renderPrimitives": 7
         }
@@ -6638,11 +6638,11 @@
       "dropGlbs": [
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/m4a1/m4a1-drop-lod0.glb",
-          "sha256": "edf34a32a0fcb52e425829c23c047ce23d4044fb0b86c932664623e68eaee510",
+          "sha256": "1e262d6c12590a3320ad755d869263ed01891cafc9ecaf890d643bb0b04ff7bb",
           "variant": "drop-lod0",
           "lod": 0,
-          "triangles": 22940,
-          "bytes": 444244,
+          "triangles": 23128,
+          "bytes": 446024,
           "meshNodes": 8,
           "renderPrimitives": 8
         }
@@ -6693,7 +6693,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/m4a1.provenance.json",
-        "sha256": "6e6e554e638b5b169fec702d131b5ec2f075d6118d293332199c63e7a737057a"
+        "sha256": "9026be518ae445db346691a1053c9f9303cedce736ed2a7aeb4df53fb38929e7"
       },
       "sockets": [
         "rightGrip",
@@ -6736,7 +6736,7 @@
         "renders": [
           {
             "path": "docs/assets/pass65-weapons/firearms/m4a1/m4a1-hero-quarter.png",
-            "sha256": "3708b507291fe5eb968f0dbed28b2a0b72a4f4b8990fce53583caf8d9cf78fdf",
+            "sha256": "8b2cc1aa230f8084711a48086d0b7a1a55006cd33c941679d608164ed71096cd",
             "width": 480,
             "height": 360,
             "cameraId": "hero-quarter",
@@ -6744,7 +6744,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/m4a1/m4a1-side-silhouette.png",
-            "sha256": "33ab9aa0a7e9664a4374e14b2942c7df2ea7306c64cc427697e6f5961259247b",
+            "sha256": "87b5bbb89fc50b20280f63cbb375c7b08cbeff40269c373de2070ee2d3fe6f12",
             "width": 480,
             "height": 360,
             "cameraId": "side-silhouette",
@@ -6752,7 +6752,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/m4a1/m4a1-sight-line.png",
-            "sha256": "2e69c1226772d337d084e30cc5f866fad97be10c26b3f6d7bb36b007aff62c69",
+            "sha256": "6cfb4bdc3db68999115a2d6e7724906e6463046e26646ac2751c0595ace1d7f8",
             "width": 480,
             "height": 360,
             "cameraId": "sight-line",
@@ -6760,7 +6760,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/m4a1/m4a1-reload-action.png",
-            "sha256": "0a0d8ae7f98c2e872d4891436c267a7c8da3d9558af067dd9025ea5865ac5e93",
+            "sha256": "e87dcf2ff204655a89964048429b42da6ce8dd64297be3463722237db146a927",
             "width": 480,
             "height": 360,
             "cameraId": "reload-action",
@@ -6768,7 +6768,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/m4a1/m4a1-world-lod0-silhouette.png",
-            "sha256": "c81ba740365954bcaac66ef78a082bef84e4e3660098a6cdea23460125296818",
+            "sha256": "95bd8b626148e5172ab75e2bea95661c6a50b0006a3526b05adb8f5bfff6eb02",
             "width": 480,
             "height": 360,
             "cameraId": "world-lod0-silhouette",
@@ -6776,7 +6776,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/m4a1/m4a1-world-lod2-silhouette.png",
-            "sha256": "aad5525ac7ad912541aa1c6bdf2b6efe4aac943581b5b06d226080adf5a47236",
+            "sha256": "8992c0c16d84a5b56502d320490e1da19872589294ef2583fceba7045ba307b9",
             "width": 480,
             "height": 360,
             "cameraId": "world-lod2-silhouette",
@@ -6784,7 +6784,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/m4a1/m4a1-drop-lod0-silhouette.png",
-            "sha256": "c854b617063e843705b51ff949fd76fb77176d42d925f824c33ec6d35121fbe3",
+            "sha256": "ea3f1068326b25cc8eaffff2659f82873cfc9bfde7d58ded66ee8610b202bf16",
             "width": 480,
             "height": 360,
             "cameraId": "drop-lod0-silhouette",
@@ -6793,7 +6793,7 @@
         ],
         "contactSheet": {
           "path": "docs/assets/pass65-weapons/firearms/m4a1/m4a1-contact-sheet.png",
-          "sha256": "8e00edc1201b742a74e0e0684a5567cfffdb12f24ab155a7ff4d9afa73b40821",
+          "sha256": "c96ca60102d770ec29dcb0678346f6ceeeebc357c133b87190d46eb4b877911a",
           "width": 1920,
           "height": 720
         }
@@ -6802,8 +6802,8 @@
         "deliveries": [
           {
             "variant": "first-person-lod0",
-            "triangles": 32112,
-            "bytes": 533360,
+            "triangles": 32300,
+            "bytes": 535112,
             "meshNodes": 8,
             "renderPrimitives": 8,
             "materials": 4,
@@ -6829,12 +6829,12 @@
             "sightForwardDot": 0.9994291737710199,
             "declaredLength": 1.32,
             "platformAnatomy": "upper-lower-magwell-ras-direct-impingement-stanag-buffer-stock",
-            "silhouetteSignature": "{\"designId\":\"m4a1-direct-impingement-v1\",\"family\":\"assault-rifle\",\"triangles\":32112,\"meshNodes\":8,\"declaredLength\":1.32,\"platformAnatomy\":\"upper-lower-magwell-ras-direct-impingement-stanag-buffer-stock\",\"signatures\":[11,23,34]}"
+            "silhouetteSignature": "{\"designId\":\"m4a1-direct-impingement-v1\",\"family\":\"assault-rifle\",\"triangles\":32300,\"meshNodes\":8,\"declaredLength\":1.32,\"platformAnatomy\":\"upper-lower-magwell-ras-direct-impingement-stanag-buffer-stock\",\"signatures\":[11,23,34]}"
           },
           {
             "variant": "first-person-lod1",
-            "triangles": 30324,
-            "bytes": 517692,
+            "triangles": 30512,
+            "bytes": 519448,
             "meshNodes": 8,
             "renderPrimitives": 8,
             "materials": 4,
@@ -6860,12 +6860,12 @@
             "sightForwardDot": 0.9994291737710199,
             "declaredLength": 1.32,
             "platformAnatomy": "upper-lower-magwell-ras-direct-impingement-stanag-buffer-stock",
-            "silhouetteSignature": "{\"designId\":\"m4a1-direct-impingement-v1\",\"family\":\"assault-rifle\",\"triangles\":30324,\"meshNodes\":8,\"declaredLength\":1.32,\"platformAnatomy\":\"upper-lower-magwell-ras-direct-impingement-stanag-buffer-stock\",\"signatures\":[11,23,34]}"
+            "silhouetteSignature": "{\"designId\":\"m4a1-direct-impingement-v1\",\"family\":\"assault-rifle\",\"triangles\":30512,\"meshNodes\":8,\"declaredLength\":1.32,\"platformAnatomy\":\"upper-lower-magwell-ras-direct-impingement-stanag-buffer-stock\",\"signatures\":[11,23,34]}"
           },
           {
             "variant": "world-lod0",
-            "triangles": 30324,
-            "bytes": 517716,
+            "triangles": 30512,
+            "bytes": 519476,
             "meshNodes": 8,
             "renderPrimitives": 8,
             "materials": 4,
@@ -6891,12 +6891,12 @@
             "sightForwardDot": 0.9994291737710199,
             "declaredLength": 1.32,
             "platformAnatomy": "upper-lower-magwell-ras-direct-impingement-stanag-buffer-stock",
-            "silhouetteSignature": "{\"designId\":\"m4a1-direct-impingement-v1\",\"family\":\"assault-rifle\",\"triangles\":30324,\"meshNodes\":8,\"declaredLength\":1.32,\"platformAnatomy\":\"upper-lower-magwell-ras-direct-impingement-stanag-buffer-stock\",\"signatures\":[11,23,34]}"
+            "silhouetteSignature": "{\"designId\":\"m4a1-direct-impingement-v1\",\"family\":\"assault-rifle\",\"triangles\":30512,\"meshNodes\":8,\"declaredLength\":1.32,\"platformAnatomy\":\"upper-lower-magwell-ras-direct-impingement-stanag-buffer-stock\",\"signatures\":[11,23,34]}"
           },
           {
             "variant": "world-lod1",
-            "triangles": 22940,
-            "bytes": 444260,
+            "triangles": 23128,
+            "bytes": 446036,
             "meshNodes": 8,
             "renderPrimitives": 8,
             "materials": 4,
@@ -6922,12 +6922,12 @@
             "sightForwardDot": 0.9994291737710199,
             "declaredLength": 1.32,
             "platformAnatomy": "upper-lower-magwell-ras-direct-impingement-stanag-buffer-stock",
-            "silhouetteSignature": "{\"designId\":\"m4a1-direct-impingement-v1\",\"family\":\"assault-rifle\",\"triangles\":22940,\"meshNodes\":8,\"declaredLength\":1.32,\"platformAnatomy\":\"upper-lower-magwell-ras-direct-impingement-stanag-buffer-stock\",\"signatures\":[11,23,33]}"
+            "silhouetteSignature": "{\"designId\":\"m4a1-direct-impingement-v1\",\"family\":\"assault-rifle\",\"triangles\":23128,\"meshNodes\":8,\"declaredLength\":1.32,\"platformAnatomy\":\"upper-lower-magwell-ras-direct-impingement-stanag-buffer-stock\",\"signatures\":[11,23,33]}"
           },
           {
             "variant": "world-lod2",
-            "triangles": 17016,
-            "bytes": 382532,
+            "triangles": 17204,
+            "bytes": 384328,
             "meshNodes": 7,
             "renderPrimitives": 7,
             "materials": 4,
@@ -6953,12 +6953,12 @@
             "sightForwardDot": 0.9994291737710199,
             "declaredLength": 1.32,
             "platformAnatomy": "upper-lower-magwell-ras-direct-impingement-stanag-buffer-stock",
-            "silhouetteSignature": "{\"designId\":\"m4a1-direct-impingement-v1\",\"family\":\"assault-rifle\",\"triangles\":17016,\"meshNodes\":7,\"declaredLength\":1.32,\"platformAnatomy\":\"upper-lower-magwell-ras-direct-impingement-stanag-buffer-stock\",\"signatures\":[11,21,30]}"
+            "silhouetteSignature": "{\"designId\":\"m4a1-direct-impingement-v1\",\"family\":\"assault-rifle\",\"triangles\":17204,\"meshNodes\":7,\"declaredLength\":1.32,\"platformAnatomy\":\"upper-lower-magwell-ras-direct-impingement-stanag-buffer-stock\",\"signatures\":[11,21,30]}"
           },
           {
             "variant": "drop-lod0",
-            "triangles": 22940,
-            "bytes": 444244,
+            "triangles": 23128,
+            "bytes": 446024,
             "meshNodes": 8,
             "renderPrimitives": 8,
             "materials": 4,
@@ -6984,7 +6984,7 @@
             "sightForwardDot": 0.9994291737710199,
             "declaredLength": 1.32,
             "platformAnatomy": "upper-lower-magwell-ras-direct-impingement-stanag-buffer-stock",
-            "silhouetteSignature": "{\"designId\":\"m4a1-direct-impingement-v1\",\"family\":\"assault-rifle\",\"triangles\":22940,\"meshNodes\":8,\"declaredLength\":1.32,\"platformAnatomy\":\"upper-lower-magwell-ras-direct-impingement-stanag-buffer-stock\",\"signatures\":[11,23,33]}"
+            "silhouetteSignature": "{\"designId\":\"m4a1-direct-impingement-v1\",\"family\":\"assault-rifle\",\"triangles\":23128,\"meshNodes\":8,\"declaredLength\":1.32,\"platformAnatomy\":\"upper-lower-magwell-ras-direct-impingement-stanag-buffer-stock\",\"signatures\":[11,23,33]}"
           }
         ]
       }
@@ -7011,11 +7011,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -7133,7 +7133,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/ak-47.provenance.json",
-        "sha256": "6d9009c18ee4ab8cb39cc8a77e264f2881676fd2aef98cc1b17ad9682e1fb644"
+        "sha256": "9d75ad1448ea98c7f654e18aad1cfe93d9b8b5a434d44553e6ff2eb0df891603"
       },
       "sockets": [
         "rightGrip",
@@ -7451,11 +7451,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -7573,7 +7573,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/minigun.provenance.json",
-        "sha256": "3b36b00d1cdb9a79ec773855f9e7bd29472800f5ea8b26a60d8262f014c61926"
+        "sha256": "bcc61595a821fbf7227aff2a957dffd9ec935a635c98e7720d10aa191680d70f"
       },
       "sockets": [
         "rightGrip",
@@ -7892,11 +7892,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -7905,21 +7905,21 @@
       "firstPersonGlbs": [
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/m14-ebr/m14-ebr-fp-lod0.glb",
-          "sha256": "4a841b30a972349174102ec749324acb85fb81581cc69eb32fcbfeb4e4f53aea",
+          "sha256": "8e6c85f4216436eea451344a06b6a76d5da51e742171962f8851cae9b79f2a4b",
           "variant": "first-person-lod0",
           "lod": 0,
-          "triangles": 10296,
-          "bytes": 289784,
+          "triangles": 10484,
+          "bytes": 291556,
           "meshNodes": 7,
           "renderPrimitives": 7
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/m14-ebr/m14-ebr-fp-lod1.glb",
-          "sha256": "1c95056221f747b7ab65026465589336427200a805a528b1e4457a5cdf79f6f6",
+          "sha256": "f225f389f74d6a8bc8b0486a0274e287eb69b5b11aecce6b24e94072943ba836",
           "variant": "first-person-lod1",
           "lod": 1,
-          "triangles": 7466,
-          "bytes": 254108,
+          "triangles": 7620,
+          "bytes": 255716,
           "meshNodes": 7,
           "renderPrimitives": 7
         }
@@ -7927,31 +7927,31 @@
       "worldGlbs": [
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/m14-ebr/m14-ebr-world-lod0.glb",
-          "sha256": "6cdb8ba67dd3e574c8ad79be01846d8be82dae7d477248623c2a2fa57df1db60",
+          "sha256": "7a7c85aae3f68d651e49762357a57fcb9ad6bdb5af70abe518cdddf4b787a158",
           "variant": "world-lod0",
           "lod": 0,
-          "triangles": 10240,
-          "bytes": 289924,
+          "triangles": 10428,
+          "bytes": 291796,
           "meshNodes": 7,
           "renderPrimitives": 7
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/m14-ebr/m14-ebr-world-lod1.glb",
-          "sha256": "0b5151bac4ff4f0520d61a0d74d9a3db3ef1a61d1514d05d29795153488ab0fe",
+          "sha256": "df199e109551beb8082f56c22cead266dfbab6e6b8653198168d415c633214d1",
           "variant": "world-lod1",
           "lod": 1,
-          "triangles": 8160,
-          "bytes": 267704,
+          "triangles": 8348,
+          "bytes": 269552,
           "meshNodes": 7,
           "renderPrimitives": 7
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/m14-ebr/m14-ebr-world-lod2.glb",
-          "sha256": "a308141eeb0795d90b72ddf0d436cd003cd8d2112528d3247cee8ad1d02c8fa4",
+          "sha256": "e4b7bfad95c6610b969dceba31074dd2a93de20abe7d73177cc0f3d43d60b75a",
           "variant": "world-lod2",
           "lod": 2,
-          "triangles": 5084,
-          "bytes": 223812,
+          "triangles": 5230,
+          "bytes": 224076,
           "meshNodes": 7,
           "renderPrimitives": 7
         }
@@ -7959,11 +7959,11 @@
       "dropGlbs": [
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/m14-ebr/m14-ebr-drop-lod0.glb",
-          "sha256": "0bd856b4a154c613994b6cedfdc60b0f6af6adb6866b7ab663a8b860b35da066",
+          "sha256": "6a5b7b89b3cb4ef9f024a67adda63d0b3551c155bc91a5c29def259bf81f9772",
           "variant": "drop-lod0",
           "lod": 0,
-          "triangles": 8160,
-          "bytes": 267692,
+          "triangles": 8348,
+          "bytes": 269540,
           "meshNodes": 7,
           "renderPrimitives": 7
         }
@@ -8014,7 +8014,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/m14-ebr.provenance.json",
-        "sha256": "404002ebcfe80f31b1c0cfef1df304848eb932a0464ee267bed48aa4fa8b7ce2"
+        "sha256": "208533ad29aa673a92fc98fdb2c638932a37615bbfd6e8058259e55a1d368b2b"
       },
       "sockets": [
         "rightGrip",
@@ -8057,7 +8057,7 @@
         "renders": [
           {
             "path": "docs/assets/pass65-weapons/firearms/m14-ebr/m14-ebr-hero-quarter.png",
-            "sha256": "8d7ba2d2b1cb6a83cd1b1e7734b9cedb17baea5bba940d71239013a7af77b55f",
+            "sha256": "e13e5968c9df43fb39287e2a8a15a351153c78f44758ecd0b59d5a2bec0498db",
             "width": 480,
             "height": 360,
             "cameraId": "hero-quarter",
@@ -8065,7 +8065,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/m14-ebr/m14-ebr-side-silhouette.png",
-            "sha256": "52acbccf6b2e2185a8dd5ed4182b2a51879c0cd5d66c5b647a1e6d260b2cab30",
+            "sha256": "42c615b376901160da308682179c00935aa1739ed8833dc3f872b6343f4dabcf",
             "width": 480,
             "height": 360,
             "cameraId": "side-silhouette",
@@ -8073,7 +8073,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/m14-ebr/m14-ebr-sight-line.png",
-            "sha256": "95f2465f59578b7d9acf1d5d733e9dbb1c3611420f4b4ec06db5359e3b6f6fd0",
+            "sha256": "f062bc21663b1d07170e2be26a22025bb73f193820376d62859a6228dfc0b406",
             "width": 480,
             "height": 360,
             "cameraId": "sight-line",
@@ -8081,7 +8081,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/m14-ebr/m14-ebr-reload-action.png",
-            "sha256": "0198329c9ac75f4fdb1021e5622061dd0a159141c2d035fd4e69fc1eee452891",
+            "sha256": "32738704596f5ac578f0f2c9a0b21e55484bd44908e57dc530527810098d7e03",
             "width": 480,
             "height": 360,
             "cameraId": "reload-action",
@@ -8089,7 +8089,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/m14-ebr/m14-ebr-world-lod0-silhouette.png",
-            "sha256": "fb700b000e730e48814de9fc2ada7638ed70a84556f39db8773766a53deafe0b",
+            "sha256": "76d9c0c4a5effa9296afa40c9dea2b6b64c5e9cbc6b576152f56998ddfbf52fb",
             "width": 480,
             "height": 360,
             "cameraId": "world-lod0-silhouette",
@@ -8097,7 +8097,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/m14-ebr/m14-ebr-world-lod2-silhouette.png",
-            "sha256": "147e871319e2b3796741d59d891968061dc578ca965bafcd22434da687699936",
+            "sha256": "1667293b895ad94a7840038b2b82cff417686eb4ae6ee5ad83a2f871df02d16a",
             "width": 480,
             "height": 360,
             "cameraId": "world-lod2-silhouette",
@@ -8105,7 +8105,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/m14-ebr/m14-ebr-drop-lod0-silhouette.png",
-            "sha256": "fdc50acf743a06a27a4cced234b8de01503db644c1743d903053ba956bba11c6",
+            "sha256": "f25c77c367cf7e0aa067edbb80a941f206c914b3606f432c38b5b38e2a457a54",
             "width": 480,
             "height": 360,
             "cameraId": "drop-lod0-silhouette",
@@ -8114,7 +8114,7 @@
         ],
         "contactSheet": {
           "path": "docs/assets/pass65-weapons/firearms/m14-ebr/m14-ebr-contact-sheet.png",
-          "sha256": "e4761c396a459334c2bbb7f705efb214800378fbdfb81424fa9cd91ea8866ec2",
+          "sha256": "873e1393ad1064001e2c3f86f0b6058b09d0c525e111f8850d35ebe210e110e5",
           "width": 1920,
           "height": 720
         }
@@ -8123,8 +8123,8 @@
         "deliveries": [
           {
             "variant": "first-person-lod0",
-            "triangles": 10296,
-            "bytes": 289784,
+            "triangles": 10484,
+            "bytes": 291556,
             "meshNodes": 7,
             "renderPrimitives": 7,
             "materials": 5,
@@ -8150,12 +8150,12 @@
             "sightForwardDot": 0.9999999999999962,
             "declaredLength": 1.55,
             "platformAnatomy": "sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail",
-            "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":10296,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
+            "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":10484,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
           },
           {
             "variant": "first-person-lod1",
-            "triangles": 7466,
-            "bytes": 254108,
+            "triangles": 7620,
+            "bytes": 255716,
             "meshNodes": 7,
             "renderPrimitives": 7,
             "materials": 5,
@@ -8181,12 +8181,12 @@
             "sightForwardDot": 0.9999999999999962,
             "declaredLength": 1.55,
             "platformAnatomy": "sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail",
-            "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":7466,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
+            "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":7620,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
           },
           {
             "variant": "world-lod0",
-            "triangles": 10240,
-            "bytes": 289924,
+            "triangles": 10428,
+            "bytes": 291796,
             "meshNodes": 7,
             "renderPrimitives": 7,
             "materials": 5,
@@ -8212,12 +8212,12 @@
             "sightForwardDot": 0.9999999999999962,
             "declaredLength": 1.55,
             "platformAnatomy": "sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail",
-            "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":10240,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
+            "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":10428,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
           },
           {
             "variant": "world-lod1",
-            "triangles": 8160,
-            "bytes": 267704,
+            "triangles": 8348,
+            "bytes": 269552,
             "meshNodes": 7,
             "renderPrimitives": 7,
             "materials": 5,
@@ -8243,12 +8243,12 @@
             "sightForwardDot": 0.9999999999999962,
             "declaredLength": 1.55,
             "platformAnatomy": "sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail",
-            "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":8160,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
+            "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":8348,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
           },
           {
             "variant": "world-lod2",
-            "triangles": 5084,
-            "bytes": 223812,
+            "triangles": 5230,
+            "bytes": 224076,
             "meshNodes": 7,
             "renderPrimitives": 7,
             "materials": 5,
@@ -8274,12 +8274,12 @@
             "sightForwardDot": 0.9999999999999962,
             "declaredLength": 1.55,
             "platformAnatomy": "sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail",
-            "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":5084,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
+            "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":5230,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
           },
           {
             "variant": "drop-lod0",
-            "triangles": 8160,
-            "bytes": 267692,
+            "triangles": 8348,
+            "bytes": 269540,
             "meshNodes": 7,
             "renderPrimitives": 7,
             "materials": 5,
@@ -8305,7 +8305,7 @@
             "sightForwardDot": 0.9999999999999962,
             "declaredLength": 1.55,
             "platformAnatomy": "sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail",
-            "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":8160,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
+            "silhouetteSignature": "{\"designId\":\"m14ebr-sage-chassis-v1\",\"family\":\"marksman\",\"triangles\":8348,\"meshNodes\":7,\"declaredLength\":1.55,\"platformAnatomy\":\"sage-ebr-chassis-op-rod-box-magazine-skeletal-stock-long-optic-rail\",\"signatures\":[14,21,24]}"
           }
         ]
       }
@@ -8332,11 +8332,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -8345,21 +8345,21 @@
       "firstPersonGlbs": [
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/slug-shotgun/slug-shotgun-fp-lod0.glb",
-          "sha256": "63a3760613685c6300298320397ff3f9c18fcf68d48fecca6e58862888708de5",
+          "sha256": "8f74adb17d1d81dd555166e91fc233774c793fce5d1df07dc320759dc225494d",
           "variant": "first-person-lod0",
           "lod": 0,
-          "triangles": 8000,
-          "bytes": 252032,
+          "triangles": 8376,
+          "bytes": 255576,
           "meshNodes": 8,
           "renderPrimitives": 8
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/slug-shotgun/slug-shotgun-fp-lod1.glb",
-          "sha256": "d0a9f79bff138cd0e4b2c9590895ad76d7cb352cc739f5507d1597c0fcd61b8a",
+          "sha256": "320043c8855d30363382f896bdc036353be8f2ae43129b50d89569c614806dac",
           "variant": "first-person-lod1",
           "lod": 1,
-          "triangles": 7058,
-          "bytes": 239352,
+          "triangles": 7366,
+          "bytes": 242368,
           "meshNodes": 8,
           "renderPrimitives": 8
         }
@@ -8367,31 +8367,31 @@
       "worldGlbs": [
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/slug-shotgun/slug-shotgun-world-lod0.glb",
-          "sha256": "6502244a23858bf42160c7e32c647e98b7f5d5949cf0d83966ec14dcd5ff1d7b",
+          "sha256": "3eeccb2600247f9c83b3191cb1ad97fd60dbb50bd13ce817b34ca0dec0b581fd",
           "variant": "world-lod0",
           "lod": 0,
-          "triangles": 9656,
-          "bytes": 273872,
+          "triangles": 10032,
+          "bytes": 277396,
           "meshNodes": 8,
           "renderPrimitives": 8
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/slug-shotgun/slug-shotgun-world-lod1.glb",
-          "sha256": "6711118a8f0bbf05d1517d0431a1d6853a04acd4b9831390d35c120816858f54",
+          "sha256": "49141e6952c61a1efb2be7708b85acbb2510fe1320973659859abd5fce94b39a",
           "variant": "world-lod1",
           "lod": 1,
-          "triangles": 7904,
-          "bytes": 256872,
+          "triangles": 8280,
+          "bytes": 260424,
           "meshNodes": 8,
           "renderPrimitives": 8
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/slug-shotgun/slug-shotgun-world-lod2.glb",
-          "sha256": "3a168af61b8bfe2159d2d8f1679c0111e124243752101fbaf4959c491d9913ba",
+          "sha256": "359c75008e13088247122f875c58b52cbe08438af5cf948e5330b42192484019",
           "variant": "world-lod2",
           "lod": 2,
-          "triangles": 4754,
-          "bytes": 215152,
+          "triangles": 5046,
+          "bytes": 215904,
           "meshNodes": 8,
           "renderPrimitives": 8
         }
@@ -8399,11 +8399,11 @@
       "dropGlbs": [
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/slug-shotgun/slug-shotgun-drop-lod0.glb",
-          "sha256": "b555e4f33b86a18d91daabf65d87c277c7669652e800e8928a983b700c01f467",
+          "sha256": "b1511d7fe964541811f6fd3f4e788981ce8f8a12cbd2a9a1c6d85c200dd3c1e2",
           "variant": "drop-lod0",
           "lod": 0,
-          "triangles": 7904,
-          "bytes": 256856,
+          "triangles": 8280,
+          "bytes": 260416,
           "meshNodes": 8,
           "renderPrimitives": 8
         }
@@ -8454,7 +8454,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/slug-shotgun.provenance.json",
-        "sha256": "45471cf8105589dcf65b6d0491e23d8069ffdd772a0e66acc0fcda1b9c5a0989"
+        "sha256": "5194727ed4da1c91759034d8f0c7cb1b1fd605e92c2f06bf7546a7d9e9bbe429"
       },
       "sockets": [
         "rightGrip",
@@ -8497,7 +8497,7 @@
         "renders": [
           {
             "path": "docs/assets/pass65-weapons/firearms/slug-shotgun/slug-shotgun-hero-quarter.png",
-            "sha256": "fc6a4e865fe6541422e0f85e3bf6e93ccb0e68888980a5b8bf9a09a813445bac",
+            "sha256": "4b00a38f4a7548555bf1f9f5524615206dc51f4c5f1366aad125cd07034d3dfa",
             "width": 480,
             "height": 360,
             "cameraId": "hero-quarter",
@@ -8505,7 +8505,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/slug-shotgun/slug-shotgun-side-silhouette.png",
-            "sha256": "67352f128a492b85f0b520b3bccdc08ef095b29c66144c3fcd8908b4080d5514",
+            "sha256": "5ed78cb8d167a11d4313eb29ae7634a385e1c6f46b505227d079707b099738e5",
             "width": 480,
             "height": 360,
             "cameraId": "side-silhouette",
@@ -8513,7 +8513,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/slug-shotgun/slug-shotgun-sight-line.png",
-            "sha256": "2ff0c273f87eefb6b967dc482e2e069d491b218cfa387f2378f5cf040b48d29a",
+            "sha256": "a2932e9190fc1680dfcb593daac0ee4d31aba51211051fca7c216dd9f917c6ea",
             "width": 480,
             "height": 360,
             "cameraId": "sight-line",
@@ -8521,7 +8521,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/slug-shotgun/slug-shotgun-reload-action.png",
-            "sha256": "a772ccb42a1351173fb64dfebe542a58144d245cb6652f8353131ac1763089ca",
+            "sha256": "3cc342cfd4616c1aeac867b562b5514257e6b00d71d1e35e1a7f818bca1f9151",
             "width": 480,
             "height": 360,
             "cameraId": "reload-action",
@@ -8529,7 +8529,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/slug-shotgun/slug-shotgun-world-lod0-silhouette.png",
-            "sha256": "eb0ce2300f4ac65ed4872a0a2f72a196d53dfa653a96ebface06832982517337",
+            "sha256": "504446644f205817061065d8927d29523251c610002305959f866017fda63f24",
             "width": 480,
             "height": 360,
             "cameraId": "world-lod0-silhouette",
@@ -8537,7 +8537,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/slug-shotgun/slug-shotgun-world-lod2-silhouette.png",
-            "sha256": "a7020e87ca7df7e28d05c391d85de76b962a6a57121a63cfad9655c89c3a47bf",
+            "sha256": "36457ebf7bc8d1cd0e44d0554558a92b7f83865d44d39eff3f16adf514cd5fb3",
             "width": 480,
             "height": 360,
             "cameraId": "world-lod2-silhouette",
@@ -8545,7 +8545,7 @@
           },
           {
             "path": "docs/assets/pass65-weapons/firearms/slug-shotgun/slug-shotgun-drop-lod0-silhouette.png",
-            "sha256": "5bf6d1876426f151093689a2a8eea6a5f1bbe8d4f2495a314eb7247cede37ac2",
+            "sha256": "5fc853d1264bf66f5d3bdc78e30b1d6aac61595aabc5f0676c643237ebf4c126",
             "width": 480,
             "height": 360,
             "cameraId": "drop-lod0-silhouette",
@@ -8554,7 +8554,7 @@
         ],
         "contactSheet": {
           "path": "docs/assets/pass65-weapons/firearms/slug-shotgun/slug-shotgun-contact-sheet.png",
-          "sha256": "7960beb1073c4789bf2ebea7bda4e9510897c51125413ae856d21470c29a905e",
+          "sha256": "bdd401ee30b2e55c9f9414f762c176b1471140631c70439243048c85343448e1",
           "width": 1920,
           "height": 720
         }
@@ -8563,8 +8563,8 @@
         "deliveries": [
           {
             "variant": "first-person-lod0",
-            "triangles": 8000,
-            "bytes": 252032,
+            "triangles": 8376,
+            "bytes": 255576,
             "meshNodes": 8,
             "renderPrimitives": 8,
             "materials": 5,
@@ -8590,12 +8590,12 @@
             "sightForwardDot": 0.9999999999999963,
             "declaredLength": 1.36,
             "platformAnatomy": "argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle",
-            "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":8000,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
+            "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":8376,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
           },
           {
             "variant": "first-person-lod1",
-            "triangles": 7058,
-            "bytes": 239352,
+            "triangles": 7366,
+            "bytes": 242368,
             "meshNodes": 8,
             "renderPrimitives": 8,
             "materials": 5,
@@ -8621,12 +8621,12 @@
             "sightForwardDot": 0.9999999999999963,
             "declaredLength": 1.36,
             "platformAnatomy": "argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle",
-            "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":7058,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
+            "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":7366,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
           },
           {
             "variant": "world-lod0",
-            "triangles": 9656,
-            "bytes": 273872,
+            "triangles": 10032,
+            "bytes": 277396,
             "meshNodes": 8,
             "renderPrimitives": 8,
             "materials": 5,
@@ -8652,12 +8652,12 @@
             "sightForwardDot": 0.9999999999999963,
             "declaredLength": 1.36,
             "platformAnatomy": "argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle",
-            "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":9656,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
+            "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":10032,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
           },
           {
             "variant": "world-lod1",
-            "triangles": 7904,
-            "bytes": 256872,
+            "triangles": 8280,
+            "bytes": 260424,
             "meshNodes": 8,
             "renderPrimitives": 8,
             "materials": 5,
@@ -8683,12 +8683,12 @@
             "sightForwardDot": 0.9999999999999963,
             "declaredLength": 1.36,
             "platformAnatomy": "argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle",
-            "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":7904,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
+            "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":8280,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
           },
           {
             "variant": "world-lod2",
-            "triangles": 4754,
-            "bytes": 215152,
+            "triangles": 5046,
+            "bytes": 215904,
             "meshNodes": 8,
             "renderPrimitives": 8,
             "materials": 5,
@@ -8714,12 +8714,12 @@
             "sightForwardDot": 0.9999999999999963,
             "declaredLength": 1.36,
             "platformAnatomy": "argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle",
-            "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":4754,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
+            "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":5046,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
           },
           {
             "variant": "drop-lod0",
-            "triangles": 7904,
-            "bytes": 256856,
+            "triangles": 8280,
+            "bytes": 260416,
             "meshNodes": 8,
             "renderPrimitives": 8,
             "materials": 5,
@@ -8745,7 +8745,7 @@
             "sightForwardDot": 0.9999999999999963,
             "declaredLength": 1.36,
             "platformAnatomy": "argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle",
-            "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":7904,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
+            "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":8280,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
           }
         ]
       }
@@ -8772,11 +8772,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -8894,7 +8894,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/flashlight-pistol.provenance.json",
-        "sha256": "78a823fbacad68315ba3bcfa474dc355d7137db0dc4d91066a5a154d5ed3b4f6"
+        "sha256": "ec5ccc5ad9aafe808f74cf73a7a198b77221b28d078041763aeeda5917f215b2"
       },
       "sockets": [
         "rightGrip",
@@ -9560,11 +9560,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -9682,7 +9682,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/flamethrower.provenance.json",
-        "sha256": "a3a10ce157e3f6ec0a2d591f14dbc44f71ce7de90a0554a7d7a0b93c933ec163"
+        "sha256": "3d83168b27566ddcde27f700cce8fb6e48752ddb151e9ff52efdf947254bb87e"
       },
       "sockets": [
         "rightGrip",
@@ -10001,11 +10001,11 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-weapon-families.py",
-        "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+        "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -10123,7 +10123,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/flare-gun.provenance.json",
-        "sha256": "248a0221219c5e2fd85199b583c5984563aa9f6756320823e2bebe9ad06575ad"
+        "sha256": "bc60688745d1345a550be4a3e25face3e0f6722534171a88822cd74a15fc1559"
       },
       "sockets": [
         "rightGrip",

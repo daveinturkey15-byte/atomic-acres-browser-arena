@@ -394,8 +394,26 @@ function structuralSuppressionValid(suppression, active) {
     });
 }
 
+// HF-410: read the ONE source of truth rather than restating it. This runner
+// hardcoded requiredDepth = 0.1, i.e. 0.08 + 0.02, which made it a third place
+// the gameplay near plane was written down and guaranteed it would disagree
+// with the spec the day that constant moved. The margin (0.02) is unchanged.
+const NEAR_PLANE_REQUIRED_MARGIN_METERS = 0.02;
+const FIRST_PERSON_CAMERA_NEAR_METERS = (() => {
+  const source = readFileSync(resolve(root, 'src/viewmodel-body-fit.ts'), 'utf8');
+  const match = /export const FIRST_PERSON_CAMERA_NEAR_METERS = ([0-9.]+);/.exec(source);
+  if (!match) {
+    throw new Error('Pass 69.3 runner could not read FIRST_PERSON_CAMERA_NEAR_METERS from src/viewmodel-body-fit.ts');
+  }
+  const value = Number(match[1]);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`Pass 69.3 runner read a non-positive FIRST_PERSON_CAMERA_NEAR_METERS: ${match[1]}`);
+  }
+  return value;
+})();
+
 function visiblePoseValid(sample, weapon, pose, expectedSample = null) {
-  const requiredDepth = 0.1;
+  const requiredDepth = FIRST_PERSON_CAMERA_NEAR_METERS + NEAR_PLANE_REQUIRED_MARGIN_METERS;
   return sample?.pose === pose
     && sample.sample === expectedSample
     && sample.effectiveViewmodelVisible === true

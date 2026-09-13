@@ -26,6 +26,63 @@ describe('hosted crossbow glass behavior', () => {
     });
   });
 
+  /**
+   * HF-348 solo half. The owner's report was "tac crossbow bolt AND explosion
+   * didn't break glass": the TAC-15 mutates glass twice, once on the bolt and
+   * again on its blast. Every other test here is about a HOSTED role - guest
+   * prediction, host-canonical replication - so nothing pinned the offline
+   * path, where the local player is its own authority and both phases must
+   * land against an untouched pane.
+   */
+  it('breaks glass on both bolt phases in solo, where the local player is the authority', () => {
+    // Solo is authoritative by construction: there is no host to defer to.
+    expect(admitCrossbowGlassMutation(true).accepted).toBe(true);
+
+    const boltPane = createGlassState('solo-bolt-pane', 5);
+    const bolt = admitGlassImpact(boltPane, {
+      isHost: true,
+      matchEpoch: 5,
+      expectedRevision: boltPane.revision,
+      impactId: 'crossbow:solo:impact:1',
+      tick: 12,
+      profile: 'bullet',
+    });
+    expect(bolt.accepted, 'solo bolt impact must break its pane').toBe(true);
+    expect(glassAuthorityProjection(bolt.state)).toMatchObject({
+      phase: 'breached', apertureOpen: true, movementSolid: false,
+    });
+
+    // A DIFFERENT pane, caught by the blast rather than the bolt itself.
+    const blastPane = createGlassState('solo-blast-pane', 5);
+    const blast = admitGlassImpact(blastPane, {
+      isHost: true,
+      matchEpoch: 5,
+      expectedRevision: blastPane.revision,
+      impactId: 'crossbow:solo:explosion:1',
+      tick: 13,
+      profile: 'explosion',
+    });
+    expect(blast.accepted, 'solo bolt explosion must break nearby panes').toBe(true);
+    // The blast profile carries more damage than a bullet, so the pane leaves
+    // the frame entirely rather than merely breaching - still open, still
+    // non-solid, which is what the player is owed either way.
+    expect(glassAuthorityProjection(blast.state)).toMatchObject({
+      phase: 'detached', apertureOpen: true, movementSolid: false, ballisticSolid: false,
+    });
+
+    // The same two phases replayed on one pane are admitted once each and
+    // never twice, so solo cannot double-count a break.
+    const replay = admitGlassImpact(bolt.state, {
+      isHost: true,
+      matchEpoch: 5,
+      expectedRevision: boltPane.revision,
+      impactId: 'crossbow:solo:impact:1',
+      tick: 12,
+      profile: 'bullet',
+    });
+    expect(replay.accepted).toBe(false);
+  });
+
   it('keeps real cover while excluding only the struck pane from blast LOS', () => {
     const struckPane = { minX: -0.4, maxX: 0.4, minY: 0, maxY: 2, minZ: 0, maxZ: 0.08 };
     const wall = { minX: -1, maxX: 1, minY: 0, maxY: 3, minZ: 1, maxZ: 1.2 };

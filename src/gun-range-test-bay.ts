@@ -1,7 +1,7 @@
 import type { Box2, Point3 } from './collision';
 import { createBallisticSurface, type BallisticMaterialId, type BallisticSurface } from './ballistics';
 import { movementProfile } from './gameplay';
-import { PASS65_KILLSTREAK_CATALOG, type Pass65KillstreakId } from './killstreak-catalog';
+import { PASS65_KILLSTREAK_CATALOG, type SelectableKillstreakId } from './killstreak-catalog';
 import { WEAPON_IDS, type WeaponId } from './protocol';
 import type { DynamicWorldCollider } from './physics';
 
@@ -95,7 +95,12 @@ const corridorEntry = Object.freeze({ x: 20.5, y: 1.7, z: 12 });
 const doorApproach = Object.freeze({ x: 51.25, y: 1.7, z: 12 });
 const corridorLengthM = doorApproach.x - corridorEntry.x;
 
-const supportStations = Object.freeze(PASS65_KILLSTREAK_CATALOG.definitions.map((definition, index) => Object.freeze({
+// HF-334: the bay dispenses trainable FIELD SUPPORTS. A care-package-only
+// weapon reward is not a streak you can practise activating, so it is filtered
+// out BEFORE indexing — every existing station keeps its exact position.
+const supportStations = Object.freeze(PASS65_KILLSTREAK_CATALOG.definitions
+  .filter((definition) => definition.availability !== 'care-only')
+  .map((definition, index) => Object.freeze({
   id: definition.id,
   position: Object.freeze({
     x: 92 - Math.floor(index / 6) * 8,
@@ -103,7 +108,7 @@ const supportStations = Object.freeze(PASS65_KILLSTREAK_CATALOG.definitions.map(
     z: -19 + (index % 6) * 9.6,
   }),
   runtimeStatus: 'active-training-station' as const,
-}))) as readonly GunRangeTestBayStation<Pass65KillstreakId>[];
+}))) as readonly GunRangeTestBayStation<SelectableKillstreakId>[];
 
 const weaponStations = Object.freeze(WEAPON_IDS.map((weaponId, index) => Object.freeze({
   id: weaponId,
@@ -353,7 +358,7 @@ export function nearestGunRangeTestBayWeaponStation(
 export function nearestGunRangeTestBaySupportStation(
   position: Readonly<Point3>,
   maximumDistance = GUN_RANGE_TEST_BAY_STATION_INTERACTION_RANGE_M,
-): GunRangeTestBayStationProximity<Pass65KillstreakId> | null {
+): GunRangeTestBayStationProximity<SelectableKillstreakId> | null {
   return nearestTrainingStation(GUN_RANGE_TEST_BAY_CONTRACT.supportStations, position, maximumDistance);
 }
 
@@ -382,6 +387,37 @@ export function gunRangeTestBayDummyPose(
     // Atomic Acres operators face local -Z. Point that authored forward axis
     // along the current leg of the route instead of using Three's +Z basis.
     yawRadians: Math.atan2(-travelX, -travelZ),
+  });
+}
+
+/** HF-347: pure host-side damage application for a training dummy. The host
+ * is the only writer of dummy health/active/respawn state; guests receive the
+ * result through shot outcomes and lobby-snapshot heartbeats. Keeping the
+ * reducer pure lets the host path and unit tests share one truth. */
+export type GunRangeDummyDamageResult = Readonly<{
+  appliedDamage: number;
+  healthAfter: number;
+  died: boolean;
+  /** Host-clock respawn timestamp when the hit was lethal; null otherwise. */
+  respawnAtMs: number | null;
+}>;
+
+export function resolveGunRangeDummyDamage(
+  healthBefore: number,
+  damage: number,
+  nowMs: number,
+  respawnDelayMs: number,
+): GunRangeDummyDamageResult {
+  if (!Number.isFinite(nowMs) || nowMs < 0) throw new TypeError('dummy damage time must be finite and non-negative');
+  const admitted = Math.max(0, Number.isFinite(damage) ? damage : 0);
+  const before = Math.max(0, Number.isFinite(healthBefore) ? healthBefore : 0);
+  const healthAfter = Math.max(0, before - admitted);
+  const died = before > 0 && healthAfter <= 0;
+  return Object.freeze({
+    appliedDamage: before - healthAfter,
+    healthAfter,
+    died,
+    respawnAtMs: died ? nowMs + Math.max(0, respawnDelayMs) : null,
   });
 }
 

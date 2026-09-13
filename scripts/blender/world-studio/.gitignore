@@ -1,0 +1,3 @@
+# Blender writes a rolling .blend1 backup beside the saved file; it is not source.
+source/*.blend1
+source/*.blend2

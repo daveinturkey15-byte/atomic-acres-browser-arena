@@ -1,16 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import {
+  VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS,
   VIEWMODEL_CONTACT_PROBE_OFFSETS,
   VIEWMODEL_CONTACT_PROFILES,
   VIEWMODEL_CONTACT_RESPONSE_CONTRACT,
+  VIEWMODEL_FIRE_ADMISSION_CONTRACT,
+  VIEWMODEL_FIRE_BLOCK_HIGH_READY_BLEND,
+  VIEWMODEL_FIRE_MAXIMUM_SPREAD_PENALTY_RADIANS,
   advanceAdsBlend,
   advanceWeaponHeat,
   fireCycleAt,
   hitReactionAt,
   magnifiedFovDegrees,
+  viewmodelContactResponse,
+  viewmodelFireAdmission,
+  viewmodelFireAdmissionFromResponse,
   viewmodelFloorClearance,
   viewmodelContactProbePaddingMeters,
-  viewmodelContactResponse,
   viewmodelObstructionPose,
   viewmodelSurfaceRetreat,
 } from './weapon-presentation-state';
@@ -86,10 +92,17 @@ describe('weapon presentation state', () => {
   });
 
   it('adds bounded prone and floor clearance without moving gameplay authority', () => {
-    expect(viewmodelObstructionPose(null, false, null)).toEqual({ retreat: 0, lift: 0 });
+    // contactDepthMeters is null from this reducer BY CONSTRUCTION: it only
+    // ever sees the authored probe distance, and the presentation fold must be
+    // handed the measured envelope depth instead (filled in by
+    // systems/viewmodel-contact-probe.ts). Pinned so a future caller cannot
+    // quietly start feeding the fold an authored guess again.
+    expect(viewmodelObstructionPose(null, false, null))
+      .toEqual({ retreat: 0, lift: 0, contactDepthMeters: null });
     expect(viewmodelObstructionPose(null, true, 0.61)).toEqual({
       retreat: 0.09,
       lift: expect.any(Number),
+      contactDepthMeters: null,
     });
     expect(viewmodelObstructionPose(null, true, 0.61).lift).toBeGreaterThanOrEqual(0.13);
     expect(viewmodelObstructionPose(0.2, true, 0.2).retreat).toBeLessThanOrEqual(
@@ -115,7 +128,11 @@ describe('weapon presentation state', () => {
     expect(Object.keys(VIEWMODEL_CONTACT_PROFILES).sort()).toEqual([...WEAPON_IDS].sort());
     for (const weapon of WEAPON_IDS) {
       const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
-      const response = viewmodelContactResponse(weapon, 0.7, 0.2, true, 0);
+      // 2026-08-30 re-pin: the prone floor-lift baseline moved to the
+      // measured flat-ground value (0.2), so this deep-contact fixture uses a
+      // lift genuinely past it (under-cover squeeze), not open-field prone -
+      // which must no longer fold at all.
+      const response = viewmodelContactResponse(weapon, 0.7, 0.29, true, 0);
       expect(profile.weapon).toBe(weapon);
       expect(profile.probeLengthMeters).toBeGreaterThanOrEqual(1.15);
       expect(profile.fullStowDistanceMeters).toBeGreaterThanOrEqual(0.5);
@@ -132,7 +149,12 @@ describe('weapon presentation state', () => {
         aimAuthority: 'camera-forward-unchanged',
       });
       expect(response.obstructionBlend).toBeGreaterThan(0.85);
-      expect(response.pitchRadians).toBeGreaterThan(0.5);
+      // RE-PINNED FOR HF-410 (owner asked for the "holding it up" pose to be
+      // reworked out). The blend is still asserted, so the response is still
+      // live; only its visible amplitude is capped by
+      // VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS, because the rig no
+      // longer sits outside the body it is carried in.
+      expect(response.pitchRadians).toBeCloseTo(VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS, 9);
       expect(response.scale).toBeGreaterThanOrEqual(profile.minimumScale);
       expect(response.scale).toBeLessThan(1);
       expect([
@@ -284,11 +306,87 @@ describe('weapon presentation state', () => {
       aimAuthority: 'camera-forward-unchanged',
     });
     expect(adsContact.highReadyBlend).toBeGreaterThan(0.4);
-    expect(adsContact.pitchRadians).toBeGreaterThan(0.3);
+    // RE-PINNED FOR HF-410: capped, for the reason above.
+    expect(adsContact.pitchRadians).toBeCloseTo(VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS, 9);
     expect(adsContact.yawRadians).toBeLessThan(0);
     expect(adsContact.rollRadians).toBeGreaterThan(0);
     expect(adsContact.scale).toBeLessThan(1);
     expect(adsContact.additionalLiftMeters).toBeGreaterThan(0);
     expect(adsContact.additionalDropMeters).toBeGreaterThan(0);
+  });
+
+  // HF-343: the near-wall raise must gate firing, presentation-only no more.
+  it('recommends a typed fire policy from the contact response without touching aim authority', () => {
+    const open = viewmodelFireAdmission('carbine', 0, 0, false, 0);
+    expect(open).toMatchObject({
+      contract: VIEWMODEL_FIRE_ADMISSION_CONTRACT,
+      weapon: 'carbine',
+      policy: 'block-full-stow-graduate-partial-v1',
+      aimAuthority: 'camera-forward-unchanged',
+      obstructionBlend: 0,
+      highReadyBlend: 0,
+      fireBlocked: false,
+      blockReason: 'open-space',
+      spreadPenaltyRadians: 0,
+    });
+
+    // Fully raised against cover (retreat clamped at the profile maximum, the
+    // wall blend saturating) must block with the full-stow reason.
+    const profile = VIEWMODEL_CONTACT_PROFILES.carbine;
+    const raised = viewmodelFireAdmission('carbine', profile.maximumSurfaceRetreatMeters, 0, false, 0);
+    expect(raised.fireBlocked).toBe(true);
+    expect(raised.blockReason).toBe('full-stow');
+    expect(raised.spreadPenaltyRadians).toBe(VIEWMODEL_FIRE_MAXIMUM_SPREAD_PENALTY_RADIANS);
+
+    // A forward probe hit inside the authored full-stow distance blocks even
+    // when the smoothed retreat has not saturated yet.
+    const stow = viewmodelFireAdmissionFromResponse(
+      'carbine',
+      viewmodelContactResponse('carbine', 0.2, 0, false, 0),
+      profile.fullStowDistanceMeters,
+    );
+    expect(stow.fireBlocked).toBe(true);
+    expect(stow.blockReason).toBe('full-stow');
+
+    // Partially raised: graduated penalty, never blocked below the threshold.
+    const partial = viewmodelFireAdmission('carbine', profile.maximumSurfaceRetreatMeters * 0.5, 0, false, 0);
+    expect(partial.fireBlocked).toBe(false);
+    expect(partial.blockReason).toBe('open-space');
+    expect(partial.highReadyBlend).toBeGreaterThan(0);
+    expect(partial.highReadyBlend).toBeLessThan(VIEWMODEL_FIRE_BLOCK_HIGH_READY_BLEND);
+    expect(partial.spreadPenaltyRadians).toBeGreaterThan(0);
+    expect(partial.spreadPenaltyRadians).toBeLessThan(VIEWMODEL_FIRE_MAXIMUM_SPREAD_PENALTY_RADIANS);
+    // Monotonic graduation: raising further never reduces the penalty.
+    const moreRaised = viewmodelFireAdmission('carbine', profile.maximumSurfaceRetreatMeters * 0.75, 0, false, 0);
+    expect(moreRaised.spreadPenaltyRadians).toBeGreaterThan(partial.spreadPenaltyRadians);
+
+    // The high-ready threshold itself blocks with the dedicated reason when
+    // the wall blend alone has not saturated (floor-driven raise).
+    const floorRaised = viewmodelFireAdmissionFromResponse(
+      'carbine',
+      viewmodelContactResponse('carbine', 0, 1.7, false, 0),
+      5,
+    );
+    expect(floorRaised.highReadyBlend).toBeGreaterThanOrEqual(VIEWMODEL_FIRE_BLOCK_HIGH_READY_BLEND);
+    expect(floorRaised.fireBlocked).toBe(true);
+    expect(floorRaised.blockReason).toBe('high-ready');
+
+    // Settled ADS against cover still cannot fire through the wall.
+    const adsCover = viewmodelFireAdmission('carbine', profile.maximumSurfaceRetreatMeters, 0.2, true, 1);
+    expect(adsCover.fireBlocked).toBe(true);
+
+    for (const value of [raised.highReadyBlend, raised.spreadPenaltyRadians, partial.spreadPenaltyRadians]) {
+      expect(Number.isFinite(value)).toBe(true);
+    }
+  });
+
+  it('keeps every canonical weapon blockable at close cover and free in open space', () => {
+    for (const weapon of WEAPON_IDS) {
+      const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
+      expect(viewmodelFireAdmission(weapon, 0, 0, false, 0).fireBlocked, weapon).toBe(false);
+      const blocked = viewmodelFireAdmission(weapon, profile.maximumSurfaceRetreatMeters, 0.2, true, 1);
+      expect(blocked.fireBlocked, weapon).toBe(true);
+      expect(blocked.spreadPenaltyRadians, weapon).toBe(VIEWMODEL_FIRE_MAXIMUM_SPREAD_PENALTY_RADIANS);
+    }
   });
 });

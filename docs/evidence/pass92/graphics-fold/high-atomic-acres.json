@@ -1,0 +1,587 @@
+{
+  "schema": "hf414-graphics-profile-audit/1",
+  "startedAtIso": "2026-09-03T16:56:25.613Z",
+  "completedAtIso": "2026-09-03T16:57:18.430Z",
+  "preset": "high",
+  "arena": "atomic-acres",
+  "viewport": {
+    "width": 2560,
+    "height": 1440
+  },
+  "backend": "webgpu",
+  "admissionOutcome": "admitted",
+  "admissionMs": 34529,
+  "pipelinesAtMenu": 0,
+  "pipelinesBeforeAdmission": 375,
+  "pipelinesDuringAdmission": 375,
+  "pipelinesInCombat": 0,
+  "shaderModulesTotal": 433,
+  "completionPacing": {
+    "ready": true,
+    "sampleCount": 180,
+    "rateHz": 71.83621343200485,
+    "cadenceHz": 81.30081332331096,
+    "meanMs": 13.920555555820465,
+    "p05Ms": 8.899999976158142,
+    "medianMs": 12.299999952316284,
+    "p95Ms": 26.800000071525574,
+    "p99Ms": 29,
+    "maxMs": 35.700000047683716,
+    "longFrames": {
+      "over20Ms": 21,
+      "over33Ms": 1,
+      "over50Ms": 0,
+      "over100Ms": 0
+    },
+    "lastResetReason": "foreground scheduler gap"
+  },
+  "submissionPacing": {
+    "ready": true,
+    "sampleCount": 180,
+    "rateHz": 83.72871894781434,
+    "cadenceHz": 86.95652173913044,
+    "meanMs": 11.943333333730697,
+    "p05Ms": 8.299999952316284,
+    "medianMs": 11.5,
+    "p95Ms": 16,
+    "p99Ms": 17.5,
+    "maxMs": 19.100000023841858,
+    "longFrames": {
+      "over20Ms": 0,
+      "over33Ms": 0,
+      "over50Ms": 0,
+      "over100Ms": 0
+    },
+    "lastResetReason": "foreground scheduler gap"
+  },
+  "maximumCompletionLatencyMs": 425.500000095366,
+  "presentationStatus": "healthy",
+  "skippedSubmissions": 182,
+  "drawCallsLastAdmittedFrame": 190,
+  "trianglesLastAdmittedFrame": 536462,
+  "canvas": {
+    "width": 2560,
+    "height": 1440
+  },
+  "devicePixelRatio": 1,
+  "graphics": null,
+  "settings": {
+    "requested": {
+      "version": 1,
+      "graphics": {
+        "schemaVersion": 1,
+        "preset": "high",
+        "renderScale": 1,
+        "adaptiveResolution": true,
+        "targetFps": 240,
+        "frameRateLimit": 0,
+        "antiAliasing": "msaa-4x",
+        "geometryDetail": "full",
+        "shadows": "high",
+        "shadowResolution": "high",
+        "shadowUpdateMode": "static",
+        "shadowFilter": "auto",
+        "indirectLighting": "high",
+        "bakedIndirect": "low",
+        "ambientOcclusion": "high",
+        "screenSpaceReflections": "low",
+        "screenSpaceGi": "off",
+        "rayTracing": "reflections",
+        "reflectionQuality": "high",
+        "environmentIntensity": 1,
+        "volumetricQuality": "high",
+        "volumetricLightShafts": "low",
+        "smokeQuality": "high",
+        "particleQuality": "high",
+        "anisotropy": 8,
+        "decalQuality": "high",
+        "bloomQuality": "cinematic",
+        "exposure": 1,
+        "toneMapping": "aces",
+        "filmicProfile": "arena-default",
+        "sharpness": 0,
+        "filmGrain": 0.32,
+        "vignette": 0.16,
+        "depthOfField": false,
+        "depthOfFieldStrength": 0.3,
+        "motionBlur": 0,
+        "spatialUpscaling": "off",
+        "weatherIntensity": "storm",
+        "rainDensity": 1,
+        "windStrength": 1,
+        "lightning": true,
+        "wetSurfaces": true,
+        "ambientLife": 1
+      },
+      "audio": {
+        "schemaVersion": 1,
+        "gains": {
+          "master": 100,
+          "sfx": 100,
+          "movement": 100,
+          "ui": 100,
+          "announcements": 100,
+          "ambience": 82,
+          "menu-music": 72,
+          "game-music": 50
+        },
+        "mutes": {
+          "master": false,
+          "sfx": false,
+          "movement": false,
+          "ui": false,
+          "announcements": false,
+          "ambience": false,
+          "menu-music": false,
+          "game-music": false
+        },
+        "gameMusicRetuned": true
+      },
+      "accessibility": {
+        "schemaVersion": 1,
+        "reducedMotion": false,
+        "reducedDamageFlash": false,
+        "reducedSensoryEffects": false,
+        "damageFlashScale": 1,
+        "weaponMotionScale": 1
+      },
+      "privacy": {
+        "schemaVersion": 1,
+        "shareGlobalLeaderboard": false
+      }
+    },
+    "graphics": {
+      "requestedPreset": "high",
+      "effectivePreset": "high",
+      "renderProfile": "blender",
+      "renderScale": 1,
+      "adaptive": true,
+      "targetFps": 240,
+      "frameRateLimit": 0,
+      "antialiasSamples": 4,
+      "postAntiAliasing": "off",
+      "shadows": true,
+      "shadowMapSize": 2048,
+      "shadowUpdateMode": "static",
+      "shadowFilter": "auto",
+      "indirectLightScale": 1,
+      "ambientOcclusion": {
+        "quality": "high",
+        "enabled": true,
+        "resolutionScale": 0.5,
+        "samples": 12,
+        "radius": 0.22,
+        "strength": 0.52,
+        "denoise": true
+      },
+      "reflectionScale": 1,
+      "reflectionQuality": "high",
+      "environmentIntensity": 1,
+      "screenSpace": {
+        "bakedIndirect": {
+          "tier": "low",
+          "enabled": true,
+          "probeSpacingM": 3,
+          "raysPerProbe": 48,
+          "bounces": 1,
+          "composite": 0.38
+        },
+        "godrays": {
+          "quality": "low",
+          "enabled": true,
+          "unavailableReason": null,
+          "raymarchSteps": 24,
+          "resolutionScale": 0.35,
+          "density": 0.35,
+          "maximumDensity": 0.12,
+          "distanceAttenuation": 2.6,
+          "additiveGain": 0.14,
+          "bilateralBlur": true
+        },
+        "reflections": {
+          "quality": "low",
+          "enabled": true,
+          "resolutionScale": 0.5,
+          "marchQuality": 0.35,
+          "maximumDistance": 6,
+          "thickness": 0.18,
+          "intensity": 0.5,
+          "screenEdgeFade": 0.24,
+          "binaryRefine": false,
+          "reflectNonMetals": true
+        },
+        "globalIllumination": {
+          "quality": "off",
+          "enabled": false,
+          "sliceCount": 0,
+          "stepCount": 0,
+          "giIntensity": 0,
+          "radius": 0,
+          "thickness": 0,
+          "expFactor": 0,
+          "denoise": false
+        },
+        "depthOfField": {
+          "enabled": false,
+          "strength": 0.3,
+          "focusDistanceM": 26,
+          "focalLengthM": 120,
+          "bokehScale": 0
+        },
+        "motionBlur": {
+          "enabled": false,
+          "strength": 0,
+          "samples": 0,
+          "deadZoneNdc": 0.006,
+          "kneeNdc": 0.024,
+          "maximumUvOffset": 0
+        },
+        "upscaling": {
+          "mode": "off",
+          "enabled": false,
+          "sceneResolutionScale": 1,
+          "label": "Off"
+        },
+        "rayTracing": {
+          "tier": "reflections",
+          "enabled": true,
+          "unavailableReason": null,
+          "maximumDepth": 2,
+          "refractionsEnabled": false,
+          "causticsEnabled": false,
+          "shadowCastingLights": 1,
+          "maximumProxyShapes": 24,
+          "maximumAdditiveGain": 0.2,
+          "backgroundLuminanceFraction": 0.06,
+          "metalScreenAreaBudget": 0.12,
+          "transparentScreenAreaBudget": 0.06,
+          "apertureRadiusM": 0.000008,
+          "focalDistanceM": 26
+        }
+      },
+      "volumetricScale": 0.8,
+      "maximumAnisotropy": 8,
+      "particleScale": 0.8,
+      "decalScale": 0.8,
+      "smokeScale": 0.8,
+      "post": {
+        "bloomStrength": 0.14,
+        "exposureScale": 1,
+        "toneMapping": "aces",
+        "filmGrainScale": 0.32,
+        "vignetteStrength": 0.16,
+        "sharpness": 0
+      },
+      "gradeProfile": "arena-default",
+      "weather": {
+        "intensity": "storm",
+        "ceilingState": "storm",
+        "rainDensity": 1,
+        "windStrength": 1,
+        "lightning": true,
+        "wetSurfaces": true,
+        "weatherEnabled": true
+      },
+      "ambientLife": {
+        "density": 1,
+        "enabled": true
+      },
+      "reason": null
+    },
+    "displayedGraphicsPreset": "high",
+    "liveApplication": {
+      "profile": "blender",
+      "appliedAt": 2163.600000023842,
+      "stagedReconstruction": [],
+      "pendingRendererReload": false
+    },
+    "accessibility": {
+      "schemaVersion": 1,
+      "reducedMotion": false,
+      "reducedDamageFlash": false,
+      "reducedSensoryEffects": false,
+      "damageFlashScale": 1,
+      "weaponMotionScale": 1,
+      "reducedSensory": false,
+      "reasons": []
+    },
+    "playerProfile": {
+      "schemaVersion": 1,
+      "revision": 2,
+      "source": "default-created",
+      "writeProtected": false,
+      "legacyCleanupFailures": []
+    },
+    "advancedGraphicsRegistry": {
+      "registeredKeys": [
+        "renderScale",
+        "adaptiveResolution",
+        "targetFps",
+        "frameRateLimit",
+        "antiAliasing",
+        "geometryDetail",
+        "shadows",
+        "shadowResolution",
+        "shadowUpdateMode",
+        "shadowFilter",
+        "indirectLighting",
+        "bakedIndirect",
+        "ambientOcclusion",
+        "screenSpaceReflections",
+        "screenSpaceGi",
+        "rayTracing",
+        "reflectionQuality",
+        "environmentIntensity",
+        "volumetricQuality",
+        "volumetricLightShafts",
+        "smokeQuality",
+        "particleQuality",
+        "anisotropy",
+        "decalQuality",
+        "bloomQuality",
+        "exposure",
+        "toneMapping",
+        "filmicProfile",
+        "sharpness",
+        "filmGrain",
+        "vignette",
+        "depthOfField",
+        "depthOfFieldStrength",
+        "motionBlur",
+        "spatialUpscaling",
+        "weatherIntensity",
+        "rainDensity",
+        "windStrength",
+        "lightning",
+        "wetSurfaces",
+        "ambientLife"
+      ],
+      "controls": [
+        {
+          "key": "renderScale",
+          "runtimeConsumer": "adaptive-quality",
+          "applyMode": "live"
+        },
+        {
+          "key": "adaptiveResolution",
+          "runtimeConsumer": "adaptive-quality",
+          "applyMode": "live"
+        },
+        {
+          "key": "targetFps",
+          "runtimeConsumer": "adaptive-quality",
+          "applyMode": "live"
+        },
+        {
+          "key": "frameRateLimit",
+          "runtimeConsumer": "frame-scheduler",
+          "applyMode": "live"
+        },
+        {
+          "key": "antiAliasing",
+          "runtimeConsumer": "renderer-init",
+          "applyMode": "pipeline-rebuild"
+        },
+        {
+          "key": "geometryDetail",
+          "runtimeConsumer": "arena-stream",
+          "applyMode": "arena-reload"
+        },
+        {
+          "key": "shadows",
+          "runtimeConsumer": "shadow-runtime",
+          "applyMode": "live"
+        },
+        {
+          "key": "shadowResolution",
+          "runtimeConsumer": "shadow-runtime",
+          "applyMode": "live"
+        },
+        {
+          "key": "shadowUpdateMode",
+          "runtimeConsumer": "shadow-runtime",
+          "applyMode": "live"
+        },
+        {
+          "key": "shadowFilter",
+          "runtimeConsumer": "shadow-runtime",
+          "applyMode": "live"
+        },
+        {
+          "key": "indirectLighting",
+          "runtimeConsumer": "arena-lighting",
+          "applyMode": "live"
+        },
+        {
+          "key": "bakedIndirect",
+          "runtimeConsumer": "baked-indirect",
+          "applyMode": "pipeline-rebuild"
+        },
+        {
+          "key": "ambientOcclusion",
+          "runtimeConsumer": "ambient-occlusion",
+          "applyMode": "pipeline-rebuild"
+        },
+        {
+          "key": "screenSpaceReflections",
+          "runtimeConsumer": "screen-space-reflections",
+          "applyMode": "pipeline-rebuild"
+        },
+        {
+          "key": "screenSpaceGi",
+          "runtimeConsumer": "screen-space-gi",
+          "applyMode": "pipeline-rebuild"
+        },
+        {
+          "key": "rayTracing",
+          "runtimeConsumer": "ray-tracing",
+          "applyMode": "pipeline-rebuild"
+        },
+        {
+          "key": "reflectionQuality",
+          "runtimeConsumer": "material-refinement",
+          "applyMode": "live"
+        },
+        {
+          "key": "environmentIntensity",
+          "runtimeConsumer": "material-refinement",
+          "applyMode": "live"
+        },
+        {
+          "key": "volumetricQuality",
+          "runtimeConsumer": "atmosphere-runtime",
+          "applyMode": "live"
+        },
+        {
+          "key": "volumetricLightShafts",
+          "runtimeConsumer": "volumetric-light-shafts",
+          "applyMode": "pipeline-rebuild"
+        },
+        {
+          "key": "smokeQuality",
+          "runtimeConsumer": "smoke-presentation",
+          "applyMode": "live"
+        },
+        {
+          "key": "particleQuality",
+          "runtimeConsumer": "presentation-budget",
+          "applyMode": "live"
+        },
+        {
+          "key": "anisotropy",
+          "runtimeConsumer": "material-refinement",
+          "applyMode": "live"
+        },
+        {
+          "key": "decalQuality",
+          "runtimeConsumer": "presentation-budget",
+          "applyMode": "live"
+        },
+        {
+          "key": "bloomQuality",
+          "runtimeConsumer": "hdr-pipeline",
+          "applyMode": "live"
+        },
+        {
+          "key": "exposure",
+          "runtimeConsumer": "hdr-pipeline",
+          "applyMode": "live"
+        },
+        {
+          "key": "toneMapping",
+          "runtimeConsumer": "hdr-pipeline",
+          "applyMode": "live"
+        },
+        {
+          "key": "filmicProfile",
+          "runtimeConsumer": "hdr-pipeline",
+          "applyMode": "live"
+        },
+        {
+          "key": "sharpness",
+          "runtimeConsumer": "hdr-pipeline",
+          "applyMode": "live"
+        },
+        {
+          "key": "filmGrain",
+          "runtimeConsumer": "hdr-pipeline",
+          "applyMode": "live"
+        },
+        {
+          "key": "vignette",
+          "runtimeConsumer": "hdr-pipeline",
+          "applyMode": "live"
+        },
+        {
+          "key": "depthOfField",
+          "runtimeConsumer": "depth-of-field",
+          "applyMode": "pipeline-rebuild"
+        },
+        {
+          "key": "depthOfFieldStrength",
+          "runtimeConsumer": "depth-of-field",
+          "applyMode": "live"
+        },
+        {
+          "key": "motionBlur",
+          "runtimeConsumer": "motion-blur",
+          "applyMode": "pipeline-rebuild"
+        },
+        {
+          "key": "spatialUpscaling",
+          "runtimeConsumer": "spatial-upscaling",
+          "applyMode": "pipeline-rebuild"
+        },
+        {
+          "key": "weatherIntensity",
+          "runtimeConsumer": "weather-presentation",
+          "applyMode": "live"
+        },
+        {
+          "key": "rainDensity",
+          "runtimeConsumer": "rain-presentation",
+          "applyMode": "live"
+        },
+        {
+          "key": "windStrength",
+          "runtimeConsumer": "weather-presentation",
+          "applyMode": "live"
+        },
+        {
+          "key": "lightning",
+          "runtimeConsumer": "weather-presentation",
+          "applyMode": "live"
+        },
+        {
+          "key": "wetSurfaces",
+          "runtimeConsumer": "rain-presentation",
+          "applyMode": "live"
+        },
+        {
+          "key": "ambientLife",
+          "runtimeConsumer": "ambient-particles",
+          "applyMode": "live"
+        }
+      ],
+      "unavailableCapabilities": [
+        {
+          "id": "path-tracing",
+          "reason": "WebGPU exposes no ray-tracing pipeline, acceleration structures or ray queries in any shipping browser. Screen-space GI ray-marches the depth buffer instead, and is labelled as exactly that.",
+          "evidence": "renderer capability gate"
+        },
+        {
+          "id": "ai-upscaling-frame-generation",
+          "reason": "DLSS, FSR frame generation and Ray Reconstruction are vendor-native driver technologies with no browser API. The available upscaler is AMD FSR 1, which is spatial and runs as an ordinary shader; it is offered under its own name in Spatial upscaling.",
+          "evidence": "browser capability boundary"
+        }
+      ]
+    }
+  },
+  "renderer": null,
+  "vramBeforeMiB": 15696,
+  "vramAfterMiB": 3128,
+  "comfyBusyBefore": false,
+  "comfyBusyAfter": null,
+  "errors": [],
+  "vramDeltaMiB": -12568
+}

@@ -3,9 +3,30 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
 
+import { ARENA_IDS, isArenaId } from '../../src/arena-identity';
+
 const ARENAS = ['atomic-acres', 'rustworks-1v1', 'skyline-terminal', 'gun-range'] as const;
 const requestedArena = process.env.PASS66_AUDIO_ARENA;
+// PASS 85 Lane N repair. The filter below used to be silent about a
+// PASS66_AUDIO_ARENA it did not recognise: it yielded an EMPTY selection, every
+// test skipped, and the run reported success having measured no audio at all.
+// The identical shape was a live bug in tests/e2e/pass66-browser-admission-cycles.spec.ts.
+// An unknown id is named against the canonical registry, not dropped.
+if (requestedArena !== undefined && !isArenaId(requestedArena)) {
+  throw new Error(
+    `PASS66_AUDIO_ARENA=${requestedArena} is not an arena id; known ids: ${ARENA_IDS.join(', ')}`,
+  );
+}
+if (requestedArena !== undefined && !(ARENAS as readonly string[]).includes(requestedArena)) {
+  throw new Error(
+    `PASS66_AUDIO_ARENA=${requestedArena} is a real arena but is outside this soak's measured `
+    + `budget (${ARENAS.join(', ')}); widen ARENAS here and in scripts/qa/run-pass66-audio-long-run.mjs together`,
+  );
+}
 const selectedArenas = ARENAS.filter((arenaId) => !requestedArena || requestedArena === arenaId);
+if (selectedArenas.length === 0) {
+  throw new Error('pass66 audio long run selected no arena; refusing to report success over nothing');
+}
 const enabled = process.env.PASS66_AUDIO_LONG_RUN === '1';
 const expectedSourceSha = process.env.PASS66_AUDIO_SOURCE_SHA ?? '';
 

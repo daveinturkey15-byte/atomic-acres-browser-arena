@@ -1,0 +1,3 @@
+$ npx tsc --noEmit
+(no diagnostics)
+exit 0

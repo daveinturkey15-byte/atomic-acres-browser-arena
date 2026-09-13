@@ -1,0 +1,4 @@
+active after 30484 ms
+minimap box {"x":1055.40283203125,"y":27.59052276611328,"width":198.0511474609375,"height":198.05113983154297}
+snapshot {"bots":4,"alive":4,"escalation":{"deaths":0,"initialBots":4,"targetBots":4,"activeBots":4,"dormantBots":2,"dormantBotsPrewarmed":true,"dynamicReinforcementLights":0,"maximumBots":6,"nextReinforcementAt":10,"lastEliminationProfile":{"deathDropMs":0,"deathPoseMs":0,"rewardAndFeedMs":0,"reinforcementMs":0,"totalSyncMs":0}},"backend":null}
+pageErrors []

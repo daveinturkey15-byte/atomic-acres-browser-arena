@@ -1,0 +1,75 @@
+{
+  "station": "nuketown2-garage",
+  "assignment": {
+    "left": "B",
+    "right": "A"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "left",
+  "winner": "B",
+  "confidence": 0.84,
+  "probes": {
+    "left": {
+      "expected": "UMRD",
+      "answered": "UMRD"
+    },
+    "right": {
+      "expected": "RMAW",
+      "answered": "RMAW"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-garage.png",
+      "sourceSha256": "722c1a35d1e05d0ae35f34ece82efde2b3f1d8d9970021be8e2c3ccce2431863",
+      "shownSha256": "3a2d14ecbb98508e057f44a85f34a1d58fb960c511ead9840a1595694811176e",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-garage.png",
+      "sourceSha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142",
+      "shownSha256": "bff553a98d16c50236dd43b02175c1dbcd47bcaa275c6364e2a6687aedbd7fbe",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "Both match reference-4 structure, but LEFT preserves its value and lighting relationships: the exterior driveway in r1c1 stays the brightest evenly-sunlit plane with a light reflective car rear glass, the header panel in r0c1 stays pale blue-gray, and the side siding walls in r1c0 and r1c2 stay even off-white, while RIGHT darkens the driveway with a broad shadow, darkens the header to gray, blacks the car glass, and adds a harsh diagonal sun streak on the left wall in r1c0 not present in the reference.",
+  "leftCloser": [
+    "pale blue-gray header panel above opening in r0c1 matches reference vs dark gray in RIGHT",
+    "exterior driveway in r1c1 remains brightest evenly sunlit plane like reference vs shadow-darkened in RIGHT",
+    "left siding wall in r1c0 and right siding wall in r1c2 even off-white without harsh diagonal streak like reference",
+    "car rear glass in r1c1 light reflective like reference vs blacked out in RIGHT"
+  ],
+  "rightCloser": [
+    "wood plank deck in r2c2 deeper brown saturation slightly closer to reference plank tone",
+    "foreground mat in r2c1 darker value slightly closer to reference dark mat"
+  ],
+  "largestDifference": {
+    "region": "r1c1",
+    "what": "exterior driveway is bright evenly sunlit in LEFT but darkened by a broad shadow in RIGHT"
+  },
+  "elapsedMs": 42965,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

@@ -135,6 +135,7 @@ export function adaptWeaponDefinitionToLegacy(definition: WeaponDefinition): Leg
       caliber: definition.penetration.calibreLabel,
       penetrationPower: definition.penetration.power,
       fmjMultiplier: definition.penetration.fmjMultiplier,
+      wallPenetrationMultiplier: definition.penetration.wallPenetrationMultiplier,
       energyFalloffStart: definition.penetration.energyFalloffStartM,
       energyFalloffEnd: definition.penetration.energyFalloffEndM,
       minimumEnergyRetention: definition.penetration.minimumEnergyRetention,

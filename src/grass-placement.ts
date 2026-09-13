@@ -1,22 +1,74 @@
-import { ARENA_BOUNDS, GARAGE_LAYOUT, HOUSE_LAYOUT } from './arena-layout';
+import { ARENA_BOUNDS, STREET_END_X, GARAGE_LAYOUT, HOUSE_LAYOUT, STREET_HALF_WIDTH } from './arena-layout';
 import type { Box2 } from './collision';
 
-export const GRASS_GROUND_LAYOUT_ID = 'manicured-verges-v3';
+export const GRASS_GROUND_LAYOUT_ID = 'manicured-verges-v4';
 export const GRASS_MAX_BLADES = 720;
 export const GRASS_BLADES_PER_INSTANCE = 3;
 export const GRASS_MAX_HEIGHT = 0.22;
 
+/**
+ * Hard-surface half depth across the street (metres from the centreline):
+ * asphalt to STREET_HALF_WIDTH (6.5), kerbstone band 1.2 m (spec roadway
+ * `curbs`: centre |z| 7.1, size 1.2 -> 6.5..7.7), then sidewalk 1.1 m (spec
+ * `sidewalks`: centre |z| 8.25, size 1.1 -> 7.7..8.8). Grass must never grow
+ * inside this band. Source of truth: STREET_HALF_WIDTH plus the authored
+ * roadway table in source-assets/blender/atomic-acres-arena-spec.json.
+ */
+export const KERB_DEPTH_M = 1.2;
+export const SIDEWALK_DEPTH_M = 1.1;
+export const HARD_SURFACE_HALF_DEPTH_M = STREET_HALF_WIDTH + KERB_DEPTH_M + SIDEWALK_DEPTH_M;
+
 export type GrassGroundRegion = Readonly<{
-  id: 'west-verge' | 'east-verge';
+  id: 'north-lawn' | 'south-lawn' | 'west-garden' | 'east-garden';
   minX: number;
   maxX: number;
   minZ: number;
   maxZ: number;
 }>;
 
+/**
+ * manicured-verges-v4 (Pass 82 "better grass in nuketown"). The v3 regions
+ * pre-dated the Pass 78 axis flip ("X runs ALONG the street, Z runs ACROSS
+ * it"): their west/east bands at |x| > 14.2 crossed the ENTIRE current
+ * street canyon, so both grass consumers (the WebGL2 GrassSystem and the
+ * WebGPU 'Pass 64 TSL grass' layer) grew blades on the asphalt, kerbs and
+ * pavements at both street ends while the actual back yards behind each
+ * house stayed bald. v4 re-derives the two lawn bands from the live layout
+ * authority: everything between the pavement edge and the boundary fence,
+ * on both sides of the street. Structures and props are rejected separately
+ * (insideStructuralFootprint + the caller's collider list).
+ */
 export const GRASS_GROUND_REGIONS: readonly GrassGroundRegion[] = Object.freeze([
-  Object.freeze({ id: 'west-verge', minX: -33.35, maxX: -14.2, minZ: -42.35, maxZ: 42.35 }),
-  Object.freeze({ id: 'east-verge', minX: 14.2, maxX: 33.35, minZ: -42.35, maxZ: 42.35 }),
+  Object.freeze({
+    id: 'north-lawn',
+    minX: ARENA_BOUNDS.minX,
+    maxX: ARENA_BOUNDS.maxX,
+    minZ: ARENA_BOUNDS.minZ,
+    maxZ: -HARD_SURFACE_HALF_DEPTH_M,
+  }),
+  Object.freeze({
+    id: 'south-lawn',
+    minX: ARENA_BOUNDS.minX,
+    maxX: ARENA_BOUNDS.maxX,
+    minZ: HARD_SURFACE_HALF_DEPTH_M,
+    maxZ: ARENA_BOUNDS.maxZ,
+  }),
+  // v3: the asphalt ends at STREET_END_X; the end aprons beyond it are lawn
+  // at street level all the way to the boundary.
+  Object.freeze({
+    id: 'west-garden',
+    minX: ARENA_BOUNDS.minX,
+    maxX: -STREET_END_X,
+    minZ: -HARD_SURFACE_HALF_DEPTH_M,
+    maxZ: HARD_SURFACE_HALF_DEPTH_M,
+  }),
+  Object.freeze({
+    id: 'east-garden',
+    minX: STREET_END_X,
+    maxX: ARENA_BOUNDS.maxX,
+    minZ: -HARD_SURFACE_HALF_DEPTH_M,
+    maxZ: HARD_SURFACE_HALF_DEPTH_M,
+  }),
 ]);
 
 export type GrassPlacement = Readonly<{
@@ -128,7 +180,16 @@ export function createGrassPlacements(colliders: readonly Box2[], maximum = GRAS
         width: 0.08 + unit(hash32(shape ^ 0x2c1b3c6d)) * 0.05,
         height: 0.1 + unit(hash32(shape ^ 0x297a2d39)) * (GRASS_MAX_HEIGHT - 0.1),
         phase: unit(hash32(shape ^ 0x9e3779b9)) * Math.PI * 2,
-        chunk: regionIndex * 2 + (z >= 0 ? 1 : 0),
+        // Four distance-cull chunks: each lawn band splits at the street's
+        // mid-X so a camera at one end of the map can drop the far half.
+        // (v3 split by z-sign, which the v4 bands make constant per region.)
+        // REDESIGN 2026-08-29: the two end-garden strips FOLD INTO their
+        // adjacent quadrant chunk (by z-sign and end) so the chunk count and
+        // its distance-cull semantics stay exactly four - a garden's blades
+        // cull with the map end they sit on.
+        chunk: regionIndex < 2
+          ? regionIndex * 2 + (x >= (region.minX + region.maxX) / 2 ? 1 : 0)
+          : (z < 0 ? 0 : 2) + (x >= 0 ? 1 : 0),
       }));
     }
     if (placements.length >= limit) break;

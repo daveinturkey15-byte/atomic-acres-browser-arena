@@ -1,0 +1,13 @@
+diff --git a/src/bootstrap.ts b/src/bootstrap.ts
+index c9675186..14ba6f4b 100644
+--- a/src/bootstrap.ts
++++ b/src/bootstrap.ts
+@@ -46,7 +46,7 @@ const newestBuildIsPublished = CHANGELOG[0]?.releasedAt !== PENDING_PRODUCTION_R
+ // does too, so the description cannot drift from the build it describes.
+ const latestDescription = newestBuildIsPublished
+   ? releaseChannels.latest.description
+-  : `${releaseChannels.latest.description} Local HITL candidate - not yet published.`;
++  : `${releaseChannels.latest.description} Release candidate - not yet published.`;
+ const appElement = document.querySelector<HTMLDivElement>('#app');
+ if (!appElement) throw new Error('Missing #app root');
+ const app = appElement;

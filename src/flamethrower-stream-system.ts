@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Team } from './protocol';
 import { CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS } from './killstreak-runtime';
 import { FLAMETHROWER_EFFECT } from './special-weapon-effects';
+import { WEAPON_CATALOG } from './combat/weapon-catalog';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 import {
   FLAME_DAMAGE_PULSE_INTERVAL_MS,
@@ -22,6 +23,29 @@ const GROUND_FIRE_POOL_CAPACITY = 24;
 
 export const FLAMETHROWER_GROUND_FIRE_MERGE_RADIUS_M = 0.8;
 export const FLAMETHROWER_GROUND_FIRE_PRESENTATION_RADIUS_M = 0.82;
+
+/**
+ * Owner 2026-08-25 ("ensure crimson flamethrower has same fire style as the
+ * original btw, just with the adjusted dmg"): every weapon that presents as
+ * the flamethrower fuel stream must reach the ONE shared
+ * FlamethrowerStreamSystem — same particles, colour ramp, spread, lifetime —
+ * with only its damage stat diverging. Membership is DERIVED from the
+ * canonical catalog (the hitscan projection of the ignited-fuel burn volume),
+ * never hand-maintained, so a future fuel variant joins automatically.
+ */
+const FLAMETHROWER_STREAM_SIGNATURE = Object.freeze({
+  fireKind: 'hitscan',
+  calibreLabel: 'ignited fuel stream',
+} as const);
+
+export const FLAMETHROWER_STREAM_WEAPON_IDS: readonly string[] = WEAPON_CATALOG
+  .filter((definition) => definition.fireKind === FLAMETHROWER_STREAM_SIGNATURE.fireKind
+    && definition.penetration.calibreLabel === FLAMETHROWER_STREAM_SIGNATURE.calibreLabel)
+  .map((definition) => definition.id);
+
+export function isFlamethrowerStreamWeapon(weaponId: string): boolean {
+  return FLAMETHROWER_STREAM_WEAPON_IDS.includes(weaponId);
+}
 
 /**
  * A software adapter already draws the retained, spatially merged ground-fire

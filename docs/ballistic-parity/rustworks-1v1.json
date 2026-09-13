@@ -1,0 +1,426 @@
+{
+ "arena": "rustworks-1v1",
+ "contract": "every substantial visible mesh is rated for gunfire, excluded by a stated rule, or accepted below with a reason; unrated is the honest remainder",
+ "completionPercent": 100,
+ "ratchet": {
+  "unratedAfterLedger": 0,
+  "ceiling": 0,
+  "withinCeiling": true
+ },
+ "census": {
+  "total": 47,
+  "ratedDirect": 44,
+  "ratedByFootprint": 0,
+  "dynamicTargets": 0,
+  "excludedByRule": 3,
+  "unrated": 0,
+  "acceptedByLedger": 0,
+  "unratedAfterLedger": 0
+ },
+ "shotSurfaceStats": {
+  "total": 64,
+  "byMaterial": {
+   "structural-metal": 21,
+   "concrete": 7,
+   "container": 36
+  },
+  "byClassification": {
+   "explicit": 46,
+   "rule": 18
+  }
+ },
+ "excludedByRule": {
+  "cloth/soft presentation": 1,
+  "above the standing combat volume (canopy/eaves/overhead dressing)": 2
+ },
+ "footprintExplained": [],
+ "acceptedShootThrough": [],
+ "unratedMeshes": [],
+ "staleLedgerRows": [],
+ "shotSurfaces": [
+  {
+   "id": "Rustworks arena:0:deck",
+   "name": "rustworks-rig-deck-top",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:1:rustworks-tower-leg",
+   "name": "rustworks-tower-leg",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Rustworks arena:2:rustworks-tower-leg-base",
+   "name": "rustworks-tower-leg-base",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Rustworks arena:3:rustworks-tower-leg",
+   "name": "rustworks-tower-leg",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Rustworks arena:4:rustworks-tower-leg-base",
+   "name": "rustworks-tower-leg-base",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Rustworks arena:5:rustworks-tower-leg",
+   "name": "rustworks-tower-leg",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Rustworks arena:6:rustworks-tower-leg-base",
+   "name": "rustworks-tower-leg-base",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Rustworks arena:7:rustworks-tower-leg",
+   "name": "rustworks-tower-leg",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Rustworks arena:8:rustworks-tower-leg-base",
+   "name": "rustworks-tower-leg-base",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Rustworks arena:9:rustworks-undercroft-module",
+   "name": "rustworks-undercroft-module",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:10:rustworks-undercroft-module",
+   "name": "rustworks-undercroft-module",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:11:rustworks-undercroft-module",
+   "name": "rustworks-undercroft-module",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:12:rustworks-undercroft-module",
+   "name": "rustworks-undercroft-module",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:13:rustworks-lower-deck",
+   "name": "rustworks-lower-deck",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:14:rustworks-upper-deck",
+   "name": "rustworks-upper-deck",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:15:rustworks-lower-ramp-foot-pad",
+   "name": "rustworks-lower-ramp-foot-pad",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:16:rustworks-lower-ramp",
+   "name": "rustworks-lower-ramp",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:17:rustworks-lower-ramp-landing",
+   "name": "rustworks-lower-ramp-landing",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:18:rustworks-ship-ladder-lower-landing",
+   "name": "rustworks-ship-ladder-lower-landing",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:19:rustworks-ship-ladder",
+   "name": "rustworks-ship-ladder",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Rustworks arena:20:rustworks-ship-ladder-upper-landing",
+   "name": "rustworks-ship-ladder-upper-landing",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:21:rustworks-upper-access",
+   "name": "rustworks-upper-access",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Rustworks arena:22:rustworks-service-trench-wall",
+   "name": "rustworks-service-trench-wall",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:23:rustworks-service-trench-wall",
+   "name": "rustworks-service-trench-wall",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:24:rustworks-service-trench-wall",
+   "name": "rustworks-service-trench-wall",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:25:rustworks-service-trench-wall",
+   "name": "rustworks-service-trench-wall",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:26:rustworks-service-trench-wall",
+   "name": "rustworks-service-trench-wall",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:27:rustworks-service-trench-wall",
+   "name": "rustworks-service-trench-wall",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:28:rustworks-open-container-wall-a",
+   "name": "rustworks-open-container-wall-a",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:29:rustworks-open-container-wall-b",
+   "name": "rustworks-open-container-wall-b",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:30:rustworks-open-container-roof",
+   "name": "rustworks-open-container-roof",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:31:rustworks-shipping-container",
+   "name": "rustworks-shipping-container",
+   "material": "container",
+   "classification": "rule"
+  },
+  {
+   "id": "Rustworks arena:32:rustworks-shipping-container",
+   "name": "rustworks-shipping-container",
+   "material": "container",
+   "classification": "rule"
+  },
+  {
+   "id": "Rustworks arena:33:rustworks-open-container-wall-a",
+   "name": "rustworks-open-container-wall-a",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:34:rustworks-open-container-wall-b",
+   "name": "rustworks-open-container-wall-b",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:35:rustworks-open-container-roof",
+   "name": "rustworks-open-container-roof",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:36:rustworks-open-one-container-closed-end",
+   "name": "rustworks-open-one-container-closed-end",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:37:rustworks-open-container-wall-a",
+   "name": "rustworks-open-container-wall-a",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:38:rustworks-open-container-wall-b",
+   "name": "rustworks-open-container-wall-b",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:39:rustworks-open-container-roof",
+   "name": "rustworks-open-container-roof",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:40:rustworks-open-one-container-closed-end",
+   "name": "rustworks-open-one-container-closed-end",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:41:rustworks-shipping-container",
+   "name": "rustworks-shipping-container",
+   "material": "container",
+   "classification": "rule"
+  },
+  {
+   "id": "Rustworks arena:42:rustworks-open-container-wall-a",
+   "name": "rustworks-open-container-wall-a",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:43:rustworks-open-container-wall-b",
+   "name": "rustworks-open-container-wall-b",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:44:rustworks-open-container-roof",
+   "name": "rustworks-open-container-roof",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:45:rustworks-shipping-container",
+   "name": "rustworks-shipping-container",
+   "material": "container",
+   "classification": "rule"
+  },
+  {
+   "id": "Rustworks arena:46:rustworks-shipping-container",
+   "name": "rustworks-shipping-container",
+   "material": "container",
+   "classification": "rule"
+  },
+  {
+   "id": "Rustworks arena:47:rustworks-open-container-wall-a",
+   "name": "rustworks-open-container-wall-a",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:48:rustworks-open-container-wall-b",
+   "name": "rustworks-open-container-wall-b",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:49:rustworks-open-container-roof",
+   "name": "rustworks-open-container-roof",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:50:rustworks-open-one-container-closed-end",
+   "name": "rustworks-open-one-container-closed-end",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:51:rustworks-open-container-wall-a",
+   "name": "rustworks-open-container-wall-a",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:52:rustworks-open-container-wall-b",
+   "name": "rustworks-open-container-wall-b",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:53:rustworks-open-container-roof",
+   "name": "rustworks-open-container-roof",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:54:rustworks-shipping-container",
+   "name": "rustworks-shipping-container",
+   "material": "container",
+   "classification": "rule"
+  },
+  {
+   "id": "Rustworks arena:55:rustworks-shipping-container",
+   "name": "rustworks-shipping-container",
+   "material": "container",
+   "classification": "rule"
+  },
+  {
+   "id": "Rustworks arena:56:rustworks-open-container-wall-a",
+   "name": "rustworks-open-container-wall-a",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:57:rustworks-open-container-wall-b",
+   "name": "rustworks-open-container-wall-b",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:58:rustworks-open-container-roof",
+   "name": "rustworks-open-container-roof",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:59:rustworks-shipping-container",
+   "name": "rustworks-shipping-container",
+   "material": "container",
+   "classification": "rule"
+  },
+  {
+   "id": "Rustworks arena:60:rustworks-open-container-wall-a",
+   "name": "rustworks-open-container-wall-a",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:61:rustworks-open-container-wall-b",
+   "name": "rustworks-open-container-wall-b",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:62:rustworks-open-container-roof",
+   "name": "rustworks-open-container-roof",
+   "material": "container",
+   "classification": "explicit"
+  },
+  {
+   "id": "Rustworks arena:63:rustworks-open-one-container-closed-end",
+   "name": "rustworks-open-one-container-closed-end",
+   "material": "container",
+   "classification": "explicit"
+  }
+ ]
+}

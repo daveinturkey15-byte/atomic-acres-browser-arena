@@ -12,6 +12,7 @@ export type GuestReloadPending = Readonly<{
   connectionEpoch: string;
   lifeId: number;
   actionSequence: number;
+  requestId: string;
   weapon: OrdinaryWeaponId;
   startedAtHostTimeMs: number;
   completesAtHostTimeMs: number;
@@ -52,6 +53,7 @@ export type GuestReloadAdvance = Readonly<{
   state: GuestReloadAuthorityState;
   inventory: GuestCombatInventory;
   actionSequence: number | null;
+  requestId: string | null;
   weapon: OrdinaryWeaponId | null;
 }>;
 
@@ -104,6 +106,7 @@ export function admitGuestReloadIntent(
     connectionEpoch: context.connectionEpoch,
     lifeId: context.lifeId,
     actionSequence: message.actionSequence,
+    requestId: message.requestId,
     weapon: message.weapon,
     startedAtHostTimeMs: context.nowHostTimeMs,
     completesAtHostTimeMs: context.nowHostTimeMs + durationMs,
@@ -131,7 +134,7 @@ export function advanceGuestReloadAuthority(
   const pending = state.pending;
   if (!pending) return Object.freeze({
     status: 'cancelled', reason: 'no-pending-reload', state, inventory: context.inventory,
-    actionSequence: null, weapon: null,
+    actionSequence: null, requestId: null, weapon: null,
   });
   const cancel = (reason: GuestReloadReason): GuestReloadAdvance => Object.freeze({
     status: 'cancelled',
@@ -139,6 +142,7 @@ export function advanceGuestReloadAuthority(
     state: Object.freeze({ ...state, pending: null }),
     inventory: context.inventory,
     actionSequence: pending.actionSequence,
+    requestId: pending.requestId,
     weapon: pending.weapon,
   });
   if (pending.connectionEpoch !== context.connectionEpoch) return cancel('connection-epoch');
@@ -148,7 +152,7 @@ export function advanceGuestReloadAuthority(
   if (context.nowHostTimeMs > pending.expiresAtHostTimeMs) return cancel('expired');
   if (context.nowHostTimeMs < pending.completesAtHostTimeMs) return Object.freeze({
     status: 'pending', reason: 'duration-pending', state, inventory: context.inventory,
-    actionSequence: pending.actionSequence, weapon: pending.weapon,
+    actionSequence: pending.actionSequence, requestId: pending.requestId, weapon: pending.weapon,
   });
 
   const spec = WEAPONS[pending.weapon];
@@ -167,6 +171,7 @@ export function advanceGuestReloadAuthority(
       context.preserveReserve ? reserve : reserve - moved,
     ),
     actionSequence: pending.actionSequence,
+    requestId: pending.requestId,
     weapon: pending.weapon,
   });
 }

@@ -1,0 +1,119 @@
+diff --git a/src/weapon-presentation.ts b/src/weapon-presentation.ts
+index 34ed122f..47a01563 100644
+--- a/src/weapon-presentation.ts
++++ b/src/weapon-presentation.ts
+@@ -3751,9 +3751,21 @@ export class WeaponPresentation {
+    * costs. Hidden rigs (hundreds of nodes each) deep-freeze; the active rig
+    * unfreezes so its authored animations reach the renderer. */
+   private applyModelMatrixFreeze(): void {
++    // HF-399: freeze/unfreeze only on a visibility TRANSITION. Both helpers
++    // traverse the whole model (and unfreeze forces a full world-matrix
++    // refresh), and this runs every frame from update(): measured 2026-09-02
++    // at ~5,000 Object3D.traverse calls per frame, 1.5 ms of a 25 ms frame.
++    // The invariant is unchanged - whatever is visible is unfrozen - it is
++    // just not re-established on models whose state did not move.
+     for (const entry of this.models.values()) {
+-      if (entry.visible) deepUnfreezeSubtreeMatrices(entry);
+-      else deepFreezeSubtreeMatrices(entry);
++      const frozen = entry.userData.hf399MatrixFrozen === true;
++      if (entry.visible && (frozen || entry.userData.hf399MatrixFrozen === undefined)) {
++        deepUnfreezeSubtreeMatrices(entry);
++        entry.userData.hf399MatrixFrozen = false;
++      } else if (!entry.visible && !frozen) {
++        deepFreezeSubtreeMatrices(entry);
++        entry.userData.hf399MatrixFrozen = true;
++      }
+     }
+   }
+ 
+@@ -4063,7 +4075,12 @@ export class WeaponPresentation {
+       reloadProgress: null,
+       meleeProgress: null,
+     });
+-    this.root.updateWorldMatrix(true, true);
++    // HF-399: one consistent refresh of the mounted rig per frame, through
++    // updateMatrixWorld so the deep-frozen hidden models are skipped (the
++    // updateWorldMatrix(_, true) child recursion bypasses the freeze override
++    // and re-multiplied every parked weapon's matrices every frame).
++    this.root.updateWorldMatrix(true, false);
++    this.root.updateMatrixWorld(true);
+   }
+ 
+   private configureWeaponFlashlight(id: WeaponId): void {
+@@ -4766,7 +4783,7 @@ export class WeaponPresentation {
+       const upperDirection = elbowPoint.sub(rig.shoulder.position).normalize();
+       rig.shoulder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), upperDirection);
+       rig.elbow.position.set(0, 0, -rig.upperLength);
+-      rig.shoulder.updateWorldMatrix(true, true);
++      rig.shoulder.updateWorldMatrix(true, false); // HF-399: worldToLocal needs only this node
+       const targetInShoulder = rig.shoulder.worldToLocal(targetWorld.clone());
+       const lowerDirection = targetInShoulder.sub(rig.elbow.position).normalize();
+       rig.elbow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), lowerDirection);
+@@ -4778,7 +4795,7 @@ export class WeaponPresentation {
+       } else {
+         rig.hand.quaternion.copy(gripQuaternion);
+       }
+-      rig.elbow.updateWorldMatrix(true, true);
++      rig.elbow.updateWorldMatrix(true, false); // HF-399: getWorldPosition refreshes the hand chain
+       const handWorld = rig.hand.getWorldPosition(new THREE.Vector3());
+       diagnostics.push({
+         side: rig.side,
+@@ -4815,7 +4832,12 @@ export class WeaponPresentation {
+     const preferredAxis = scratch.orientPreferredAxis.set(1, 0, 0).applyQuaternion(bone.quaternion);
+     stableDirectionDelta(currentParent, desiredParent, preferredAxis, scratch.orientDelta);
+     bone.quaternion.premultiply(scratch.orientDelta).normalize();
+-    bone.updateWorldMatrix(false, true);
++    // HF-399: (false, false). Every later read on this chain goes through
++    // getWorldPosition/getWorldQuaternion, which refresh the parent chain
++    // themselves; walking the whole subtree here (fingers, skinned sleeve and
++    // whatever is socketed below the wrist) three bones x two arms x up to
++    // three iterations per frame was the largest matrix cost in the frame.
++    bone.updateWorldMatrix(false, false);
+   }
+ 
+   /** The exported palm node is the complete position and orientation authority. */
+@@ -4846,7 +4868,7 @@ export class WeaponPresentation {
+ 
+   private alignRiggedPalmWorld(rig: RiggedViewArm, targetRotationWorld: THREE.Quaternion): number {
+     const scratch = this.riggedArmSolveScratch;
+-    rig.wrist.updateWorldMatrix(true, true);
++    rig.wrist.updateWorldMatrix(true, false); // HF-399: palmContact refreshes its own chain below
+     const currentPalm = rig.palmContact.getWorldQuaternion(scratch.palmWorldRotation);
+     const wristWorld = rig.wrist.getWorldQuaternion(scratch.wristWorldRotation);
+     const parentWorld = rig.wrist.parent
+@@ -4855,7 +4877,7 @@ export class WeaponPresentation {
+     scratch.palmRotationDelta.copy(targetRotationWorld).multiply(currentPalm.invert());
+     wristWorld.premultiply(scratch.palmRotationDelta);
+     rig.wrist.quaternion.copy(parentWorld.invert().multiply(wristWorld)).normalize();
+-    rig.wrist.updateWorldMatrix(false, true);
++    rig.wrist.updateWorldMatrix(false, false); // HF-399
+     return rig.palmContact.getWorldQuaternion(scratch.palmWorldRotation).angleTo(targetRotationWorld);
+   }
+ 
+@@ -4889,7 +4911,7 @@ export class WeaponPresentation {
+       entry.copy(projectedEntry.unproject(this.camera));
+     }
+     rig.shoulder.position.copy(parent.worldToLocal(scratch.shoulderEntryLocal.copy(entry)));
+-    rig.shoulder.updateWorldMatrix(false, true);
++    rig.shoulder.updateWorldMatrix(false, false); // HF-399
+     const projected = scratch.shoulderProjected.copy(entry).project(this.camera);
+     return Object.freeze({
+       ndc: Object.freeze([projected.x, projected.y, projected.z] as const),
+@@ -4925,7 +4947,7 @@ export class WeaponPresentation {
+       scratch.carriageWorld.dot(scratch.cameraUp),
+     );
+     rig.shoulder.position.copy(parent.worldToLocal(entry));
+-    rig.shoulder.updateWorldMatrix(false, true);
++    rig.shoulder.updateWorldMatrix(false, false); // HF-399
+   }
+ 
+   /**
+@@ -4995,7 +5017,7 @@ export class WeaponPresentation {
+ 
+     parent.updateWorldMatrix(true, false);
+     rig.shoulder.position.copy(parent.worldToLocal(scratch.shoulderEntryLocal.copy(candidate)));
+-    rig.shoulder.updateWorldMatrix(false, true);
++    rig.shoulder.updateWorldMatrix(false, false); // HF-399
+     const finalShoulder = rig.shoulder.getWorldPosition(scratch.shoulderPosition);
+     projected = scratch.shoulderProjected.copy(finalShoulder).project(this.camera);
+     result.ndc[0] = projected.x;

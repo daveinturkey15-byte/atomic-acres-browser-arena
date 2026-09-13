@@ -1,0 +1,128 @@
+{
+  "contract": "map3-pipeline-census-v1",
+  "measuredAt": "2026-09-03T01:12:43.647Z",
+  "port": 4219,
+  "seconds": 26,
+  "pipelinesTotal": 104,
+  "pipelinesDuringConstruction": 76,
+  "pipelinesAfterMark": 28,
+  "pipelinesAfterMarkDetail": [
+    {
+      "atMs": 12312,
+      "label": "renderPipeline_MeshStandardNodeMaterial_49"
+    },
+    {
+      "atMs": 12323,
+      "label": "renderPipeline_MeshStandardNodeMaterial_31"
+    },
+    {
+      "atMs": 12336,
+      "label": "renderPipeline_MeshStandardNodeMaterial_31"
+    },
+    {
+      "atMs": 12348,
+      "label": "renderPipeline_MeshStandardNodeMaterial_45"
+    },
+    {
+      "atMs": 12359,
+      "label": "renderPipeline_MeshStandardNodeMaterial_34"
+    },
+    {
+      "atMs": 12368,
+      "label": "renderPipeline_MeshStandardNodeMaterial_44"
+    },
+    {
+      "atMs": 12398,
+      "label": "renderPipeline_MeshStandardNodeMaterial_36"
+    },
+    {
+      "atMs": 12420,
+      "label": "renderPipeline_MeshStandardNodeMaterial_37"
+    },
+    {
+      "atMs": 12430,
+      "label": "renderPipeline_MeshStandardNodeMaterial_42"
+    },
+    {
+      "atMs": 12436,
+      "label": "renderPipeline_MeshStandardNodeMaterial_43"
+    },
+    {
+      "atMs": 12446,
+      "label": "renderPipeline_MeshStandardNodeMaterial_38"
+    },
+    {
+      "atMs": 12453,
+      "label": "renderPipeline_MeshStandardNodeMaterial_39"
+    },
+    {
+      "atMs": 12470,
+      "label": "renderPipeline_MeshStandardNodeMaterial_40"
+    },
+    {
+      "atMs": 12506,
+      "label": "renderPipeline_MeshStandardNodeMaterial_79"
+    },
+    {
+      "atMs": 12515,
+      "label": "renderPipeline_MeshStandardNodeMaterial_81"
+    },
+    {
+      "atMs": 12524,
+      "label": "renderPipeline_MeshStandardNodeMaterial_80"
+    },
+    {
+      "atMs": 12534,
+      "label": "renderPipeline_MeshStandardNodeMaterial_78"
+    },
+    {
+      "atMs": 12540,
+      "label": "renderPipeline_MeshBasicNodeMaterial_18"
+    },
+    {
+      "atMs": 17541,
+      "label": "renderPipeline_MeshStandardNodeMaterial_50"
+    },
+    {
+      "atMs": 17550,
+      "label": "renderPipeline_MeshStandardNodeMaterial_51"
+    },
+    {
+      "atMs": 33401,
+      "label": "renderPipeline_MeshStandardNodeMaterial_56"
+    },
+    {
+      "atMs": 33414,
+      "label": "renderPipeline_MeshStandardNodeMaterial_57"
+    },
+    {
+      "atMs": 33425,
+      "label": "renderPipeline_MeshStandardNodeMaterial_58"
+    },
+    {
+      "atMs": 33434,
+      "label": "renderPipeline_MeshStandardNodeMaterial_59"
+    },
+    {
+      "atMs": 33445,
+      "label": "renderPipeline_MeshStandardNodeMaterial_61"
+    },
+    {
+      "atMs": 33455,
+      "label": "renderPipeline_MeshStandardNodeMaterial_64"
+    },
+    {
+      "atMs": 33464,
+      "label": "renderPipeline_MeshStandardNodeMaterial_28"
+    },
+    {
+      "atMs": 33474,
+      "label": "renderPipeline_MeshStandardNodeMaterial_29"
+    }
+  ],
+  "shaderModulesTotal": 152,
+  "shaderModulesAfterMark": 34,
+  "hud": "177 fps · 248 draws · 638k tris · WebGPU · shim 54/152 · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D  |  1-8 solo corridor · 0 all · O shadows · P foliage · ",
+  "errorPanel": "",
+  "verdict": "FAIL"
+}

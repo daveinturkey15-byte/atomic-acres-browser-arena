@@ -32,7 +32,7 @@ function baseCheckpoint(killstreak?: HostMatchCheckpoint['killstreak']): HostMat
     lobbyRevision: 5,
     config: {
       arenaId: 'atomic-acres', mode: 'ffa', capacity: 4, hostedBotCount: 0,
-      autoBalance: false, durationMs: 300_000,
+      autoBalance: false, durationMs: 300_000, scoreLimit: null,
     },
     members: [{ id: 'host-1', name: 'HOST', team: 0, ready: true, connected: true, pingMs: 0, dhv: 10 }],
     scores: [{ id: 'host-1', kills: 30, deaths: 0, damageDealt: 3_000, damageTaken: 0 }],

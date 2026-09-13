@@ -1,0 +1,1 @@
+{"arena": "nuketown2", "contract": "pass95-frame-hitch-attributor-v1", "fps": 72.6, "hitches": {"count": 7, "over100": 0, "over33": 28, "thresholdMs": 50, "totalMs": 391, "worstMs": 65.9}, "label": "candidate-regression"}

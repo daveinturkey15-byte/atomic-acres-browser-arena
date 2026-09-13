@@ -1,0 +1,73 @@
+{
+  "station": "nuketown2-overhead",
+  "assignment": {
+    "left": "A",
+    "right": "B"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "left",
+  "winner": "A",
+  "confidence": 0.85,
+  "probes": {
+    "left": {
+      "expected": "NDJA",
+      "answered": "NDJA"
+    },
+    "right": {
+      "expected": "YEUR",
+      "answered": "YEUR"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-overhead.png",
+      "sourceSha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c",
+      "shownSha256": "fad24301717068eb92f8315e9969a51269badca2d26a96399133f83e15063dd2",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-overhead.png",
+      "sourceSha256": "1ee079ecac28031e6d20af821598eb2a2274c6de28acda55a92877b3cc826240",
+      "shownSha256": "10cedbe70b49e7ddff13f9b3097220dd6ac57ccb0bd029c159ceedeb449db01f",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "Against the overhead reference, LEFT preserves the reference value structure in r1c1 while RIGHT breaks it: the top-block roof in r1c1 stays mid-gray with two black caps in the reference and LEFT but blows to near-white in RIGHT, and both circular-pad box trucks in r1c1 read dark in the reference and LEFT but the lower truck flips to light silver-white in RIGHT, with central compound shading in r1c1-r1c2 also darker and closer to reference in LEFT.",
+  "leftCloser": [
+    "Top-block roof value in r1c1 stays mid-gray with two black caps as in references, not overbright",
+    "Both circular-pad trucks in r1c1 stay dark as in references, not one light silver",
+    "Central road, pad and shadow contrast in r1c1-r1c2 tracks reference depth and layout"
+  ],
+  "rightCloser": [
+    "Distant conifer haze and sandy apron in r0c0-r0c2 remain broadly similar, no structural advantage"
+  ],
+  "largestDifference": {
+    "region": "r1c1",
+    "what": "lower circular-pad truck and adjacent top-block roof read dark gray/black in LEFT vs light silver/near-white in RIGHT"
+  },
+  "elapsedMs": 47528,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

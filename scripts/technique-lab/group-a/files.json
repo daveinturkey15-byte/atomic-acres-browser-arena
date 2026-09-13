@@ -1,0 +1,13 @@
+[
+  { "sourceId": 1, "repoKey": 1, "paths": ["docs/RIG.md", "action_specs/spin.json", "pipeline/apply_mixamo_fk.py"] },
+  { "sourceId": 2, "repoKey": 2, "paths": ["index.html"] },
+  { "sourceId": 6, "repoKey": 6, "paths": ["docs/ARCHITECTURE.md", "SKILL.md"] },
+  { "sourceId": 7, "repoKey": 7, "paths": ["docs/TECHNIQUE.md", "PROMPTS.md", "src/scene/softShadow.ts"] },
+  { "sourceId": 8, "repoKey": 8, "paths": ["PROMPT.md", "src/gfx/glsl.js", "src/render/grade.js"] },
+  { "sourceId": 9, "repoKey": 9, "paths": ["skills/improve-threejs/SKILL.md"] },
+  { "sourceId": 10, "repoKey": 10, "paths": ["docs/vibe3d-architecture.md", "models.json"] },
+  { "sourceId": 10, "repoKey": 1010, "paths": ["packages/props/package.json", "packages/props/README.md"] },
+  { "sourceId": 13, "repoKey": 13, "paths": ["prompt.md", "ARCHITECTURE.md"] },
+  { "sourceId": 15, "repoKey": 15, "paths": ["ThreeBrowserRuntime/samples/webgpu_rtx_light_transport_observatory/src/main.mjs"] },
+  { "sourceId": 16, "repoKey": 16, "paths": ["src/skeleton.hpp", "src/sequence.cpp"] }
+]

@@ -1,0 +1,81 @@
+--- a/scripts/qa/mp-soak-gate-v22.mjs
++++ b/scripts/qa/mp-soak-gate-v22.mjs
+@@ -33,6 +33,7 @@
+ import { rejoinV2, damageBoundaryV2, verifyLiveArtifact, calibrate } from './mp-soak-v2-scenarios.mjs';
+ import { SOAK_V22_CONTRACT, RELOAD_V22_CONTRACT, DEATH_V22_CONTRACT, V22_SOAK_CONFIG, CARBINE_MAGAZINE_CAPACITY, v22LifeInPage, reloadBaselineSignature, evaluateMpSoakV22, evaluateReloadV22, evaluateDeathV22 } from './mp-soak-v22-consumer.mjs';
+ import { boundedStep, waitOrStop } from './mp-soak-v2-runtime.mjs';
++import { captureReloadTrigger } from './reload-trigger-identity.mjs';
+ import { ensurePauseMenu } from './mp-soak-menu-state.mjs';
+ import { finalizationWriter } from './mp-soak-finalization.mjs';
+ import { safeSkyShot, ammoAcknowledged, installReloadObserver, collectReloadObserver } from './mp-reload-stage-diagnostic.mjs';
+@@ -626,45 +627,7 @@
+     }
+     if (!shotAck) throw Error('real shot did not receive all-peer ammo acknowledgement');
+     reloadNodeBefore = Date.now();
+-    reloadTrigger = await peers[role].page.evaluate(() => {
+-      const debug = window.__ATOMIC_ACRES_DEBUG__;
+-      const initial = debug.snapshot();
+-      const before = initial.player;
+-      const beforeLife = {
+-        subjectId: before.id,
+-        epoch: initial.killstreak?.matchEpoch ?? null,
+-        hp: before.hp,
+-        alive: before.alive,
+-        lifeId: initial.networkSync?.localContinuity ?? null,
+-        supportLife: initial.killstreak?.actors?.find((actor) => actor.actorId === before.id)?.lifeId ?? null,
+-        deathCount: initial.privateMatch?.scores?.find((score) => score.id === before.id)?.deaths ?? null,
+-      };
+-      const protocolBefore = initial.reloadAuthority?.protocolTrace ?? [];
+-      const atMs = performance.now();
+-      debug.reload();
+-      const afterSnapshot = debug.snapshot();
+-      const after = afterSnapshot.player;
+-      const protocolAfter = afterSnapshot.reloadAuthority?.protocolTrace ?? [];
+-      const initiated = protocolAfter.slice(protocolBefore.length).find((entry) => entry.actorId === before.id
+-        && entry.action === 'start' && entry.direction === 'send' && entry.status === 'requested'
+-        && entry.reason === 'reliable-retry-lane');
+-      const afterLife = {
+-        subjectId: after.id,
+-        epoch: afterSnapshot.killstreak?.matchEpoch ?? null,
+-        hp: after.hp,
+-        alive: after.alive,
+-        lifeId: afterSnapshot.networkSync?.localContinuity ?? null,
+-        supportLife: afterSnapshot.killstreak?.actors?.find((actor) => actor.actorId === after.id)?.lifeId ?? null,
+-        deathCount: afterSnapshot.privateMatch?.scores?.find((score) => score.id === after.id)?.deaths ?? null,
+-      };
+-      return {
+-        subjectId: before.id, atMs, afterAtMs: performance.now(), origin: performance.timeOrigin,
+-        beforeAmmo: before.ammo, afterAmmo: after.ammo, reloading: after.reloading,
+-        beforeLife, afterLife,
+-        requestId: initiated?.requestId ?? null, actionSequence: initiated?.actionSequence ?? null,
+-        initiatedAtMs: initiated?.atMs ?? null,
+-      };
+-    });
++    reloadTrigger = await peers[role].page.evaluate(captureReloadTrigger);
+     reloadNodeAfter = Date.now();
+     deadlineNodeMs = reloadNodeBefore + V22_SOAK_CONFIG.reloadSamplePointMs + V22_SOAK_CONFIG.reloadCompletionBudgetMs + ACK_BUDGET_MS;
+     await sleep(Math.max(0, reloadNodeAfter + V22_SOAK_CONFIG.reloadSamplePointMs - Date.now()));
+@@ -690,8 +653,6 @@
+     for (const peer of PEERS) calibration.after[peer] = await calibrate(peers[peer].page);
+   }
+   const peerEvidence = Object.fromEntries(PEERS.map((peer) => [peer, normalizedReloadObserver(observers[peer], subjectId)]));
+-  const hostAdmission = peerEvidence.host.protocol.find((entry) => entry.direction === 'admit'
+-    && entry.actorId === subjectId && entry.requestId === reloadTrigger?.requestId && entry.action === 'start' && entry.status === 'accepted');
+   const allAfter = allPeerAmmo(afterViews, subjectId);
+   const report = {
+     contract: RELOAD_V22_CONTRACT,
+@@ -700,11 +661,11 @@
+     config: bundle.config,
+     transaction: {
+       subjectId,
+-      requestId: hostAdmission?.requestId ?? null,
+-      actionSequence: hostAdmission?.actionSequence ?? null,
++      requestId: reloadTrigger?.requestId ?? null,
++      actionSequence: reloadTrigger?.actionSequence ?? null,
+       initiatorRole: role,
+       trigger: reloadTrigger,
+-      expected: { subjectId, epoch: expectedEpoch, lifeId: expectedLifeId, deathCount: expectedDeathCount },
++      expected: { subjectId, epoch: reloadTrigger?.beforeLife?.epoch ?? null, lifeId: reloadTrigger?.beforeLife?.lifeId ?? null, connectionEpoch: reloadTrigger?.beforeLife?.connectionEpoch ?? null, deathCount: reloadTrigger?.beforeLife?.deathCount ?? null },
+       calibration,
+       host: {
+         lifeEvidence: { subjectId, epoch: beforeLife.host.epoch, lifeId: beforeLife.host.supportLife, renderLife: beforeLife.host.renderLife, deathCount: beforeLife.host.deathCount, hp: beforeLife.host.hp, alive: beforeLife.host.alive, capturedAtMs: beforeLife.host.atMs },

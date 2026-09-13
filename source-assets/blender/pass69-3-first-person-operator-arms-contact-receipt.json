@@ -1,5 +1,59 @@
 {
   "audit": {
+    "authoredClipTravel": {
+      "ads-in": {
+        "armTravelRadians": 0.05,
+        "rotationProperty": "rotation_euler"
+      },
+      "ads-out": {
+        "armTravelRadians": 0.05,
+        "rotationProperty": "rotation_euler"
+      },
+      "dry-fire": {
+        "armTravelRadians": 0.018,
+        "rotationProperty": "rotation_euler"
+      },
+      "empty-reload": {
+        "armTravelRadians": 0.34,
+        "rotationProperty": "rotation_euler"
+      },
+      "equip": {
+        "armTravelRadians": 0.08,
+        "rotationProperty": "rotation_euler"
+      },
+      "fire": {
+        "armTravelRadians": 0.035,
+        "rotationProperty": "rotation_euler"
+      },
+      "idle": {
+        "armTravelRadians": 0.012,
+        "rotationProperty": "rotation_euler"
+      },
+      "inspect": {
+        "armTravelRadians": 0.18,
+        "rotationProperty": "rotation_euler"
+      },
+      "melee": {
+        "armTravelRadians": 0.34,
+        "rotationProperty": "rotation_euler"
+      },
+      "reload": {
+        "armTravelRadians": 0.28,
+        "rotationProperty": "rotation_euler"
+      },
+      "sprint": {
+        "armTravelRadians": 0.22,
+        "rotationProperty": "rotation_euler"
+      },
+      "unequip": {
+        "armTravelRadians": 0.16,
+        "rotationProperty": "rotation_euler"
+      },
+      "walk": {
+        "armTravelRadians": 0.025,
+        "rotationProperty": "rotation_euler"
+      }
+    },
     "authoredSleeveGeometry": {
       "contract": "authored-weighted-sleeve-mass-v1",
       "passed": true,
@@ -85,6 +139,7 @@
         "upAxis": "+Z"
       }
     },
+    "poseRotationMode": "XYZ",
     "weighting": {
       "blendedVertices": 4586,
       "contract": "normalized-four-influence-meaningful-bone-evidence-v1",
@@ -137,12 +192,12 @@
   "lods": {
     "lod0": {
       "path": "artifacts/blender-operator-arms/pass70-manual-master/pass65-first-person-arms-lod0.glb",
-      "sha256": "8c0243bbb566f301066478ad61b4707a7301a3a61d5cf97eae291cea12e33a6d",
+      "sha256": "6914dafd8f5f41045787e354251a24d4eaaece0e051d67fcbde2f0925a85c835",
       "triangles": 9744
     },
     "lod1": {
       "path": "artifacts/blender-operator-arms/pass70-manual-master/pass65-first-person-arms-lod1.glb",
-      "sha256": "58aaffa351f927c84cabb2bad5488f93ec56144c529d88cd78ca12b97209cbad",
+      "sha256": "c4300aa12283eb0b1218d60ccf0a3d4d9f1401e8e34ea66d55a35c2441088f10",
       "triangles": 7703
     }
   },

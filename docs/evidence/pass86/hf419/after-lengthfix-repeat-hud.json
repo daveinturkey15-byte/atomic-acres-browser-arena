@@ -1,0 +1,95 @@
+{
+  "hub-overview": {
+    "pose": {
+      "x": 0,
+      "y": 1.7,
+      "z": -4,
+      "yaw": 0,
+      "pitch": -0.05
+    },
+    "samples": [
+      "180 fps · 158 draws · 523k tris · WebGPU · shim 43/139 · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D"
+    ],
+    "fpsMin": 180,
+    "fpsMax": 180,
+    "frameStats": {
+      "n": 543,
+      "dtP50": 5.599999904632568,
+      "dtP95": 6.099999904632568,
+      "encodeP50": 2.600000023841858,
+      "encodeP95": 3.399999976158142,
+      "draws": 160,
+      "tris": 522698
+    }
+  },
+  "corridor-3-grammar": {
+    "pose": {
+      "x": -20,
+      "y": 1.7,
+      "z": -1.2246467991473533e-15,
+      "yaw": 1.5707963267948966,
+      "pitch": -0.05
+    },
+    "samples": [
+      "180 fps · 152 draws · 279k tris · WebGPU · shim 49/154 · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D"
+    ],
+    "fpsMin": 180,
+    "fpsMax": 180,
+    "frameStats": {
+      "n": 543,
+      "dtP50": 5.599999904632568,
+      "dtP95": 5.700000047683716,
+      "encodeP50": 2.399999976158142,
+      "encodeP95": 3,
+      "draws": 151,
+      "tris": 277776
+    }
+  },
+  "corridor-3-street-cell": {
+    "pose": {
+      "x": -71.5,
+      "y": 1.87,
+      "z": 5.199999999999996,
+      "yaw": 1.5707963267948966,
+      "pitch": -0.045
+    },
+    "samples": [
+      "180 fps · 129 draws · 242k tris · WebGPU · shim 49/154 · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D"
+    ],
+    "fpsMin": 180,
+    "fpsMax": 180,
+    "frameStats": {
+      "n": 540,
+      "dtP50": 5.599999904632568,
+      "dtP95": 5.700000047683716,
+      "encodeP50": 2,
+      "encodeP95": 2.600000023841858,
+      "draws": 127,
+      "tris": 242432
+    }
+  },
+  "corridor-3-street-kerbside": {
+    "pose": {
+      "x": -80,
+      "y": 1.42,
+      "z": 2.399999999999995,
+      "yaw": 0.9507963267948966,
+      "pitch": -0.1
+    },
+    "samples": [
+      "180 fps · 132 draws · 245k tris · WebGPU · shim 49/154 · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D"
+    ],
+    "fpsMin": 180,
+    "fpsMax": 180,
+    "frameStats": {
+      "n": 542,
+      "dtP50": 5.599999904632568,
+      "dtP95": 5.700000047683716,
+      "encodeP50": 2.1999999284744263,
+      "encodeP95": 2.8000000715255737,
+      "draws": 132,
+      "tris": 245016
+    }
+  },
+  "__pageErrors": []
+}

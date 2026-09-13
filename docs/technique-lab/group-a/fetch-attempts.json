@@ -1,0 +1,1382 @@
+{
+  "generatedAt": "2026-09-12T15:36:52+00:00",
+  "tool": "scripts/technique-lab/group-a/source_reader.py",
+  "note": "Bodies are cached outside the repository; only hashes and outcomes are committed.",
+  "cacheRoot": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a",
+  "attempts": [
+    {
+      "url": "https://x.com/Graalitoo/status/2089469774602633431",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        1
+      ],
+      "attemptedAt": "2026-09-12T15:28:17+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 232750,
+      "sha256": "e7be2070d7cbe07d74bb6f8ff9e0dafa5fd970504d49d98b607796d4448b6778",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___x.com_Graalitoo_status_2089469774602633431",
+      "error": null,
+      "finalUrl": "https://x.com/Graalitoo/status/2089469774602633431",
+      "contentType": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://github.com/squall01337/mixamo-llm-mocap",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        1
+      ],
+      "attemptedAt": "2026-09-12T15:28:18+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 300267,
+      "sha256": "ba4b89806a1124b918df8c605cbc6aae9992128faee3c878c3d4e663543f87f3",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___github.com_squall01337_mixamo-llm-mocap",
+      "error": null,
+      "finalUrl": "https://github.com/squall01337/mixamo-llm-mocap",
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "url": "https://x.com/Graalitoo/status/2089656660981862487",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        2
+      ],
+      "attemptedAt": "2026-09-12T15:28:19+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 168174,
+      "sha256": "c5e31871530d31e7b36b6c5b86faa352b07df79dbcc1393c0225d992a4b5d1ae",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___x.com_Graalitoo_status_2089656660981862487",
+      "error": null,
+      "finalUrl": "https://x.com/Graalitoo/status/2089656660981862487",
+      "contentType": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://github.com/squall01337/abyssal-ocean",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        2
+      ],
+      "attemptedAt": "2026-09-12T15:28:20+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 279300,
+      "sha256": "bbdfe0404ccec6de5ecb85c729e005be39209580448617b6f9e6d9fbf7a2f5b2",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___github.com_squall01337_abyssal-ocean",
+      "error": null,
+      "finalUrl": "https://github.com/squall01337/abyssal-ocean",
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "url": "https://x.com/Graalitoo/status/2077373937449648518",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        3
+      ],
+      "attemptedAt": "2026-09-12T15:28:20+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 224972,
+      "sha256": "637391c2296a24528a9ef6c61af619c539458dcd2d97bbe7974ae0aa28931a78",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___x.com_Graalitoo_status_2077373937449648518",
+      "error": null,
+      "finalUrl": "https://x.com/Graalitoo/status/2077373937449648518",
+      "contentType": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://x.com/gruberbuilds/status/2090235767922512234",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        4
+      ],
+      "attemptedAt": "2026-09-12T15:28:21+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 200080,
+      "sha256": "f22acb73f363177e3881c679d00aa40cf2d97d4e81cada2560b756a70444b835",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___x.com_gruberbuilds_status_2090235767922512234",
+      "error": null,
+      "finalUrl": "https://x.com/gruberbuilds/status/2090235767922512234",
+      "contentType": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://x.com/victormustar/status/2089310616854892818",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        5
+      ],
+      "attemptedAt": "2026-09-12T15:28:22+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 201262,
+      "sha256": "6460463a51008d07ca06ca21b3c16e4094147c7690ab2405fd09e7d64393cdd5",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___x.com_victormustar_status_2089310616854892818",
+      "error": null,
+      "finalUrl": "https://x.com/victormustar/status/2089310616854892818",
+      "contentType": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://www.minimax.io/blog/minimax-h3",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        5
+      ],
+      "attemptedAt": "2026-09-12T15:28:23+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 98310,
+      "sha256": "d96b0498d723b13508a8962d628dde3bf7af969e10c5b2b7acf0d959f2a0318a",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___www.minimax.io_blog_minimax-h3",
+      "error": null,
+      "finalUrl": "https://www.minimax.io/blog/minimax-h3",
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "url": "https://huggingface.co/MiniMaxAI/MiniMax-H3",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        5
+      ],
+      "attemptedAt": "2026-09-12T15:28:25+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 270745,
+      "sha256": "d707ec5df3062b3b9d11443a2aa6513cbfc86af0fab4112df512c3cfc00f5d3e",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___huggingface.co_MiniMaxAI_MiniMax-H3",
+      "error": null,
+      "finalUrl": "https://huggingface.co/MiniMaxAI/MiniMax-H3",
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "url": "https://github.com/img2threejs/img2threejs",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        6
+      ],
+      "attemptedAt": "2026-09-12T15:28:25+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 478533,
+      "sha256": "2d73bb26889d4f83dd00b770f2328b839b6f4fb37907b16d512b78a76fc1d9bc",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___github.com_img2threejs_img2threejs",
+      "error": null,
+      "finalUrl": "https://github.com/img2threejs/img2threejs",
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "url": "https://x.com/prasenx/status/2087604022849184080",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        7
+      ],
+      "attemptedAt": "2026-09-12T15:28:26+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 260717,
+      "sha256": "d7c81eb3687a97ac3181c98d63103185b918728dc8949fdf9b7dd66cf168de69",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___x.com_prasenx_status_2087604022849184080",
+      "error": null,
+      "finalUrl": "https://x.com/prasenx/status/2087604022849184080",
+      "contentType": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://github.com/StarKnightt/night-street",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        7
+      ],
+      "attemptedAt": "2026-09-12T15:28:26+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 473397,
+      "sha256": "e0b8d43d93150f65d96e78e5139dd31808165946375933d6280b72ebe775c54b",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___github.com_StarKnightt_night-street",
+      "error": null,
+      "finalUrl": "https://github.com/StarKnightt/night-street",
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "url": "https://github.com/StarKnightt/jungle-trail",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        8
+      ],
+      "attemptedAt": "2026-09-12T15:28:27+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 317450,
+      "sha256": "4ff843859190c6ba33c2a68210b40a999b085a9c1432288fd24ed9fdbbcbc219",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___github.com_StarKnightt_jungle-trail",
+      "error": null,
+      "finalUrl": "https://github.com/StarKnightt/jungle-trail",
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "url": "https://x.com/aidenybai/status/2089400082550620636",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        9
+      ],
+      "attemptedAt": "2026-09-12T15:28:27+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 190542,
+      "sha256": "abfa0d9a5ef9f757c85e3eda39b049a24b61725008baf59600573f5cfccbb8c4",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___x.com_aidenybai_status_2089400082550620636",
+      "error": null,
+      "finalUrl": "https://x.com/aidenybai/status/2089400082550620636",
+      "contentType": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://github.com/millionco/react-doctor",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        9
+      ],
+      "attemptedAt": "2026-09-12T15:28:28+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 326051,
+      "sha256": "4d47f83575cdfcfe66d84e7ff3111c4dfe33e4cc419e0ee16fc1bad7e8b97c66",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___github.com_millionco_react-doctor",
+      "error": null,
+      "finalUrl": "https://github.com/millionco/react-doctor",
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "url": "https://x.com/DerekBrenner/status/2089780687708856412",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        10
+      ],
+      "attemptedAt": "2026-09-12T15:28:29+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 193286,
+      "sha256": "1c2fac7bd31448d06c9b68c3b8e7c320c92624712b9bbf5b16249d212674a8a8",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___x.com_DerekBrenner_status_2089780687708856412",
+      "error": null,
+      "finalUrl": "https://x.com/DerekBrenner/status/2089780687708856412",
+      "contentType": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://x.com/alightinastorm/status/2088712139364041161",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        10
+      ],
+      "attemptedAt": "2026-09-12T15:28:30+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 300704,
+      "sha256": "4be81b41d0904e275116766ec8a7da4e8cb96d81991734e5039a9555fd4f46cb",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___x.com_alightinastorm_status_2088712139364041161",
+      "error": null,
+      "finalUrl": "https://x.com/alightinastorm/status/2088712139364041161",
+      "contentType": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://x.com/alightinastorm/status/2097598580546470197",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        10
+      ],
+      "attemptedAt": "2026-09-12T15:28:30+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 182045,
+      "sha256": "5712f4685778b360440c08caad3f82b7f8a88f8cfa630bd7fa0054584a65bb80",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___x.com_alightinastorm_status_2097598580546470197",
+      "error": null,
+      "finalUrl": "https://x.com/alightinastorm/status/2097598580546470197",
+      "contentType": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://github.com/vibe-stack/vibe3d",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        10
+      ],
+      "attemptedAt": "2026-09-12T15:28:31+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 326956,
+      "sha256": "76398da0d87d354d49e6d7344ff43e7b68fcc1f77b6c294c35c4589c95ccd24a",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___github.com_vibe-stack_vibe3d",
+      "error": null,
+      "finalUrl": "https://github.com/vibe-stack/vibe3d",
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "url": "https://github.com/keysforthewin/thaikit",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        10
+      ],
+      "attemptedAt": "2026-09-12T15:28:31+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 408172,
+      "sha256": "da7ee1b16f74bea297ca0cedba7b38b39195c4f067e9ac6c9f3564bfa85c801b",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___github.com_keysforthewin_thaikit",
+      "error": null,
+      "finalUrl": "https://github.com/keysforthewin/thaikit",
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "url": "https://x.com/filiksyos/status/2089297181026951425",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        11
+      ],
+      "attemptedAt": "2026-09-12T15:28:32+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 221065,
+      "sha256": "c415c1c5d30ee5fbb032273455dcce2dc3ef1aa069b29fd9cbf3c89246288761",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___x.com_filiksyos_status_2089297181026951425",
+      "error": null,
+      "finalUrl": "https://x.com/filiksyos/status/2089297181026951425",
+      "contentType": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://x.com/anshuc/status/2065598069790716294",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        12
+      ],
+      "attemptedAt": "2026-09-12T15:28:33+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 259876,
+      "sha256": "d6758cb07f01b66922bee3f78f68cd249e43b9402d67b9199f72a7f13a1eab50",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___x.com_anshuc_status_2065598069790716294",
+      "error": null,
+      "finalUrl": "https://x.com/anshuc/status/2065598069790716294",
+      "contentType": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://somethingbig.ai/gauntlet-loop",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        13
+      ],
+      "attemptedAt": "2026-09-12T15:28:33+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 73735,
+      "sha256": "ad41388bce2df34b5456b6d39723e14d7f940568c1d26f95ecdbb6737f630fdf",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___somethingbig.ai_gauntlet-loop",
+      "error": null,
+      "finalUrl": "https://somethingbig.ai/gauntlet-loop",
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "url": "https://github.com/mshumer/Claude-of-Duty",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        13
+      ],
+      "attemptedAt": "2026-09-12T15:28:34+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 289260,
+      "sha256": "c5183c61128a9dd998197a2a0196497bc40eaa5062bdddaab2089a985f7cb058",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___github.com_mshumer_Claude-of-Duty",
+      "error": null,
+      "finalUrl": "https://github.com/mshumer/Claude-of-Duty",
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "url": "https://www.modernclaudefare.com/",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        14
+      ],
+      "attemptedAt": "2026-09-12T15:28:34+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 138790,
+      "sha256": "1cd1317ebdb3264c192e5c2c96f65eaa90e5b1b7a4fab5af4be02f1262b53c7f",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___www.modernclaudefare.com_",
+      "error": null,
+      "finalUrl": "https://www.modernclaudefare.com/",
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "url": "https://x.com/samgcoder/status/2091775237646114921",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        15
+      ],
+      "attemptedAt": "2026-09-12T15:28:35+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 196665,
+      "sha256": "83ebded394f3d881c827b1e0eb14bdc7830fcb089a1a39fc52dedfd4b208f51e",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___x.com_samgcoder_status_2091775237646114921",
+      "error": null,
+      "finalUrl": "https://x.com/SamGCoder/status/2091775237646114921",
+      "contentType": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://github.com/SamG-Coder/threepp",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        15
+      ],
+      "attemptedAt": "2026-09-12T15:28:36+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 452667,
+      "sha256": "e480c882b26e5ec2dcb7f681c581aabfd44fb960fc65991dfe6fa01faebc5ba9",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___github.com_SamG-Coder_threepp",
+      "error": null,
+      "finalUrl": "https://github.com/SamG-Coder/threepp",
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "url": "https://x.com/stefan_3d_ai/status/2091531702183350276",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        16
+      ],
+      "attemptedAt": "2026-09-12T15:28:37+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 197076,
+      "sha256": "a1828d73f251569fea1cb58bfc95c69f52e2bebe2f8358eec55a5b36929edaa4",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___x.com_stefan_3d_ai_status_2091531702183350276",
+      "error": null,
+      "finalUrl": "https://x.com/Stefan_3D_AI/status/2091531702183350276",
+      "contentType": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://x.com/jichiep/status/2091277918521417834",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        16
+      ],
+      "attemptedAt": "2026-09-12T15:28:38+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 190102,
+      "sha256": "11a9a237ff991ae8f81081f1e3728bf3aa7f23b90229ba2092623c9115b406de",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___x.com_jichiep_status_2091277918521417834",
+      "error": null,
+      "finalUrl": "https://x.com/jichiep/status/2091277918521417834",
+      "contentType": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://github.com/localai-org/kimodo.cpp",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        16
+      ],
+      "attemptedAt": "2026-09-12T15:28:39+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 320052,
+      "sha256": "12d601cda9e64016bfb2c743c61cf89153899807b7c8c4f5772c3042dc2c4ba3",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___github.com_localai-org_kimodo.cpp",
+      "error": null,
+      "finalUrl": "https://github.com/localai-org/kimodo.cpp",
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "url": "https://cadle.gg/",
+      "kind": "owner-shared-url",
+      "sourceIds": [
+        17
+      ],
+      "attemptedAt": "2026-09-12T15:28:41+00:00",
+      "outcome": "error",
+      "httpStatus": null,
+      "bytes": null,
+      "sha256": null,
+      "localPath": null,
+      "error": "URLError: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:1032)>"
+    },
+    {
+      "url": "https://api.github.com/repos/squall01337/mixamo-llm-mocap/commits/00dfd5385506022d533c84f6737a09f5f4392623",
+      "kind": "github-commit",
+      "sourceIds": [
+        1
+      ],
+      "attemptedAt": "2026-09-12T15:28:42+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 5442,
+      "sha256": "ec3f2f2cd968a49581aa7317d75681d6bf7a07b08c0b0289162fc36408b364f6",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_squall01337_mixamo-llm-mocap_commits_00dfd5385506022d533c84f6737a09f5f4392623",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/squall01337/mixamo-llm-mocap/commits/00dfd5385506022d533c84f6737a09f5f4392623",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/squall01337/mixamo-llm-mocap/git/trees/00dfd5385506022d533c84f6737a09f5f4392623?recursive=1",
+      "kind": "github-tree",
+      "sourceIds": [
+        1
+      ],
+      "attemptedAt": "2026-09-12T15:28:43+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 8078,
+      "sha256": "5bb080837141c6a57726380beafa35316c85ee2637d48eac62354912a05bee24",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_squall01337_mixamo-llm-mocap_git_trees_00dfd5385506022d533c84f6737a09f5f4392623_recursive_1",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/squall01337/mixamo-llm-mocap/git/trees/00dfd5385506022d533c84f6737a09f5f4392623?recursive=1",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/squall01337/mixamo-llm-mocap/00dfd5385506022d533c84f6737a09f5f4392623/LICENSE",
+      "kind": "licence-or-readme",
+      "sourceIds": [
+        1
+      ],
+      "attemptedAt": "2026-09-12T15:28:43+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 2045,
+      "sha256": "72e27d3bfbfd96976566aae6039eef0a74a6610831154096ed1e2c241cba7870",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_squall01337_mixamo-llm-mocap_00dfd5385506022d533c84f6737a09f5f4392623_LICENSE",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/squall01337/mixamo-llm-mocap/00dfd5385506022d533c84f6737a09f5f4392623/LICENSE",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/squall01337/abyssal-ocean/commits/142265f5013b6f27bea4f4f819b832dec75c7bad",
+      "kind": "github-commit",
+      "sourceIds": [
+        2
+      ],
+      "attemptedAt": "2026-09-12T15:28:44+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 9688,
+      "sha256": "ec98b999918f62d9ea061557f3bd6e750d9022cbb26115f948a1873d635e6fb0",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_squall01337_abyssal-ocean_commits_142265f5013b6f27bea4f4f819b832dec75c7bad",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/squall01337/abyssal-ocean/commits/142265f5013b6f27bea4f4f819b832dec75c7bad",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/squall01337/abyssal-ocean/git/trees/142265f5013b6f27bea4f4f819b832dec75c7bad?recursive=1",
+      "kind": "github-tree",
+      "sourceIds": [
+        2
+      ],
+      "attemptedAt": "2026-09-12T15:28:45+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 1778,
+      "sha256": "335918cc3f87f1c7792e65e41657e9eb8e387094ff069873b2ae33364482c777",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_squall01337_abyssal-ocean_git_trees_142265f5013b6f27bea4f4f819b832dec75c7bad_recursive_1",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/squall01337/abyssal-ocean/git/trees/142265f5013b6f27bea4f4f819b832dec75c7bad?recursive=1",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/squall01337/abyssal-ocean/142265f5013b6f27bea4f4f819b832dec75c7bad/LICENSE",
+      "kind": "licence-or-readme",
+      "sourceIds": [
+        2
+      ],
+      "attemptedAt": "2026-09-12T15:28:45+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 1077,
+      "sha256": "90adab8a633db9147c4e1b6df58e8817ead63b578f83c25bed503fb36f3d0dd3",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_squall01337_abyssal-ocean_142265f5013b6f27bea4f4f819b832dec75c7bad_LICENSE",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/squall01337/abyssal-ocean/142265f5013b6f27bea4f4f819b832dec75c7bad/LICENSE",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/img2threejs/img2threejs/commits/d6673386f89673a58736f8d398dd16ece67874f5",
+      "kind": "github-commit",
+      "sourceIds": [
+        6
+      ],
+      "attemptedAt": "2026-09-12T15:28:47+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 1110847,
+      "sha256": "8b56767a945eafa7b18fe38c674ebe4d2fcbc7811ec0dc7f0048e81466f6dc1e",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_img2threejs_img2threejs_commits_d6673386f89673a58736f8d398dd16ece67874f5",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/img2threejs/img2threejs/commits/d6673386f89673a58736f8d398dd16ece67874f5",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/img2threejs/img2threejs/git/trees/d6673386f89673a58736f8d398dd16ece67874f5?recursive=1",
+      "kind": "github-tree",
+      "sourceIds": [
+        6
+      ],
+      "attemptedAt": "2026-09-12T15:28:50+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 75777,
+      "sha256": "6b0dcec7a56ec8fd94ba1fe3d7f94cd0f9a5d4ee8b7fc68da4cf36996f6f8044",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_img2threejs_img2threejs_git_trees_d6673386f89673a58736f8d398dd16ece67874f5_recursive_1",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/img2threejs/img2threejs/git/trees/d6673386f89673a58736f8d398dd16ece67874f5?recursive=1",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/img2threejs/img2threejs/d6673386f89673a58736f8d398dd16ece67874f5/LICENSE",
+      "kind": "licence-or-readme",
+      "sourceIds": [
+        6
+      ],
+      "attemptedAt": "2026-09-12T15:28:51+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 11337,
+      "sha256": "4595055948a67e91177115c57e154804046878e77ff223de22accc880012827a",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_img2threejs_img2threejs_d6673386f89673a58736f8d398dd16ece67874f5_LICENSE",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/img2threejs/img2threejs/d6673386f89673a58736f8d398dd16ece67874f5/LICENSE",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/StarKnightt/night-street/commits/333f064778105640588a95d2c2d150780044e7bf",
+      "kind": "github-commit",
+      "sourceIds": [
+        7
+      ],
+      "attemptedAt": "2026-09-12T15:28:52+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 13555,
+      "sha256": "1d2c95dd34c428eb55ce03cce33f21080e7a9cc1839b7238761f6f96557a2241",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_StarKnightt_night-street_commits_333f064778105640588a95d2c2d150780044e7bf",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/StarKnightt/night-street/commits/333f064778105640588a95d2c2d150780044e7bf",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/StarKnightt/night-street/git/trees/333f064778105640588a95d2c2d150780044e7bf?recursive=1",
+      "kind": "github-tree",
+      "sourceIds": [
+        7
+      ],
+      "attemptedAt": "2026-09-12T15:28:53+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 61963,
+      "sha256": "62544f841dafda82ed879df8d271ab25f4efaf61ab3d975cf1aca37b6d8c1bfb",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_StarKnightt_night-street_git_trees_333f064778105640588a95d2c2d150780044e7bf_recursive_1",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/StarKnightt/night-street/git/trees/333f064778105640588a95d2c2d150780044e7bf?recursive=1",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/StarKnightt/night-street/333f064778105640588a95d2c2d150780044e7bf/LICENSE",
+      "kind": "licence-or-readme",
+      "sourceIds": [
+        7
+      ],
+      "attemptedAt": "2026-09-12T15:28:54+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 1080,
+      "sha256": "fe0317b05d6938c3804ab94a6e0145e28aae9ab92738cd5e883640c61840f42f",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_StarKnightt_night-street_333f064778105640588a95d2c2d150780044e7bf_LICENSE",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/StarKnightt/night-street/333f064778105640588a95d2c2d150780044e7bf/LICENSE",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/StarKnightt/jungle-trail/commits/c15640d3a2b6f08ca68e4df98fdfc953ea8a070a",
+      "kind": "github-commit",
+      "sourceIds": [
+        8
+      ],
+      "attemptedAt": "2026-09-12T15:28:55+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 5283,
+      "sha256": "c309e2a96263c076857ddb063552282530dd15f8f199114f2b1106d186d73c12",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_StarKnightt_jungle-trail_commits_c15640d3a2b6f08ca68e4df98fdfc953ea8a070a",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/StarKnightt/jungle-trail/commits/c15640d3a2b6f08ca68e4df98fdfc953ea8a070a",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/StarKnightt/jungle-trail/git/trees/c15640d3a2b6f08ca68e4df98fdfc953ea8a070a?recursive=1",
+      "kind": "github-tree",
+      "sourceIds": [
+        8
+      ],
+      "attemptedAt": "2026-09-12T15:28:56+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 20576,
+      "sha256": "62c85ce7ac024da8a4e9cdc8a884464e6782a057e0e5c4f133143d0ed4b19b99",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_StarKnightt_jungle-trail_git_trees_c15640d3a2b6f08ca68e4df98fdfc953ea8a070a_recursive_1",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/StarKnightt/jungle-trail/git/trees/c15640d3a2b6f08ca68e4df98fdfc953ea8a070a?recursive=1",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/StarKnightt/jungle-trail/c15640d3a2b6f08ca68e4df98fdfc953ea8a070a/LICENSE",
+      "kind": "licence-or-readme",
+      "sourceIds": [
+        8
+      ],
+      "attemptedAt": "2026-09-12T15:28:57+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 1080,
+      "sha256": "fe0317b05d6938c3804ab94a6e0145e28aae9ab92738cd5e883640c61840f42f",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_StarKnightt_jungle-trail_c15640d3a2b6f08ca68e4df98fdfc953ea8a070a_LICENSE",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/StarKnightt/jungle-trail/c15640d3a2b6f08ca68e4df98fdfc953ea8a070a/LICENSE",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/millionco/react-doctor/commits/e183c3519010599d929ed14d99a18bf1f8f8a44c",
+      "kind": "github-commit",
+      "sourceIds": [
+        9
+      ],
+      "attemptedAt": "2026-09-12T15:28:58+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 12502,
+      "sha256": "ff3f20efebd39af83f0c49c3740a39f32a624f5d91c37aa45f90efa0145849cc",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_millionco_react-doctor_commits_e183c3519010599d929ed14d99a18bf1f8f8a44c",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/millionco/react-doctor/commits/e183c3519010599d929ed14d99a18bf1f8f8a44c",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/millionco/react-doctor/git/trees/e183c3519010599d929ed14d99a18bf1f8f8a44c?recursive=1",
+      "kind": "github-tree",
+      "sourceIds": [
+        9
+      ],
+      "attemptedAt": "2026-09-12T15:28:59+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 2235146,
+      "sha256": "38cc5ed8a5231e06aae223decaab5901021972f41db2bca2aea9debdb3d36053",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_millionco_react-doctor_git_trees_e183c3519010599d929ed14d99a18bf1f8f8a44c_recursive_1",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/millionco/react-doctor/git/trees/e183c3519010599d929ed14d99a18bf1f8f8a44c?recursive=1",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/millionco/react-doctor/e183c3519010599d929ed14d99a18bf1f8f8a44c/LICENSE",
+      "kind": "licence-or-readme",
+      "sourceIds": [
+        9
+      ],
+      "attemptedAt": "2026-09-12T15:29:04+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 1732,
+      "sha256": "aa9b278de35d20d320e40789db8b3e242096ed4a89c5aaf8fbe23a5e55c08ff1",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_millionco_react-doctor_e183c3519010599d929ed14d99a18bf1f8f8a44c_LICENSE",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/millionco/react-doctor/e183c3519010599d929ed14d99a18bf1f8f8a44c/LICENSE",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/vibe-stack/vibe3d/commits/fb3ba78a5a21dd69db86018e74d279895501df33",
+      "kind": "github-commit",
+      "sourceIds": [
+        10
+      ],
+      "attemptedAt": "2026-09-12T15:29:05+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 21359,
+      "sha256": "b2724a3c72262c8e33d929d7c6fdb6ecf636af23e827cbf728a41f4a5035923d",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_vibe-stack_vibe3d_commits_fb3ba78a5a21dd69db86018e74d279895501df33",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/vibe-stack/vibe3d/commits/fb3ba78a5a21dd69db86018e74d279895501df33",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/vibe-stack/vibe3d/git/trees/fb3ba78a5a21dd69db86018e74d279895501df33?recursive=1",
+      "kind": "github-tree",
+      "sourceIds": [
+        10
+      ],
+      "attemptedAt": "2026-09-12T15:29:06+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 955628,
+      "sha256": "e0cc54d6bdc29405ca3c66550ee109d07e16e2fdc4d78b568a4438b06dc7cc8d",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_vibe-stack_vibe3d_git_trees_fb3ba78a5a21dd69db86018e74d279895501df33_recursive_1",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/vibe-stack/vibe3d/git/trees/fb3ba78a5a21dd69db86018e74d279895501df33?recursive=1",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/vibe-stack/vibe3d/fb3ba78a5a21dd69db86018e74d279895501df33/LICENSE",
+      "kind": "licence-or-readme",
+      "sourceIds": [
+        10
+      ],
+      "attemptedAt": "2026-09-12T15:29:10+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 1076,
+      "sha256": "ca538757ed3d930df3c1eca8668e1c0663814071c97dde0406c9773eeb37992e",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_vibe-stack_vibe3d_fb3ba78a5a21dd69db86018e74d279895501df33_LICENSE",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/vibe-stack/vibe3d/fb3ba78a5a21dd69db86018e74d279895501df33/LICENSE",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/keysforthewin/thaikit/commits/92095c48ae8792132b60dfb4052c9d7b2ad795f2",
+      "kind": "github-commit",
+      "sourceIds": [
+        10
+      ],
+      "attemptedAt": "2026-09-12T15:29:11+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 11249,
+      "sha256": "f75f709574d696dda9f1c54fc9ce739f4e795e760d4f89d31d837d0bbf09ef05",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_keysforthewin_thaikit_commits_92095c48ae8792132b60dfb4052c9d7b2ad795f2",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/keysforthewin/thaikit/commits/92095c48ae8792132b60dfb4052c9d7b2ad795f2",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/keysforthewin/thaikit/git/trees/92095c48ae8792132b60dfb4052c9d7b2ad795f2?recursive=1",
+      "kind": "github-tree",
+      "sourceIds": [
+        10
+      ],
+      "attemptedAt": "2026-09-12T15:29:12+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 560599,
+      "sha256": "aec5c93990cfae3b1dacf85438e25ec133cd4b5d0f4745366cd656eaa0ae956f",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_keysforthewin_thaikit_git_trees_92095c48ae8792132b60dfb4052c9d7b2ad795f2_recursive_1",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/keysforthewin/thaikit/git/trees/92095c48ae8792132b60dfb4052c9d7b2ad795f2?recursive=1",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/keysforthewin/thaikit/92095c48ae8792132b60dfb4052c9d7b2ad795f2/LICENSE",
+      "kind": "licence-or-readme",
+      "sourceIds": [
+        10
+      ],
+      "attemptedAt": "2026-09-12T15:29:14+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 1077,
+      "sha256": "2aa2f718bcb0370581d2600d6b785b082f8c997b7e564dc6595bc9649e50ad9c",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_keysforthewin_thaikit_92095c48ae8792132b60dfb4052c9d7b2ad795f2_LICENSE",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/keysforthewin/thaikit/92095c48ae8792132b60dfb4052c9d7b2ad795f2/LICENSE",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/mshumer/Claude-of-Duty/commits/d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853",
+      "kind": "github-commit",
+      "sourceIds": [
+        13
+      ],
+      "attemptedAt": "2026-09-12T15:29:14+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 5271,
+      "sha256": "ff9aa53b3e367c6d2efcb5e570b0461d05503916949d738e01dde46536978d68",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_mshumer_Claude-of-Duty_commits_d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/mshumer/Claude-of-Duty/commits/d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/mshumer/Claude-of-Duty/git/trees/d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853?recursive=1",
+      "kind": "github-tree",
+      "sourceIds": [
+        13
+      ],
+      "attemptedAt": "2026-09-12T15:29:14+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 47150,
+      "sha256": "ade8c484e8c245f7f8b089892078b7e48e639edfbf98dd92529a59a0d47e4a3c",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_mshumer_Claude-of-Duty_git_trees_d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853_recursive_1",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/mshumer/Claude-of-Duty/git/trees/d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853?recursive=1",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/mshumer/Claude-of-Duty/d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853/LICENSE",
+      "kind": "licence-or-readme",
+      "sourceIds": [
+        13
+      ],
+      "attemptedAt": "2026-09-12T15:29:15+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 1064,
+      "sha256": "7ba018b28d540012029c1d39acd134ec1ab3693108c9d05a5e1122cc84054af5",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_mshumer_Claude-of-Duty_d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853_LICENSE",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/mshumer/Claude-of-Duty/d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853/LICENSE",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/SamG-Coder/threepp/commits/367ec39da837224f076711b5d24d68be8280cc5a",
+      "kind": "github-commit",
+      "sourceIds": [
+        15
+      ],
+      "attemptedAt": "2026-09-12T15:29:15+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 182643,
+      "sha256": "a27248fd65c32b15d1d0a266f0363b11e842bf2a53b4695db700c50377c12923",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_SamG-Coder_threepp_commits_367ec39da837224f076711b5d24d68be8280cc5a",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/SamG-Coder/threepp/commits/367ec39da837224f076711b5d24d68be8280cc5a",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/SamG-Coder/threepp/git/trees/367ec39da837224f076711b5d24d68be8280cc5a?recursive=1",
+      "kind": "github-tree",
+      "sourceIds": [
+        15
+      ],
+      "attemptedAt": "2026-09-12T15:29:15+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 789681,
+      "sha256": "61f40707e331d9ba3d9b15c312b47609710f57937946938ee09e52e6aeb09ca5",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_SamG-Coder_threepp_git_trees_367ec39da837224f076711b5d24d68be8280cc5a_recursive_1",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/SamG-Coder/threepp/git/trees/367ec39da837224f076711b5d24d68be8280cc5a?recursive=1",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/SamG-Coder/threepp/367ec39da837224f076711b5d24d68be8280cc5a/LICENSE",
+      "kind": "licence-or-readme",
+      "sourceIds": [
+        15
+      ],
+      "attemptedAt": "2026-09-12T15:29:16+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 1103,
+      "sha256": "21d4a1832a497194e8a6cfe64deb7c517545d28985edf64da01e91b48b2c6a25",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_SamG-Coder_threepp_367ec39da837224f076711b5d24d68be8280cc5a_LICENSE",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/SamG-Coder/threepp/367ec39da837224f076711b5d24d68be8280cc5a/LICENSE",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/localai-org/kimodo.cpp/commits/92341f31940d54d4f0a44aa5975e470b78b2ab5c",
+      "kind": "github-commit",
+      "sourceIds": [
+        16
+      ],
+      "attemptedAt": "2026-09-12T15:29:16+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 162121,
+      "sha256": "019af545bce9c3f79a7fba499c1a66dac550850a04452390aa4c042b39f081a6",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_localai-org_kimodo.cpp_commits_92341f31940d54d4f0a44aa5975e470b78b2ab5c",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/localai-org/kimodo.cpp/commits/92341f31940d54d4f0a44aa5975e470b78b2ab5c",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://api.github.com/repos/localai-org/kimodo.cpp/git/trees/92341f31940d54d4f0a44aa5975e470b78b2ab5c?recursive=1",
+      "kind": "github-tree",
+      "sourceIds": [
+        16
+      ],
+      "attemptedAt": "2026-09-12T15:29:17+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 25214,
+      "sha256": "81722e4847219ad9f91eddd21b79a1d2c834379f2742156a4f90e40207eb10c8",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___api.github.com_repos_localai-org_kimodo.cpp_git_trees_92341f31940d54d4f0a44aa5975e470b78b2ab5c_recursive_1",
+      "error": null,
+      "finalUrl": "https://api.github.com/repos/localai-org/kimodo.cpp/git/trees/92341f31940d54d4f0a44aa5975e470b78b2ab5c?recursive=1",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/localai-org/kimodo.cpp/92341f31940d54d4f0a44aa5975e470b78b2ab5c/LICENSE",
+      "kind": "licence-or-readme",
+      "sourceIds": [
+        16
+      ],
+      "attemptedAt": "2026-09-12T15:29:17+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 11357,
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_localai-org_kimodo.cpp_92341f31940d54d4f0a44aa5975e470b78b2ab5c_LICENSE",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/localai-org/kimodo.cpp/92341f31940d54d4f0a44aa5975e470b78b2ab5c/LICENSE",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/squall01337/mixamo-llm-mocap/00dfd5385506022d533c84f6737a09f5f4392623/docs/RIG.md",
+      "kind": "implementation-file",
+      "sourceIds": [
+        1
+      ],
+      "attemptedAt": "2026-09-12T15:29:55+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 3810,
+      "sha256": "7d085a63a05068348740cea77399a76dd9becf965f6cbaf0de895afebc7669d8",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_squall01337_mixamo-llm-mocap_00dfd5385506022d533c84f6737a09f5f4392623_docs_RIG.md",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/squall01337/mixamo-llm-mocap/00dfd5385506022d533c84f6737a09f5f4392623/docs/RIG.md",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/squall01337/mixamo-llm-mocap/00dfd5385506022d533c84f6737a09f5f4392623/action_specs/spin.json",
+      "kind": "implementation-file",
+      "sourceIds": [
+        1
+      ],
+      "attemptedAt": "2026-09-12T15:29:55+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 2865,
+      "sha256": "061836284ed6c85276144c82345146eaa28677399dbe8385fa03cd02ddbab058",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_squall01337_mixamo-llm-mocap_00dfd5385506022d533c84f6737a09f5f4392623_action_specs_spin.json",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/squall01337/mixamo-llm-mocap/00dfd5385506022d533c84f6737a09f5f4392623/action_specs/spin.json",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/squall01337/mixamo-llm-mocap/00dfd5385506022d533c84f6737a09f5f4392623/pipeline/apply_mixamo_fk.py",
+      "kind": "implementation-file",
+      "sourceIds": [
+        1
+      ],
+      "attemptedAt": "2026-09-12T15:29:56+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 28604,
+      "sha256": "cb43ceadf1bb410ee047577ba8ccae17d736aca9064a191cad47e9504e68ca0f",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_squall01337_mixamo-llm-mocap_00dfd5385506022d533c84f6737a09f5f4392623_pipeline_apply_mixamo_fk.py",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/squall01337/mixamo-llm-mocap/00dfd5385506022d533c84f6737a09f5f4392623/pipeline/apply_mixamo_fk.py",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/squall01337/abyssal-ocean/142265f5013b6f27bea4f4f819b832dec75c7bad/index.html",
+      "kind": "implementation-file",
+      "sourceIds": [
+        2
+      ],
+      "attemptedAt": "2026-09-12T15:29:56+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 83466,
+      "sha256": "db2849045aaeb5ff92cef9742a61a1954bd94468d49fa2d84715cd897d946d4e",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_squall01337_abyssal-ocean_142265f5013b6f27bea4f4f819b832dec75c7bad_index.html",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/squall01337/abyssal-ocean/142265f5013b6f27bea4f4f819b832dec75c7bad/index.html",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/img2threejs/img2threejs/d6673386f89673a58736f8d398dd16ece67874f5/docs/ARCHITECTURE.md",
+      "kind": "implementation-file",
+      "sourceIds": [
+        6
+      ],
+      "attemptedAt": "2026-09-12T15:29:56+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 9487,
+      "sha256": "c278589557299fe0fc76b2fbeab25ecda1cfc973c17bd2db1b5ac17f3ff2df57",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_img2threejs_img2threejs_d6673386f89673a58736f8d398dd16ece67874f5_docs_ARCHITECTURE.md",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/img2threejs/img2threejs/d6673386f89673a58736f8d398dd16ece67874f5/docs/ARCHITECTURE.md",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/img2threejs/img2threejs/d6673386f89673a58736f8d398dd16ece67874f5/SKILL.md",
+      "kind": "implementation-file",
+      "sourceIds": [
+        6
+      ],
+      "attemptedAt": "2026-09-12T15:29:56+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 48766,
+      "sha256": "c0ae7cdb98c991e0f6f08483c955e22f65eea83cf2386222157c58e903e5dc95",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_img2threejs_img2threejs_d6673386f89673a58736f8d398dd16ece67874f5_SKILL.md",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/img2threejs/img2threejs/d6673386f89673a58736f8d398dd16ece67874f5/SKILL.md",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/StarKnightt/night-street/333f064778105640588a95d2c2d150780044e7bf/docs/TECHNIQUE.md",
+      "kind": "implementation-file",
+      "sourceIds": [
+        7
+      ],
+      "attemptedAt": "2026-09-12T15:29:57+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 58960,
+      "sha256": "e6032118de3d5196c39479c1ce10d52c92027223bc88f79944c68e00de26e0c0",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_StarKnightt_night-street_333f064778105640588a95d2c2d150780044e7bf_docs_TECHNIQUE.md",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/StarKnightt/night-street/333f064778105640588a95d2c2d150780044e7bf/docs/TECHNIQUE.md",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/StarKnightt/night-street/333f064778105640588a95d2c2d150780044e7bf/PROMPTS.md",
+      "kind": "implementation-file",
+      "sourceIds": [
+        7
+      ],
+      "attemptedAt": "2026-09-12T15:29:57+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 14956,
+      "sha256": "a80b959e3293fdb2f0ec9b0698bf755ccf983558c852e57c2c08144023202f3e",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_StarKnightt_night-street_333f064778105640588a95d2c2d150780044e7bf_PROMPTS.md",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/StarKnightt/night-street/333f064778105640588a95d2c2d150780044e7bf/PROMPTS.md",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/StarKnightt/night-street/333f064778105640588a95d2c2d150780044e7bf/src/scene/softShadow.ts",
+      "kind": "implementation-file",
+      "sourceIds": [
+        7
+      ],
+      "attemptedAt": "2026-09-12T15:29:57+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 16800,
+      "sha256": "d17150510789c452e97f520c2d527669c60ccc75ec8377c5869d634c3d00caa8",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_StarKnightt_night-street_333f064778105640588a95d2c2d150780044e7bf_src_scene_softShadow.ts",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/StarKnightt/night-street/333f064778105640588a95d2c2d150780044e7bf/src/scene/softShadow.ts",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/StarKnightt/jungle-trail/c15640d3a2b6f08ca68e4df98fdfc953ea8a070a/PROMPT.md",
+      "kind": "implementation-file",
+      "sourceIds": [
+        8
+      ],
+      "attemptedAt": "2026-09-12T15:29:57+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 3328,
+      "sha256": "2a6d63a029b516a4440b7fbcaadbcea04413772199a34bb7f433cbf678d30858",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_StarKnightt_jungle-trail_c15640d3a2b6f08ca68e4df98fdfc953ea8a070a_PROMPT.md",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/StarKnightt/jungle-trail/c15640d3a2b6f08ca68e4df98fdfc953ea8a070a/PROMPT.md",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/StarKnightt/jungle-trail/c15640d3a2b6f08ca68e4df98fdfc953ea8a070a/src/gfx/glsl.js",
+      "kind": "implementation-file",
+      "sourceIds": [
+        8
+      ],
+      "attemptedAt": "2026-09-12T15:29:58+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 11330,
+      "sha256": "2f09310f1a0fd321717988f645dd9c3f9dd549ab6a2fcdfc76e252825fa9f0c8",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_StarKnightt_jungle-trail_c15640d3a2b6f08ca68e4df98fdfc953ea8a070a_src_gfx_glsl.js",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/StarKnightt/jungle-trail/c15640d3a2b6f08ca68e4df98fdfc953ea8a070a/src/gfx/glsl.js",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/StarKnightt/jungle-trail/c15640d3a2b6f08ca68e4df98fdfc953ea8a070a/src/render/grade.js",
+      "kind": "implementation-file",
+      "sourceIds": [
+        8
+      ],
+      "attemptedAt": "2026-09-12T15:29:58+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 65101,
+      "sha256": "d48e6d1a14ba0227484e1f399a3767e78b1870a5c2a1dabfb3ba684d4e5185d8",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_StarKnightt_jungle-trail_c15640d3a2b6f08ca68e4df98fdfc953ea8a070a_src_render_grade.js",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/StarKnightt/jungle-trail/c15640d3a2b6f08ca68e4df98fdfc953ea8a070a/src/render/grade.js",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/millionco/react-doctor/e183c3519010599d929ed14d99a18bf1f8f8a44c/skills/improve-threejs/SKILL.md",
+      "kind": "implementation-file",
+      "sourceIds": [
+        9
+      ],
+      "attemptedAt": "2026-09-12T15:29:58+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 9128,
+      "sha256": "bd5871e3368fe784b2f77f931f3839a55192c16ee08079fa1e5267c440ac2adc",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_millionco_react-doctor_e183c3519010599d929ed14d99a18bf1f8f8a44c_skills_improve-threejs_SKILL.md",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/millionco/react-doctor/e183c3519010599d929ed14d99a18bf1f8f8a44c/skills/improve-threejs/SKILL.md",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/vibe-stack/vibe3d/fb3ba78a5a21dd69db86018e74d279895501df33/docs/vibe3d-architecture.md",
+      "kind": "implementation-file",
+      "sourceIds": [
+        10
+      ],
+      "attemptedAt": "2026-09-12T15:29:58+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 26731,
+      "sha256": "6a2ee94ab667203858afc736ccbc77aa4ce5915b1bc11878ce7b24bc096a692a",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_vibe-stack_vibe3d_fb3ba78a5a21dd69db86018e74d279895501df33_docs_vibe3d-architecture.md",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/vibe-stack/vibe3d/fb3ba78a5a21dd69db86018e74d279895501df33/docs/vibe3d-architecture.md",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/vibe-stack/vibe3d/fb3ba78a5a21dd69db86018e74d279895501df33/models.json",
+      "kind": "implementation-file",
+      "sourceIds": [
+        10
+      ],
+      "attemptedAt": "2026-09-12T15:29:59+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 394,
+      "sha256": "f5539ddf0a8df887b4c8c85cf1c555b3692d48a575de6ae4b11b74e545ea87a2",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_vibe-stack_vibe3d_fb3ba78a5a21dd69db86018e74d279895501df33_models.json",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/vibe-stack/vibe3d/fb3ba78a5a21dd69db86018e74d279895501df33/models.json",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/keysforthewin/thaikit/92095c48ae8792132b60dfb4052c9d7b2ad795f2/packages/props/package.json",
+      "kind": "implementation-file",
+      "sourceIds": [
+        10
+      ],
+      "attemptedAt": "2026-09-12T15:29:59+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 885,
+      "sha256": "179febae7403235d0677e2275f5feee453e26ef2143d1c681078991023989986",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_keysforthewin_thaikit_92095c48ae8792132b60dfb4052c9d7b2ad795f2_packages_props_package.json",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/keysforthewin/thaikit/92095c48ae8792132b60dfb4052c9d7b2ad795f2/packages/props/package.json",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/keysforthewin/thaikit/92095c48ae8792132b60dfb4052c9d7b2ad795f2/packages/props/README.md",
+      "kind": "implementation-file",
+      "sourceIds": [
+        10
+      ],
+      "attemptedAt": "2026-09-12T15:29:59+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 2324,
+      "sha256": "fb7a8a94f8fe0c79e8876bf39201064a77d59d6723964ea189bb51745daade3b",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_keysforthewin_thaikit_92095c48ae8792132b60dfb4052c9d7b2ad795f2_packages_props_README.md",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/keysforthewin/thaikit/92095c48ae8792132b60dfb4052c9d7b2ad795f2/packages/props/README.md",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/mshumer/Claude-of-Duty/d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853/prompt.md",
+      "kind": "implementation-file",
+      "sourceIds": [
+        13
+      ],
+      "attemptedAt": "2026-09-12T15:29:59+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 941,
+      "sha256": "4c6d494ebaa6123309bc5e0a29b4ab07cadb279b4376239e02d78e3a240667c2",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_mshumer_Claude-of-Duty_d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853_prompt.md",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/mshumer/Claude-of-Duty/d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853/prompt.md",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/mshumer/Claude-of-Duty/d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853/ARCHITECTURE.md",
+      "kind": "implementation-file",
+      "sourceIds": [
+        13
+      ],
+      "attemptedAt": "2026-09-12T15:29:59+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 9369,
+      "sha256": "76f406211b3b6c84191d21fd9d6dcb629c05375c1edcd5fc9af35454070033e5",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_mshumer_Claude-of-Duty_d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853_ARCHITECTURE.md",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/mshumer/Claude-of-Duty/d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853/ARCHITECTURE.md",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/SamG-Coder/threepp/367ec39da837224f076711b5d24d68be8280cc5a/ThreeBrowserRuntime/samples/webgpu_rtx_light_transport_observatory/src/main.mjs",
+      "kind": "implementation-file",
+      "sourceIds": [
+        15
+      ],
+      "attemptedAt": "2026-09-12T15:30:00+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 19212,
+      "sha256": "91016b9e6a1d5323495eee9f6cb47a8edc0888a2dbfc87241612391d58a925f4",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_SamG-Coder_threepp_367ec39da837224f076711b5d24d68be8280cc5a_ThreeBrowserRuntime_samples_webgpu_rtx_light_transport_o",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/SamG-Coder/threepp/367ec39da837224f076711b5d24d68be8280cc5a/ThreeBrowserRuntime/samples/webgpu_rtx_light_transport_observatory/src/main.mjs",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/localai-org/kimodo.cpp/92341f31940d54d4f0a44aa5975e470b78b2ab5c/src/skeleton.hpp",
+      "kind": "implementation-file",
+      "sourceIds": [
+        16
+      ],
+      "attemptedAt": "2026-09-12T15:30:00+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 6872,
+      "sha256": "6c1e1d98170a99105bd325c32caff5421bfb20d1e16160980a9f2c3258e244a3",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_localai-org_kimodo.cpp_92341f31940d54d4f0a44aa5975e470b78b2ab5c_src_skeleton.hpp",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/localai-org/kimodo.cpp/92341f31940d54d4f0a44aa5975e470b78b2ab5c/src/skeleton.hpp",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/localai-org/kimodo.cpp/92341f31940d54d4f0a44aa5975e470b78b2ab5c/src/sequence.cpp",
+      "kind": "implementation-file",
+      "sourceIds": [
+        16
+      ],
+      "attemptedAt": "2026-09-12T15:30:00+00:00",
+      "outcome": "ok",
+      "httpStatus": 200,
+      "bytes": 7700,
+      "sha256": "1b099faabcfa7a9e179bbfb0a1adbe1d9976b8bd9fc83e1b56a6c118c4236808",
+      "localPath": "C:\\Users\\david\\AppData\\Local\\Temp\\technique-lab-group-a\\https___raw.githubusercontent.com_localai-org_kimodo.cpp_92341f31940d54d4f0a44aa5975e470b78b2ab5c_src_sequence.cpp",
+      "error": null,
+      "finalUrl": "https://raw.githubusercontent.com/localai-org/kimodo.cpp/92341f31940d54d4f0a44aa5975e470b78b2ab5c/src/sequence.cpp",
+      "contentType": "text/plain; charset=utf-8"
+    }
+  ]
+}

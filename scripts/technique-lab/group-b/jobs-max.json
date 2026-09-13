@@ -1,0 +1,13 @@
+[
+  { "sourceId": 20, "role": "method-implementation", "url": "https://raw.githubusercontent.com/Kevin-Liu-01/Claude-of-Tanks/9004ce65a9be52793a3f4130bde034ec4a857f32/src/sim/armor.js" },
+  { "sourceId": 20, "role": "method-implementation", "url": "https://raw.githubusercontent.com/Kevin-Liu-01/Claude-of-Tanks/9004ce65a9be52793a3f4130bde034ec4a857f32/src/sim/ballistics.js" },
+  { "sourceId": 27, "role": "skill-body", "url": "https://raw.githubusercontent.com/majidmanzarpour/threejs-game-skills/7221c1f4a6d2ae189a4d85d058d24f3228499d46/skills/threejs-gameplay-systems/SKILL.md" },
+  { "sourceId": 27, "role": "skill-body", "url": "https://raw.githubusercontent.com/majidmanzarpour/threejs-game-skills/7221c1f4a6d2ae189a4d85d058d24f3228499d46/skills/threejs-game-director/SKILL.md" },
+  { "sourceId": 28, "role": "skill-body", "url": "https://raw.githubusercontent.com/dgreenheck/webgpu-claude-skill/af2319bd01bb7cc881267a9ef42cafdaf5e9029d/skills/webgpu-threejs-tsl/SKILL.md" },
+  { "sourceId": 28, "role": "skill-body", "url": "https://raw.githubusercontent.com/dgreenheck/webgpu-claude-skill/af2319bd01bb7cc881267a9ef42cafdaf5e9029d/skills/webgpu-threejs-tsl/docs/materials.md" },
+  { "sourceId": 29, "role": "skill-body", "url": "https://raw.githubusercontent.com/CloudAI-X/threejs-skills/b1c623076c661fc9b03dac19292e825a5d106823/skills/threejs-geometry/SKILL.md" },
+  { "sourceId": 29, "role": "skill-body", "url": "https://raw.githubusercontent.com/CloudAI-X/threejs-skills/b1c623076c661fc9b03dac19292e825a5d106823/skills/threejs-materials/SKILL.md" },
+  { "sourceId": 31, "role": "asset-page", "url": "https://opengameart.org/content/fps-arms-rigged-only" },
+  { "sourceId": 34, "role": "method-implementation", "url": "https://raw.githubusercontent.com/mshumer/Claude-of-Duty/d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853/README.md" },
+  { "sourceId": 34, "role": "method-implementation", "url": "https://raw.githubusercontent.com/mshumer/Claude-of-Duty/d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853/src/weapons/ballistics.js" }
+]

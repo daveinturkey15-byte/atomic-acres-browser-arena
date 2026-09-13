@@ -9,6 +9,7 @@ import {
   PASS73_LIVE_GRAPHICS_VIEWPORT,
   assertPass73LiveGraphicsReceipt,
 } from './pass73-live-graphics-contract.mjs';
+import { OFFSCREEN_ARGS } from './lib/browser-launch-flags.mjs';
 
 const repositoryRoot = resolve(import.meta.dirname, '..', '..');
 const artifactRoot = resolve(repositoryRoot, 'artifacts', 'pass73', 'live-graphics');
@@ -299,8 +300,8 @@ try {
   browser = await chromium.launch({
     executablePath: browserExecutablePath,
     headless: false,
-    args: [
-      '--enable-unsafe-webgpu',
+    args: [...OFFSCREEN_ARGS,
+    '--enable-unsafe-webgpu',
       '--ignore-gpu-blocklist',
       '--use-angle=d3d11',
       '--disable-software-rasterizer',

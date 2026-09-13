@@ -2,7 +2,27 @@ import { DRONE_SUPPORT_LIFETIMES_MS } from './killstreak-support-catalog';
 
 export const CARE_PACKAGE_KILLSTREAK_ID = 'care-package';
 export const NUKE_KILLSTREAK_ID = 'nuke';
+export const CRIMSON_FLAMETHROWER_KILLSTREAK_ID = 'crimson-flamethrower';
 export const CARE_PACKAGE_FIXED_DENOMINATOR = 100;
+
+/**
+ * HF-334: rewards whose care-package probability is an EXACT percentage rather
+ * than a share of the weighted pool. The Nuke has always been exactly 1%; the
+ * owner asked for the flamethrower reward at exactly 10%, which no integer
+ * base weight can express while the Nuke stays exactly 1% (the arithmetic
+ * demands a weight of 1230/89). Declaring it fixed makes the owner's number
+ * exact instead of approximated.
+ *
+ * A fixed reward carries zero base weight and is optional: a catalog that
+ * omits one simply redistributes its percentage to the weighted entries, so
+ * this stays backwards-compatible with any catalog that predates it.
+ */
+export const CARE_PACKAGE_FIXED_PERCENTS: Readonly<Record<string, number>> = Object.freeze({
+  [NUKE_KILLSTREAK_ID]: 1,
+  [CRIMSON_FLAMETHROWER_KILLSTREAK_ID]: 10,
+});
+
+/** Retained for callers that predate the generalised fixed-percent pool. */
 export const CARE_PACKAGE_NON_NUKE_SCALE = CARE_PACKAGE_FIXED_DENOMINATOR - 1;
 
 export type KillstreakAvailability = 'selectable' | 'care-only' | 'retired';
@@ -41,6 +61,8 @@ export type KillstreakCatalog<Id extends string = string> = Readonly<{
     nonNukeBaseWeightTotal: number;
     totalWeightUnits: number;
     fixedNukeProbability: Readonly<{ numerator: 1; denominator: 100 }>;
+    /** Exact percentages claimed by fixed rewards present in this catalog. */
+    fixedPercents: Readonly<Record<string, number>>;
   }>;
 }>;
 
@@ -93,7 +115,10 @@ function validateSourceDefinition(value: unknown, index: number): asserts value 
   if (typeof value.displayName !== 'string' || value.displayName.trim().length === 0 || value.displayName.length > 80) {
     throw new Error(`${label} has invalid display name`);
   }
-  if (!Number.isSafeInteger(value.cost) || (value.cost as number) < 1 || (value.cost as number) > 100) {
+  // A care-only reward is never bought with kills, so cost 0 is its honest
+  // value there and nowhere else — a purchasable streak still needs a real one.
+  const minimumCost = value.availability === 'care-only' ? 0 : 1;
+  if (!Number.isSafeInteger(value.cost) || (value.cost as number) < minimumCost || (value.cost as number) > 100) {
     throw new Error(`${label} has invalid cost`);
   }
   if (!TIERS.includes(value.tier as KillstreakTier)) throw new Error(`${label} has invalid tier`);
@@ -143,10 +168,23 @@ export function createKillstreakCatalog<const Id extends string>(
     throw new Error('nuke must be selectable with its fixed-probability base weight set to zero');
   }
 
+  // Fixed-percentage rewards actually present in THIS catalog.
+  const fixedPercentById = new Map<string, number>();
+  for (const source of sources) {
+    const percent = CARE_PACKAGE_FIXED_PERCENTS[source.id];
+    if (percent === undefined || source.availability === 'retired') continue;
+    fixedPercentById.set(source.id, percent);
+  }
+  const fixedPercentTotal = [...fixedPercentById.values()].reduce((total, percent) => total + percent, 0);
+  if (fixedPercentTotal >= CARE_PACKAGE_FIXED_DENOMINATOR) {
+    throw new Error('care-package fixed rewards cannot claim the whole pool');
+  }
+  const weightedScale = CARE_PACKAGE_FIXED_DENOMINATOR - fixedPercentTotal;
+
   let nonNukeBaseWeightTotal = 0;
   for (const source of sources) {
     const eligible = source.availability !== 'retired' && source.id !== CARE_PACKAGE_KILLSTREAK_ID;
-    if (!eligible || source.id === NUKE_KILLSTREAK_ID) {
+    if (!eligible || fixedPercentById.has(source.id)) {
       if (source.carePackageBaseWeightUnits !== 0) {
         throw new Error(`${source.id} must have zero care-package base weight`);
       }
@@ -165,8 +203,11 @@ export function createKillstreakCatalog<const Id extends string>(
 
   const weightFor = (source: KillstreakCatalogSourceDefinition<Id>): number => {
     if (source.availability === 'retired' || source.id === CARE_PACKAGE_KILLSTREAK_ID) return 0;
-    if (source.id === NUKE_KILLSTREAK_ID) return nonNukeBaseWeightTotal;
-    return safeMultiply(source.carePackageBaseWeightUnits, CARE_PACKAGE_NON_NUKE_SCALE, `${source.id} derived care weight`);
+    const fixedPercent = fixedPercentById.get(source.id);
+    if (fixedPercent !== undefined) {
+      return safeMultiply(nonNukeBaseWeightTotal, fixedPercent, `${source.id} fixed care weight`);
+    }
+    return safeMultiply(source.carePackageBaseWeightUnits, weightedScale, `${source.id} derived care weight`);
   };
 
   const definitions = Object.freeze(sources.map((source) => Object.freeze({
@@ -188,9 +229,12 @@ export function createKillstreakCatalog<const Id extends string>(
   }
   const expectedTotal = safeMultiply(nonNukeBaseWeightTotal, CARE_PACKAGE_FIXED_DENOMINATOR, 'care-package expected total');
   if (cursor !== expectedTotal) throw new Error(`care-package formula mismatch ${cursor}/${expectedTotal}`);
-  const nukeEntry = entries.find((entry) => entry.id === NUKE_KILLSTREAK_ID);
-  if (!nukeEntry || nukeEntry.weightUnits * CARE_PACKAGE_FIXED_DENOMINATOR !== cursor) {
-    throw new Error('nuke must equal exactly one percent of the care-package pool');
+  // Every fixed reward must land on its exact percentage, Nuke included.
+  for (const [fixedId, percent] of fixedPercentById) {
+    const entry = entries.find((candidate) => candidate.id === fixedId);
+    if (!entry || safeMultiply(entry.weightUnits, CARE_PACKAGE_FIXED_DENOMINATOR, `${fixedId} fixed check`) !== safeMultiply(cursor, percent, `${fixedId} fixed target`)) {
+      throw new Error(`${fixedId} must equal exactly ${percent} percent of the care-package pool`);
+    }
   }
 
   return Object.freeze({
@@ -200,6 +244,7 @@ export function createKillstreakCatalog<const Id extends string>(
       nonNukeBaseWeightTotal,
       totalWeightUnits: cursor,
       fixedNukeProbability: Object.freeze({ numerator: 1 as const, denominator: 100 as const }),
+      fixedPercents: Object.freeze(Object.fromEntries(fixedPercentById)),
     }),
   });
 }
@@ -227,10 +272,22 @@ export const PASS65_KILLSTREAK_SOURCES = freezeSourceDefinitions([
   { id: 'hunter-swarm', displayName: 'Hunter Swarm', cost: 8, tier: 'high', availability: 'selectable', carePackageBaseWeightUnits: 9, relationship: 'retained-slot-3-or-4', activation: 'instant', durationMs: 20_000, repeatable: false },
   { id: 'chopper', displayName: 'Chopper Gunner', cost: 8, tier: 'high', availability: 'selectable', carePackageBaseWeightUnits: 9, relationship: 'slot-3-or-4-alternative', activation: 'instant', durationMs: 30_000, repeatable: false },
   { id: 'drone-swarm', displayName: 'Drone Swarm', cost: 15, tier: 'top', availability: 'selectable', carePackageBaseWeightUnits: 1, relationship: 'nuke-slot-alternative', activation: 'instant', durationMs: DRONE_SUPPORT_LIFETIMES_MS.swarm, repeatable: false },
+  // HF-334: care-package-only reward at exactly 10% (owner decision 2026-08-22).
+  // Grants the crimson flamethrower — a separate weapon instance from the
+  // arena-bound map flamethrower, so the world pickup is never consumed.
+  { id: 'crimson-flamethrower', displayName: 'Crimson Flamethrower', cost: 0, tier: 'mid', availability: 'care-only', carePackageBaseWeightUnits: 0, relationship: 'care-package-fixed-ten-percent', activation: 'instant', durationMs: 45_000, repeatable: true },
   { id: 'nuke', displayName: 'Nuke', cost: 15, tier: 'top', availability: 'selectable', carePackageBaseWeightUnits: 0, relationship: 'drone-swarm-slot-alternative-and-one-percent-care-reward', activation: 'instant', durationMs: 0, repeatable: false },
 ] as const satisfies readonly KillstreakCatalogSourceDefinition[]);
 
 export type Pass65KillstreakId = typeof PASS65_KILLSTREAK_SOURCES[number]['id'];
+
+/**
+ * Killstreaks a player can actually put in a loadout slot. Excludes
+ * care-package-only rewards (HF-334's crimson flamethrower), which are weapon
+ * grants rather than streaks and therefore have no slot, demo clip or menu
+ * media. Maps keyed by this type stay exhaustive over real streaks.
+ */
+export type SelectableKillstreakId = Exclude<Pass65KillstreakId, typeof CRIMSON_FLAMETHROWER_KILLSTREAK_ID>;
 export const PASS65_KILLSTREAK_CATALOG = createKillstreakCatalog(PASS65_KILLSTREAK_SOURCES);
 
 export type KillstreakSlotDefinition = Readonly<{
@@ -248,7 +305,7 @@ export const PASS65_KILLSTREAK_SLOT_DEFINITIONS: readonly KillstreakSlotDefiniti
 
 export type KillstreakLoadoutV1 = Readonly<{
   schemaVersion: 1;
-  slots: readonly [Pass65KillstreakId, Pass65KillstreakId, Pass65KillstreakId, Pass65KillstreakId, Pass65KillstreakId];
+  slots: readonly [SelectableKillstreakId, SelectableKillstreakId, SelectableKillstreakId, SelectableKillstreakId, SelectableKillstreakId];
 }>;
 
 export type KillstreakLoadoutValidation = Readonly<{

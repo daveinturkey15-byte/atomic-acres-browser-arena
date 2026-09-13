@@ -1,0 +1,1013 @@
+{
+ "arena": "skyline-terminal",
+ "contract": "every substantial visible mesh is rated for gunfire, excluded by a stated rule, or accepted below with a reason; unrated is the honest remainder",
+ "completionPercent": 100,
+ "ratchet": {
+  "unratedAfterLedger": 0,
+  "ceiling": 0,
+  "withinCeiling": true
+ },
+ "census": {
+  "total": 110,
+  "ratedDirect": 61,
+  "ratedByFootprint": 0,
+  "dynamicTargets": 0,
+  "excludedByRule": 49,
+  "unrated": 0,
+  "acceptedByLedger": 0,
+  "unratedAfterLedger": 0
+ },
+ "shotSurfaceStats": {
+  "total": 161,
+  "byMaterial": {
+   "concrete": 8,
+   "wood": 80,
+   "interior-wall": 9,
+   "earth": 2,
+   "structural-metal": 10,
+   "glass": 9,
+   "vehicle": 29,
+   "container": 10,
+   "fence": 4
+  },
+  "byClassification": {
+   "explicit": 10,
+   "rule": 151
+  }
+ },
+ "excludedByRule": {
+  "sky/atmosphere dressing": 49
+ },
+ "footprintExplained": [],
+ "acceptedShootThrough": [],
+ "unratedMeshes": [],
+ "staleLedgerRows": [],
+ "shotSurfaces": [
+  {
+   "id": "Skyline Terminal arena:0:tarmac",
+   "name": "skyline-tarmac-apron",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Skyline Terminal arena:1:skyline-wood-pallet-west-deck-0--2.08",
+   "name": "skyline-wood-pallet-west-deck-0--2.08",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:2:skyline-wood-pallet-west-deck-0--1.04",
+   "name": "skyline-wood-pallet-west-deck-0--1.04",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:3:skyline-wood-pallet-west-deck-0-0",
+   "name": "skyline-wood-pallet-west-deck-0-0",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:4:skyline-wood-pallet-west-deck-0-1.04",
+   "name": "skyline-wood-pallet-west-deck-0-1.04",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:5:skyline-wood-pallet-west-deck-0-2.08",
+   "name": "skyline-wood-pallet-west-deck-0-2.08",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:6:skyline-wood-pallet-west-runner-0--1.02",
+   "name": "skyline-wood-pallet-west-runner-0--1.02",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:7:skyline-wood-pallet-west-runner-0-0",
+   "name": "skyline-wood-pallet-west-runner-0-0",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:8:skyline-wood-pallet-west-runner-0-1.02",
+   "name": "skyline-wood-pallet-west-runner-0-1.02",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:9:skyline-wood-pallet-west-deck-1--2.08",
+   "name": "skyline-wood-pallet-west-deck-1--2.08",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:10:skyline-wood-pallet-west-deck-1--1.04",
+   "name": "skyline-wood-pallet-west-deck-1--1.04",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:11:skyline-wood-pallet-west-deck-1-0",
+   "name": "skyline-wood-pallet-west-deck-1-0",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:12:skyline-wood-pallet-west-deck-1-1.04",
+   "name": "skyline-wood-pallet-west-deck-1-1.04",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:13:skyline-wood-pallet-west-deck-1-2.08",
+   "name": "skyline-wood-pallet-west-deck-1-2.08",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:14:skyline-wood-pallet-west-runner-1--1.02",
+   "name": "skyline-wood-pallet-west-runner-1--1.02",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:15:skyline-wood-pallet-west-runner-1-0",
+   "name": "skyline-wood-pallet-west-runner-1-0",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:16:skyline-wood-pallet-west-runner-1-1.02",
+   "name": "skyline-wood-pallet-west-runner-1-1.02",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:17:skyline-wood-pallet-west-deck-2--2.08",
+   "name": "skyline-wood-pallet-west-deck-2--2.08",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:18:skyline-wood-pallet-west-deck-2--1.04",
+   "name": "skyline-wood-pallet-west-deck-2--1.04",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:19:skyline-wood-pallet-west-deck-2-0",
+   "name": "skyline-wood-pallet-west-deck-2-0",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:20:skyline-wood-pallet-west-deck-2-1.04",
+   "name": "skyline-wood-pallet-west-deck-2-1.04",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:21:skyline-wood-pallet-west-deck-2-2.08",
+   "name": "skyline-wood-pallet-west-deck-2-2.08",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:22:skyline-wood-pallet-west-runner-2--1.02",
+   "name": "skyline-wood-pallet-west-runner-2--1.02",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:23:skyline-wood-pallet-west-runner-2-0",
+   "name": "skyline-wood-pallet-west-runner-2-0",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:24:skyline-wood-pallet-west-runner-2-1.02",
+   "name": "skyline-wood-pallet-west-runner-2-1.02",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:25:skyline-wood-pallet-west-deck-3--2.08",
+   "name": "skyline-wood-pallet-west-deck-3--2.08",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:26:skyline-wood-pallet-west-deck-3--1.04",
+   "name": "skyline-wood-pallet-west-deck-3--1.04",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:27:skyline-wood-pallet-west-deck-3-0",
+   "name": "skyline-wood-pallet-west-deck-3-0",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:28:skyline-wood-pallet-west-deck-3-1.04",
+   "name": "skyline-wood-pallet-west-deck-3-1.04",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:29:skyline-wood-pallet-west-deck-3-2.08",
+   "name": "skyline-wood-pallet-west-deck-3-2.08",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:30:skyline-wood-pallet-west-runner-3--1.02",
+   "name": "skyline-wood-pallet-west-runner-3--1.02",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:31:skyline-wood-pallet-west-runner-3-0",
+   "name": "skyline-wood-pallet-west-runner-3-0",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:32:skyline-wood-pallet-west-runner-3-1.02",
+   "name": "skyline-wood-pallet-west-runner-3-1.02",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:33:skyline-wood-pallet-east-deck-0--2.08",
+   "name": "skyline-wood-pallet-east-deck-0--2.08",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:34:skyline-wood-pallet-east-deck-0--1.04",
+   "name": "skyline-wood-pallet-east-deck-0--1.04",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:35:skyline-wood-pallet-east-deck-0-0",
+   "name": "skyline-wood-pallet-east-deck-0-0",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:36:skyline-wood-pallet-east-deck-0-1.04",
+   "name": "skyline-wood-pallet-east-deck-0-1.04",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:37:skyline-wood-pallet-east-deck-0-2.08",
+   "name": "skyline-wood-pallet-east-deck-0-2.08",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:38:skyline-wood-pallet-east-runner-0--1.02",
+   "name": "skyline-wood-pallet-east-runner-0--1.02",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:39:skyline-wood-pallet-east-runner-0-0",
+   "name": "skyline-wood-pallet-east-runner-0-0",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:40:skyline-wood-pallet-east-runner-0-1.02",
+   "name": "skyline-wood-pallet-east-runner-0-1.02",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:41:skyline-wood-pallet-east-deck-1--2.08",
+   "name": "skyline-wood-pallet-east-deck-1--2.08",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:42:skyline-wood-pallet-east-deck-1--1.04",
+   "name": "skyline-wood-pallet-east-deck-1--1.04",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:43:skyline-wood-pallet-east-deck-1-0",
+   "name": "skyline-wood-pallet-east-deck-1-0",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:44:skyline-wood-pallet-east-deck-1-1.04",
+   "name": "skyline-wood-pallet-east-deck-1-1.04",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:45:skyline-wood-pallet-east-deck-1-2.08",
+   "name": "skyline-wood-pallet-east-deck-1-2.08",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:46:skyline-wood-pallet-east-runner-1--1.02",
+   "name": "skyline-wood-pallet-east-runner-1--1.02",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:47:skyline-wood-pallet-east-runner-1-0",
+   "name": "skyline-wood-pallet-east-runner-1-0",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:48:skyline-wood-pallet-east-runner-1-1.02",
+   "name": "skyline-wood-pallet-east-runner-1-1.02",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:49:skyline-wood-pallet-east-deck-2--2.08",
+   "name": "skyline-wood-pallet-east-deck-2--2.08",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:50:skyline-wood-pallet-east-deck-2--1.04",
+   "name": "skyline-wood-pallet-east-deck-2--1.04",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:51:skyline-wood-pallet-east-deck-2-0",
+   "name": "skyline-wood-pallet-east-deck-2-0",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:52:skyline-wood-pallet-east-deck-2-1.04",
+   "name": "skyline-wood-pallet-east-deck-2-1.04",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:53:skyline-wood-pallet-east-deck-2-2.08",
+   "name": "skyline-wood-pallet-east-deck-2-2.08",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:54:skyline-wood-pallet-east-runner-2--1.02",
+   "name": "skyline-wood-pallet-east-runner-2--1.02",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:55:skyline-wood-pallet-east-runner-2-0",
+   "name": "skyline-wood-pallet-east-runner-2-0",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:56:skyline-wood-pallet-east-runner-2-1.02",
+   "name": "skyline-wood-pallet-east-runner-2-1.02",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:57:skyline-wood-pallet-east-deck-3--2.08",
+   "name": "skyline-wood-pallet-east-deck-3--2.08",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:58:skyline-wood-pallet-east-deck-3--1.04",
+   "name": "skyline-wood-pallet-east-deck-3--1.04",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:59:skyline-wood-pallet-east-deck-3-0",
+   "name": "skyline-wood-pallet-east-deck-3-0",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:60:skyline-wood-pallet-east-deck-3-1.04",
+   "name": "skyline-wood-pallet-east-deck-3-1.04",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:61:skyline-wood-pallet-east-deck-3-2.08",
+   "name": "skyline-wood-pallet-east-deck-3-2.08",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:62:skyline-wood-pallet-east-runner-3--1.02",
+   "name": "skyline-wood-pallet-east-runner-3--1.02",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:63:skyline-wood-pallet-east-runner-3-0",
+   "name": "skyline-wood-pallet-east-runner-3-0",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:64:skyline-wood-pallet-east-runner-3-1.02",
+   "name": "skyline-wood-pallet-east-runner-3-1.02",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:65:skyline-terminal-silver-ceiling",
+   "name": "skyline-terminal-silver-ceiling",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:66:skyline-concourse-mezzanine",
+   "name": "skyline-concourse-mezzanine",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:67:skyline-mezzanine-front-center",
+   "name": "skyline-mezzanine-front-center",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:68:skyline-mezzanine-front-west",
+   "name": "skyline-mezzanine-front-west",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:69:skyline-mezzanine-front-east",
+   "name": "skyline-mezzanine-front-east",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:70:skyline-gate-connector-floor",
+   "name": "skyline-gate-connector-floor",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:71:skyline-concourse-seat-cover--10",
+   "name": "skyline-concourse-seat-cover--10",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:72:skyline-concourse-seat-cover-10",
+   "name": "skyline-concourse-seat-cover-10",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:73:skyline-concourse-charging-planter--25",
+   "name": "skyline-concourse-charging-planter--25",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:74:skyline-concourse-charging-planter-25",
+   "name": "skyline-concourse-charging-planter-25",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:75:skyline-concourse-escalator",
+   "name": "skyline-concourse-escalator",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:76:skyline-concourse-escalator",
+   "name": "skyline-concourse-escalator",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:77:skyline-terminal-backwall",
+   "name": "skyline-terminal-backwall",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:78:skyline-terminal-leftwall",
+   "name": "skyline-terminal-leftwall",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:79:skyline-terminal-rightwall",
+   "name": "skyline-terminal-rightwall",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:80:skyline-security-scanner",
+   "name": "skyline-security-scanner",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:81:skyline-security-scanner",
+   "name": "skyline-security-scanner",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:82:skyline-security-belt",
+   "name": "skyline-security-belt",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:83:skyline-cafe-counter",
+   "name": "skyline-cafe-counter",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:84:skyline-dutyfree-kiosk",
+   "name": "skyline-dutyfree-kiosk",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:85:skyline-upper-kiosk--12",
+   "name": "skyline-upper-kiosk--12",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:86:skyline-upper-kiosk-12",
+   "name": "skyline-upper-kiosk-12",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:87:skyline-baggage-claim-carousel",
+   "name": "skyline-baggage-claim-carousel",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:88:skyline-facade-window--22",
+   "name": "skyline-facade-window--22",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Skyline Terminal arena:89:skyline-facade-window--14",
+   "name": "skyline-facade-window--14",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Skyline Terminal arena:90:skyline-facade-window--6",
+   "name": "skyline-facade-window--6",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Skyline Terminal arena:91:skyline-facade-window-6",
+   "name": "skyline-facade-window-6",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Skyline Terminal arena:92:skyline-facade-window-14",
+   "name": "skyline-facade-window-14",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Skyline Terminal arena:93:skyline-facade-window-22",
+   "name": "skyline-facade-window-22",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Skyline Terminal arena:94:skyline-jetbridge-floor",
+   "name": "skyline-jetbridge-floor",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:95:skyline-jetbridge-wall-left",
+   "name": "skyline-jetbridge-wall-left",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:96:skyline-jetbridge-wall-right",
+   "name": "skyline-jetbridge-wall-right",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:97:skyline-jetbridge-cabin-ramp",
+   "name": "skyline-jetbridge-cabin-ramp",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:98:skyline-jetliner-fuselage-top",
+   "name": "skyline-jetliner-fuselage-top",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:99:skyline-jetliner-cabin-floor",
+   "name": "skyline-jetliner-cabin-floor",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:100:skyline-jetliner-side-north",
+   "name": "skyline-jetliner-side-north",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:101:skyline-jetliner-side-north",
+   "name": "skyline-jetliner-side-north",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:102:skyline-jetliner-side-south",
+   "name": "skyline-jetliner-side-south",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:103:skyline-cockpit-floor",
+   "name": "skyline-cockpit-floor",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:104:skyline-cockpit-lower-side-north",
+   "name": "skyline-cockpit-lower-side-north",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:105:skyline-cockpit-lower-side-south",
+   "name": "skyline-cockpit-lower-side-south",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:106:skyline-cockpit-glass-north",
+   "name": "skyline-cockpit-glass-north",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Skyline Terminal arena:107:skyline-cockpit-glass-south",
+   "name": "skyline-cockpit-glass-south",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Skyline Terminal arena:108:skyline-cockpit-roof",
+   "name": "skyline-cockpit-roof",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:109:skyline-cockpit-front-lower",
+   "name": "skyline-cockpit-front-lower",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:110:skyline-cockpit-glass-front",
+   "name": "skyline-cockpit-glass-front",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Skyline Terminal arena:111:skyline-cabin-seat-left--12",
+   "name": "skyline-cabin-seat-left--12",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:112:skyline-cabin-seat-right--12",
+   "name": "skyline-cabin-seat-right--12",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:113:skyline-cabin-seat-left--8",
+   "name": "skyline-cabin-seat-left--8",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:114:skyline-cabin-seat-right--8",
+   "name": "skyline-cabin-seat-right--8",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:115:skyline-cabin-seat-left--4",
+   "name": "skyline-cabin-seat-left--4",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:116:skyline-cabin-seat-right--4",
+   "name": "skyline-cabin-seat-right--4",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:117:skyline-cabin-seat-left-4",
+   "name": "skyline-cabin-seat-left-4",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:118:skyline-cabin-seat-right-4",
+   "name": "skyline-cabin-seat-right-4",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:119:skyline-cabin-seat-left-8",
+   "name": "skyline-cabin-seat-left-8",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:120:skyline-cabin-seat-right-8",
+   "name": "skyline-cabin-seat-right-8",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:121:skyline-cabin-seat-left-12",
+   "name": "skyline-cabin-seat-left-12",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:122:skyline-cabin-seat-right-12",
+   "name": "skyline-cabin-seat-right-12",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:123:skyline-jetliner-wing-port-authority-1",
+   "name": "skyline-jetliner-wing-port-authority-1",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:124:skyline-jetliner-wing-port-authority-2",
+   "name": "skyline-jetliner-wing-port-authority-2",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:125:skyline-jetliner-wing-port-authority-3",
+   "name": "skyline-jetliner-wing-port-authority-3",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:126:skyline-jetliner-wing-port-authority-4",
+   "name": "skyline-jetliner-wing-port-authority-4",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:127:skyline-jetliner-wing-port-authority-5",
+   "name": "skyline-jetliner-wing-port-authority-5",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:128:skyline-jetliner-wing-port-authority-6",
+   "name": "skyline-jetliner-wing-port-authority-6",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:129:skyline-jetliner-wing-port-authority-7",
+   "name": "skyline-jetliner-wing-port-authority-7",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:130:skyline-jetliner-wing-port-authority-8",
+   "name": "skyline-jetliner-wing-port-authority-8",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:131:skyline-jetliner-wing-starboard-authority-1",
+   "name": "skyline-jetliner-wing-starboard-authority-1",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:132:skyline-jetliner-wing-starboard-authority-2",
+   "name": "skyline-jetliner-wing-starboard-authority-2",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:133:skyline-jetliner-wing-starboard-authority-3",
+   "name": "skyline-jetliner-wing-starboard-authority-3",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:134:skyline-jetliner-wing-starboard-authority-4",
+   "name": "skyline-jetliner-wing-starboard-authority-4",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:135:skyline-jetliner-wing-starboard-authority-5",
+   "name": "skyline-jetliner-wing-starboard-authority-5",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:136:skyline-jetliner-wing-starboard-authority-6",
+   "name": "skyline-jetliner-wing-starboard-authority-6",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:137:skyline-jetliner-wing-starboard-authority-7",
+   "name": "skyline-jetliner-wing-starboard-authority-7",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:138:skyline-jetliner-wing-starboard-authority-8",
+   "name": "skyline-jetliner-wing-starboard-authority-8",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:139:skyline-jetliner-engine-1",
+   "name": "skyline-jetliner-engine-1",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:140:skyline-jetliner-engine-2",
+   "name": "skyline-jetliner-engine-2",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:141:skyline-airstair",
+   "name": "skyline-airstair",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:142:skyline-fuel-trailer",
+   "name": "skyline-fuel-trailer",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:143:skyline-tarmac-cargo--20-18-lower",
+   "name": "skyline-tarmac-cargo--20-18-lower",
+   "material": "container",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:144:skyline-tarmac-cargo--20-18-upper",
+   "name": "skyline-tarmac-cargo--20-18-upper",
+   "material": "container",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:145:skyline-tarmac-cargo-20-18-lower",
+   "name": "skyline-tarmac-cargo-20-18-lower",
+   "material": "container",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:146:skyline-tarmac-cargo-20-18-upper",
+   "name": "skyline-tarmac-cargo-20-18-upper",
+   "material": "container",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:147:skyline-tarmac-cargo--12-26-lower",
+   "name": "skyline-tarmac-cargo--12-26-lower",
+   "material": "container",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:148:skyline-tarmac-cargo--12-26-upper",
+   "name": "skyline-tarmac-cargo--12-26-upper",
+   "material": "container",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:149:skyline-tarmac-cargo-12-26-lower",
+   "name": "skyline-tarmac-cargo-12-26-lower",
+   "material": "container",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:150:skyline-tarmac-cargo-12-26-upper",
+   "name": "skyline-tarmac-cargo-12-26-upper",
+   "material": "container",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:151:skyline-tarmac-cargo-0-28-lower",
+   "name": "skyline-tarmac-cargo-0-28-lower",
+   "material": "container",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:152:skyline-tarmac-cargo-0-28-upper",
+   "name": "skyline-tarmac-cargo-0-28-upper",
+   "material": "container",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:153:skyline-luggage-cart",
+   "name": "skyline-luggage-cart",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:154:skyline-luggage-cart",
+   "name": "skyline-luggage-cart",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:155:skyline-luggage-cart",
+   "name": "skyline-luggage-cart",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:156:skyline-luggage-cart",
+   "name": "skyline-luggage-cart",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:157:skyline-fence-north",
+   "name": "skyline-fence-north",
+   "material": "fence",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:158:skyline-fence-south",
+   "name": "skyline-fence-south",
+   "material": "fence",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:159:skyline-fence-west",
+   "name": "skyline-fence-west",
+   "material": "fence",
+   "classification": "rule"
+  },
+  {
+   "id": "Skyline Terminal arena:160:skyline-fence-east",
+   "name": "skyline-fence-east",
+   "material": "fence",
+   "classification": "rule"
+  }
+ ]
+}

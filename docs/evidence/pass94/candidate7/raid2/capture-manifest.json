@@ -1,0 +1,81 @@
+{
+  "contract": "arena-viewpoint-regression-capture-v1",
+  "verdict": "PASS",
+  "label": "candidate7",
+  "sha": "ae79572410f02639bb189622d34703b42425ce4d",
+  "url": "http://127.0.0.1:4300",
+  "renderer": "webgpu",
+  "backend": "webgpu",
+  "adapter": {
+    "gpu": true,
+    "adapter": true,
+    "device": true,
+    "vendor": "nvidia",
+    "architecture": "blackwell"
+  },
+  "bundleAtStart": "/legacy-main-CO_TtT3v.js",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "seed": "viewpoint",
+  "settleMs": 2500,
+  "samples": 3,
+  "capturedAt": "2026-09-05T05:06:23.669Z",
+  "environmentInvalid": null,
+  "arenas": [
+    {
+      "arena": "raid2",
+      "ok": true,
+      "shots": [
+        {
+          "cameraId": "raid2-estate-overview",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\raid2\\raid2\\raid2-estate-overview.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\raid2\\raid2\\raid2-estate-overview.png",
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\raid2\\raid2\\raid2-estate-overview.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\raid2\\raid2\\raid2-estate-overview.s2.png"
+          ],
+          "committedFrame": 244,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.04,
+          "frame": 271
+        },
+        {
+          "cameraId": "raid2-west-apron",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\raid2\\raid2\\raid2-west-apron.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\raid2\\raid2\\raid2-west-apron.png",
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\raid2\\raid2\\raid2-west-apron.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\raid2\\raid2\\raid2-west-apron.s2.png"
+          ],
+          "committedFrame": 607,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.04,
+          "frame": 637
+        },
+        {
+          "cameraId": "raid2-garage-fan",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\raid2\\raid2\\raid2-garage-fan.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\raid2\\raid2\\raid2-garage-fan.png",
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\raid2\\raid2\\raid2-garage-fan.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\raid2\\raid2\\raid2-garage-fan.s2.png"
+          ],
+          "committedFrame": 993,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.04,
+          "frame": 1018
+        }
+      ],
+      "ms": 55166,
+      "errors": []
+    }
+  ]
+}

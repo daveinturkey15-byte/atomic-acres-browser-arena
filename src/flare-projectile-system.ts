@@ -29,6 +29,13 @@ export type FlareProjectileTarget = Readonly<{
   kind: 'player' | 'bot' | 'practice-target';
   position: THREE.Vector3;
   radiusM: number;
+  /**
+   * HF-321 (Pass 74): vertical half-height of the direct-hit admission capsule
+   * around `position`, so a standing target is hittable at head height and not
+   * only near its snapshot centre. Omitted or 0 keeps the exact legacy sphere
+   * admission. Snapshot-local only; never checkpointed or replicated.
+   */
+  halfHeightM?: number;
 }>;
 
 export type FlareProjectileImpact = Readonly<{
@@ -128,18 +135,18 @@ export type FlareAuthorityRestoreResult = Readonly<{
   poolExhaustions: number;
 }>;
 
-export function flareSegmentSphereFraction(
-  start: THREE.Vector3,
-  delta: THREE.Vector3,
-  centre: THREE.Vector3,
+function segmentSphereFractionScalar(
+  offsetX: number,
+  offsetY: number,
+  offsetZ: number,
+  deltaX: number,
+  deltaY: number,
+  deltaZ: number,
   radiusM: number,
 ): number | null {
-  if (!Number.isFinite(radiusM) || radiusM <= 0 || delta.lengthSq() <= 1e-12) return null;
-  const offsetX = start.x - centre.x;
-  const offsetY = start.y - centre.y;
-  const offsetZ = start.z - centre.z;
-  const a = delta.lengthSq();
-  const b = 2 * (offsetX * delta.x + offsetY * delta.y + offsetZ * delta.z);
+  const a = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
+  if (a <= 1e-12) return null;
+  const b = 2 * (offsetX * deltaX + offsetY * deltaY + offsetZ * deltaZ);
   const c = offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ - radiusM * radiusM;
   if (c <= 0) return 0;
   const discriminant = b * b - 4 * a * c;
@@ -150,6 +157,85 @@ export function flareSegmentSphereFraction(
   if (near >= 0 && near <= 1) return near;
   if (far >= 0 && far <= 1) return far;
   return null;
+}
+
+export function flareSegmentSphereFraction(
+  start: THREE.Vector3,
+  delta: THREE.Vector3,
+  centre: THREE.Vector3,
+  radiusM: number,
+): number | null {
+  if (!Number.isFinite(radiusM) || radiusM <= 0 || delta.lengthSq() <= 1e-12) return null;
+  return segmentSphereFractionScalar(
+    start.x - centre.x,
+    start.y - centre.y,
+    start.z - centre.z,
+    delta.x,
+    delta.y,
+    delta.z,
+    radiusM,
+  );
+}
+
+/**
+ * HF-321 (Pass 74): "flare gun needs a much better hitbox, wider and higher
+ * when as a projectile". The direct-hit admission volume is a vertical capsule
+ * (axis from centre.y - halfHeightM to centre.y + halfHeightM, radius radiusM)
+ * so torso- and head-height flares admit against standing targets whose
+ * snapshot centre sits lower. halfHeightM <= 0 degenerates to the exact legacy
+ * sphere admission. Allocation-free; deterministic at the fixed step so host
+ * and guests replay identical trajectories.
+ */
+export function flareSegmentVerticalCapsuleFraction(
+  start: THREE.Vector3,
+  delta: THREE.Vector3,
+  centre: THREE.Vector3,
+  radiusM: number,
+  halfHeightM: number,
+): number | null {
+  if (!Number.isFinite(halfHeightM) || halfHeightM <= 0) {
+    return flareSegmentSphereFraction(start, delta, centre, radiusM);
+  }
+  if (!Number.isFinite(radiusM) || radiusM <= 0 || delta.lengthSq() <= 1e-12) return null;
+  const offsetX = start.x - centre.x;
+  const offsetY = start.y - centre.y;
+  const offsetZ = start.z - centre.z;
+  // Start already inside the capsule: admit immediately, matching the
+  // sphere path's c <= 0 behaviour.
+  const clampedAxisY = Math.max(-halfHeightM, Math.min(halfHeightM, offsetY));
+  const surfaceY = offsetY - clampedAxisY;
+  if (offsetX * offsetX + surfaceY * surfaceY + offsetZ * offsetZ <= radiusM * radiusM) return 0;
+  let earliest: number | null = null;
+  // Cylindrical side: XZ quadratic, admitted only inside the vertical band.
+  const a = delta.x * delta.x + delta.z * delta.z;
+  if (a > 1e-12) {
+    const b = 2 * (offsetX * delta.x + offsetZ * delta.z);
+    const c = offsetX * offsetX + offsetZ * offsetZ - radiusM * radiusM;
+    const discriminant = b * b - 4 * a * c;
+    if (discriminant >= 0) {
+      const root = Math.sqrt(discriminant);
+      const near = (-b - root) / (2 * a);
+      const far = (-b + root) / (2 * a);
+      if (near >= 0 && near <= 1 && Math.abs(offsetY + delta.y * near) <= halfHeightM) {
+        earliest = near;
+      } else if (far >= 0 && far <= 1 && Math.abs(offsetY + delta.y * far) <= halfHeightM) {
+        earliest = far;
+      }
+    }
+  }
+  // Hemispherical caps at centre.y +/- halfHeightM. A cap-sphere fraction whose
+  // point lies inside the vertical band is an interior point reached strictly
+  // after a surface crossing already in the candidate set, so taking the
+  // minimum over side and cap candidates yields the true earliest entry.
+  const topCap = segmentSphereFractionScalar(
+    offsetX, offsetY - halfHeightM, offsetZ, delta.x, delta.y, delta.z, radiusM,
+  );
+  if (topCap !== null && (earliest === null || topCap < earliest)) earliest = topCap;
+  const bottomCap = segmentSphereFractionScalar(
+    offsetX, offsetY + halfHeightM, offsetZ, delta.x, delta.y, delta.z, radiusM,
+  );
+  if (bottomCap !== null && (earliest === null || bottomCap < earliest)) earliest = bottomCap;
+  return earliest;
 }
 
 /** Fixed-capacity projectile and burn-light system; no runtime mesh allocation. */
@@ -829,11 +915,16 @@ export class FlareProjectileSystem {
     let targetFraction = Number.POSITIVE_INFINITY;
     if (entity.authority && !entity.directHitDelivered) {
       for (const candidate of targets) {
-        const fraction = flareSegmentSphereFraction(
+        // HF-321: sweep against the target's vertical admission capsule
+        // (sphere when halfHeightM is absent). The projectile radius inflates
+        // the capsule radius only; through-wall safety stays with the
+        // targetFraction <= worldFraction gate below.
+        const fraction = flareSegmentVerticalCapsuleFraction(
           this.start,
           this.delta,
           candidate.position,
           candidate.radiusM + FLARE_PROJECTILE_EFFECT.collisionRadiusM,
+          candidate.halfHeightM ?? 0,
         );
         if (fraction !== null && fraction < targetFraction) {
           targetFraction = fraction;

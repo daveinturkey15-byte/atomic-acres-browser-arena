@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "familyId": "pass79-test-arena-loading-backdrops",
+  "generatedAt": "2026-08-31",
+  "note": "Deployment loading backdrops for Test1 and Test2, derived from the arenas' own authoritative WebGPU runtime captures. Replaces the placeholder pair, which were byte-for-byte copies of the gun-range and high-seas backdrops. The six Lane I backdrops and their masters are untouched.",
+  "encode": {
+    "captureSize": [
+      2560,
+      1440
+    ],
+    "outputSize": [
+      1536,
+      864
+    ],
+    "resampler": "PIL.Image.LANCZOS",
+    "format": "WEBP",
+    "qualityCeiling": 88,
+    "qualityUsed": {
+      "test1": 85,
+      "test2": 88
+    },
+    "method": 6,
+    "sizeBandBytes": [
+      169200,
+      239202
+    ],
+    "inheritedFrom": "scripts/art-gen/finalize_lane_i.py"
+  },
+  "finalizer": {
+    "path": "scripts/assets/finalize_pass79_test_arena_loading_backdrops.py",
+    "sha256": "7612170305b47c70a08aafe9079b2b50d3c72f6734364bd9fde63829cfc2148d"
+  },
+  "generator": {
+    "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+    "sha256": "80194703903c5c8381ac7ac706b117540885b950242a9293189f224153032d15"
+  },
+  "arenas": [
+    {
+      "arenaId": "test1",
+      "replaces": "byte-for-byte copy of gun-range-loading.webp",
+      "previousSha256": "5f367e3b1a2f9c3f6611a3045b09f23c187eb8bbc68dbcfcbbfcfc0c13960df6",
+      "capture": {
+        "source": "authoritative-runtime-arena",
+        "backendRequired": "webgpu",
+        "backendUsed": "webgpu",
+        "softwareAdapter": false,
+        "receiptPath": "artifacts/pass65/menu-preview-rotor-review/runtime-capture-receipt.json",
+        "inputsStable": true,
+        "driftedInputPaths": [],
+        "capturedFrames": 240,
+        "frameSetSha256": "bb2233f0b77111378284a6fd8ad8f1aa0e8f8526a7c773e7e2aeb49a53fa6fa3",
+        "sourceFrame": 150,
+        "sourceFrameSha256": "eb27a840a400ae48d187595806c97a045baff2d0f605a549444bb963f03e168f",
+        "reviewNote": "Container yard filling the left third with the re-authored red/blue/green/teal container livery clearly separated, both covered firing lines running away to the right, and the central concrete structure on the sightline. Deliberately not the poster frame (60)."
+      },
+      "master": {
+        "path": "source-assets/loading/pass79-test-arena-loading/test1-loading-master.png",
+        "sha256": "630e3169f5a10cc65e4355d82cc855544555675590dc783496d3ffe5f8e749d9"
+      },
+      "encodeQuality": 85,
+      "runtimeFile": {
+        "path": "public/assets/original/loading/test1-loading.webp",
+        "sha256": "a8c429949f7a589545cf6a40b6e8b7765508070c62925228086d63e89d74b12a",
+        "bytes": 238726
+      }
+    },
+    {
+      "arenaId": "test2",
+      "replaces": "byte-for-byte copy of high-seas-loading.webp",
+      "previousSha256": "b97bb548cb02463bab8f683d1328d6f46e46bc508b3105b36e4caa2721d8b083",
+      "capture": {
+        "source": "authoritative-runtime-arena",
+        "backendRequired": "webgpu",
+        "backendUsed": "webgpu",
+        "softwareAdapter": false,
+        "receiptPath": "artifacts/pass65/menu-preview-rotor-review/runtime-capture-receipt.json",
+        "inputsStable": true,
+        "driftedInputPaths": [],
+        "capturedFrames": 240,
+        "frameSetSha256": "67ca2674c891093e2c3ed2b8c6cf78746c777b612cdddfa2e987f6aa86161069",
+        "sourceFrame": 120,
+        "sourceFrameSha256": "c08b04ab6767dbddc11720b567772707985ce4c4c575cccee13fc1d076e77f74",
+        "reviewNote": "Turquoise pool and red sport court both centred and unobstructed, terrace parterre, umbrellas and hedges around them, with the re-placed violet/gold sky band on the horizon. Deliberately not the poster frame (60)."
+      },
+      "master": {
+        "path": "source-assets/loading/pass79-test-arena-loading/test2-loading-master.png",
+        "sha256": "e4e33da31c1117345a06248a0caa9640390894849adabe4aef853a291eeb6631"
+      },
+      "encodeQuality": 88,
+      "runtimeFile": {
+        "path": "public/assets/original/loading/test2-loading.webp",
+        "sha256": "d8b6a346474fa9c847f53f0cd68b61e5f76a443dff61c17af5dd2f6003bd2d48",
+        "bytes": 192942
+      }
+    }
+  ]
+}

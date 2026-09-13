@@ -1,0 +1,364 @@
+{
+  "port": 4216,
+  "sampleMs": [
+    500,
+    1000,
+    2000,
+    3000,
+    5500,
+    8000,
+    12000,
+    20000,
+    30000
+  ],
+  "runs": [
+    {
+      "run": 1,
+      "startedAt": "2026-09-03T02:34:48.109Z",
+      "poses": {
+        "corridor-3-grammar": {
+          "series": [
+            {
+              "tMs": 500,
+              "draws": 142,
+              "trisK": 337
+            },
+            {
+              "tMs": 1000,
+              "draws": 134,
+              "trisK": 265
+            },
+            {
+              "tMs": 2000,
+              "draws": 136,
+              "trisK": 265
+            },
+            {
+              "tMs": 3000,
+              "draws": 138,
+              "trisK": 266
+            },
+            {
+              "tMs": 5500,
+              "draws": 137,
+              "trisK": 265
+            },
+            {
+              "tMs": 8000,
+              "draws": 140,
+              "trisK": 264
+            },
+            {
+              "tMs": 12000,
+              "draws": 143,
+              "trisK": 265
+            },
+            {
+              "tMs": 20000,
+              "draws": 136,
+              "trisK": 265
+            },
+            {
+              "tMs": 30000,
+              "draws": 151,
+              "trisK": 268
+            }
+          ],
+          "paired": {
+            "found": false
+          },
+          "castShadowVariant": {
+            "found": false
+          },
+          "shadowVolume": null
+        },
+        "corridor-3-street-cell": {
+          "series": [
+            {
+              "tMs": 500,
+              "draws": 127,
+              "trisK": 231
+            },
+            {
+              "tMs": 1000,
+              "draws": 125,
+              "trisK": 230
+            },
+            {
+              "tMs": 2000,
+              "draws": 121,
+              "trisK": 228
+            },
+            {
+              "tMs": 3000,
+              "draws": 121,
+              "trisK": 229
+            },
+            {
+              "tMs": 5500,
+              "draws": 121,
+              "trisK": 230
+            },
+            {
+              "tMs": 8000,
+              "draws": 116,
+              "trisK": 230
+            },
+            {
+              "tMs": 12000,
+              "draws": 118,
+              "trisK": 229
+            },
+            {
+              "tMs": 20000,
+              "draws": 120,
+              "trisK": 229
+            },
+            {
+              "tMs": 30000,
+              "draws": 114,
+              "trisK": 229
+            }
+          ],
+          "paired": {
+            "found": false
+          },
+          "castShadowVariant": {
+            "found": false
+          },
+          "shadowVolume": null
+        },
+        "corridor-3-street-kerbside": {
+          "series": [
+            {
+              "tMs": 500,
+              "draws": 116,
+              "trisK": 230
+            },
+            {
+              "tMs": 1000,
+              "draws": 117,
+              "trisK": 230
+            },
+            {
+              "tMs": 2000,
+              "draws": 122,
+              "trisK": 232
+            },
+            {
+              "tMs": 3000,
+              "draws": 127,
+              "trisK": 233
+            },
+            {
+              "tMs": 5500,
+              "draws": 130,
+              "trisK": 233
+            },
+            {
+              "tMs": 8000,
+              "draws": 133,
+              "trisK": 232
+            },
+            {
+              "tMs": 12000,
+              "draws": 122,
+              "trisK": 228
+            },
+            {
+              "tMs": 20000,
+              "draws": 110,
+              "trisK": 228
+            },
+            {
+              "tMs": 30000,
+              "draws": 123,
+              "trisK": 229
+            }
+          ],
+          "paired": {
+            "found": false
+          },
+          "castShadowVariant": {
+            "found": false
+          },
+          "shadowVolume": null
+        }
+      }
+    },
+    {
+      "run": 2,
+      "startedAt": "2026-09-03T02:36:24.437Z",
+      "poses": {
+        "corridor-3-grammar": {
+          "series": [
+            {
+              "tMs": 500,
+              "draws": null,
+              "trisK": null
+            },
+            {
+              "tMs": 1000,
+              "draws": 134,
+              "trisK": 265
+            },
+            {
+              "tMs": 2000,
+              "draws": 138,
+              "trisK": 266
+            },
+            {
+              "tMs": 3000,
+              "draws": 136,
+              "trisK": 265
+            },
+            {
+              "tMs": 5500,
+              "draws": 140,
+              "trisK": 265
+            },
+            {
+              "tMs": 8000,
+              "draws": 140,
+              "trisK": 264
+            },
+            {
+              "tMs": 12000,
+              "draws": 142,
+              "trisK": 264
+            },
+            {
+              "tMs": 20000,
+              "draws": 136,
+              "trisK": 265
+            },
+            {
+              "tMs": 30000,
+              "draws": 151,
+              "trisK": 268
+            }
+          ],
+          "paired": {
+            "found": false
+          },
+          "castShadowVariant": {
+            "found": false
+          },
+          "shadowVolume": null
+        },
+        "corridor-3-street-cell": {
+          "series": [
+            {
+              "tMs": 500,
+              "draws": 125,
+              "trisK": 230
+            },
+            {
+              "tMs": 1000,
+              "draws": 123,
+              "trisK": 230
+            },
+            {
+              "tMs": 2000,
+              "draws": 123,
+              "trisK": 228
+            },
+            {
+              "tMs": 3000,
+              "draws": 121,
+              "trisK": 229
+            },
+            {
+              "tMs": 5500,
+              "draws": 121,
+              "trisK": 229
+            },
+            {
+              "tMs": 8000,
+              "draws": 114,
+              "trisK": 229
+            },
+            {
+              "tMs": 12000,
+              "draws": 119,
+              "trisK": 230
+            },
+            {
+              "tMs": 20000,
+              "draws": 121,
+              "trisK": 230
+            },
+            {
+              "tMs": 30000,
+              "draws": 114,
+              "trisK": 229
+            }
+          ],
+          "paired": {
+            "found": false
+          },
+          "castShadowVariant": {
+            "found": false
+          },
+          "shadowVolume": null
+        },
+        "corridor-3-street-kerbside": {
+          "series": [
+            {
+              "tMs": 500,
+              "draws": 117,
+              "trisK": 230
+            },
+            {
+              "tMs": 1000,
+              "draws": 118,
+              "trisK": 230
+            },
+            {
+              "tMs": 2000,
+              "draws": 125,
+              "trisK": 232
+            },
+            {
+              "tMs": 3000,
+              "draws": 127,
+              "trisK": 233
+            },
+            {
+              "tMs": 5500,
+              "draws": 132,
+              "trisK": 233
+            },
+            {
+              "tMs": 8000,
+              "draws": 133,
+              "trisK": 231
+            },
+            {
+              "tMs": 12000,
+              "draws": 122,
+              "trisK": 229
+            },
+            {
+              "tMs": 20000,
+              "draws": 111,
+              "trisK": 229
+            },
+            {
+              "tMs": 30000,
+              "draws": 123,
+              "trisK": 229
+            }
+          ],
+          "paired": {
+            "found": false
+          },
+          "castShadowVariant": {
+            "found": false
+          },
+          "shadowVolume": null
+        }
+      }
+    }
+  ]
+}

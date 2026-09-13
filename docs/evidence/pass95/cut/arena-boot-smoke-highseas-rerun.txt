@@ -1,0 +1,40 @@
+[lock] acquired 10:53:23
+
+Running 1 test using 1 worker
+
+(node:209792) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  1 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › high-seas: boots a clean visible solo match (2.3m)
+
+
+  1) [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › high-seas: boots a clean visible solo match 
+
+    TimeoutError: page.waitForFunction: Timeout 120000ms exceeded.
+
+      146 |       // Reach active phase - or surface the game's own deployment failure text,
+      147 |       // which names the cause instead of a bare timeout.
+    > 148 |       const outcomeHandle = await page.waitForFunction(
+          |                                        ^
+      149 |         () => {
+      150 |           const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: DebugApi }).__ATOMIC_ACRES_DEBUG__;
+      151 |           const state = api?.snapshot();
+        at C:\Users\david\projects\aa-claude-release84\tests\e2e\pass74-arena-boot-smoke.spec.ts:148:40
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass74-arena-boot-smoke-ar-c0982--a-clean-visible-solo-match-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass74-arena-boot-smoke-ar-c0982--a-clean-visible-solo-match-chromium\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass74-arena-boot-smoke-ar-c0982--a-clean-visible-solo-match-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace artifacts\pass25a\playwright-results\pass74-arena-boot-smoke-ar-c0982--a-clean-visible-solo-match-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › high-seas: boots a clean visible solo match 
+[exit] 1 at 10:55:45
+[lock] released

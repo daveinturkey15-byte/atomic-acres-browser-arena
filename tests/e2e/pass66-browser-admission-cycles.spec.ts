@@ -2,8 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type BrowserContextOptions, type Page, type TestInfo } from '@playwright/test';
+import { ARENA_IDS, isArenaId, type ArenaId } from '../../src/arena-identity';
 
-type ArenaId = 'atomic-acres' | 'skyline-terminal' | 'rustworks-1v1' | 'gun-range';
 type RenderProfile = 'performance' | 'blender' | 'compat';
 type Renderer = 'webgl2' | 'webgpu';
 
@@ -79,11 +79,29 @@ const requestedProfiles = (process.env.QA_PASS66_ADMISSION_PROFILES ?? 'performa
   .map((entry) => entry.trim())
   .filter((entry): entry is RenderProfile => ['performance', 'blender', 'compat'].includes(entry));
 const profiles: readonly RenderProfile[] = [...new Set(requestedProfiles)];
-const requestedArenas = (process.env.QA_PASS66_ADMISSION_ARENAS
-  ?? 'atomic-acres,skyline-terminal,rustworks-1v1,gun-range')
+// PASS 85 Lane N. The DEFAULT stays the four-arena cold/warm matrix this gate's
+// latency ceilings and per-cycle budget were measured against - widening it is a
+// timing change, not a wiring change, and belongs to whoever re-measures those
+// ceilings. What was wrong is the FILTER: it repeated the same four ids, so
+// QA_PASS66_ADMISSION_ARENAS=test1 silently produced an EMPTY roster and the gate
+// reported success having admitted nothing. It now validates against the
+// canonical ARENA_IDS, and an unknown id is named rather than dropped.
+const DEFAULT_ADMISSION_ARENAS = 'atomic-acres,skyline-terminal,rustworks-1v1,gun-range';
+const requestedArenaIds = (process.env.QA_PASS66_ADMISSION_ARENAS ?? DEFAULT_ADMISSION_ARENAS)
   .split(',')
   .map((entry) => entry.trim())
-  .filter((entry): entry is ArenaId => ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'].includes(entry));
+  .filter(Boolean);
+const unknownArenaIds = requestedArenaIds.filter((entry) => !isArenaId(entry));
+if (unknownArenaIds.length > 0) {
+  throw new Error(
+    `QA_PASS66_ADMISSION_ARENAS names ${unknownArenaIds.join(', ')}, which is not in ARENA_IDS `
+    + `(${ARENA_IDS.join(', ')}). A silently dropped arena is an empty gate.`,
+  );
+}
+const requestedArenas = requestedArenaIds.filter(isArenaId);
+if (requestedArenas.length === 0) {
+  throw new Error('QA_PASS66_ADMISSION_ARENAS selected no arenas; this gate would admit nothing and pass.');
+}
 const arenas: readonly ArenaId[] = [...new Set(requestedArenas)];
 
 const LATENCY_CEILINGS_MS = Object.freeze({

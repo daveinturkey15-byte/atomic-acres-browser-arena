@@ -1,0 +1,216 @@
+{
+  "contract": "arena-viewpoint-regression-capture-v1",
+  "verdict": "PASS",
+  "label": "acc2",
+  "sha": "d44258e6",
+  "url": "http://127.0.0.1:41942",
+  "renderer": "webgpu",
+  "backend": "webgpu",
+  "adapter": {
+    "gpu": true,
+    "adapter": true,
+    "device": true,
+    "vendor": "nvidia",
+    "architecture": "blackwell"
+  },
+  "bundleAtStart": "/legacy-main-C6q_LQca.js",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "seed": "viewpoint",
+  "settleMs": 5000,
+  "samples": 3,
+  "capturedAt": "2026-09-04T14:36:19.620Z",
+  "environmentInvalid": null,
+  "arenas": [
+    {
+      "arena": "nuketown2",
+      "ok": true,
+      "shots": [
+        {
+          "cameraId": "nuketown2-overhead",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-overhead.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-overhead.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-overhead.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-overhead.s2.png"
+          ],
+          "committedFrame": 323,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 346
+        },
+        {
+          "cameraId": "nuketown2-north-yard",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-north-yard.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-north-yard.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-north-yard.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-north-yard.s2.png"
+          ],
+          "committedFrame": 575,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 598
+        },
+        {
+          "cameraId": "nuketown2-south-yard",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-south-yard.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-south-yard.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-south-yard.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-south-yard.s2.png"
+          ],
+          "committedFrame": 852,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 877
+        },
+        {
+          "cameraId": "nuketown2-street-centre",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-street-centre.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-street-centre.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-street-centre.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-street-centre.s2.png"
+          ],
+          "committedFrame": 1123,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 1148
+        },
+        {
+          "cameraId": "nuketown2-north-upper-window",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-north-upper-window.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-north-upper-window.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-north-upper-window.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-north-upper-window.s2.png"
+          ],
+          "committedFrame": 1400,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 1425
+        },
+        {
+          "cameraId": "nuketown2-south-upper-window",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-south-upper-window.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-south-upper-window.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-south-upper-window.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-south-upper-window.s2.png"
+          ],
+          "committedFrame": 1672,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 1695
+        },
+        {
+          "cameraId": "nuketown2-into-sun-street",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-into-sun-street.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-into-sun-street.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-into-sun-street.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-into-sun-street.s2.png"
+          ],
+          "committedFrame": 1964,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 1992
+        },
+        {
+          "cameraId": "nuketown2-north-interior",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-north-interior.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-north-interior.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-north-interior.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-north-interior.s2.png"
+          ],
+          "committedFrame": 2292,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 2314
+        },
+        {
+          "cameraId": "nuketown2-south-interior",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-south-interior.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-south-interior.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-south-interior.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-south-interior.s2.png"
+          ],
+          "committedFrame": 2559,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 2582
+        },
+        {
+          "cameraId": "nuketown2-garage",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-garage.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-garage.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-garage.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-garage.s2.png"
+          ],
+          "committedFrame": 2877,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 2897
+        },
+        {
+          "cameraId": "nuketown2-north-balcony",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-north-balcony.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-north-balcony.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-north-balcony.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-north-balcony.s2.png"
+          ],
+          "committedFrame": 3102,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 3126
+        },
+        {
+          "cameraId": "nuketown2-front-porch",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-front-porch.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-front-porch.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-front-porch.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-acc2\\artifacts\\viewpoint-regression\\acc2\\nuketown2\\nuketown2-front-porch.s2.png"
+          ],
+          "committedFrame": 3370,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 3400
+        }
+      ],
+      "ms": 86202,
+      "errors": []
+    }
+  ]
+}

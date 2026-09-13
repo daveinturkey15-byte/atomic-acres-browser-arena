@@ -42,6 +42,10 @@ describe('Pass 30 atmosphere budget', () => {
     expect(system.telemetry()).toMatchObject({ arenaId: 'gun-range', mistCards: 4, smokeCards: 2, dustMotes: 24, triangles: 12, perFrameAllocations: 0 });
     system.setArena('skyline-terminal');
     expect(system.telemetry()).toMatchObject({ arenaId: 'skyline-terminal', mistCards: 6, smokeCards: 3, dustMotes: 48, triangles: 18, perFrameAllocations: 0 });
+    system.setArena('farcrysis');
+    expect(system.telemetry()).toMatchObject({ arenaId: 'farcrysis', mistCards: 10, smokeCards: 5, dustMotes: 40, triangles: 30, perFrameAllocations: 0 });
+    system.setArena('high-seas');
+    expect(system.telemetry()).toMatchObject({ arenaId: 'high-seas', mistCards: 6, smokeCards: 3, dustMotes: 28, triangles: 18, perFrameAllocations: 0 });
   });
 
   it('brings restrained distance fog into the playable depth of every non-compat arena', () => {
@@ -50,6 +54,9 @@ describe('Pass 30 atmosphere budget', () => {
     expect(atmosphereFogRange('performance', 'gun-range')).toEqual({ near: 42, far: 105 });
     expect(atmosphereFogRange('performance', 'skyline-terminal')).toEqual({ near: 44, far: 130 });
     expect(atmosphereFogRange('blender', 'skyline-terminal')).toEqual({ near: 40, far: 122 });
+    expect(atmosphereFogRange('performance', 'farcrysis')).toEqual({ near: 18, far: 52 });
+    expect(atmosphereFogRange('performance', 'high-seas')).toEqual({ near: 48, far: 142 });
+    expect(atmosphereFogRange('blender', 'high-seas')).toEqual({ near: 42, far: 132 });
     expect(atmosphereFogRange('compat', 'atomic-acres')).toEqual({ near: 56, far: 140 });
   });
 
