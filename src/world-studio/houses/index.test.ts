@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -62,6 +63,28 @@ function extrasOf(node: { extras?: Record<string, unknown> }): Record<string, un
 }
 
 const VARIANTS = HOUSE_SHELLS.map((spec) => ({ spec, gltf: readGlb(REPO(`public/${spec.path}`)) }));
+
+const EXPECTED_WAVE5_GLBS: Record<string, { bytes: number; sha256: string }> = {
+  teal: {
+    bytes: 5_670_156,
+    sha256: 'bc7c4667062a10f6c4878ccea3e99d148dc8296b9c9aa238799802e260f81698',
+  },
+  yellow: {
+    bytes: 5_644_860,
+    sha256: '2fec2939227a60aab7234173ac9eee72a8c0e8f111de024e353e261fab4f1042',
+  },
+};
+
+describe.each(HOUSE_SHELLS)('world-studio house shell wave5 provenance: $variant', (spec) => {
+  it('pins the exact shipped GLB bytes without changing the historic thumbnail revision', () => {
+    const path = REPO(`public/${spec.path}`);
+    const bytes = readFileSync(path);
+    const expected = EXPECTED_WAVE5_GLBS[spec.variant];
+    expect(expected, `missing wave5 pin for ${spec.variant}`).toBeDefined();
+    expect(bytes.byteLength).toBe(expected.bytes);
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe(expected.sha256);
+  });
+});
 
 describe.each(VARIANTS)('world-studio house shell GLB: $spec.variant', ({ spec, gltf }) => {
   const nodes = gltf.nodes;

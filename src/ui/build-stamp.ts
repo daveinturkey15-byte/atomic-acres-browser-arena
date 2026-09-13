@@ -9,9 +9,9 @@ export function buildStampMarkup(): string {
   return `<div class="build-stamp">
     <button type="button" aria-describedby="build-changes"><b>BUILD ${number}</b><time>${stamp}${date ? ' UK' : ''}</time></button>
     <div id="build-changes" role="tooltip"><strong>In this build</strong><ul>
-      <li>Reduced bright siding reveals on both Blender houses.</li>
-      <li>Interior light fixtures aligned with the authored ceilings.</li>
-      <li>Updated house assets and thumbnails in the Skills Lab gallery.</li>
+      <li>Corrected the build report hover/focus popup stacking.</li>
+      <li>Applied the wave5 buried-face correction to both Blender house shells.</li>
+      <li>Historic house thumbnails remain unchanged; facade seams are still under review.</li>
     </ul></div>
   </div>`;
 }

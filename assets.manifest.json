@@ -10,12 +10,12 @@
       "license": "Original project work",
       "files": "public/assets/world-studio/blender/houses/*",
       "sourceProvenance": "public/assets/world-studio/blender/houses/catalog.json",
-      "modifications": "Revision4 corrects the sheathing material behind siding reveals and opaque export sidedness. Geometry and gameplay authority unchanged. Residual coplanar facade seams remain an OPEN visual defect; not a visual acceptance.",
+      "modifications": "Revision5 applies the wave5 buried-face correction to both Blender house shells while preserving geometry, apertures, stairs and gameplay authority. Historic revision4 thumbnails are unchanged. Residual coplanar facade seams remain an OPEN visual defect; runtime performance and visual acceptance remain OPEN.",
       "attributionRequired": false,
       "runtimeFiles": [
         {
           "path": "public/assets/world-studio/blender/houses/house-teal-shell.glb",
-          "sha256": "38cc4c2d941524434bad5a51772e07fe3a35a7775c0ccca9a239fbb9731a5c27"
+          "sha256": "bc7c4667062a10f6c4878ccea3e99d148dc8296b9c9aa238799802e260f81698"
         },
         {
           "path": "public/assets/world-studio/blender/houses/house-teal-street.png",
@@ -35,7 +35,7 @@
         },
         {
           "path": "public/assets/world-studio/blender/houses/house-yellow-shell.glb",
-          "sha256": "c7d7c219978a6e0738faa338e40f96e861e6a316a2560576c9bd55d90540b08f"
+          "sha256": "2fec2939227a60aab7234173ac9eee72a8c0e8f111de024e353e261fab4f1042"
         },
         {
           "path": "public/assets/world-studio/blender/houses/house-yellow-street.png",

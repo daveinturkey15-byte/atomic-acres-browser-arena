@@ -15,7 +15,7 @@
       "category": "architecture",
       "qualityRank": 1,
       "qualityReason": "Full structural shell with real lap-siding relief, stepped shingle courses, a random-ashlar masonry chimney built from individual stones, open slatted pergola, balustrades and open gameplay apertures, plus the interior partitions and the 16-tread internal stair; audited clear against all 26 declared openings, 9 interior cased openings and 24 transcribed runtime probes.",
-      "revision": 4,
+      "revision": 5,
       "authoredBy": {
         "harness": "claude",
         "model": "claude-opus-5",
@@ -34,7 +34,7 @@
         "Exterior thumbnails are 512x320 CPU Cycles renders at 24 samples, sized for a gallery tile rather than for judging material detail.",
         "The two interior thumbnails add four interior fill lamps because a closed house lit only by the exterior sun renders as noise at any sample count this lane can afford. They are a photographic rig for inspecting geometry and say nothing about the project light rig, interior bounce or mood. The stair frame is also aimed at the flight rather than at the review point's published target.",
         "Siding, shingle and stone maps are 512px procedural tiles; close-camera interior inspection will show the tile repeat.",
-        "Revision4 reduces bright siding reveals. Same-facing coincident surfaces and vertical seams remain OPEN; source surface-conflict audit is still red. Runtime inspection is required."
+        "Revision5 applies the wave5 buried-face correction and preserves the accepted envelope, apertures and stair contract. Historic thumbnail revision4 files are unchanged; same-facing facade seams and the source surface-conflict audit remain OPEN pending runtime inspection."
       ],
       "metrics": {
         "triangles": 37944,
@@ -76,16 +76,17 @@
       "interiorApertureMismatches": [],
       "stairTreadProblems": [],
       "blockedRuntimeProbes": [],
-      "sha256": "38cc4c2d941524434bad5a51772e07fe3a35a7775c0ccca9a239fbb9731a5c27",
+      "sha256": "bc7c4667062a10f6c4878ccea3e99d148dc8296b9c9aa238799802e260f81698",
       "partition": "world-studio.house.teal.shell",
       "houseId": "teal-house",
       "placement": [
-        -20.0,
-        0.0,
-        0.0
+        -20,
+        0,
+        0
       ],
       "apertureMismatches": [],
-      "blender": "5.1.2"
+      "blender": "5.1.2",
+      "thumbRevision": 4
     },
     {
       "id": "world-studio-house-yellow-shell",
@@ -100,7 +101,7 @@
       "category": "architecture",
       "qualityRank": 2,
       "qualityReason": "Full structural shell with real lap-siding relief, stepped shingle courses, a random-ashlar masonry chimney built from individual stones, open slatted pergola, balustrades and open gameplay apertures, plus the interior partitions and the 16-tread internal stair; audited clear against all 26 declared openings, 9 interior cased openings and 24 transcribed runtime probes.",
-      "revision": 4,
+      "revision": 5,
       "authoredBy": {
         "harness": "claude",
         "model": "claude-opus-5",
@@ -119,7 +120,7 @@
         "Exterior thumbnails are 512x320 CPU Cycles renders at 24 samples, sized for a gallery tile rather than for judging material detail.",
         "The two interior thumbnails add four interior fill lamps because a closed house lit only by the exterior sun renders as noise at any sample count this lane can afford. They are a photographic rig for inspecting geometry and say nothing about the project light rig, interior bounce or mood. The stair frame is also aimed at the flight rather than at the review point's published target.",
         "Siding, shingle and stone maps are 512px procedural tiles; close-camera interior inspection will show the tile repeat.",
-        "Revision4 reduces bright siding reveals. Same-facing coincident surfaces and vertical seams remain OPEN; source surface-conflict audit is still red. Runtime inspection is required."
+        "Revision5 applies the wave5 buried-face correction and preserves the accepted envelope, apertures and stair contract. Historic thumbnail revision4 files are unchanged; same-facing facade seams and the source surface-conflict audit remain OPEN pending runtime inspection."
       ],
       "metrics": {
         "triangles": 38112,
@@ -161,16 +162,17 @@
       "interiorApertureMismatches": [],
       "stairTreadProblems": [],
       "blockedRuntimeProbes": [],
-      "sha256": "c7d7c219978a6e0738faa338e40f96e861e6a316a2560576c9bd55d90540b08f",
+      "sha256": "2fec2939227a60aab7234173ac9eee72a8c0e8f111de024e353e261fab4f1042",
       "partition": "world-studio.house.yellow.shell",
       "houseId": "yellow-house",
       "placement": [
-        20.0,
-        0.0,
-        0.0
+        20,
+        0,
+        0
       ],
       "apertureMismatches": [],
-      "blender": "5.1.2"
+      "blender": "5.1.2",
+      "thumbRevision": 4
     }
   ]
 }

@@ -66,6 +66,27 @@ TILE_M = {
 # itself never reads anything but this constant.
 SHEATHING_SLOT = "siding"
 
+# ---------------------------------------------------------------- surface ownership
+#
+# Wave 5. A wall plane is a *place*, not a surface, and until now four different members
+# all put a face on it: the sheathing leaf, every lap-siding course's inboard face, the
+# opening reveal lining, and the back face of everything mounted outboard. Coplanar faces
+# with the same facing cannot be cured by culling — the depth buffer picks a winner per
+# pixel, which is the dashed vertical seam ``audit_surfaces.py`` measures as falsifier 13.
+#
+# The rule now is: **exactly one member owns each plane, and every other member stands off
+# from it by more than the audit's 1.5 mm epsilon.** The outboard wall plane is owned by
+# the siding face; the inboard wall plane is owned by the lining. Nothing here moves an
+# outward-visible surface: the siding's outer face, the canonical bounds, every aperture
+# void and every marker are untouched. Only faces that were already buried inside the wall
+# cavity move, and they move inwards.
+#
+# Offsets are >= SEAM_STANDOFF because a separation below the audit's epsilon still counts
+# as a depth conflict and still fights at distance; a 0.5 mm "fix" would be cosmetic on the
+# report and useless in the depth buffer.
+SEAM_STANDOFF = 0.004   # m — minimum separation between two same-facing surfaces
+SHEATHING_SETBACK = 0.012  # m — leaf face behind the wall plane; the reveal's shadow gap
+
 
 # ---------------------------------------------------------------- deterministic PRNG
 
@@ -319,7 +340,15 @@ def build_exterior_wall(b: Builder, frame: C.WallFrame, openings: Sequence[C.Ope
         # Why the lane's Cycles review frames never showed it is *not* established — a 15 mm
         # slot in sun shadow is the likely reason but no runtime capture exists to confirm it
         # (falsifier 1), so treat the runtime lighting story as a hypothesis, not a result.
-        _wall_box(b, frame, SHEATHING_SLOT, rect, -half, half - out * 0.012)
+        #
+        # Wave 5 corrects the *sign*. ``half - out * 0.012`` only sets the leaf back on walls
+        # whose outward normal is +X/+Z. On an ``out = -1`` wall it did the opposite: the leaf's
+        # outboard face landed exactly ON the wall plane — coplanar with the reveal lining and
+        # with the inboard face of every siding course — while the leaf's other end pushed 12 mm
+        # *through* the interior lining, putting a siding-slot face in the lining's own plane.
+        # Written as an explicit (inboard, outboard) pair it is sign-correct on all four walls:
+        # flush with the inboard wall plane, set back SHEATHING_SETBACK from the outboard one.
+        _wall_box(b, frame, SHEATHING_SLOT, rect, -out * half, out * (half - SHEATHING_SETBACK))
         # Interior lining, inboard of the structure (shell only: paint, no furniture).
         _wall_box(b, frame, "trim", rect, -out * (half + C.LINING), -out * half, opaque=False)
         # Lap siding: one real course per 152.4 mm, 3 mm reveal between courses, 18 mm proud.
@@ -340,9 +369,14 @@ def _emit_lap_siding(b: Builder, frame: C.WallFrame, rect: C.Rect, half: float) 
         cy0, cy1 = max(cy0, y0), min(cy1, y1)
         if cy1 - cy0 < 0.004:
             continue
-        n0 = half if out > 0 else -half - proud
-        n1 = half + proud if out > 0 else -half
-        _wall_box(b, frame, "siding", (u0, u1, cy0, cy1), n0, n1, opaque=False)
+        # Wave 5: the course's *outboard* face is the visible one and does not move. Its
+        # inboard face used to sit exactly on the wall plane, which is also where the back
+        # face of every mounted casing, watertable, downspout and apron sits — the single
+        # largest source of same-facing coincident pairs in the shipped GLB, and all of it
+        # buried. Biting SEAM_STANDOFF into the cavity separates them; the course still
+        # overlaps the leaf's 12 mm setback by 8 mm, so no gap opens behind the boards.
+        _wall_box(b, frame, "siding", (u0, u1, cy0, cy1),
+                  out * (half - SEAM_STANDOFF), out * (half + proud), opaque=False)
 
 
 def dress_opening(b: Builder, frame: C.WallFrame, opening: C.Opening) -> None:
@@ -371,10 +405,18 @@ def dress_opening(b: Builder, frame: C.WallFrame, opening: C.Opening) -> None:
         _wall_box(b, frame, "trim", (u0 - casing - 0.05, u1 + casing + 0.05, y1 + casing, y1 + casing + 0.06), face, face + out * 0.135)
 
     # Reveal lining so the cut edge never shows raw wall.
-    _wall_box(b, frame, "trim", (u0, u1, y1 - 0.03, y1), -half, half, opaque=False)
+    #
+    # Wave 5: it used to span exactly -half..half, i.e. it put a face on *both* wall planes.
+    # The outboard one is same-facing with the leaf's face and with the reveal of every
+    # course beside it, and it is visible straight down the opening, so it is a seam a
+    # street camera can actually see. It now runs from the inboard plane to SEAM_STANDOFF
+    # proud of the outboard plane — still inside the void, still covering the cut edge (it
+    # covers 4 mm more of it than before), and coplanar with nothing.
+    reveal_in, reveal_out = -out * half, out * (half + SEAM_STANDOFF)
+    _wall_box(b, frame, "trim", (u0, u1, y1 - 0.03, y1), reveal_in, reveal_out, opaque=False)
     if opening.kind != "garage":
-        _wall_box(b, frame, "trim", (u0, u0 + 0.03, y0, y1), -half, half, opaque=False)
-        _wall_box(b, frame, "trim", (u1 - 0.03, u1, y0, y1), -half, half, opaque=False)
+        _wall_box(b, frame, "trim", (u0, u0 + 0.03, y0, y1), reveal_in, reveal_out, opaque=False)
+        _wall_box(b, frame, "trim", (u1 - 0.03, u1, y0, y1), reveal_in, reveal_out, opaque=False)
 
     if opening.kind in ("window", "slider"):
         inset = 0.04

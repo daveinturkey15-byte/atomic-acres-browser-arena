@@ -4,7 +4,7 @@
   "partition": "world-studio.house.teal.shell",
   "blender": "5.1.2",
   "glb": "public/assets/world-studio/blender/houses/house-teal-shell.glb",
-  "sha256": "38cc4c2d941524434bad5a51772e07fe3a35a7775c0ccca9a239fbb9731a5c27",
+  "sha256": "bc7c4667062a10f6c4878ccea3e99d148dc8296b9c9aa238799802e260f81698",
   "bytes": 5670156,
   "localBounds": {
     "min": [
