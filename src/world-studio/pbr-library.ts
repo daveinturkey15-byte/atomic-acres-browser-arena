@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 /**
- * world-studio/pbr-library â€” reusable CC0 PBR material factory (2026-09-12).
+ * world-studio/pbr-library — reusable CC0 PBR material factory (2026-09-12).
  *
  * Additive, presentation-only. This module owns NO scene, renderer, lights or
  * tone mapping: it builds `MeshStandardMaterial`s from locally hosted original
@@ -16,18 +16,18 @@ import * as THREE from 'three';
  * `release(consumer)` disposes exactly that consumer's clones; `dispose()`
  * disposes the originals and any live consumers.
  *
- * UV contract: tiling is PHYSICAL. `repeat = sizeMeters / tileMeters` â€”
+ * UV contract: tiling is PHYSICAL. `repeat = sizeMeters / tileMeters` —
  * callers pass the real-world surface size; the library never rescales
  * geometry UVs. Root integration example (parent performs it):
  *
  * ```ts
  * const pbr = createStudioPbrLibrary();          // defaults to the hosted dir
  * void pbr.load();                                // kick off; errors land in whenReady()
- * // â€¦after `await pbr.whenReady()` (or poll isReady()):
+ * // …after `await pbr.whenReady()` (or poll isReady()):
  * const road = pbr.createConsumer('asphalt_02', { sizeMeters: [12, 60] });
- * roadMesh.material = road.material;              // 3 m tile â†’ repeat 4Ã—20
+ * roadMesh.material = road.material;              // 3 m tile → repeat 4×20
  * const wall = pbr.createConsumer('brushed_concrete_03', { sizeMeters: [8, 2.55], normalScale: 0.6 });
- * wallMesh.material = wall.material;              // 2 m tile â†’ repeat 4Ã—1.275
+ * wallMesh.material = wall.material;              // 2 m tile → repeat 4×1.275
  * // on arena retirement: road consumers first, then pbr.dispose()
  * ```
  */
