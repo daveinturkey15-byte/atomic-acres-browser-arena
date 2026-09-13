@@ -609,3 +609,16 @@
   .tl-canvas-wrap { min-height: 240px; height: 40vh; }
   .tl-url-row { grid-template-columns: 40px minmax(0, 1fr); }
 }
+
+.tl-date { font-size: 12px; color: var(--tl-muted); white-space: nowrap; }
+.tl-card-date { font-size: 12px; color: var(--tl-muted); }
+.tl-url-date { font-size: 13px; color: var(--tl-muted); margin: 4px 0 6px; }
+.tl-url-mapping-filter { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; font-size: 14px; color: var(--tl-muted); }
+.tl-url-mapping-filter select { padding: 9px 12px; border-radius: 8px; border: 1px solid rgba(79, 191, 198, 0.4); background: var(--tl-bg); color: #eef7f6; font: inherit; }
+.tl-lighting-layout { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr) minmax(0, 360px); grid-template-rows: minmax(0, 1fr); gap: 10px; flex: 1 1 auto; min-height: 0; }
+.tl-lighting-head { display: flex; flex-direction: column; gap: 8px; }
+.tl-lighting-controls { display: flex; flex-wrap: wrap; gap: 12px; }
+@media (max-width: 900px) {
+  .tl-lighting-layout { grid-template-columns: minmax(0, 280px) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+  .tl-lighting-layout .tl-detail { grid-column: 1 / -1; max-height: 34vh; }
+}

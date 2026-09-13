@@ -11,6 +11,8 @@
  * - URLs are deploy-base-relative (`assets/...`); absolute file paths are rejected.
  */
 
+import { maxDate } from './sorting';
+
 export interface BlenderAsset {
   key: string;
   lane: string;
@@ -29,6 +31,13 @@ export interface BlenderAsset {
   limitations: string[];
   metrics: { triangles: number | null; materials: number | null; textureBytes: number | null } | null;
   sha256: string | null;
+  /**
+   * Optional recorded dates supplied by the lane catalog. Any or all may be
+   * absent; a missing date is unknown, never guessed from revision or order.
+   */
+  createdAt: string | null;
+  updatedAt: string | null;
+  generatedAsOf: string | null;
 }
 
 export interface CatalogReadResult {
@@ -113,6 +122,9 @@ export function parseBlenderCatalog(lane: string, data: unknown): CatalogReadRes
         ? { triangles: num(metrics.triangles), materials: Array.isArray(metrics.materials) ? metrics.materials.length : num(metrics.materials), textureBytes: num(metrics.textureBytes) }
         : null,
       sha256: str(r.sha256),
+      createdAt: str(r.createdAt),
+      updatedAt: str(r.updatedAt),
+      generatedAsOf: str(r.generatedAsOf),
     });
   });
   return out;
@@ -142,6 +154,9 @@ export const BUILTIN_BLENDER_ASSETS: BlenderAsset[] = [
     limitations: ['No render thumbnail in this tree yet'],
     metrics: null,
     sha256: 'a7059b50bdd41281377a54cb65f51c51b06d67c4ca2ae03d7e0ee9982a6b0ff5',
+    createdAt: null,
+    updatedAt: null,
+    generatedAsOf: null,
   },
   {
     key: 'shipped/hero-truck',
@@ -161,8 +176,22 @@ export const BUILTIN_BLENDER_ASSETS: BlenderAsset[] = [
     limitations: ['No render thumbnail in this tree yet'],
     metrics: null,
     sha256: 'b602d3037c5d6c23d174e17006a9b5ae6abb9de4835fba5d23fee377fdd74199',
+    createdAt: null,
+    updatedAt: null,
+    generatedAsOf: null,
   },
 ];
+
+/**
+ * Latest recorded date for an asset, or null when the lane recorded none.
+ * Only the three explicit date fields count; revision hashes, load order and
+ * curated rank are never treated as dates.
+ */
+export function blenderAssetDate(
+  asset: Pick<BlenderAsset, 'createdAt' | 'updatedAt' | 'generatedAsOf'>,
+): string | null {
+  return maxDate([asset.createdAt, asset.updatedAt, asset.generatedAsOf]);
+}
 
 /** Curated order: qualityRank desc (unranked last), then lane, then id. Stable. */
 export function sortCurated(assets: BlenderAsset[]): BlenderAsset[] {

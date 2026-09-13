@@ -40,6 +40,22 @@ import {
   type BlenderAsset,
 } from './gallery/blender-catalog';
 import { createBlenderViewer, type BlenderViewerHandle } from './gallery/blender-viewer';
+import { blenderAssetDate } from './gallery/blender-catalog';
+import {
+  LIGHTING_BLADE_COUNT,
+  LIGHTING_TIMES,
+  LIGHTING_WEATHER,
+  UNSUPPORTED_TIMES,
+  UNSUPPORTED_WEATHER,
+  createLightingPreview,
+  isLightingTime,
+  isLightingWeather,
+  type LightingPreviewHandle,
+  type LightingTime,
+  type LightingWeather,
+} from './gallery/lighting-preview';
+import { UNKNOWN_DATE_LABEL, sortNewestFirst } from './gallery/sorting';
+import { latestEvidenceDate, urlTarget } from './gallery/url-targets';
 import type {
   Adaptation,
   DemoComparison,
@@ -151,8 +167,13 @@ interface LabState {
   research: Map<number, ResearchEvidence>;
   researchSummary: string;
   researchIgnored: string[];
-  // Skills Lab tabs, sources catalog and Blender gallery.
+  // Skills Lab tabs, sources catalog, Blender gallery and lighting preview.
   tab: TabId;
+  urlMappingFilter: 'all' | 'mapped' | 'unmapped';
+  lighting: LightingPreviewHandle | null;
+  lightingTime: LightingTime;
+  lightingWeather: LightingWeather;
+  lightingStatus: string;
   sourceCatalog: SourceCatalog | null;
   sourceCatalogNote: string;
   blenderAssets: BlenderAsset[];
@@ -162,15 +183,20 @@ interface LabState {
   blenderRequest: number;
   blenderStatus: string;
   viewer: BlenderViewerHandle | null;
+  lightingTimeSelect: HTMLSelectElement;
+  lightingWeatherSelect: HTMLSelectElement;
+  lightingDetail: HTMLElement;
   modelLoader: LabHostOptions['modelLoader'];
   tabButtons: HTMLButtonElement[];
   panels: Record<TabId, HTMLElement>;
   stage: HTMLElement;
   stageSlotSkills: HTMLElement;
   stageSlotBlender: HTMLElement;
+  stageSlotLighting: HTMLElement;
   urlBody: HTMLElement;
   urlSearch: HTMLInputElement;
   urlQuery: string;
+  urlMappingSelect: HTMLSelectElement;
   blenderGrid: HTMLElement;
   blenderDetail: HTMLElement;
   // DOM refs.
@@ -245,19 +271,30 @@ function createState(container: HTMLElement): LabState {
     blenderRequest: 0,
     blenderStatus: 'Click a card to load its GLB into the stage.',
     viewer: null,
+    lighting: null,
+    lightingTime: 'noon',
+    lightingWeather: 'clear',
+    lightingStatus: 'Lighting preview not mounted yet.',
+    lightingTimeSelect: document.createElement('select'),
+    lightingWeatherSelect: document.createElement('select'),
+    lightingDetail: document.createElement('aside'),
     modelLoader: undefined,
     tabButtons: [],
     panels: {
       skills: document.createElement('section'),
       urls: document.createElement('section'),
       blender: document.createElement('section'),
+      lighting: document.createElement('section'),
     },
     stage: document.createElement('section'),
     stageSlotSkills: document.createElement('div'),
     stageSlotBlender: document.createElement('div'),
+    stageSlotLighting: document.createElement('div'),
     urlBody: document.createElement('div'),
     urlSearch: document.createElement('input'),
     urlQuery: '',
+    urlMappingFilter: 'all',
+    urlMappingSelect: document.createElement('select'),
     blenderGrid: document.createElement('div'),
     blenderDetail: document.createElement('aside'),
     root: document.createElement('div'),
@@ -295,12 +332,13 @@ function text<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-type TabId = 'skills' | 'urls' | 'blender';
+type TabId = 'skills' | 'urls' | 'blender' | 'lighting';
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'skills', label: 'Skills & demos' },
   { id: 'urls', label: 'URL provided' },
   { id: 'blender', label: 'Blender gallery' },
+  { id: 'lighting', label: 'Lighting & Environment' },
 ];
 
 function buildDom(state: LabState): void {
@@ -468,7 +506,12 @@ function buildDom(state: LabState): void {
   s.urlSearch.type = 'search';
   s.urlSearch.placeholder = 'Filter by id, title, host or URL…';
   s.urlSearch.setAttribute('aria-label', 'Filter source URLs');
-  urlHead.append(s.urlSearch);
+  const mappingFilterLabel = document.createElement('label');
+  mappingFilterLabel.className = 'tl-url-mapping-filter';
+  mappingFilterLabel.append(document.createTextNode('Mapping '));
+  fillMappingFilter(s.urlMappingSelect);
+  mappingFilterLabel.append(s.urlMappingSelect);
+  urlHead.append(s.urlSearch, mappingFilterLabel);
   s.urlBody.className = 'tl-url-body';
   urls.append(urlHead, s.urlBody);
 
@@ -493,7 +536,9 @@ function buildDom(state: LabState): void {
   s.blenderDetail.setAttribute('aria-label', 'Blender asset detail');
   blender.append(gal, s.stageSlotBlender, s.blenderDetail);
 
-  s.root.append(header, s.panels.skills, s.panels.urls, s.panels.blender, legend);
+  buildLightingPanel(s);
+
+  s.root.append(header, s.panels.skills, s.panels.urls, s.panels.blender, s.panels.lighting, legend);
   s.container.append(s.root);
   renderUrlTab(s);
   renderBlenderTab(s);
@@ -503,7 +548,7 @@ function buildDom(state: LabState): void {
 function readUrlTab(): TabId {
   try {
     const param = new URLSearchParams(window.location.search).get('tab');
-    if (param === 'urls' || param === 'blender') return param;
+    if (param === 'urls' || param === 'blender' || param === 'lighting') return param;
   } catch {
     // default tab
   }
@@ -524,6 +569,9 @@ function selectTab(state: LabState, tab: TabId): void {
     state.panels[id].hidden = id !== tab;
   }
   // Move the single stage to the visible tab; only one content root at a time.
+  // Leaving the Lighting tab always frees its preview: it owns scene content
+  // but performs no async work, so no request counter is needed for it.
+  if (previous === 'lighting' && tab !== 'lighting') teardownLighting(state);
   if (tab === 'blender') {
     if (state.stage.parentNode !== state.stageSlotBlender) state.stageSlotBlender.append(state.stage);
     if (previous !== 'blender') {
@@ -531,6 +579,18 @@ function selectTab(state: LabState, tab: TabId): void {
       showEmpty(state, state.viewer?.current() ? '' : state.blenderStatus);
       if (state.viewer?.current()) hideEmpty(state);
       if (state.blenderSelected) void loadBlenderAsset(state, state.blenderSelected);
+    }
+  } else if (tab === 'lighting') {
+    if (state.stage.parentNode !== state.stageSlotLighting) state.stageSlotLighting.append(state.stage);
+    if (previous !== 'lighting') {
+      if (previous === 'blender') {
+        // Same invalidation as the Skills path: a late GLB resolve/reject must
+        // never touch the Lighting stage or its status.
+        state.blenderRequest += 1;
+        state.viewer?.clear();
+      }
+      teardownActive(state);
+      mountLighting(state);
     }
   } else if (tab === 'skills') {
     if (state.stage.parentNode !== state.stageSlotSkills) state.stageSlotSkills.append(state.stage);
@@ -593,24 +653,46 @@ function galleryItem(state: LabState, record: ResolvedRecord): HTMLLIElement {
   const b = badgeFor(record);
   badge.className = `tl-badge ${b.cls}`.trim();
   badge.textContent = b.label;
-  button.append(num, name, badge);
+  const date = document.createElement('span');
+  date.className = 'tl-date';
+  date.textContent = UNKNOWN_DATE_LABEL;
+  button.append(num, name, badge, date);
   button.addEventListener('click', () => mountSelection(state, record.id));
   li.append(button);
   return li;
 }
 
 function refreshGallery(state: LabState): void {
+  // Newest first over recorded evidence dates; undated records keep id order
+  // after every dated record and are labelled, never treated as old.
+  const orderedGallery = sortNewestFirst(state.records, (candidate) =>
+    latestEvidenceDate(state.sourceCatalog?.sources.get(candidate.id)),
+  );
+  const galleryItems = new Map<number, HTMLLIElement>();
+  for (const li of Array.from(state.list.children)) {
+    galleryItems.set(Number((li as HTMLLIElement).dataset.sourceId), li as HTMLLIElement);
+  }
+  state.list.replaceChildren(
+    ...orderedGallery
+      .map((record) => galleryItems.get(record.id))
+      .filter((li): li is HTMLLIElement => li !== undefined),
+  );
   let shown = 0;
+  let unknownDates = 0;
   for (const li of Array.from(state.list.children)) {
     const item = li as HTMLLIElement;
     const id = Number(item.dataset.sourceId);
     const record = state.records[id - 1];
     const button = item.querySelector('button');
     const badge = item.querySelector('.tl-badge');
+    const dateEl = item.querySelector('.tl-date');
     if (record && button && badge) {
       const b = badgeFor(record);
       badge.textContent = b.label;
       badge.className = `tl-badge ${b.cls}`.trim();
+      const recordDate = latestEvidenceDate(state.sourceCatalog?.sources.get(record.id));
+      if (recordDate === null) unknownDates += 1;
+      if (dateEl) dateEl.textContent = recordDate ?? UNKNOWN_DATE_LABEL;
       const selected = id === state.selectedId;
       button.classList.toggle('is-selected', selected);
       if (selected) button.setAttribute('aria-current', 'true');
@@ -620,7 +702,8 @@ function refreshGallery(state: LabState): void {
       if (visible) shown += 1;
     }
   }
-  state.count.textContent = `Showing ${shown} of ${state.records.length}`;
+  state.count.textContent =
+    'Showing ' + shown + ' of ' + state.records.length + ' · newest first · ' + unknownDates + ' without recorded dates';
 }
 
 function recordVisible(state: LabState, record: ResolvedRecord): boolean {
@@ -1149,7 +1232,8 @@ function startLoop(state: LabState): void {
  */
 function frameSelection(state: LabState): void {
   if (!state.controls) return;
-  const root = state.active?.demo.root ?? state.viewer?.current()?.root ?? null;
+  const root =
+    state.active?.demo.root ?? state.lighting?.root ?? state.viewer?.current()?.root ?? null;
   const box = root ? visibleGeometryBox(root) : null;
   const fit = box ? computeFrameFit(box, state.camera.fov, state.camera.aspect) : null;
   if (!fit) {
@@ -1717,7 +1801,13 @@ function renderUrlTab(state: LabState): void {
   const q = state.urlQuery.trim().toLowerCase();
   let rows = 0;
   let urls = 0;
-  for (const record of state.records) {
+  let unmappedRows = 0;
+  // Newest first over recorded evidence dates; undated rows keep id order,
+  // after every dated row, with an explicit unknown-date label.
+  const orderedUrlRecords = sortNewestFirst(state.records, (candidate) =>
+    latestEvidenceDate(state.sourceCatalog?.sources.get(candidate.id)),
+  );
+  for (const record of orderedUrlRecords) {
     const catalogRow = state.sourceCatalog?.sources.get(record.id);
     const all = [...record.sources];
     for (const u of catalogRow?.urls ?? []) if (!all.includes(u.url)) all.push(u.url);
@@ -1729,12 +1819,56 @@ function renderUrlTab(state: LabState): void {
     row.dataset.sourceId = String(record.id);
     row.append(text('span', 'tl-num', String(record.id).padStart(2, '0')), text('h3', '', record.title));
     const mapping = mappingState(catalogRow, record.entry?.createDemo != null, record.entry?.adaptation === 'blocked');
+    const rowMapped = mapping.label === 'mapped to skill';
+    if (state.urlMappingFilter === 'mapped' && !rowMapped) continue;
+    if (state.urlMappingFilter === 'unmapped' && rowMapped) continue;
+    if (!rowMapped) unmappedRows += 1;
     const mapP = document.createElement('p');
     mapP.className = 'tl-url-mapping';
     const badge = text('span', `tl-badge ${mapping.label === 'mapped to skill' ? 'is-loaded' : mapping.label === 'blocked' ? 'is-blocked' : ''}`.trim(), mapping.label);
     mapP.append(badge, document.createTextNode(mapping.detail));
     if (record.aliasOf !== null) mapP.append(document.createTextNode(` · alias of row ${record.aliasOf}`));
     row.append(mapP);
+    const rowDate = latestEvidenceDate(catalogRow);
+    row.append(
+      text(
+        'p',
+        'tl-url-date',
+        rowDate === null
+          ? UNKNOWN_DATE_LABEL + ' — no evidence date recorded for this row; not treated as old.'
+          : 'Newest recorded evidence: ' + rowDate,
+      ),
+    );
+    // Same-host target for mapped rows only. Unmapped rows never get one:
+    // a target is never invented from a URL alone.
+    const rowTarget = urlTarget(catalogRow, record.entry?.createDemo != null, record.id, state.blenderAssets);
+    if (rowTarget !== null) {
+      const openLabel =
+        rowTarget.kind === 'demo' ? 'Open skill demo #' + rowTarget.sourceId : 'Open Blender asset ' + rowTarget.assetKey;
+      const openButton = text('button', 'tl-btn', openLabel);
+      openButton.type = 'button';
+      openButton.dataset.action = rowTarget.kind === 'demo' ? 'open-demo' : 'open-blender';
+      openButton.dataset.sourceId = String(record.id);
+      if (rowTarget.kind === 'blender') openButton.dataset.assetKey = rowTarget.assetKey;
+      openButton.addEventListener('click', () => {
+        if (rowTarget.kind === 'demo') {
+          selectTab(state, 'skills');
+          mountSelection(state, rowTarget.sourceId);
+        } else {
+          selectTab(state, 'blender');
+          void loadBlenderAsset(state, rowTarget.assetKey);
+        }
+      });
+      row.append(openButton);
+    } else if (rowMapped) {
+      row.append(
+        text(
+          'p',
+          'tl-muted',
+          'Mapped, but no demo is delivered for this row and the catalog names no Blender asset — no target invented.',
+        ),
+      );
+    }
     const list = document.createElement('ul');
     list.className = 'tl-url-list';
     if (all.length === 0) list.append(text('li', 'tl-muted', 'No source URL recorded for this row.'));
@@ -1789,7 +1923,19 @@ function renderUrlTab(state: LabState): void {
   }
   // Count line first, rows after. replaceChildren over a snapshot keeps to
   // the DOM subset the bounded host fake supports (no prepend/insertBefore).
-  const count = text('p', 'tl-count', `${rows} of ${state.records.length} rows · ${urls} URL(s) shown · ${state.sourceCatalogNote}`);
+  const count = text(
+    'p',
+    'tl-count',
+    rows +
+      ' of ' +
+      state.records.length +
+      ' rows · ' +
+      urls +
+      ' URL(s) shown · newest first · ' +
+      unmappedRows +
+      ' unmapped · ' +
+      state.sourceCatalogNote,
+  );
   body.replaceChildren(count, ...Array.from(body.children));
 }
 
@@ -1816,6 +1962,7 @@ async function loadSourceCatalog(state: LabState, gen: number, options: LabHostO
     state.sourceCatalogNote = `Sources-lane catalog not loaded (${toMessage(err)}); mappings show as ingestion needed.`;
   }
   renderUrlTab(state);
+  refreshGallery(state);
   renderDetail(state, state.records[state.selectedId - 1]);
 }
 
@@ -1853,7 +2000,10 @@ async function loadBlenderCatalogs(state: LabState, gen: number, options: LabHos
 function renderBlenderTab(state: LabState): void {
   const grid = state.blenderGrid;
   grid.replaceChildren();
-  for (const asset of state.blenderAssets) {
+  // Newest first over lane-recorded dates; assets without one keep curated
+  // order after every dated asset, labelled instead of guessed.
+  const orderedBlenderAssets = sortNewestFirst(state.blenderAssets, blenderAssetDate);
+  for (const asset of orderedBlenderAssets) {
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'tl-card';
@@ -1872,6 +2022,7 @@ function renderBlenderTab(state: LabState): void {
     card.append(
       text('span', 'tl-card-title', asset.title),
       text('span', 'tl-card-meta', `${asset.lane} · rank ${asset.qualityRank ?? 'unranked'} (curated)`),
+      text('span', 'tl-card-date', blenderAssetDate(asset) ?? UNKNOWN_DATE_LABEL),
     );
     card.addEventListener('click', () => void loadBlenderAsset(state, asset.key));
     grid.append(card);
@@ -1956,6 +2107,177 @@ async function loadBlenderAsset(state: LabState, key: string): Promise<void> {
 }
 
 /* ------------------------------------------------------------------ */
+/* Lighting & Environment tab                                          */
+/* ------------------------------------------------------------------ */
+
+function fillMappingFilter(select: HTMLSelectElement): void {
+  const options: Array<[string, string]> = [
+    ['all', 'All rows'],
+    ['mapped', 'Mapped only'],
+    ['unmapped', 'Unmapped URLs'],
+  ];
+  for (const [value, label] of options) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    select.append(option);
+  }
+  select.value = 'all';
+}
+
+function fillLightingSelect(
+  select: HTMLSelectElement,
+  supported: ReadonlyArray<string>,
+  unsupported: ReadonlyArray<string>,
+  current: string,
+): void {
+  for (const value of supported) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = value;
+    select.append(option);
+  }
+  for (const value of unsupported) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = value + ' (unavailable — not implemented)';
+    option.disabled = true;
+    select.append(option);
+  }
+  select.value = current;
+}
+
+function buildLightingPanel(state: LabState): void {
+  const panel = state.panels.lighting;
+  panel.classList.add('tl-lighting-layout');
+  const head = document.createElement('div');
+  head.className = 'tl-lighting-head';
+  head.append(
+    text('h2', 'tl-section-title', 'Lighting & Environment'),
+    text(
+      'p',
+      'tl-muted',
+      'CPU-built preview from real lab techniques: jittered-grid grass blades ' +
+        '(source 18 restatement, static — no GLSL wind bend), an asphalt ribbon ' +
+        'following the terrain, and a PBR shed (MeshStandardMaterial with real ' +
+        'roughness/metalness). Only the time/weather states below are ' +
+        'implemented; the rest are labelled unavailable. The host scene ' +
+        'provides no environment map in this lane, so reflections stay ' +
+        'diffuse. Visual/FPS acceptance: OPEN — no browser render inspected.',
+    ),
+  );
+  const controls = document.createElement('div');
+  controls.className = 'tl-filters tl-lighting-controls';
+  const timeLabel = document.createElement('label');
+  timeLabel.append(document.createTextNode('Time of day '));
+  fillLightingSelect(state.lightingTimeSelect, LIGHTING_TIMES, UNSUPPORTED_TIMES, state.lightingTime);
+  timeLabel.append(state.lightingTimeSelect);
+  const weatherLabel = document.createElement('label');
+  weatherLabel.append(document.createTextNode('Weather '));
+  fillLightingSelect(state.lightingWeatherSelect, LIGHTING_WEATHER, UNSUPPORTED_WEATHER, state.lightingWeather);
+  weatherLabel.append(state.lightingWeatherSelect);
+  controls.append(timeLabel, weatherLabel);
+  head.append(controls);
+  state.lightingTimeSelect.addEventListener('change', () => {
+    const value = state.lightingTimeSelect.value;
+    if (!isLightingTime(value)) return;
+    state.lightingTime = value;
+    if (state.lighting) {
+      state.lighting.setTimeOfDay(value);
+      state.lightingStatus = 'Lighting preview: ' + state.lightingTime + ', ' + state.lightingWeather + '.';
+    } else {
+      state.lightingStatus =
+        'Lighting preview will mount as ' + state.lightingTime + ', ' + state.lightingWeather + '.';
+    }
+    renderLightingDetail(state);
+  });
+  state.lightingWeatherSelect.addEventListener('change', () => {
+    const value = state.lightingWeatherSelect.value;
+    if (!isLightingWeather(value)) return;
+    state.lightingWeather = value;
+    if (state.lighting) {
+      state.lighting.setWeather(value);
+      state.lightingStatus = 'Lighting preview: ' + state.lightingTime + ', ' + state.lightingWeather + '.';
+    } else {
+      state.lightingStatus =
+        'Lighting preview will mount as ' + state.lightingTime + ', ' + state.lightingWeather + '.';
+    }
+    renderLightingDetail(state);
+  });
+  state.lightingDetail.className = 'tl-detail';
+  state.lightingDetail.setAttribute('aria-label', 'Lighting preview detail');
+  panel.append(head, state.stageSlotLighting, state.lightingDetail);
+  renderLightingDetail(state);
+}
+
+function renderLightingDetail(state: LabState): void {
+  const detail = state.lightingDetail;
+  detail.replaceChildren();
+  detail.append(text('h2', '', 'Lighting preview'));
+  detail.append(text('p', 'tl-status', state.lightingStatus));
+  const meta = document.createElement('dl');
+  meta.className = 'tl-meta';
+  meta.append(
+    metaRow('Time of day', state.lightingTime + ' (implemented: ' + LIGHTING_TIMES.join(', ') + ')'),
+    metaRow('Weather', state.lightingWeather + ' (implemented: ' + LIGHTING_WEATHER.join(', ') + ')'),
+    metaRow(
+      'Preview content',
+      'grass ' + LIGHTING_BLADE_COUNT + ' blades (jittered grid, source-18 restatement) · asphalt road · PBR shed',
+    ),
+    metaRow(
+      'Materials',
+      'MeshStandardMaterial with real roughness/metalness; envMapIntensity set but no environment map in this lane',
+    ),
+    metaRow('Lifecycle', 'one shared renderer/RAF; the preview mounts with this tab and is disposed on leave'),
+    metaRow('Visual acceptance', 'OPEN — no browser/GPU render inspected'),
+  );
+  detail.append(meta);
+}
+
+function mountLighting(state: LabState): void {
+  teardownLighting(state);
+  if (!state.renderer) {
+    state.lightingStatus = state.rendererError
+      ? 'Renderer failed: ' + state.rendererError
+      : 'Renderer starting…';
+    showEmpty(state, state.lightingStatus);
+    renderLightingDetail(state);
+    refreshMetrics(state);
+    return;
+  }
+  try {
+    const preview = createLightingPreview();
+    preview.setTimeOfDay(state.lightingTime);
+    preview.setWeather(state.lightingWeather);
+    state.lighting = preview;
+    state.scene.add(preview.root);
+    state.lightingStatus =
+      'Lighting preview ready — ' + state.lightingTime + ', ' + state.lightingWeather + '. Built on CPU; visual acceptance OPEN.';
+    hideEmpty(state);
+    frameSelection(state);
+  } catch (err) {
+    state.lighting = null;
+    state.lightingStatus = 'Lighting preview failed: ' + toMessage(err);
+    reportError(state, state.lightingStatus);
+    showEmpty(state, state.lightingStatus);
+  }
+  renderLightingDetail(state);
+  refreshMetrics(state);
+}
+
+function teardownLighting(state: LabState): void {
+  const preview = state.lighting;
+  state.lighting = null;
+  if (!preview) return;
+  state.scene.remove(preview.root);
+  try {
+    preview.dispose();
+  } catch (err) {
+    reportError(state, 'Lighting preview dispose threw: ' + toMessage(err) + ' — host stays usable.');
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Wiring, errors, teardown                                            */
 /* ------------------------------------------------------------------ */
 
@@ -1987,6 +2309,11 @@ function wireControls(state: LabState): void {
   state.adaptationSelect.addEventListener('change', () => {
     state.adaptationFilter = state.adaptationSelect.value;
     refreshGallery(state);
+  });
+  state.urlMappingSelect.addEventListener('change', () => {
+    const value = state.urlMappingSelect.value;
+    state.urlMappingFilter = value === 'mapped' || value === 'unmapped' ? value : 'all';
+    renderUrlTab(state);
   });
   // Capture relevant renderer/demo failures plus page-level error events.
   // Only short message strings are displayed — no stacks, URLs or objects —
@@ -2051,6 +2378,7 @@ function disposeLab(state: LabState): void {
   window.removeEventListener('error', state.onWindowError);
   window.removeEventListener('unhandledrejection', state.onWindowRejection);
   teardownActive(state);
+  teardownLighting(state);
   state.viewer?.dispose();
   state.viewer = null;
   state.controls?.dispose();
