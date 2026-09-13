@@ -25,6 +25,16 @@ export function createStudioInteriors(anchors: readonly StudioInteriorAnchor[]):
   const solids: StudioInteriorSolid[] = [];
   const solidRoles = new Map<string, InteriorRole>();
   const components: { id: string; anchorId: string; role: InteriorRole; size: V3; local: V3 }[] = [];
+  const retile = (geometry: BufferGeometry, role: InteriorRole): void => {
+    const tile = palette[role].userData.tileMetres as number | undefined;
+    if (!tile) return;
+    const pos = geometry.getAttribute('position'), normal = geometry.getAttribute('normal'), uv = geometry.getAttribute('uv');
+    for (let i = 0; i < pos.count; i++) {
+      const nx = Math.abs(normal.getX(i)), ny = Math.abs(normal.getY(i));
+      uv.setXY(i, (nx > 0.7 ? pos.getZ(i) : pos.getX(i)) / tile,
+        (ny > 0.7 ? pos.getZ(i) : pos.getY(i)) / tile);
+    }
+  };
   for (const a of anchors) {
     const [w, d] = a.footprint;
     const rotation = new Quaternion().setFromEuler(new Euler(0, a.yaw, 0));
@@ -35,15 +45,7 @@ export function createStudioInteriors(anchors: readonly StudioInteriorAnchor[]):
         throw new Error(`Furniture exceeds anchor footprint: ${a.id}/${name}`);
       const geometry = cylinder ? new CylinderGeometry(size[0] * 0.36, size[0] * 0.5, size[1], 8)
         : new RoundedBoxGeometry(...size, 1, Math.min(radius, ...size.map(n => n / 3)));
-      const tile = palette[role].userData.tileMetres as number | undefined;
-      if (tile) {
-        const pos = geometry.getAttribute('position'), normal = geometry.getAttribute('normal'), uv = geometry.getAttribute('uv');
-        for (let i = 0; i < pos.count; i++) {
-          const nx = Math.abs(normal.getX(i)), ny = Math.abs(normal.getY(i));
-          uv.setXY(i, (nx > 0.7 ? pos.getZ(i) : pos.getX(i)) / tile,
-            (ny > 0.7 ? pos.getZ(i) : pos.getY(i)) / tile);
-        }
-      }
+      retile(geometry, role);
       const centre = new Vector3(...p).applyQuaternion(rotation).add(anchorPosition);
       const matrix = new Matrix4().compose(centre, rotation, new Vector3(1, 1, 1));
       geometry.applyMatrix4(matrix);
@@ -83,6 +85,12 @@ export function createStudioInteriors(anchors: readonly StudioInteriorAnchor[]):
         emit(`seat-cushion-${i}`, 'fabric', [x, 0.425, 0.09], [cw, 0.2, d - 0.27], true, 0.07);
         emit(`back-cushion-${i}`, 'fabric', [x, 0.77, -d / 2 + 0.25], [cw, 0.43, 0.16], false, 0.065);
         emit(`welt-${i}`, 'cream', [x, 0.423, d / 2 - 0.039], [cw - 0.035, 0.005, 0.005], false, 0.002);
+      }
+      if (a.id === 'teal-house-sofa') {
+        // Throw pillows on the west sofa only; the east sofa keeps its shipped set.
+        emit('pillow-cream--1', 'cream', [-0.585, 0.72, -0.1], [0.4, 0.38, 0.13], false, 0.05);
+        emit('pillow-ochre', 'ochre', [0, 0.74, -0.12], [0.4, 0.4, 0.13], false, 0.05);
+        emit('pillow-fabric-1', 'fabric', [0.585, 0.72, -0.1], [0.4, 0.38, 0.13], false, 0.05);
       }
     } else if (a.id.endsWith('-bed') || a.id.endsWith('-bed2')) {
       legs(0.18, 0.12);
@@ -125,6 +133,11 @@ export function createStudioInteriors(anchors: readonly StudioInteriorAnchor[]):
         emit('television-case', 'walnut', [-0.15, 1.02, 0], [0.75, 0.54, d - 0.07], true, 0.035);
         emit('television-glass', 'dark', [-0.20, 1.035, d / 2 - 0.024], [0.54, 0.39, 0.025], false, 0.045);
         emit('television-dial', 'metal', [0.16, 1.05, d / 2 - 0.008], [0.046, 0.046, 0.012]);
+        if (a.id === 'teal-house-tv-unit') {
+          // Trailing plant on the west credenza, clear of the television case.
+          emit('credenza-pot', 'ochre', [0.55, 0.79, 0], [0.16, 0.12, 0.16], false, 0, true);
+          emit('credenza-plant', 'fabric', [0.55, 0.97, 0], [0.24, 0.22, 0.24], false, 0.06);
+        }
       }
     } else if (a.id.endsWith('-coffee-table') || a.id.endsWith('-dining-table') || a.id.endsWith('-desk') || a.id.endsWith('-workbench')) {
       const coffee = a.id.endsWith('-coffee-table'), bench = a.id.endsWith('-workbench');
@@ -136,11 +149,131 @@ export function createStudioInteriors(anchors: readonly StudioInteriorAnchor[]):
         for (let i = 0; i < 2; i++) emit(`drawer-pull-${i}`, 'metal', [w * 0.3, h - 0.12 - i * 0.15, d / 2 - 0.02], [0.18, 0.018, 0.025]);
       }
       book(-w * 0.17, h + 0.055, 0);
+      if (a.id === 'teal-house-coffee-table') {
+        // Turned-wood platter plus a stacked second book on the west table.
+        emit('serving-platter', 'ochre', [0.2, h + 0.065, -0.05], [0.32, 0.06, 0.32], false, 0.025);
+        book(-w * 0.17, h + 0.1, 0);
+      }
       if (bench) {
         emit('toolbox', 'ochre', [w * 0.24, h + 0.17, -d * 0.1], [0.48, 0.25, 0.3], false, 0.02);
         emit('toolbox-handle', 'metal', [w * 0.24, h + 0.32, -d * 0.1], [0.18, 0.025, 0.025]);
       }
     } else throw new Error(`Unsupported interior anchor: ${a.id}`);
+  }
+  // G2 west-living dressing: teal-house (west, centreX -20) only. The yellow
+  // house keeps its shipped set, so the far side is a control view. Every
+  // room-scale part below is presentation-only (never solid: zero new solids,
+  // zero collision change); furniture-anchor parts above keep the pattern's
+  // own solid flags. Room parts are recorded against the synthetic room
+  // anchor `teal-house-living` (room-local origin [-20, 0.08, 0]) rather than
+  // a furniture footprint, which they intentionally exceed. Only existing
+  // InteriorRoles feed the merge buckets, so the draw-group census never grows.
+  if (anchors.some((a) => a.id === 'teal-house-sofa')) {
+    const ROOM = { minX: -19.95, maxX: -13.3, minZ: -8.78, maxZ: -0.15, minY: 0.08, maxY: 3.0 } as const;
+    const emitRoom = (name: string, role: InteriorRole, center: V3, size: V3,
+      opts: { cylinder?: boolean; radius?: number; yaw?: number } = {}) => {
+      const yaw = opts.yaw ?? 0;
+      const c = Math.abs(Math.cos(yaw)), s = Math.abs(Math.sin(yaw));
+      const hx = (size[0] * c + size[2] * s) / 2, hz = (size[0] * s + size[2] * c) / 2;
+      if (center[0] - hx < ROOM.minX || center[0] + hx > ROOM.maxX
+        || center[2] - hz < ROOM.minZ || center[2] + hz > ROOM.maxZ
+        || center[1] - size[1] / 2 < ROOM.minY - 1e-6 || center[1] + size[1] / 2 > ROOM.maxY)
+        throw new Error(`West living dressing outside room envelope: ${name}`);
+      const roomRotation = new Quaternion().setFromEuler(new Euler(0, yaw, 0));
+      const roomGeometry = opts.cylinder
+        ? new CylinderGeometry(size[0] * 0.36, size[0] * 0.5, size[1], 8)
+        : new RoundedBoxGeometry(...size, 1, Math.min(opts.radius ?? 0.008, ...size.map((n) => n / 3)));
+      retile(roomGeometry, role);
+      roomGeometry.applyMatrix4(new Matrix4().compose(new Vector3(...center), roomRotation, new Vector3(1, 1, 1)));
+      const roomNormalized = roomGeometry.index ? roomGeometry.toNonIndexed() : roomGeometry;
+      if (roomNormalized !== roomGeometry) roomGeometry.dispose();
+      roomNormalized.clearGroups();
+      const roomBucket = buckets.get(role) ?? [];
+      roomBucket.push(roomNormalized); buckets.set(role, roomBucket);
+      components.push({ id: `teal-house-living-${name}`, anchorId: 'teal-house-living',
+        role, size, local: [center[0] + 20, center[1] - 0.08, center[2]] });
+    };
+    // Area rug under the coffee-table zone, sliding under the sofa front edge.
+    emitRoom('rug-underlay', 'cream', [-16.6, 0.09, -4.4], [3.6, 0.02, 2.6], { radius: 0.004 });
+    emitRoom('rug-pattern', 'quilt', [-16.6, 0.105, -4.4], [3.4, 0.015, 2.4], { radius: 0.003 });
+    // Two lounge chairs facing each other across the coffee table.
+    const armchair = (cx: number, cz: number, yaw: number, pillow: InteriorRole, tag: string) => {
+      const c = Math.cos(yaw), s = Math.sin(yaw);
+      const at = (lx: number, lz: number): [number, number] => [cx + lx * c + lz * s, cz - lx * s + lz * c];
+      const part = (n: string, role: InteriorRole, lx: number, y: number, lz: number, size: V3, extra: { radius?: number } = {}) => {
+        const [wcx, wcz] = at(lx, lz);
+        emitRoom(`${tag}-${n}`, role, [wcx, y, wcz], size, { ...extra, yaw });
+      };
+      for (const x of [-0.3, 0.3]) for (const z of [-0.33, 0.33]) {
+        const [wcx, wcz] = at(x, z);
+        emitRoom(`${tag}-leg-${x}-${z}`, 'walnut', [wcx, 0.16, wcz], [0.06, 0.16, 0.06], { cylinder: true, yaw });
+      }
+      part('seat-frame', 'walnut', 0, 0.22, 0, [0.72, 0.12, 0.8]);
+      part('seat-cushion', 'fabric', 0, 0.36, 0.05, [0.6, 0.16, 0.62], { radius: 0.06 });
+      part('back-frame', 'fabric', 0, 0.62, -0.31, [0.72, 0.62, 0.18], { radius: 0.06 });
+      part('back-cushion', 'fabric', 0, 0.66, -0.2, [0.56, 0.4, 0.14], { radius: 0.06 });
+      part('arm--1', 'fabric', -0.33, 0.5, 0, [0.14, 0.3, 0.7], { radius: 0.05 });
+      part('arm-1', 'fabric', 0.33, 0.5, 0, [0.14, 0.3, 0.7], { radius: 0.05 });
+      part('pillow', pillow, 0.08, 0.6, -0.12, [0.34, 0.32, 0.12], { radius: 0.05 });
+    };
+    armchair(-16.6, -6.9, 0, 'ochre', 'chair-north');
+    armchair(-16.6, -2.0, Math.PI, 'cream', 'chair-south');
+    // Side table with a table lamp east of the north chair.
+    for (const x of [-0.2, 0.2]) for (const z of [-0.2, 0.2])
+      emitRoom(`side-leg-${x}-${z}`, 'walnut', [-15.35 + x, 0.34, -6.9 + z], [0.05, 0.52, 0.05], { cylinder: true });
+    emitRoom('side-top', 'walnut', [-15.35, 0.575, -6.9], [0.5, 0.05, 0.5], { radius: 0.02 });
+    emitRoom('side-book-pages', 'cream', [-15.45, 0.62, -6.85], [0.2, 0.03, 0.16]);
+    emitRoom('side-book-cover', 'ochre', [-15.45, 0.64, -6.85], [0.208, 0.008, 0.168]);
+    emitRoom('lamp-base', 'metal', [-15.22, 0.615, -6.95], [0.18, 0.03, 0.18], { cylinder: true });
+    emitRoom('lamp-stem', 'metal', [-15.22, 0.82, -6.95], [0.03, 0.4, 0.03], { cylinder: true });
+    emitRoom('lamp-shade', 'cream', [-15.22, 1.14, -6.95], [0.26, 0.28, 0.26], { cylinder: true });
+    // Floor lamp by the side window, west of the glass.
+    emitRoom('floor-lamp-base', 'metal', [-18.35, 0.1, -7.9], [0.3, 0.04, 0.3], { cylinder: true });
+    emitRoom('floor-lamp-pole', 'metal', [-18.35, 0.87, -7.9], [0.035, 1.5, 0.035], { cylinder: true });
+    emitRoom('floor-lamp-shade', 'cream', [-18.35, 1.7, -7.9], [0.34, 0.32, 0.34], { cylinder: true });
+    // Bookcase on the north wall west of the side window, with books and a plant.
+    emitRoom('shelf-back', 'walnut', [-18.9, 1.03, -8.72], [1.4, 1.9, 0.02]);
+    emitRoom('shelf-side--1', 'walnut', [-19.575, 1.03, -8.6], [0.05, 1.9, 0.32]);
+    emitRoom('shelf-side-1', 'walnut', [-18.225, 1.03, -8.6], [0.05, 1.9, 0.32]);
+    for (const y of [0.14, 0.55, 1.05, 1.55])
+      emitRoom(`shelf-board-${y}`, 'walnut', [-18.9, y, -8.6], [1.3, 0.04, 0.28]);
+    emitRoom('shelf-top', 'walnut', [-18.9, 1.96, -8.6], [1.4, 0.05, 0.32]);
+    let shelfBook = 0;
+    const shelfRow = (y: number, xs: number[], cover: InteriorRole) => {
+      for (const x of xs) {
+        emitRoom(`shelf-book-${shelfBook}-pages`, 'cream', [x, y + 0.15, -8.6], [0.055, 0.3, 0.2]);
+        emitRoom(`shelf-book-${shelfBook}-cover`, cover, [x, y + 0.154, -8.6], [0.063, 0.308, 0.208]);
+        shelfBook++;
+      }
+    };
+    shelfRow(0.57, [-19.4, -19.33, -19.26, -19.18], 'ochre');
+    shelfRow(1.07, [-19.38, -19.31, -19.24, -19.1, -19.03], 'dark');
+    emitRoom('shelf-stack-pages', 'cream', [-18.5, 1.6, -8.6], [0.24, 0.035, 0.19]);
+    emitRoom('shelf-stack-cover', 'fabric', [-18.5, 1.622, -8.6], [0.248, 0.009, 0.198]);
+    emitRoom('shelf-pot', 'ochre', [-19.25, 2.045, -8.6], [0.16, 0.12, 0.16], { cylinder: true });
+    emitRoom('shelf-plant', 'fabric', [-19.25, 2.2, -8.6], [0.24, 0.2, 0.24], { radius: 0.06 });
+    // Framed print on the north wall east of the side window.
+    emitRoom('print-frame', 'walnut', [-14.5, 1.75, -8.74], [0.98, 0.74, 0.04]);
+    emitRoom('print-mat', 'cream', [-14.5, 1.75, -8.72], [0.86, 0.62, 0.045]);
+    emitRoom('print-art', 'ochre', [-14.5, 1.75, -8.7], [0.6, 0.4, 0.05]);
+    // Sunburst clock on the spine wall, clear of the TV and the dining opening.
+    emitRoom('clock-face', 'cream', [-19.88, 2.05, -2.2], [0.05, 0.44, 0.44], { radius: 0.02 });
+    emitRoom('clock-hub', 'ochre', [-19.85, 2.05, -2.2], [0.06, 0.12, 0.12]);
+    for (const dy of [-0.36, 0.36]) emitRoom(`clock-ray-y-${dy}`, 'walnut', [-19.88, 2.05 + dy, -2.2], [0.03, 0.16, 0.06]);
+    for (const dz of [-0.36, 0.36]) emitRoom(`clock-ray-z-${dz}`, 'walnut', [-19.88, 2.05, -2.2 + dz], [0.03, 0.06, 0.16]);
+    // Drapes on both living-room windows with curtain rods.
+    emitRoom('drape-rod-north', 'metal', [-16.7, 2.45, -8.65], [3.9, 0.04, 0.04], { radius: 0.015 });
+    emitRoom('drape-north--1', 'cream', [-18.35, 1.25, -8.65], [0.5, 2.3, 0.12], { radius: 0.04 });
+    emitRoom('drape-north-1', 'cream', [-15.05, 1.25, -8.65], [0.5, 2.3, 0.12], { radius: 0.04 });
+    emitRoom('drape-rod-east', 'metal', [-13.4, 2.5, -4.6], [0.04, 0.04, 5.2], { radius: 0.015 });
+    emitRoom('drape-east--1', 'cream', [-13.4, 1.25, -6.95], [0.12, 2.3, 0.55], { radius: 0.04 });
+    emitRoom('drape-east-1', 'cream', [-13.4, 1.25, -2.25], [0.12, 2.3, 0.55], { radius: 0.04 });
+    // Corner plant by the picture window.
+    emitRoom('plant-pot', 'ochre', [-13.7, 0.28, -1.5], [0.34, 0.4, 0.34], { cylinder: true });
+    emitRoom('plant-soil', 'dark', [-13.7, 0.49, -1.5], [0.28, 0.04, 0.28], { cylinder: true });
+    emitRoom('plant-low', 'fabric', [-13.7, 0.75, -1.5], [0.4, 0.5, 0.4], { radius: 0.12 });
+    emitRoom('plant-mid', 'fabric', [-13.55, 1.05, -1.4], [0.3, 0.35, 0.3], { radius: 0.1 });
+    emitRoom('plant-top', 'fabric', [-13.85, 1.0, -1.6], [0.28, 0.3, 0.28], { radius: 0.1 });
   }
   let triangles = 0;
   for (const [role, geometries] of buckets) {
