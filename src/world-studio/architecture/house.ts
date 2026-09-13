@@ -145,6 +145,14 @@ function upperContact(tint = 1): ContactShading {
 export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfig): HouseBuild {
   const { id, centreX, frontSign, siding, masonry, accent } = config;
   const group = `${id}`;
+  // G4 dressing partition. Shell substitution hides `world-studio-<houseId>-*` and the
+  // batching contract pins those meshes invisible, so dressing the shells do NOT carry
+  // (shutters, porch dressing, roof courses) merges under a SHARED group whose mesh
+  // names (`world-studio-house-dressing-*`) match neither hide prefix — the same
+  // separate-partition precedent as `world-studio-interiors-*`. One group for both
+  // houses keeps the draw-group census cheap; every part id keeps its `${id}-` prefix,
+  // so ids stay unique, and every dressing part stays non-colliding.
+  const DRESSING_GROUP = 'house-dressing';
   const wx = (localX: number): number => centreX + frontSign * localX;
   const spanX = (a: number, b: number): [number, number] => {
     const left = wx(a);
@@ -171,11 +179,12 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
     lz1: number,
     contact?: ContactShading,
     uvSwap?: boolean,
+    emitGroup: string = group,
   ): void => {
     const [minX, maxX] = spanX(lx0, lx1);
     collector.addBox({
       id: `${id}-${partId}`,
-      group,
+      group: emitGroup,
       material,
       ballistic,
       min: [minX, Math.min(y0, y1), Math.min(lz0, lz1)],
@@ -183,6 +192,19 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
       contact,
       uvSwap,
     });
+  };
+  /** Porch/roof dressing shorthand: axis-aligned, presentation-only, dressing partition. */
+  const dbox = (
+    partId: string,
+    material: StudioMaterialId,
+    lx0: number,
+    lx1: number,
+    y0: number,
+    y1: number,
+    lz0: number,
+    lz1: number,
+  ): void => {
+    box(partId, material, null, lx0, lx1, y0, y1, lz0, lz1, undefined, undefined, DRESSING_GROUP);
   };
 
   const rotatedBox = (
@@ -192,11 +214,12 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
     centre: readonly [number, number, number],
     size: readonly [number, number, number],
     rotation: readonly [number, number, number],
+    emitGroup: string = group,
   ): void => {
     const half: [number, number, number] = [size[0] / 2, size[1] / 2, size[2] / 2];
     const geometry = studioBoxGeometry({
       id: `${id}-${partId}`,
-      group,
+      group: emitGroup,
       material,
       ballistic: null,
       min: [-half[0], -half[1], -half[2]],
@@ -207,11 +230,11 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
     );
     matrix.setPosition(centre[0], centre[1], centre[2]);
     geometry.applyMatrix4(matrix);
-    collector.addGeometry(group, material, geometry);
+    collector.addGeometry(emitGroup, material, geometry);
     if (ballistic) {
       collector.addCollider(
         `${id}-${partId}`,
-        `${group}:${material}`,
+        `${emitGroup}:${material}`,
         {
           minX: centre[0] - half[0],
           maxX: centre[0] + half[0],
@@ -293,6 +316,7 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
     n1: number,
     contact?: ContactShading,
     uvSwap?: boolean,
+    emitGroup: string = group,
   ): void => {
     const uMin = Math.min(u0, u1);
     const uMax = Math.max(u0, u1);
@@ -300,7 +324,7 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
     const nMax = frame.at + Math.max(n0, n1);
     collector.addBox({
       id: `${id}-${partId}`,
-      group,
+      group: emitGroup,
       material,
       ballistic,
       min: frame.axis === 'x' ? [uMin, y0, nMin] : [nMin, y0, uMin],
@@ -357,6 +381,22 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
       if (opening.kind === 'window') {
         const mid = (opening.y0 + opening.y1) / 2;
         wallPart(frame, `${key}-transom`, 'trim', null, u0 + inset, u1 - inset, mid - 0.03, mid + 0.03, -0.035, 0.035);
+        // Board shutters in the dark door timber, hung proud of the siding the way the
+        // judged plates dress the street fronts. Narrow lights (the entry sidelight)
+        // stay bare; sliders and doors never take them. Non-colliding by construction:
+        // both leaves flank the opening, nothing spans it.
+        const span = u1 - u0;
+        if (span >= 0.9) {
+          const shutterWidth = Math.min(0.5, span * 0.32);
+          for (const [side, edge] of [[-1, u0 - casing], [1, u1 + casing]] as const) {
+            const s0 = side < 0 ? edge - shutterWidth : edge;
+            const s1 = side < 0 ? edge : edge + shutterWidth;
+            const tag = side < 0 ? 'a' : 'b';
+            wallPart(frame, `${key}-shutter-${tag}`, 'door', null, s0, s1, opening.y0, opening.y1, face, face + proud, undefined, undefined, DRESSING_GROUP);
+            wallPart(frame, `${key}-shutter-${tag}-rail-top`, 'door', null, s0, s1, opening.y1 - 0.16, opening.y1 - 0.05, face, face + proud + out * 0.025, undefined, undefined, DRESSING_GROUP);
+            wallPart(frame, `${key}-shutter-${tag}-rail-bottom`, 'door', null, s0, s1, opening.y0 + 0.05, opening.y0 + 0.16, face, face + proud + out * 0.025, undefined, undefined, DRESSING_GROUP);
+          }
+        }
       } else {
         // Meeting stile of the parked leaf, hard against the open half.
         wallPart(frame, `${key}-stile`, 'trim', null, glassU1, glassU1 + 0.06, opening.y0 + inset, opening.y1 - inset, -0.045, 0.045, undefined, true);
@@ -714,6 +754,48 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
   box('porch-beam-inner', 'trim', null, PORCH_X0 - 0.02, PORCH_X0 + 0.18, balconyDeckY - 0.3, balconyDeckY - 0.12, PORCH_Z0, PORCH_Z1);
   box('porch-ceiling', 'trim', null, PORCH_X0, PORCH_X1 - 0.04, balconyDeckY - 0.12, balconyDeckY - 0.06, PORCH_Z0, PORCH_Z1);
   platforms.push({ id: `${id}-porch`, ...boundsOf(spanX(PORCH_X0, PORCH_X1), [PORCH_Z0, PORCH_Z1]), y: PORCH_Y });
+  // ---------------------------------------------------------------- porch dressing
+  // Street-porch dressing from the judged plates: railings that leave the step open,
+  // an armchair with a side table against the blank front wall, a lantern by the entry
+  // door and soil-topped planters flanking the step. All presentation-only (ballistic
+  // null): the porch sits at grade, so the rails guard nothing a collider must enforce,
+  // and every route the contract walks stays untouched.
+  const porchRailTop = PORCH_Y + 0.9;
+  let porchBaluster = 0;
+  // Outer edge rails flanking the step (the step itself spans localZ 3.0..5.8).
+  for (const [seg, rz0, rz1] of [['north', PORCH_Z0, 3.0], ['south', 5.8, PORCH_Z1]] as const) {
+    dbox(`porch-rail-${seg}`, 'trim', PORCH_X1 - 0.08, PORCH_X1, porchRailTop - 0.09, porchRailTop, rz0, rz1);
+    for (let z = rz0 + 0.09; z < rz1 - 0.05; z += 0.13) {
+      dbox(`porch-baluster-${seg}-${porchBaluster++}`, 'trim', PORCH_X1 - 0.06, PORCH_X1 - 0.01, PORCH_Y, porchRailTop - 0.09, z - 0.025, z + 0.025);
+    }
+  }
+  // Side rails closing both porch flanks, with a newel post at each outer corner.
+  for (const [seg, rz] of [['side-a', PORCH_Z0], ['side-b', PORCH_Z1]] as const) {
+    dbox(`porch-rail-${seg}`, 'trim', PORCH_X0 + 0.05, PORCH_X1 - 0.05, porchRailTop - 0.09, porchRailTop, rz, rz + 0.08);
+    for (let x = PORCH_X0 + 0.17; x < PORCH_X1 - 0.12; x += 0.13) {
+      dbox(`porch-baluster-${seg}-${porchBaluster++}`, 'trim', x - 0.025, x + 0.025, PORCH_Y, porchRailTop - 0.09, rz + 0.01, rz + 0.06);
+    }
+    dbox(`porch-newel-${seg}`, 'trim', PORCH_X1 - 0.24, PORCH_X1 - 0.08, PORCH_Y, porchRailTop, rz - 0.08, rz + 0.16);
+  }
+  // Armchair against the blank front wall between the picture window and the entry
+  // door, facing the street; side table alongside. Door timber with a trim cushion.
+  dbox('porch-chair-base', 'door', PORCH_X0 + 0.3, PORCH_X0 + 0.95, PORCH_Y + 0.05, PORCH_Y + 0.4, 1.15, 1.8);
+  dbox('porch-chair-back', 'door', PORCH_X0 + 0.3, PORCH_X0 + 0.45, PORCH_Y + 0.4, PORCH_Y + 0.95, 1.15, 1.8);
+  dbox('porch-chair-arm-a', 'door', PORCH_X0 + 0.3, PORCH_X0 + 0.95, PORCH_Y + 0.4, PORCH_Y + 0.6, 1.15, 1.3);
+  dbox('porch-chair-arm-b', 'door', PORCH_X0 + 0.3, PORCH_X0 + 0.95, PORCH_Y + 0.4, PORCH_Y + 0.6, 1.65, 1.8);
+  dbox('porch-chair-cushion', 'trim', PORCH_X0 + 0.42, PORCH_X0 + 0.9, PORCH_Y + 0.4, PORCH_Y + 0.5, 1.32, 1.63);
+  dbox('porch-table-top', 'door', PORCH_X0 + 0.35, PORCH_X0 + 0.8, PORCH_Y + 0.5, PORCH_Y + 0.55, 2.0, 2.45);
+  dbox('porch-table-leg', 'door', PORCH_X0 + 0.52, PORCH_X0 + 0.63, PORCH_Y, PORCH_Y + 0.5, 2.17, 2.28);
+  // Lantern on the front wall beside the entry door (door leaf parks inside, clear).
+  dbox('porch-lantern-plate', 'trim', PORCH_X0 - 0.01, PORCH_X0 + 0.06, 2.18, 2.5, 3.0, 3.2);
+  dbox('porch-lantern-lamp', 'metal', PORCH_X0 + 0.06, PORCH_X0 + 0.18, 2.24, 2.44, 3.04, 3.16);
+  dbox('porch-lantern-cap', 'trim', PORCH_X0 + 0.04, PORCH_X0 + 0.2, 2.44, 2.49, 3.02, 3.18);
+  // Soil-topped planters in the house masonry flanking the step.
+  for (const [seg, cz] of [['a', 2.68], ['b', 6.12]] as const) {
+    dbox(`porch-planter-${seg}`, masonry, 8.1, 8.45, PORCH_Y, PORCH_Y + 0.36, cz - 0.175, cz + 0.175);
+    dbox(`porch-planter-rim-${seg}`, 'trim', 8.08, 8.47, PORCH_Y + 0.34, PORCH_Y + 0.4, cz - 0.195, cz + 0.195);
+    dbox(`porch-planter-soil-${seg}`, 'foundation', 8.14, 8.41, PORCH_Y + 0.34, PORCH_Y + 0.385, cz - 0.165, cz + 0.165);
+  }
 
   // ---------------------------------------------------------------- street balcony
 
@@ -941,8 +1023,35 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
         [0, 0, -sign * frontSign * ROOF_PITCH],
       );
     }
+    // Shingle courses: thin battens proud of each slope so the roof reads as coursed
+    // shingles instead of a flat slab. Same roof material, so they draw as shadow
+    // lines; non-colliding dressing above the slabs' own ballistic envelope.
+    const courseAngle = -sign * frontSign * ROOF_PITCH;
+    const courseDx = (-frontSign * sign * ROOF_RUN) / slopeLength;
+    const courseDy = (RIDGE_Y - EAVE_Y) / slopeLength;
+    const courseOff = ROOF_THICKNESS / 2 + 0.012;
+    const courseNx = -Math.sin(courseAngle);
+    const courseNy = Math.cos(courseAngle);
+    const eaveWorldX = wx(sign * ROOF_RUN);
+    let course = 0;
+    for (let s = 0.55; s < slopeLength - 0.55; s += 0.42) {
+      rotatedBox(
+        `roof-course-${sign > 0 ? 'front' : 'rear'}-${course++}`,
+        'roof',
+        null,
+        [eaveWorldX + courseDx * s + courseNx * courseOff, EAVE_Y + courseDy * s + courseNy * courseOff, 0],
+        [0.1, 0.055, roofDepth - 0.15],
+        [0, 0, courseAngle],
+        DRESSING_GROUP,
+      );
+    }
   }
   box('ridge-cap', 'roof', null, -0.26, 0.26, RIDGE_Y - 0.06, RIDGE_Y + 0.14, -HOUSE_HALF_DEPTH - RAKE_OVERHANG, HOUSE_HALF_DEPTH + RAKE_OVERHANG);
+  // Ridge end caps: slim trim boards closing the ridge line at both gable apexes,
+  // where the judged plates carry the white verge trim into the ridge.
+  for (const [index, z] of [-(HOUSE_HALF_DEPTH + RAKE_OVERHANG), HOUSE_HALF_DEPTH + RAKE_OVERHANG].entries()) {
+    dbox(`ridge-cap-end-${index}`, 'trim', -0.32, 0.32, RIDGE_Y - 0.08, RIDGE_Y + 0.2, z - 0.08, z + 0.08);
+  }
 
   // Gable infill, stepped to stay under the roof plane. Non-colliding: it sits in the attic
   // above the ceiling slab, and the roof slabs themselves carry the ballistic envelope.

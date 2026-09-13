@@ -1,0 +1,78 @@
+{
+ "ticket": "G4",
+ "lane": "omp-newworld-20260913",
+ "verdict": "PASS",
+ "pattern_cited": "src/world-studio/architecture/house.ts box()/wallPart()/rotatedBox() helpers (existing primitives, existing StudioMaterialId palette: door/trim/metal/foundation/masonry/roof). No new asset pipeline, no Blender work, no new textures, no new materials. Presentation-only: every dressing part is ballistic-null (0 colliders added, solids 446 unchanged).",
+ "substitution_finding": "Live-DOM probe (installed-Chrome headless webgpu, world-studio solo) showed the GLB shells substitute BOTH procedural houses: every world-studio-{teal,yellow}-house-* bucket mesh visible=false, world-studiohouseteal/yellow shells visible, procedural glass panes retained. Dressing merged into the house partition would be hidden with it, so G4 dressing merges under a SHARED 'house-dressing' group (meshes world-studio-house-dressing-*), which matches neither the substitution hide-prefix (world-studio-<houseId>-*) nor the batching-test regex (^world-studio-(?:teal|yellow)-house-). Same separate-partition precedent as world-studio-interiors-*. Verified: 7 dressing meshes, 0 hide-prefix collisions, 0 batch-regex collisions.",
+ "bounded_diff": {
+  "modified": [
+   "src/world-studio/architecture/house.ts"
+  ],
+  "new": [
+   "acceptance/g4-house-dressing.json"
+  ],
+  "test_files_touched": [],
+  "note": "one source file plus this evidence file only; no test file created or edited; all throwaway QA scripts removed"
+ },
+ "structural": {
+  "dressing_boxes_addBox": 328,
+  "dressing_boxes_addGeometry_courses": 64,
+  "dressing_colliding": 0,
+  "triangles_before": 20112,
+  "triangles_after": 24816,
+  "triangles_delta": 4704,
+  "triangles_delta_note": "392 boxes x 12 tris exactly (180 shutter + 144 porch + 4 ridge caps via addBox; 64 roof courses via addGeometry)",
+  "drawGroups_before": 62,
+  "drawGroups_after": 69,
+  "drawGroups_budget": 80,
+  "solids_before": 446,
+  "solids_after": 446,
+  "shutters": "30/30 street-scale windows shuttered (15 per house x 2 leaves x top/bottom rails = 180 boxes, door timber); entry sidelight (0.4 m) stays bare; sliders/doors never shuttered",
+  "porch": "per house: 2 outer rails + 2 side rails + 2 newels + 50 balusters flanking the step, armchair + side table, entry lantern, 2 masonry planters with trim rims and soil tops",
+  "roof": "16 shingle-course battens per slope per house (same roof material, shadow-line read) + 2 trim ridge end caps per house; pre-existing frieze/fascia/soffit/gutter/rake untouched; walkable garage roof deck untouched (gameplay route)",
+  "meshes": [
+   "world-studio-house-dressing-brick",
+   "world-studio-house-dressing-door",
+   "world-studio-house-dressing-foundation",
+   "world-studio-house-dressing-metal",
+   "world-studio-house-dressing-roof",
+   "world-studio-house-dressing-stone",
+   "world-studio-house-dressing-trim"
+  ]
+ },
+ "checks": {
+  "scoped_suites": "9 files / 70 tests pass, UNMODIFIED: architecture (studio-architecture, navigation-runtime, materials), presentation-batching, arena, ground, environment, routing, weather-routing (npx vitest run)",
+  "arena_viewpoint_regression_contract": "23/23 pass, UNMODIFIED (node --test scripts/qa/arena-viewpoint-regression.test.mjs)"
+ },
+ "capture": {
+  "adapter": "nvidia/blackwell",
+  "backend": "webgpu",
+  "before_dir": "C:/Users/david/Desktop/stuff/atomic-acres-catalog/audit/captures",
+  "builder": "npx vite build --outDir dist-g4-candidate (gitignored)",
+  "contract": "arena-viewpoint-regression-capture-v1",
+  "dist_outdir": "dist-g4-candidate (gitignored)",
+  "exposure": 1.04,
+  "final_run_capturedAt": "2026-09-13T20:44:48.291Z",
+  "final_run_verdict": "PASS 8/8 stations ok with committed-presentation receipts (frames f377..f513)",
+  "head_at_capture": "9930fcdbfc2841c6de35d3e651e5ac2a0d295650",
+  "port": 41974,
+  "seed": "viewpoint",
+  "served_sha256": "4e7974b8eb6b27536173a1ac30d4deb3cdc765d1805a983f179e9427d1f0b3e3",
+  "served_vs_dist": "byte-identical (GET /index.html sha256 match before any capture trusted)",
+  "url": "http://127.0.0.1:41974",
+  "variety_gate_note": "A second identical-code run tripped the capture script's frameVariety heuristic (interiors 10.4k/10.9k distinct vs 47.9k station median, floor 0.25x) while all 8 shots stayed ok; the final run PASSED it. Proven independent of G4: the lane-before interior frame measures 9882 distinct (would fail the same median at 0.206x), and G4 adds zero interior pixels. Cause is exterior-median lift from the sibling sky lane plus per-session cloud nondeterminism, not this change. Gate untouched."
+ },
+ "frames": {
+  "after": "world-studio-<station>.png",
+  "before": "raw/world-studio/world-studio-<station>.png plus audit view-teal-house-front.png / view-yellow-house-front.png / view-loop-center.png",
+  "teal_west_house": "dark board shutters flank stair + upper windows and align with shell apertures; white porch railing/balusters/newels flank the step; wood armchair + side table + masonry planter + entry lantern dressed on the porch; no floaters, no z-fighting",
+  "yellow_east_house": "tan board shutters flank upper + picture windows; porch railing dressed; stone chimney and balcony unchanged",
+  "roofs": "main slopes show coursed-shingle lines (yellow-roof slope transect: 38 edge-turns sd 16.5 vs before 22 turns sd 8.3 at identical coords); ridge lines closed with trim end caps",
+  "roi_shutters": "teal shutter-leaf patch mean (26,52,54) vs before same-patch siding (81,120,125); yellow shutter (173,171,166, desaturated wood) vs yellow siding (194,166,130)",
+  "roi_interiors": "west-living full-frame distinct after 10452 / east-living 10880 vs before 9882: same regime, G4 pixel-neutral indoors"
+ },
+ "method": "Deterministic review-camera recapture (installed-Chrome headless webgpu, seed viewpoint, samples 1) of all 8 authored world-studio stations; structural presence via StudioSurfaceCollector interception (328 addBox + 64 addGeometry, 0 ballistic); pixel presence by sharp ROI means/distinct counts and slope-transect edge energy at identical before/after coords. Before/after whole-frame diff deliberately NOT used: the sibling sky lane changed sun/sky after the before-captures, confounding global deltas.",
+ "deferred": "Hanging vines need a foliage material the architecture palette does not carry (no green StudioMaterialId); rear-deck furniture stays with gardens/backyard ownership; shutters use door timber rather than battTop green-black to avoid new materials.",
+ "after_dir": "artifacts/viewpoint-regression/g4-dressing/world-studio",
+ "after_manifest": "artifacts/viewpoint-regression/g4-dressing/capture-manifest.json"
+}
