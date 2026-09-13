@@ -26,6 +26,14 @@ export function buildWorldStudio(scene: THREE.Scene, housePresentationOptions?: 
   const interiors = createStudioInteriors(architecture.root.userData.furnitureAnchors as StudioInteriorAnchor[]);
   const gardens = createStudioGardens();
   root.add(ground.root, architecture.root, nature.root, snow.root, vehicles.root, interiors.root, gardens.root);
+  // These groups participate in asynchronous presentation swaps. The generic arena static batch
+  // runs before house audits and hero-vehicle loads settle; marking the existing presentation
+  // groups dynamic keeps it from baking hidden fallback meshes (and their owned materials/maps)
+  // into an unowned copy that the per-asset lifecycle cannot retire. Collision and shot authority
+  // remain in the solids built below; this flag is only the art-kit batching convention.
+  architecture.root.userData.dynamic = true;
+  vehicles.root.userData.dynamic = true;
+  ground.root.userData.dynamic = true;
   root.userData.verticalNavigation = architecture.verticalNavigation;
   root.userData.worldStudioEnvironment = STUDIO_ENVIRONMENTS[0];
   root.userData.worldStudioReviewPoints = [...STUDIO_REVIEW_CAMERAS, ...(architecture.reviewPoints ?? []), ...gardens.reviewPoints];
@@ -63,6 +71,10 @@ export function buildWorldStudio(scene: THREE.Scene, housePresentationOptions?: 
   // Solids, colliders, shot surfaces, the dynamic glass registry, spawns and navigation above
   // are already final and are never derived from these meshes. Failure leaves procedural art.
   const housePresentation = attachHousePresentation({ architectureRoot: architecture.root, breakableWindows, raycastMeshes }, housePresentationOptions);
+  // House GLBs may arrive before the global presentation batch and own their PBR resources until
+  // the house lifecycle retires them. Keep both the pending shell and its eventual replacement
+  // outside the generic static-batch copy path.
+  housePresentation.root.userData.dynamic = true;
   root.add(housePresentation.root);
   root.userData.worldStudioHouseStatus = housePresentation.status();
   root.userData.worldStudioHousePresentation = housePresentation;
@@ -135,6 +147,7 @@ export function buildWorldStudio(scene: THREE.Scene, housePresentationOptions?: 
       }
     });
     const heroes = createStudioBlenderAssets({ headingRadians: Math.PI });
+    heroes.root.userData.dynamic = true;
     root.userData.worldStudioBlenderStatus = 'loading';
     retireHeroes = () => {
       heroes.dispose();
