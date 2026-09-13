@@ -1,0 +1,436 @@
+{
+  "variant": "teal",
+  "houseId": "teal-house",
+  "partition": "world-studio.house.teal.shell",
+  "blender": "5.1.2",
+  "glb": "public/assets/world-studio/blender/houses/house-teal-shell.glb",
+  "sha256": "0748813fa082fb694978168c55a896124ac4d052237d226cccafc241df7ccd50",
+  "bytes": 5670288,
+  "localBounds": {
+    "min": [
+      -9.44,
+      -0.42,
+      -10.14
+    ],
+    "max": [
+      9.049999999999999,
+      9.42,
+      20.6
+    ]
+  },
+  "placement": [
+    -20.0,
+    0.0,
+    0.0
+  ],
+  "triangles": 37944,
+  "trianglesByMaterial": {
+    "concrete": 60,
+    "door": 492,
+    "glass": 264,
+    "masonry": 5316,
+    "metal": 636,
+    "shingle": 1320,
+    "siding": 21228,
+    "trim": 8628
+  },
+  "materials": 8,
+  "drawGroups": 8,
+  "textureBytes": 2843343,
+  "textureMeasurements": {
+    "siding": {
+      "tilePixels": 512,
+      "tileMetres": 2.4384,
+      "texelsPerMetre": 209.974,
+      "featureMillimetres": 152.4,
+      "measuredFeaturePixels": 32
+    },
+    "shingle": {
+      "tilePixels": 512,
+      "tileMetres": 2.286,
+      "texelsPerMetre": 223.972,
+      "featureMillimetres": 142.875,
+      "measuredFeaturePixels": 32,
+      "measuredTabPixels": 64
+    },
+    "masonry": {
+      "tilePixels": 512,
+      "tileMetres": 2.0,
+      "texelsPerMetre": 256.0,
+      "featureMillimetres": 250.0,
+      "measuredFeaturePixels": 64,
+      "measuredJointPixels": 3
+    },
+    "trim": {
+      "tilePixels": 256,
+      "tileMetres": 1.0,
+      "texelsPerMetre": 256.0,
+      "featureMillimetres": 0.0,
+      "measuredFeaturePixels": 0.0,
+      "measuredBrushPixels": 5
+    },
+    "concrete": {
+      "tilePixels": 512,
+      "tileMetres": 2.0,
+      "texelsPerMetre": 256.0,
+      "featureMillimetres": 0.0,
+      "measuredFeaturePixels": 0.0
+    },
+    "metal": {
+      "tilePixels": 256,
+      "tileMetres": 1.0,
+      "texelsPerMetre": 256.0,
+      "featureMillimetres": 0.0,
+      "measuredFeaturePixels": 0.0
+    }
+  },
+  "panes": 22,
+  "apertureMarkers": 26,
+  "routeLandmarks": 3,
+  "apertureMismatches": [],
+  "roadClearanceLocalX": 9.5,
+  "roadClearanceOk": true,
+  "interiorPartitions": 7,
+  "interiorApertureMarkers": 9,
+  "interiorApertureMismatches": [],
+  "stairTreads": 16,
+  "stairRise": 0.20124999999999998,
+  "stairGoing": 0.28125,
+  "stairTreadTops": [
+    0.28125,
+    0.4825,
+    0.68375,
+    0.8849999999999999,
+    1.08625,
+    1.2875,
+    1.48875,
+    1.69,
+    1.8912499999999999,
+    2.0925,
+    2.2937499999999997,
+    2.495,
+    2.69625,
+    2.8975,
+    3.09875,
+    3.3
+  ],
+  "stairTreadProblems": [],
+  "stairHole": {
+    "x0": 0.08,
+    "x1": 1.55,
+    "z0": 2.55,
+    "z1": 6.7
+  },
+  "blockedRuntimeProbes": [],
+  "runtimeProbesChecked": 24,
+  "paneDetail": [
+    {
+      "name": "pane-front-living-picture",
+      "windowId": "world-studio-window:teal-house-front-living-picture-glass",
+      "solidId": "teal-house-front-living-picture-glass",
+      "localBounds": [
+        6.875,
+        1.04,
+        -6.56,
+        6.905,
+        2.41,
+        -2.64
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-front-entry-sidelight",
+      "windowId": "world-studio-window:teal-house-front-entry-sidelight-glass",
+      "solidId": "teal-house-front-entry-sidelight-glass",
+      "localBounds": [
+        6.875,
+        0.64,
+        4.76,
+        6.905,
+        2.18,
+        5.08
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-front-hall-window",
+      "windowId": "world-studio-window:teal-house-front-hall-window-glass",
+      "solidId": "teal-house-front-hall-window-glass",
+      "localBounds": [
+        6.875,
+        1.04,
+        6.44,
+        6.905,
+        2.31,
+        7.76
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-front-bedroom-street-a",
+      "windowId": "world-studio-window:teal-house-front-bedroom-street-a-glass",
+      "solidId": "teal-house-front-bedroom-street-a-glass",
+      "localBounds": [
+        6.875,
+        4.14,
+        -6.56,
+        6.905,
+        5.61,
+        -4.64
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-front-bedroom-street-b",
+      "windowId": "world-studio-window:teal-house-front-bedroom-street-b-glass",
+      "solidId": "teal-house-front-bedroom-street-b-glass",
+      "localBounds": [
+        6.875,
+        4.14,
+        -3.36,
+        6.905,
+        5.61,
+        -1.44
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-front-landing-balcony-door",
+      "windowId": "world-studio-window:teal-house-front-landing-balcony-door-glass",
+      "solidId": "teal-house-front-landing-balcony-door-glass",
+      "localBounds": [
+        6.875,
+        3.34,
+        3.64,
+        6.905,
+        5.61,
+        4.5
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-rear-dining-slider",
+      "windowId": "world-studio-window:teal-house-rear-dining-slider-glass",
+      "solidId": "teal-house-rear-dining-slider-glass",
+      "localBounds": [
+        -6.905,
+        0.12,
+        -3.86,
+        -6.875,
+        2.31,
+        -3.0
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-rear-dining-window",
+      "windowId": "world-studio-window:teal-house-rear-dining-window-glass",
+      "solidId": "teal-house-rear-dining-window-glass",
+      "localBounds": [
+        -6.905,
+        1.04,
+        -7.56,
+        -6.875,
+        2.31,
+        -6.04
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-rear-kitchen-window",
+      "windowId": "world-studio-window:teal-house-rear-kitchen-window-glass",
+      "solidId": "teal-house-rear-kitchen-window-glass",
+      "localBounds": [
+        -6.905,
+        1.09,
+        3.64,
+        -6.875,
+        2.26,
+        5.56
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-rear-study-window",
+      "windowId": "world-studio-window:teal-house-rear-study-window-glass",
+      "solidId": "teal-house-rear-study-window-glass",
+      "localBounds": [
+        -6.905,
+        4.19,
+        -7.76,
+        -6.875,
+        5.56,
+        -6.24
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-rear-balcony-door",
+      "windowId": "world-studio-window:teal-house-rear-balcony-door-glass",
+      "solidId": "teal-house-rear-balcony-door-glass",
+      "localBounds": [
+        -6.905,
+        3.34,
+        -4.16,
+        -6.875,
+        5.56,
+        -3.3
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-rear-back-hall-window",
+      "windowId": "world-studio-window:teal-house-rear-back-hall-window-glass",
+      "solidId": "teal-house-rear-back-hall-window-glass",
+      "localBounds": [
+        -6.905,
+        4.24,
+        1.04,
+        -6.875,
+        5.56,
+        2.36
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-rear-bedroom2-rear",
+      "windowId": "world-studio-window:teal-house-rear-bedroom2-rear-glass",
+      "solidId": "teal-house-rear-bedroom2-rear-glass",
+      "localBounds": [
+        -6.905,
+        4.19,
+        6.04,
+        -6.875,
+        5.56,
+        7.56
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-sideA-living-side",
+      "windowId": "world-studio-window:teal-house-sidea-living-side-glass",
+      "solidId": "teal-house-sideA-living-side-glass",
+      "localBounds": [
+        2.04,
+        1.04,
+        -8.905,
+        4.56,
+        2.36,
+        -8.875
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-sideA-dining-side",
+      "windowId": "world-studio-window:teal-house-sidea-dining-side-glass",
+      "solidId": "teal-house-sideA-dining-side-glass",
+      "localBounds": [
+        -5.56,
+        1.09,
+        -8.905,
+        -3.64,
+        2.26,
+        -8.875
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-sideA-bedroom-side",
+      "windowId": "world-studio-window:teal-house-sidea-bedroom-side-glass",
+      "solidId": "teal-house-sideA-bedroom-side-glass",
+      "localBounds": [
+        2.44,
+        4.19,
+        -8.905,
+        4.56,
+        5.56,
+        -8.875
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-sideA-study-side",
+      "windowId": "world-studio-window:teal-house-sidea-study-side-glass",
+      "solidId": "teal-house-sideA-study-side-glass",
+      "localBounds": [
+        -5.36,
+        4.19,
+        -8.905,
+        -3.64,
+        5.56,
+        -8.875
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-sideB-hall-side",
+      "windowId": "world-studio-window:teal-house-sideb-hall-side-glass",
+      "solidId": "teal-house-sideB-hall-side-glass",
+      "localBounds": [
+        3.44,
+        1.04,
+        8.875,
+        5.36,
+        2.31,
+        8.905
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-sideB-bedroom2-roof-door",
+      "windowId": "world-studio-window:teal-house-sideb-bedroom2-roof-door-glass",
+      "solidId": "teal-house-sideB-bedroom2-roof-door-glass",
+      "localBounds": [
+        -3.96,
+        3.34,
+        8.875,
+        -3.1,
+        5.51,
+        8.905
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-sideB-landing-side",
+      "windowId": "world-studio-window:teal-house-sideb-landing-side-glass",
+      "solidId": "teal-house-sideB-landing-side-glass",
+      "localBounds": [
+        2.64,
+        4.24,
+        8.875,
+        4.36,
+        5.56,
+        8.905
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-garage-west-garage-side-window",
+      "windowId": "world-studio-window:teal-house-garage-west-garage-side-window-glass",
+      "solidId": "teal-house-garage-west-garage-side-window-glass",
+      "localBounds": [
+        -3.915,
+        1.24,
+        15.54,
+        -3.885,
+        2.16,
+        16.76
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-garage-east-garage-east-window",
+      "windowId": "world-studio-window:teal-house-garage-east-garage-east-window-glass",
+      "solidId": "teal-house-garage-east-garage-east-window-glass",
+      "localBounds": [
+        3.885,
+        1.24,
+        14.54,
+        3.915,
+        2.16,
+        15.96
+      ],
+      "opaqueBehind": 0
+    }
+  ]
+}
