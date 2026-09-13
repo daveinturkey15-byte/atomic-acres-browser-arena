@@ -8,6 +8,7 @@ import {
   ATOMIC_ACRES_GENERATED_SKY_PROVENANCE_PATH,
   RUSTWORKS_GENERATED_SKY_ASSET_URL,
   RUSTWORKS_GENERATED_SKY_PROVENANCE_PATH,
+  SKY_BACKDROP_GRADIENTS,
   SKY_BACKDROP_CLOUDS,
   SKY_BACKDROP_SUN,
   SKY_BACKDROP_TEXTURE_SIZE,
@@ -216,6 +217,60 @@ describe('shared sky backdrop', () => {
     }
     expect(SKY_BACKDROP_SUN['sunset-farmland']?.y).toBeLessThanOrEqual(0.5);
     expect(SKY_BACKDROP_SUN['airport-dawn']?.y).toBeLessThan(0.5);
+  });
+
+  it('gives world-studio its own late-morning sky without touching the shared dusty preset', () => {
+    expect(skyBackdropPreset('world-studio-midmorning')).toBe('world-studio-midmorning');
+    expect(skyBackdropAssetForPreset('world-studio-midmorning')).toBeNull();
+    // Saturated mid-blue zenith held through the band a level camera sees.
+    const zenith = SKY_BACKDROP_GRADIENTS['world-studio-midmorning'][0];
+    expect(zenith?.[0]).toBe(0);
+    const [zr, zg, zb] = [1, 3, 5].map((index) => parseInt((zenith?.[1] as string).slice(index, index + 2), 16));
+    expect(zb).toBeGreaterThan(zr!);
+    expect((Math.max(zr!, zg!, zb!) - Math.min(zr!, zg!, zb!)) / Math.max(zr!, zg!, zb!)).toBeGreaterThan(0.5);
+    // Real blue still on the gradient where the street camera looks (0.40).
+    expect(SKY_BACKDROP_GRADIENTS['world-studio-midmorning'].find((entry) => entry[0] === 0.40)?.[1]).toBe('#5997d2');
+    // Sun disc above the horizon with a real angular core, at the key-light azimuth.
+    const sun = SKY_BACKDROP_SUN['world-studio-midmorning'];
+    expect(sun?.y).toBeLessThan(0.5);
+    expect(sun?.x).toBe(0.913);
+    expect(sun?.aureole?.coreDegrees).toBeGreaterThan(0);
+    expect(sun?.aureole?.reachDegrees).toBeGreaterThan(0);
+    // Discrete cumulus deck inside the visible sky hemisphere.
+    const clouds = SKY_BACKDROP_CLOUDS['world-studio-midmorning'];
+    expect(clouds?.count).toBeGreaterThan(0);
+    expect(clouds?.bandTop).toBeLessThan(0.25);
+    expect(clouds?.bandBottom).toBeLessThanOrEqual(0.56);
+  });
+
+  it('leaves the shared range-midmorning preset byte-identical for test1/map3/raid2', () => {
+    expect(SKY_BACKDROP_GRADIENTS['range-midmorning']).toEqual([
+      [0, '#2f5f9e'],
+      [0.16, '#3b73b0'],
+      [0.32, '#4e8ac2'],
+      [0.42, '#66a0d0'],
+      [0.474, '#8fbcdc'],
+      [0.492, '#b7c8cf'],
+      [0.4985, '#e7d9ba'],
+      [0.505, '#c6d5e2'],
+      [0.520, '#93aecb'],
+      [0.548, '#86a2c0'],
+      [0.578, '#aebdca'],
+      [0.608, '#c7bb9c'],
+      [0.72, '#b39a72'],
+      [1, '#7d6c4e'],
+    ]);
+    expect(SKY_BACKDROP_CLOUDS['range-midmorning']).toEqual({
+      count: 26, bandTop: 0.22, bandBottom: 0.505,
+      rgb: [253, 250, 244], shadowRgb: [116, 136, 168],
+      alpha: 0.42, scale: 0.42,
+    });
+    expect(SKY_BACKDROP_SUN['range-midmorning']).toEqual({
+      x: 0.913, y: 0.398,
+      coreRgb: [255, 252, 240], glowRgb: [252, 234, 196],
+      coreRadius: 12, glowRadius: 20,
+      aureole: { reachDegrees: 20, coreDegrees: 4, strength: 0.66, anisotropy: 0.8 },
+    });
   });
 
   it('maps every outdoor preset to one selected project-original panorama', () => {

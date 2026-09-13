@@ -9,7 +9,8 @@ export type SkyBackdropPreset =
   | 'open-ocean-day'
   | 'range-midmorning'
   | 'estate-golden-hour'
-  | 'nuketown2-golden-hour';
+  | 'nuketown2-golden-hour'
+  | 'world-studio-midmorning';
 
 export const SKY_BACKDROP_TEXTURE_SIZE = Object.freeze({ width: 2_048, height: 1_024 });
 export const ATOMIC_ACRES_GENERATED_SKY_ASSET_URL = './assets/original/skies/atomic-acres-sunset.webp';
@@ -191,6 +192,38 @@ export const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly
     // the first attempt at this turned a violet band into a pink ramp - and the
     // flyover's mass sits at y 0.52-0.62 (screen rows 56-287 at the captured
     // phase), so that is the span the cool bank has to actually occupy.
+    [0.505, '#c6d5e2'],
+    [0.520, '#93aecb'],
+    [0.548, '#86a2c0'],
+    [0.578, '#aebdca'],
+    [0.608, '#c7bb9c'],
+    [0.72, '#b39a72'],
+    [1, '#7d6c4e'],
+  ] as const),
+
+  // Owner 2026-09-13 (G1): world-studio late-morning fork of range-midmorning.
+  // World-studio is a leafy suburb under a warm hard sun (judged plate
+  // batch-3/map__street-teal.png: saturated mid-blue zenith, scattered small
+  // cumulus, warm sun), while range-midmorning must stay a hard CLEAR dusty
+  // sky for test1 (clouds:false) and map3/raid2. A shared tune is therefore
+  // impossible: this preset is consumed ONLY by world-studio (see
+  // src/rendering/arenas/world-studio.ts) and the shared entries below are
+  // untouched. Sky-half discipline as range-midmorning: horizon at 0.5, real
+  // blue held to 0.46 so a level camera (which sees roughly 0.31-0.50) never
+  // sits in a bleach ramp, one thin haze transition, then a warm late-morning
+  // horizon kiss. Stops are deepened in luma and pushed in saturation versus
+  // the shared preset so what survives the ACES grade is still blue (same
+  // lesson as the nuketown2-golden-hour tonal match). Below the horizon is
+  // the same pale-hardpan far-distance band, so the IBL ground-bounce stays
+  // honest if the environment is ever reconnected.
+  'world-studio-midmorning': Object.freeze([
+    [0, '#1d4e91'],
+    [0.16, '#2c66a9'],
+    [0.30, '#3d80c2'],
+    [0.40, '#5997d2'],
+    [0.46, '#82aedc'],
+    [0.486, '#b3c9e2'],
+    [0.4985, '#ead9b6'],
     [0.505, '#c6d5e2'],
     [0.520, '#93aecb'],
     [0.548, '#86a2c0'],
@@ -392,6 +425,21 @@ export const SKY_BACKDROP_CLOUDS: Readonly<Record<SkyBackdropPreset, Readonly<{
     rgb: [253, 250, 244] as [number, number, number], shadowRgb: [116, 136, 168] as [number, number, number],
     alpha: 0.42, scale: 0.42,
   }),
+
+  // G1 world-studio fork: scattered small late-morning cumulus toward the
+  // judged plate, not the shared preset's wide pale veil (26 soft near-white
+  // blobs at alpha 0.42 over 0.22-0.505 averaged the whole visible sky to
+  // white: saturation 0.097, zero cloud-edge energy). Small (0.22), dense
+  // (0.60), sparsely scattered (14) puffs with cool shadow sides, so the deck
+  // reads as discrete clouds with real edges and the blue survives between
+  // them. Band 0.14-0.44 sits inside the visible sky hemisphere (same
+  // assertion shape as sunset-farmland/airport-dawn: bandTop < 0.25,
+  // bandBottom <= 0.56).
+  'world-studio-midmorning': Object.freeze({
+    count: 14, bandTop: 0.14, bandBottom: 0.44,
+    rgb: [255, 252, 244] as [number, number, number], shadowRgb: [90, 115, 155] as [number, number, number],
+    alpha: 0.60, scale: 0.22,
+  }),
   // v2: the band was 0.16-0.50, so more than half of it sat above the visible
   // sky band (0.31-0.50 for a level camera) and the rest ran straight into the
   // horizon line. Pulled to 0.24-0.46 so the deck is where a player actually
@@ -535,6 +583,17 @@ export const SKY_BACKDROP_SUN: Readonly<Record<SkyBackdropPreset, Readonly<{
     // dust 0.22: a dusty range has a bright, coarse-particle halo (high g,
     // tight forward peak) rather than a wide soft one.
     aureole: Object.freeze({ reachDegrees: 20, coreDegrees: 4, strength: 0.66, anisotropy: 0.8 }),
+  }),
+
+  // G1 world-studio fork: same key-light azimuth as range-midmorning
+  // (x 0.913, y 0.398 - the disc must agree with the shadows), with a real
+  // late-morning disc presence: warm core, warm glow, and a fine-haze aureole
+  // matched to this arena's dust 0.08 (broader lobe than the dusty-range one).
+  'world-studio-midmorning': Object.freeze({
+    x: 0.913, y: 0.398,
+    coreRgb: [255, 252, 242] as [number, number, number], glowRgb: [255, 236, 200] as [number, number, number],
+    coreRadius: 12, glowRadius: 20,
+    aureole: Object.freeze({ reachDegrees: 18, coreDegrees: 2.4, strength: 0.55, anisotropy: 0.72 }),
   }),
   'estate-golden-hour': Object.freeze({
     x: 0.913, y: 0.398,
@@ -792,7 +851,7 @@ export function skyBackdropPreset(preset: string): SkyBackdropPreset {
     || preset === 'jungle-golden-hour' || preset === 'open-ocean-day'
     // Owner 2026-08-30: Test1/Test2 daylight presets, both authored procedural.
     || preset === 'range-midmorning' || preset === 'estate-golden-hour'
-    || preset === 'nuketown2-golden-hour'
+    || preset === 'nuketown2-golden-hour' || preset === 'world-studio-midmorning'
     ? preset
     : 'airport-dawn';
 }

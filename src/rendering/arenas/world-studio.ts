@@ -13,7 +13,7 @@ export const definition = createProceduralArenaVisualDefinition({
   },
   fog: { color: 0xcdd8e2, near: 130, far: 760 },
   shadows: { enabled: true, mapSize: 2048, maximumDistance: 140, normalBias: 0.041 },
-  atmosphere: { preset: 'range-midmorning', mist: 0.04, dust: 0.08, clouds: true },
+  atmosphere: { preset: 'world-studio-midmorning', mist: 0.04, dust: 0.08, clouds: true },
   colorPipeline: colorPipeline('world-studio.hdr.v1', 1.04),
   budgets: budgets({ maximumDrawCalls: 420, maximumTriangles: 700_000 }),
   reviewCameras: [
