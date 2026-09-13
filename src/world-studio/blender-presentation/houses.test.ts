@@ -212,13 +212,13 @@ describe('world-studio house presentation: assets', () => {
     expect(HOUSE_SHELLS.map((spec) => [spec.houseId, spec.position])).toEqual([
       ['teal-house', [-20, 0, 0]], ['yellow-house', [20, 0, 0]],
     ]);
-    // Revision 4 changes sheathing material and export sidedness; pin its exact audited bytes.
+    // Revision 5 buries overlapping sheathing; pin the exact exported bytes (visual seams remain open).
     expect(statSync(REPO(`public/${TEAL_HOUSE_SHELL_PATH}`)).size).toBe(5_670_156);
     expect(statSync(REPO(`public/${YELLOW_HOUSE_SHELL_PATH}`)).size).toBe(5_644_860);
     expect(createHash('sha256').update(readFileSync(REPO(`public/${TEAL_HOUSE_SHELL_PATH}`))).digest('hex'))
-      .toBe('38cc4c2d941524434bad5a51772e07fe3a35a7775c0ccca9a239fbb9731a5c27');
+      .toBe('bc7c4667062a10f6c4878ccea3e99d148dc8296b9c9aa238799802e260f81698');
     expect(createHash('sha256').update(readFileSync(REPO(`public/${YELLOW_HOUSE_SHELL_PATH}`))).digest('hex'))
-      .toBe('c7d7c219978a6e0738faa338e40f96e861e6a316a2560576c9bd55d90540b08f');
+      .toBe('2fec2939227a60aab7234173ac9eee72a8c0e8f111de024e353e261fab4f1042');
   });
 
   it('carries 22 pane markers per GLB: 20 name arena breakable windows, 2 name garage apertures the arena never glazes', () => {
