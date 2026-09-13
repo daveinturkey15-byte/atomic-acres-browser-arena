@@ -11,6 +11,7 @@ import { createStudioVehicles } from './vehicles';
 import { createStudioInteriors, type StudioInteriorAnchor } from './interiors';
 import { createStudioGardens } from './gardens';
 import { createStudioBlenderAssets } from './blender-assets';
+import { attachHousePresentation } from './blender-presentation/houses';
 import { createStudioLighting } from './lighting';
 import { createStudioPbrLibrary } from './pbr-library';
 
@@ -56,6 +57,22 @@ export function buildWorldStudio(scene: THREE.Scene): ArenaMap {
     .filter(solid => /-house-(?:ext-)?stair-\d+$/.test(solid.id))
     .map(solid => solid.bounds));
   const raycastMeshes = [...new Set(solids.map(solid => solid.mesh))];
+  // Blender house shells: presentation only. The root is attached now but stays invisible until
+  // every shell has been decided; only a house whose load resolved AND audit passed is then
+  // shown, and only that house's procedural art is hidden. Failure leaves procedural art.
+  // Solids, colliders, shot surfaces, the dynamic glass registry, spawns and navigation above
+  // are already final and are never derived from these meshes. Failure leaves procedural art.
+  const housePresentation = attachHousePresentation({ architectureRoot: architecture.root, breakableWindows, raycastMeshes });
+  root.add(housePresentation.root);
+  root.userData.worldStudioHouseStatus = housePresentation.status();
+  root.userData.worldStudioHousePresentation = housePresentation;
+  root.addEventListener('removed', () => housePresentation.dispose());
+  void housePresentation.ready.then(outcomes => {
+    if (root.parent !== scene) { housePresentation.dispose(); return; }
+    root.userData.worldStudioHouseStatus = housePresentation.status();
+    root.userData.worldStudioHouseOutcomes = Object.fromEntries([...outcomes].map(([variant, outcome]) =>
+      [variant, { substituted: outcome.substituted, reason: outcome.reason, glass: outcome.glass?.authority ?? null }]));
+  });
   if (typeof window !== 'undefined') {
     const pbr = createStudioPbrLibrary();
     let retired = false;
