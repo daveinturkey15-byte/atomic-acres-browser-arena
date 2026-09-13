@@ -9,6 +9,7 @@ import { STUDIO_ENVIRONMENTS, type StudioEnvironment } from './environment';
 import { createStudioSnow } from './snow';
 import { createStudioVehicles } from './vehicles';
 import { createStudioInteriors, type StudioInteriorAnchor } from './interiors';
+import { createStreetProps } from './prop-assets/street-props';
 import { createStudioGardens } from './gardens';
 import { createStudioBlenderAssets } from './blender-assets';
 import { attachHousePresentation, type HousePresentationOptions } from './blender-presentation/houses';
@@ -25,7 +26,10 @@ export function buildWorldStudio(scene: THREE.Scene, housePresentationOptions?: 
   const vehicles = createStudioVehicles();
   const interiors = createStudioInteriors(architecture.root.userData.furnitureAnchors as StudioInteriorAnchor[]);
   const gardens = createStudioGardens();
-  root.add(ground.root, architecture.root, nature.root, snow.root, vehicles.root, interiors.root, gardens.root);
+  // G3 street props: procedural poles/wires/sign/pillars, presentation-only
+  // (prop-assets pattern) — no solids, so movement/shot authority is untouched.
+  const streetProps = createStreetProps();
+  root.add(ground.root, architecture.root, nature.root, snow.root, vehicles.root, interiors.root, gardens.root, streetProps.root);
   // These groups participate in asynchronous presentation swaps. The generic arena static batch
   // runs before house audits and hero-vehicle loads settle; marking the existing presentation
   // groups dynamic keeps it from baking hidden fallback meshes (and their owned materials/maps)
@@ -181,6 +185,7 @@ export function buildWorldStudio(scene: THREE.Scene, housePresentationOptions?: 
   root.userData.worldStudioBuild = Object.freeze({
     id: 'world-studio', version: '20260912-first-slice', solidCount: solids.length,
     architecture: architecture.root.userData.worldStudioArchitecture, nature: nature.stats, gardens: gardens.stats,
+    streetProps: streetProps.stats,
   });
   let lastEnvironment: StudioEnvironment | undefined;
   const white = new THREE.Color(0xe8edf0);

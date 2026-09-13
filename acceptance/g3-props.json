@@ -1,0 +1,97 @@
+{
+ "after_dir": "artifacts/viewpoint-regression/g3-props/world-studio",
+ "after_manifest": "artifacts/viewpoint-regression/g3-props/capture-manifest.json",
+ "before_dir": "C:/Users/david/Desktop/stuff/atomic-acres-catalog/audit/captures",
+ "bounded_diff": {
+  "modified": [
+   "src/world-studio/arena.ts"
+  ],
+  "new": [
+   "src/world-studio/prop-assets/street-props.ts",
+   "acceptance/g3-props.json"
+  ],
+  "test_files_touched": [],
+  "note": "new module + this evidence file only; no test file created or edited"
+ },
+ "capture": {
+  "adapter": "nvidia/blackwell",
+  "backend": "webgpu",
+  "contract": "arena-viewpoint-regression-capture-v1",
+  "dist_outdir": "dist-g3-candidate (gitignored)",
+  "exposure": 1.04,
+  "port": 41973,
+  "seed": "viewpoint",
+  "served_sha256": "cc9c79042a80298ea68c29cda8d07f8145baa8bbe8ad4561268de04029a0aa61",
+  "served_vs_dist": "byte-identical (GET /index.html sha256 match before any capture trusted)",
+  "stations_ok": 8,
+  "stations_total": 8,
+  "url": "http://127.0.0.1:41973",
+  "verdict": "PASS 8/8"
+ },
+ "checks": {
+  "arena_viewpoint_regression_contract": "23/23 pass, unmodified (node --test scripts/qa/arena-viewpoint-regression.test.mjs)",
+  "scoped_suites": "9 files / 58 tests pass, unmodified: arena, ground, presentation-batching, prop-assets (fence-gate, garden-set, utility-ac), environment, routing, weather-routing (npx vitest run)"
+ },
+ "frames": {
+  "after": "world-studio-<station>.png",
+  "before": "raw/world-studio/world-studio-<station>.png plus audit view-street-axis.png / view-loop-center.png"
+ },
+ "lane": "omp-newworld-20260913",
+ "method": "Deterministic review-camera recapture (installed-Chrome headless webgpu) of all 8 authored world-studio stations; structural presence via createStreetProps stats+bounds; pixel presence by projecting authored 3D anchors into the street camera (fov 70, 1280x720) and measuring shaft edge-energy, dark shaft runs, wire-patch minima vs sky, and sign/pillar patch luminance. Before/after whole-frame diff deliberately NOT used: the sibling sky lane changed sun/sky after the before-captures, confounding global deltas; all metrics are presence-in-after at projected anchors.",
+ "pattern_cited": "src/world-studio/prop-assets/utility-ac.ts (PLACEMENT + DIMENSIONS declaration, presentation-only contract, root/ready/dispose shape) and src/world-studio/gardens/index.ts (merged per-material bucket batching, world-metre UV projection). No new textures, no model formats, no Blender work, no colliders (presentation-only, off-road placement verified per station).",
+ "pole_shafts_street_cam": {
+  "finding": "4/4 distant poles (z=-30/-20, both sides) show 3.8-7.2x edge-energy vs flanking background at projected columns; near-left pole (z=10) shows a 206-row dark shaft run at cols 312-315 (projected 312); near-right pole (z=10) shows a 69-row dark run at cols 971-972 (projected 968) with peak frame edge-energy. z=\u00b110 poles against house facades are edge-inconclusive but visually confirmed in-frame.",
+  "near_left_z10": {
+   "dark_run_cols": "312-315, 206 rows",
+   "edge_ratio_vs_bg": 0.9,
+   "note": "shaft faces camera in shadow; dark-run is the signal"
+  },
+  "near_right_z10": {
+   "dark_run_cols": "971-972, 69 rows",
+   "note": "3-4px from projection; peak edge-energy columns in frame"
+  },
+  "poles_z_minus10_edge_ratio_vs_bg": "0.2-0.3 (facade-confined, visual-only)",
+  "poles_z_minus20_edge_ratio_vs_bg": "4.9 (left), 3.8 (right)",
+  "poles_z_minus30_edge_ratio_vs_bg": "7.2 (left), 7.1 (right)"
+ },
+ "presence_roi": {
+  "sign_board_centre_px_640_345_mean_lum": 143.5,
+  "sign_board_vs_sky": 143.5,
+  "sign_pillars_right_px_738_360_mean_lum": 123.8,
+  "sky_median_rows40_200_cols500_780": 208.5,
+  "wire_span_midpoints_24_samples_min_lum": "17/24 patches clearly dark (22-134) vs sky 208.5; 7/24 marginal (158-194, subpixel wires at 50-60 m). Near spans (z 10..20) all <=106."
+ },
+ "stations": {
+  "overview": "pole rows line both road verges with visible wire runs; off-road, clear of houses/porches; pole-line shadows fall on lawn (expected crisp-shadow read)",
+  "street": "12/12 stations in frustum or correctly off-frame; wooden poles + paired crossarms both verges, 40 sagging catenary spans converging north, welcome gantry beam + blank board spanning the back road at z=-32.6, entry pillars flanking"
+ },
+ "structural": {
+  "bounds_xyz": {
+   "max": [
+    14.66,
+    7.2,
+    33.03
+   ],
+   "min": [
+    -14.66,
+    0,
+    -33.03
+   ]
+  },
+  "drawGroups": 5,
+  "meshes": [
+   "world-studio-street-props-timber",
+   "world-studio-street-props-porcelain",
+   "world-studio-street-props-wire",
+   "world-studio-street-props-stone",
+   "world-studio-street-props-globe"
+  ],
+  "pillars": 4,
+  "poles": 12,
+  "presentaton_only_all_meshes": true,
+  "triangles": 8040,
+  "wires": 40
+ },
+ "ticket": "G3",
+ "verdict": "PASS"
+}
