@@ -1,4 +1,225 @@
-# Houses lane handoff — wave 3 interior substitution, 2026-09-12
+# Houses lane handoff — wave 4 facade repair, 2026-09-13
+
+> **Wave 4 summary.** One defect closed, one defect named and left open. The white comb-like
+> striping on the facade is **fixed and measured**: the structural leaf shipped in the white
+> `trim` slot and was visible through every 3 mm lap reveal, and it now carries the `siding`
+> slot. The export also stops declaring `doubleSided` on opaque materials. The dashed vertical
+> seams are **not** closed — they are coincident same-facing surfaces and no material change can
+> resolve them; they are now measured and recorded as falsifier 13. Not one vertex moved, so
+> every declared footprint, aperture, pane, partition, tread and budget is unchanged.
+> **Still not integrated, not observed in the runtime, not visually accepted.**
+>
+> | | wave 3 | wave 4 |
+> |---|---|---|
+> | teal GLB | 5,670,288 B `0748813f…` | **5,670,156 B `38cc4c2d941524434bad5a51772e07fe3a35a7775c0ccca9a239fbb9731a5c27`** |
+> | yellow GLB | 5,644,996 B `bdd2867e…` | **5,644,860 B `c7d7c219978a6e0738faa338e40f96e861e6a316a2560576c9bd55d90540b08f`** |
+> | triangles | 37,944 / 38,112 | **unchanged** |
+> | materials / texture images / texture bytes | 8 / 18 / 2,843,343 / 2,806,733 | **unchanged** |
+> | panes / aperture markers / route landmarks | 22 / 26 / 3 | **unchanged** |
+> | interior partitions / cased openings / treads | 7 / 9 / 16 | **unchanged** |
+> | light slivers in the siding field (6 frames) | 2,095 | **807 (−61.5%)** |
+> | opaque materials exported `doubleSided` | 7 of 7 | **0 of 7** (glass still double-sided) |
+> | same-facing coincident pairs | 11,061 / not measured | **12,509 / 12,429 — open, see falsifier 13** |
+
+---
+
+# Wave 4 — what was authored, and what the numbers say
+
+Lane `houses-night-20260912` · harness `claude` · model `claude-opus-5` · effort `xhigh` ·
+machine `dave-gaming-pc` · recovery run `recovery-houses-facade-opus-xhigh-r1` (a *fresh* run
+after the wave-4 supervisor crashed mid-pass; the interrupted run's partial output is preserved
+in commits `720e9a31d` and `adfb2d398` and was continued, not restarted).
+
+## The defect, and the two things it turned out to be
+
+The Build 16 consumer capture showed two things on the long facade, and they have different
+causes. Separating them is the main result of this wave.
+
+**1. White comb-like striping — a contrast defect. Fixed.**
+`build_exterior_wall` emits three layers per wall: a structural leaf, an interior lining and the
+lap siding. The leaf shipped in the `trim` slot — painted white — and sits 12 mm behind a siding
+course that leaves a **3 mm reveal at every joint**. Every joint is therefore a 3 mm window onto
+a white board. At street distance a 3 mm line is a fraction of a pixel, so it breaks into dashes:
+a comb. Real clapboard shows shadow in that gap, not paint. The leaf now carries the `siding`
+slot via the new `SHEATHING_SLOT` constant, which is also what it physically is — sheathing
+behind the boards, never seen except through the reveal.
+
+**2. Dashed vertical seams — a depth defect. NOT fixed.** See falsifier 13.
+
+## Measured, not asserted
+
+`facade_evidence.py` is new. It rasterises the *same builder* twice — once with
+`SHEATHING_SLOT` forced back to `trim`, once as shipped — through `facade_preview.py`, a CPU
+rasteriser with a 24-bit quantised depth buffer, `FrontSide` culling and three.js's own
+near/far. A "light sliver" is a `trim` or `concrete` pixel pinched between siding on both sides
+of either axis, or a ≤12 px light blob surrounded by siding: the mechanical stand-in for a comb
+tooth. A real casing or watertable is wide on both axes and is never counted.
+
+| Frame | wave 3 slivers | wave 4 slivers | field px |
+|---|---|---|---|
+| teal street-grazing | 622 | **327** | 95,684 |
+| teal belt-grazing | 457 | **166** | 96,579 |
+| teal watertable-close | 308 | **2** | 85,948 |
+| yellow street-grazing | 376 | **245** | 85,313 |
+| yellow belt-grazing | 213 | **54** | 78,203 |
+| yellow watertable-close | 119 | **13** | 40,433 |
+| **total** | **2,095** | **807** | |
+
+The surfaces named as guilty are the proof that the right thing moved. In wave 3 the worst
+offenders on teal were the leaf's own planes — `x = −6.768` (47/201/206 px across the three
+cameras) and `z = 8.78` (179 px). In wave 4 **both leave the guilty list entirely**. What remains
+is a different set of surfaces that wave 3 and wave 4 share pixel-for-pixel, chiefly an
+interior-side `trim` plane at `x = −3.788` on the garage wing, at 160 px on both sides of the
+change. (It is `trim` in both states, so it is certainly *not* the leaf; which trim member it is
+— lining, partition or architrave — was not pinned down.) That residue is falsifier 14 and it
+was deliberately not chased: it needs a geometry change, and this pass was scoped to the narrow
+safe correction.
+
+Frames: `source-assets/world-studio/houses/{teal,yellow}/review/cpu-{camera}-wave{3,4}.png`,
+800×450. Numbers: `docs/technique-lab/houses/facade-repair-evidence.json`.
+
+## The export now agrees with its loader
+
+Blender defaults `use_backface_culling` to `False`, so every material shipped
+`doubleSided: true` and `src/world-studio/houses/index.ts:229` walked the loaded scene forcing
+`FrontSide` back onto every opaque material. The export was shipping a flag its only consumer
+immediately overrode. `make_material` now sets `use_backface_culling = not glass`, verified in
+the shipped bytes: **0 of 7 opaque materials double-sided, glass alone still double-sided**,
+which is exactly what the loader asks for.
+
+Be precise about what this buys. It cures nothing in *this* runtime, because the loader was
+already forcing `FrontSide`. It removes a silent dependency on loader repair and makes the file
+correct for any other consumer. It does not touch the same-facing pairs below.
+
+## Budget, identity and determinism — all held
+
+Nothing about this wave moves geometry; it changes one material assignment and one export flag.
+Triangles, materials, texture images, texture bytes, 22 panes, 26 aperture markers, 3 route
+landmarks, 7 partitions, 9 cased openings and all 16 treads are **identical to wave 3**, and
+`audit_maps.py` re-checks every one of them. The GLBs are 132 B / 136 B *smaller*, which is the
+dropped `doubleSided` flags. The `trim` primitive fell 8,628 → 7,620 triangles and `siding` rose
+21,228 → 22,236: the same 29,856 triangles, re-grouped.
+
+## Executable evidence — wave 4
+
+Quoted from the runs; a script on disk is not evidence that Blender ran.
+
+* `python scripts/blender/world-studio/houses/run_houses.py --variant all` → returncode **0**,
+  process-reported **`Blender 5.1.2 (hash ec6e62d40fa9 built 2026-05-19 01:37:34)`**,
+  `--background --factory-startup --threads 2 --python-exit-code 9`, `cycles.device = "CPU"`.
+  Build 2.4-2.5 s per house.
+* **Determinism.** The full `--variant all` build was run twice and teal a third time; all three
+  reproduced `38cc4c2d…` and `c7d7c219…` byte for byte.
+* `python scripts/blender/world-studio/houses/audit_maps.py` → **all checks passed**, both
+  houses, every wave-3 census check included. Palette and normal-tilt results are unchanged to
+  the reported decimal.
+* `python scripts/blender/world-studio/houses/run_houses.py --variant all --render --skip-build`
+  → returncode 0; four thumbnails per house re-shot from the new GLBs (65.8 s / 66.9 s).
+* `python scripts/blender/world-studio/houses/run_houses.py --variant all --review --skip-build`
+  → returncode 0; the six 128-spp review frames re-shot (177.7 s / 161.8 s).
+* `python scripts/blender/world-studio/houses/write_catalog.py` → 2 assets, hashes recomputed
+  from the bytes.
+* `python scripts/blender/world-studio/houses/facade_evidence.py {teal,yellow}` → the table above.
+* `python scripts/blender/world-studio/houses/audit_surfaces.py --variant all` → **exit 1, red,
+  by design.** See falsifier 13.
+
+**Not run in this pass, and therefore not claimed:** Vitest, `tsc`, any browser or GPU capture,
+and the wave-2 firefly census (the review frames were re-shot but not re-counted). The recovery
+scope forbade build/tsc/full-tree tests.
+
+## Falsifier 13 (new, and the important one). The vertical seams are still there.
+
+`audit_surfaces.py` reads the shipped GLB and finds every pair of triangles with **different
+materials** that share a plane to within 1.5 mm and whose footprints overlap. It then splits
+them by relative facing, which is the distinction that matters:
+
+| | teal | yellow |
+|---|---|---|
+| conflicting pairs (gate metric) | 33,683 | 33,615 |
+| — opposite-facing, cured by backface culling | 21,174 | 21,186 |
+| — **same-facing, cured by nothing** | **12,509** | **12,429** |
+| same-facing overlap area | 1,222.27 | 1,222.33 |
+
+An opposite-facing pair is a box's back face lying in the plane of whatever it is mounted on;
+culling drops one of the two. A **same-facing** pair is two front faces in one plane, and the
+depth buffer picks a winner per pixel — that is the dashed vertical seam. The largest same-facing
+groups are `siding+trim` (468.1), `concrete+siding` (393.7) and `metal+siding` (148.3).
+
+Three honest warnings about these numbers:
+
+1. **The wave-4 change did not improve them and was never going to.** Not one vertex moved. The
+   count *rose* from 11,061 to 12,509 purely because the audit filters on material inequality:
+   moving the leaf into `siding` makes leaf↔course pairs same-material and invisible to the
+   audit, while making leaf↔trim pairs newly visible to it. The geometry is identical. Where the
+   fix does help is that a same-material fight has no contrast and so cannot be *seen*; that is
+   why the sliver count fell while this one did not.
+2. **`conflictArea` is a pair-overlap sum, not a surface area.** 6,391 "m²" on a 14×18 m house is
+   arithmetically what it says and physically meaningless as an area. Read the pair counts.
+3. **The gate fails, before and after.** `MAX_CONFLICT_AREA = 0.0` was **not** relaxed to make
+   this wave look green. It is red on the wave-3 bytes (5,110) and red on the wave-4 bytes
+   (6,391). Closing it means separating coplanar surfaces in the builder — giving every mounted
+   box a sub-millimetre standoff — which is a geometry change this pass was not scoped to make.
+
+Falsifier: build with per-box standoffs and require `sameFacingPairs` to reach 0, then confirm
+in a runtime capture that the vertical seams are gone.
+
+## Falsifier 14 (new). 807 light slivers remain, and they are not the leaf.
+
+The residue named above: a `trim` plane at `x = −3.788` on the garage wing (160 px, identical in
+wave 3 and wave 4) plus casing returns seen edge-on at the grazing cameras. These are white
+surfaces on the inboard side of a wall that an exterior camera can nonetheless reach. Unchanged
+by this wave, not root-caused, and untested in the runtime. Falsifier: identify the emitting
+box, occlude or recolour it, and require the six-frame sliver total to fall below 100.
+
+## Files changed in wave 4
+
+```
+scripts/blender/world-studio/houses/build_house_shell.py   SHEATHING_SLOT; use_backface_culling
+scripts/blender/world-studio/houses/audit_surfaces.py      NEW gate + same/opposite-facing split
+scripts/blender/world-studio/houses/facade_preview.py      NEW CPU rasteriser with depth quantisation
+scripts/blender/world-studio/houses/facade_evidence.py     NEW before/after record
+scripts/blender/world-studio/houses/glb_reader.py          NEW dependency-free GLB reader
+scripts/blender/world-studio/houses/_probe_facing.py       NEW scratch probe (manifoldness, facing)
+scripts/blender/world-studio/houses/run_houses.py          MAX_THREADS 4 -> 2 (recovery policy)
+
+public/assets/world-studio/blender/houses/house-teal-shell.glb     5,670,156 B  38cc4c2d…
+public/assets/world-studio/blender/houses/house-yellow-shell.glb   5,644,860 B  c7d7c219…
+public/assets/world-studio/blender/houses/catalog.json             regenerated
+public/assets/world-studio/blender/houses/house-*-{street,backyard,interior-*}.png  re-rendered
+source-assets/world-studio/houses/{teal,yellow}/build-report.json  regenerated
+source-assets/world-studio/houses/{teal,yellow}/review/*.png       6 review frames re-shot,
+                                                                   12 cpu-*-wave{3,4} frames new
+docs/technique-lab/houses/facade-repair-evidence.json              NEW
+docs/technique-lab/houses/surface-conflict-audit.json              NEW
+docs/technique-lab/houses/HANDOFF.md                               this file
+```
+
+`src/world-studio/houses/**` is root-owned and was **not** touched. `arena.ts`,
+`assets.manifest.json`, the registry, shared config, interiors, lighting and every other lane
+were not touched. No commit, push or deploy was made.
+
+Two recorded deviations, both deliberate:
+
+* **`run_houses.py` thread cap 4 → 2.** The recovery phase's resource policy is
+  `blenderThreads: 2`, one local heavy task at a time. Thread count changes scheduling, not
+  arithmetic, and the three determinism runs confirm the bytes did not move.
+* **The interrupted run's teal `cpu-*-wave{3,4}.png` frames were overwritten.** Those were
+  960×540 CLI renders; the shipped set is the canonical 800×450 that `facade_evidence.py`
+  produces for both variants. The originals are preserved in commit `720e9a31d` and were not
+  deleted from history.
+
+## Carried forward unchanged from wave 3
+
+Falsifiers **1, 2, 4, 8, 9, 10, 11 and 12 all stand exactly as written below**, and nothing in
+wave 4 narrows any of them. In particular falsifier 1 — *no runtime capture exists* — is still
+the most important gap, and it is what makes this wave's central claim one-sided: the comb is
+measured gone **in a CPU rasteriser that models the runtime's culling and depth buffer**, not
+observed gone in the arena. The *mechanism* (a white board seen through a 3 mm reveal) is
+certain from the geometry; the *appearance* under the project light rig is not.
+
+---
+
+# Wave 3 — interior substitution, 2026-09-12 (unchanged history)
 
 > **Wave 3 summary.** The shells now carry the interior: seven partitions, their nine cased
 > openings, the contracted **16-tread** internal stair, the landing guard, the skirting band and

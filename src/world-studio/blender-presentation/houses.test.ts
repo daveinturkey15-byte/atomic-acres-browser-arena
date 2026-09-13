@@ -1,4 +1,5 @@
 import { readFileSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -211,9 +212,13 @@ describe('world-studio house presentation: assets', () => {
     expect(HOUSE_SHELLS.map((spec) => [spec.houseId, spec.position])).toEqual([
       ['teal-house', [-20, 0, 0]], ['yellow-house', [20, 0, 0]],
     ]);
-    // The wave-3 bytes the handoff audited, not an older export.
-    expect(statSync(REPO(`public/${TEAL_HOUSE_SHELL_PATH}`)).size).toBe(5_670_288);
-    expect(statSync(REPO(`public/${YELLOW_HOUSE_SHELL_PATH}`)).size).toBe(5_644_996);
+    // Revision 4 changes sheathing material and export sidedness; pin its exact audited bytes.
+    expect(statSync(REPO(`public/${TEAL_HOUSE_SHELL_PATH}`)).size).toBe(5_670_156);
+    expect(statSync(REPO(`public/${YELLOW_HOUSE_SHELL_PATH}`)).size).toBe(5_644_860);
+    expect(createHash('sha256').update(readFileSync(REPO(`public/${TEAL_HOUSE_SHELL_PATH}`))).digest('hex'))
+      .toBe('38cc4c2d941524434bad5a51772e07fe3a35a7775c0ccca9a239fbb9731a5c27');
+    expect(createHash('sha256').update(readFileSync(REPO(`public/${YELLOW_HOUSE_SHELL_PATH}`))).digest('hex'))
+      .toBe('c7d7c219978a6e0738faa338e40f96e861e6a316a2560576c9bd55d90540b08f');
   });
 
   it('carries 22 pane markers per GLB: 20 name arena breakable windows, 2 name garage apertures the arena never glazes', () => {

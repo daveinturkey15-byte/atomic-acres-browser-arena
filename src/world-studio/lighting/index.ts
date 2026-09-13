@@ -29,6 +29,14 @@ import { auditLocalLightOcclusion, makeShadowedLocal, type LightOcclusionAudit }
  * focal furniture anchor (id suffix) when present instead of a blind
  * centroid, so pools land over tables/benches — actual anchor positions,
  * never invented bounds.
+ *
+ * Mount correction (2026-09-13, recovery pass): pass 1 mounted the "ceiling"
+ * fixtures at standard residential heights (2.55 / 2.1 / 2.4) rather than this
+ * house's authored ceiling planes, so every fixture floated 0.45-0.90 m below
+ * the surface it is modelled as bolted to. The mount plane now comes from the
+ * house coordinate contract, and the candela are re-derived so the illuminance
+ * delivered at each focal plane is exactly what pass 1 authored. No new global
+ * state, no renderer writes, no change to ownership.
  */
 
 export type StudioLightingMode = 'presentation' | 'preview';
@@ -75,8 +83,49 @@ const FILL_TINT: Readonly<Record<string, number>> = Object.freeze({
 const FILL_NEUTRAL = 0xeef2f6;
 const COOL_SHIFT = 0xe7f0f8;
 
-/** Ceiling fixture height above each storey's floor line (house.ts:32-33). */
+/**
+ * Clear storey height from the house coordinate contract, "3.0 m clear per
+ * storey" (`architecture/house.ts:14-15`): the ground-floor ceiling is the
+ * upper slab's underside, `UPPER_FLOOR_Y - SLAB - GROUND_FLOOR_Y`
+ * = 3.30 - 0.22 - 0.08 = 3.00, and the upper ceiling is
+ * `UPPER_CEILING_Y - UPPER_FLOOR_Y` = 6.30 - 3.30 = 3.00. The same two planes
+ * are what the authored interior contact shading darkens toward
+ * (`architecture/house.ts:134,138` → `architecture/build.ts:103-116`).
+ */
+const CLEAR_STOREY_HEIGHT = 3;
+/** Garage: `garage-roof` spans 3.30-3.50, so its ceiling is 3.24 over the 0.06 slab. */
+const GARAGE_CLEAR_HEIGHT = 3.24;
+
+/**
+ * Ceiling fixture height above each storey's floor line — the anchor `y` the
+ * producer authored (`house.ts` `anchor(...)`: ground rooms `GROUND_FLOOR_Y`,
+ * upper rooms `UPPER_FLOOR_Y`, garage 0.06). `lighting.test.ts` pins these
+ * against the exported house constants, so a storey move fails closed here.
+ *
+ * Pass 1 used 2.55 / 2.1 / 2.4 — standard residential ceiling numbers rather
+ * than this house's authored planes — so every "ceiling" fixture floated
+ * 0.45 m (ground), 0.90 m (upper) and 0.84 m (garage) below the ceiling it is
+ * modelled as bolted to. See `PASS1_FIXTURE_HEIGHT` for the photometric half.
+ */
 const FIXTURE_HEIGHT: Readonly<Record<string, number>> = Object.freeze({
+  living: CLEAR_STOREY_HEIGHT,
+  dining: CLEAR_STOREY_HEIGHT,
+  kitchen: CLEAR_STOREY_HEIGHT,
+  bedroom: CLEAR_STOREY_HEIGHT,
+  bedroom2: CLEAR_STOREY_HEIGHT,
+  study: CLEAR_STOREY_HEIGHT,
+  garage: GARAGE_CLEAR_HEIGHT,
+});
+
+/**
+ * The pass-1 mount heights the `*_BASE` candela below were tuned against.
+ * Raising a lamp onto its real ceiling lengthens the throw to the focal plane,
+ * so keeping the candela would dim the ground rooms by 28% and the upper rooms
+ * by 51% — a regression on exactly the "flat/pale" reading this rig exists to
+ * fix. `baseIntensity` re-derives the candela from these instead, holding the
+ * delivered illuminance constant (see there).
+ */
+const PASS1_FIXTURE_HEIGHT: Readonly<Record<string, number>> = Object.freeze({
   living: 2.55,
   dining: 2.55,
   kitchen: 2.55,
@@ -263,8 +312,29 @@ const scratchDeep = new THREE.Color(WARM_DEEP);
 const scratchCool = new THREE.Color(COOL_SHIFT);
 
 const isKeyRoom = (room: string): boolean => room === 'living' || room === 'bedroom';
-const baseIntensity = (room: string): number => room === 'living' ? KEY_SPOT_BASE
+/** Candela as authored in pass 1, i.e. against `PASS1_FIXTURE_HEIGHT`. */
+const authoredBase = (room: string): number => room === 'living' ? KEY_SPOT_BASE
   : room === 'bedroom' ? BEDROOM_SPOT_BASE : room === 'garage' ? GARAGE_FILL_BASE : FILL_BASE;
+
+const fixtureKind = (room: string): FixtureKind => FIXTURE_KIND[room] ?? 'flush';
+/** Mount plane above the room's floor line; single source for lights and fixtures. */
+const mountHeight = (room: string): number => FIXTURE_HEIGHT[room] ?? CLEAR_STOREY_HEIGHT;
+/** Lamp origin (the bulb/lens plane) in world Y for a planned room. */
+const lampY = (plan: RoomPlan): number =>
+  plan.position.y + mountHeight(plan.room) - FIXTURE_DROP[fixtureKind(plan.room)];
+/** Lamp-to-focal-plane throw for a room mounted `height` above its floor line. */
+const throwFor = (room: string, height: number): number => height - FIXTURE_DROP[fixtureKind(room)];
+
+/**
+ * Holds the illuminance the focal plane actually receives while the mount plane
+ * moves up onto the authored ceiling: E = I/d² is authored, so I' = I·(d'/d)².
+ * Purely geometric — no room gets brighter or dimmer than pass 1 intended at
+ * its table, bed or bench. Residual: three's finite-`distance` window term
+ * (`getDistanceAttenuation`) is not compensated, costing 3% on the keys and up
+ * to 16% on the garage batten; see `docs/technique-lab/lighting/EVIDENCE-MATRIX.md`.
+ */
+const baseIntensity = (room: string): number => authoredBase(room)
+  * (throwFor(room, mountHeight(room)) / throwFor(room, PASS1_FIXTURE_HEIGHT[room] ?? mountHeight(room))) ** 2;
 const baseDistance = (room: string): number => isKeyRoom(room) ? 6.5 : room === 'garage' ? 5.5 : 5;
 
 /**
@@ -341,9 +411,7 @@ export function createStudioLighting(input: StudioLightingInput): StudioLighting
 
   for (const plan of plans) {
     const key = isKeyRoom(plan.room) && mode === 'presentation';
-    const kind = FIXTURE_KIND[plan.room] ?? 'flush';
-    const fixtureY = plan.position.y + (FIXTURE_HEIGHT[plan.room] ?? 2.4);
-    const lightY = fixtureY - FIXTURE_DROP[kind];
+    const lightY = lampY(plan);
     const light = key ? new THREE.SpotLight(0xffffff, 0, baseDistance(plan.room), SPOT_ANGLE, SPOT_PENUMBRA, 2)
       : new THREE.PointLight(0xffffff, 0, baseDistance(plan.room), 2);
     light.name = `world-studio-practical-${plan.house}-${plan.room}`;
@@ -390,7 +458,7 @@ export function createStudioLighting(input: StudioLightingInput): StudioLighting
 
   const plansByKind: Record<FixtureKind, RoomPlan[]> = { pendant: [], flush: [], batten: [] };
   for (const plan of plans) {
-    plansByKind[FIXTURE_KIND[plan.room] ?? 'flush'].push(plan);
+    plansByKind[fixtureKind(plan.room)].push(plan);
   }
   const instanceMatrix = new THREE.Matrix4();
   for (const kind of ['pendant', 'flush', 'batten'] as const) {
@@ -405,9 +473,7 @@ export function createStudioLighting(input: StudioLightingInput): StudioLighting
       mesh.userData.presentationOnly = true;
       mesh.userData.blocksShots = false;
       kindPlans.forEach((plan, index) => {
-        const kind0 = FIXTURE_KIND[plan.room] ?? 'flush';
-        const lightY = plan.position.y + (FIXTURE_HEIGHT[plan.room] ?? 2.4) - FIXTURE_DROP[kind0];
-        instanceMatrix.makeTranslation(plan.position.x, lightY, plan.position.z);
+        instanceMatrix.makeTranslation(plan.position.x, lampY(plan), plan.position.z);
         mesh.setMatrixAt(index, instanceMatrix);
       });
       mesh.instanceMatrix.needsUpdate = true;

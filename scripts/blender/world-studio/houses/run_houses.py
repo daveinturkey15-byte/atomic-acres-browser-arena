@@ -32,7 +32,11 @@ LOCK_PATH = Path(
 )
 OWNER_TAG = "claude/houses-night-20260912"
 CREATE_NO_WINDOW = 0x08000000
-MAX_THREADS = 4
+# Wave 4 runs under the recovery phase's resource policy (blenderThreads: 2, one local
+# heavy task at a time), so the cap came down from 4. Thread count changes scheduling,
+# not arithmetic — the wave-4 determinism re-run reproduced the teal bytes exactly — so
+# this does not move the export.
+MAX_THREADS = 2
 
 
 def _now() -> str:

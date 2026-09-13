@@ -15,7 +15,7 @@
       "category": "architecture",
       "qualityRank": 1,
       "qualityReason": "Full structural shell with real lap-siding relief, stepped shingle courses, a random-ashlar masonry chimney built from individual stones, open slatted pergola, balustrades and open gameplay apertures, plus the interior partitions and the 16-tread internal stair; audited clear against all 26 declared openings, 9 interior cased openings and 24 transcribed runtime probes.",
-      "revision": 3,
+      "revision": 4,
       "authoredBy": {
         "harness": "claude",
         "model": "claude-opus-5",
@@ -26,21 +26,22 @@
         "https://threejs.org/docs/pages/GLTFLoader.html"
       ],
       "license": "Original project procedurally authored artwork",
-      "method": "Deterministic Blender 5.1.2 Python authoring (CPU, --background, 4 threads) from scripts/blender/world-studio/houses/, with PBR maps synthesised in numpy from a seeded PRNG. No downloaded meshes or textures, no AI-generated images.",
+      "method": "Deterministic Blender 5.1.2 Python authoring (CPU, --background, 2 threads) from scripts/blender/world-studio/houses/, with PBR maps synthesised in numpy from a seeded PRNG. No downloaded meshes or textures, no AI-generated images.",
       "limitations": [
         "Structural shell, inside and out: walls, floors, ceilings, roof, chimney, porch, balcony, garage, trim, gutters, glazing, the seven interior partitions with their nine cased openings, and the contracted 16-tread internal stair. Furniture and interior decor still belong to the interiors lane and are NOT in this file.",
         "Presentation only. No collider, shot surface, spawn or navigation data is exported or derived; movement and shot authority stay in src/world-studio/architecture.",
         "Not yet observed in the running arena. Generated and audited is not integrated or visually accepted; root must inspect runtime and visuals before acceptance.",
         "Exterior thumbnails are 512x320 CPU Cycles renders at 24 samples, sized for a gallery tile rather than for judging material detail.",
         "The two interior thumbnails add four interior fill lamps because a closed house lit only by the exterior sun renders as noise at any sample count this lane can afford. They are a photographic rig for inspecting geometry and say nothing about the project light rig, interior bounce or mood. The stair frame is also aimed at the flight rather than at the review point's published target.",
-        "Siding, shingle and stone maps are 512px procedural tiles; close-camera interior inspection will show the tile repeat."
+        "Siding, shingle and stone maps are 512px procedural tiles; close-camera interior inspection will show the tile repeat.",
+        "Revision4 reduces bright siding reveals. Same-facing coincident surfaces and vertical seams remain OPEN; source surface-conflict audit is still red. Runtime inspection is required."
       ],
       "metrics": {
         "triangles": 37944,
         "materials": 8,
         "textureBytes": 2843343,
         "drawGroups": 8,
-        "glbBytes": 5670288,
+        "glbBytes": 5670156,
         "panes": 22,
         "apertureMarkers": 26,
         "routeLandmarks": 3,
@@ -51,8 +52,8 @@
           "masonry": 5316,
           "metal": 636,
           "shingle": 1320,
-          "siding": 21228,
-          "trim": 8628
+          "siding": 22236,
+          "trim": 7620
         },
         "localBounds": {
           "min": [
@@ -75,7 +76,7 @@
       "interiorApertureMismatches": [],
       "stairTreadProblems": [],
       "blockedRuntimeProbes": [],
-      "sha256": "0748813fa082fb694978168c55a896124ac4d052237d226cccafc241df7ccd50",
+      "sha256": "38cc4c2d941524434bad5a51772e07fe3a35a7775c0ccca9a239fbb9731a5c27",
       "partition": "world-studio.house.teal.shell",
       "houseId": "teal-house",
       "placement": [
@@ -99,7 +100,7 @@
       "category": "architecture",
       "qualityRank": 2,
       "qualityReason": "Full structural shell with real lap-siding relief, stepped shingle courses, a random-ashlar masonry chimney built from individual stones, open slatted pergola, balustrades and open gameplay apertures, plus the interior partitions and the 16-tread internal stair; audited clear against all 26 declared openings, 9 interior cased openings and 24 transcribed runtime probes.",
-      "revision": 3,
+      "revision": 4,
       "authoredBy": {
         "harness": "claude",
         "model": "claude-opus-5",
@@ -110,21 +111,22 @@
         "https://threejs.org/docs/pages/GLTFLoader.html"
       ],
       "license": "Original project procedurally authored artwork",
-      "method": "Deterministic Blender 5.1.2 Python authoring (CPU, --background, 4 threads) from scripts/blender/world-studio/houses/, with PBR maps synthesised in numpy from a seeded PRNG. No downloaded meshes or textures, no AI-generated images.",
+      "method": "Deterministic Blender 5.1.2 Python authoring (CPU, --background, 2 threads) from scripts/blender/world-studio/houses/, with PBR maps synthesised in numpy from a seeded PRNG. No downloaded meshes or textures, no AI-generated images.",
       "limitations": [
         "Structural shell, inside and out: walls, floors, ceilings, roof, chimney, porch, balcony, garage, trim, gutters, glazing, the seven interior partitions with their nine cased openings, and the contracted 16-tread internal stair. Furniture and interior decor still belong to the interiors lane and are NOT in this file.",
         "Presentation only. No collider, shot surface, spawn or navigation data is exported or derived; movement and shot authority stay in src/world-studio/architecture.",
         "Not yet observed in the running arena. Generated and audited is not integrated or visually accepted; root must inspect runtime and visuals before acceptance.",
         "Exterior thumbnails are 512x320 CPU Cycles renders at 24 samples, sized for a gallery tile rather than for judging material detail.",
         "The two interior thumbnails add four interior fill lamps because a closed house lit only by the exterior sun renders as noise at any sample count this lane can afford. They are a photographic rig for inspecting geometry and say nothing about the project light rig, interior bounce or mood. The stair frame is also aimed at the flight rather than at the review point's published target.",
-        "Siding, shingle and stone maps are 512px procedural tiles; close-camera interior inspection will show the tile repeat."
+        "Siding, shingle and stone maps are 512px procedural tiles; close-camera interior inspection will show the tile repeat.",
+        "Revision4 reduces bright siding reveals. Same-facing coincident surfaces and vertical seams remain OPEN; source surface-conflict audit is still red. Runtime inspection is required."
       ],
       "metrics": {
         "triangles": 38112,
         "materials": 8,
         "textureBytes": 2806733,
         "drawGroups": 8,
-        "glbBytes": 5644996,
+        "glbBytes": 5644860,
         "panes": 22,
         "apertureMarkers": 26,
         "routeLandmarks": 3,
@@ -135,8 +137,8 @@
           "masonry": 5484,
           "metal": 636,
           "shingle": 1320,
-          "siding": 21228,
-          "trim": 8628
+          "siding": 22236,
+          "trim": 7620
         },
         "localBounds": {
           "min": [
@@ -159,7 +161,7 @@
       "interiorApertureMismatches": [],
       "stairTreadProblems": [],
       "blockedRuntimeProbes": [],
-      "sha256": "bdd2867e05a36266cca8d468fdc56b01168e7eea65ebe29b6a5ee4a91dcc5ee6",
+      "sha256": "c7d7c219978a6e0738faa338e40f96e861e6a316a2560576c9bd55d90540b08f",
       "partition": "world-studio.house.yellow.shell",
       "houseId": "yellow-house",
       "placement": [

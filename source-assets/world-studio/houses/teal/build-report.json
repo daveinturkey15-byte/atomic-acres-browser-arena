@@ -4,8 +4,8 @@
   "partition": "world-studio.house.teal.shell",
   "blender": "5.1.2",
   "glb": "public/assets/world-studio/blender/houses/house-teal-shell.glb",
-  "sha256": "0748813fa082fb694978168c55a896124ac4d052237d226cccafc241df7ccd50",
-  "bytes": 5670288,
+  "sha256": "38cc4c2d941524434bad5a51772e07fe3a35a7775c0ccca9a239fbb9731a5c27",
+  "bytes": 5670156,
   "localBounds": {
     "min": [
       -9.44,
@@ -31,8 +31,8 @@
     "masonry": 5316,
     "metal": 636,
     "shingle": 1320,
-    "siding": 21228,
-    "trim": 8628
+    "siding": 22236,
+    "trim": 7620
   },
   "materials": 8,
   "drawGroups": 8,

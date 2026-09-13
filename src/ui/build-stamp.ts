@@ -9,9 +9,9 @@ export function buildStampMarkup(): string {
   return `<div class="build-stamp">
     <button type="button" aria-describedby="build-changes"><b>BUILD ${number}</b><time>${stamp}${date ? ' UK' : ''}</time></button>
     <div id="build-changes" role="tooltip"><strong>In this build</strong><ul>
-      <li>Blender houses, vehicles and road textures now load into the level.</li>
-      <li>Breakable windows retained; map loading and cleanup repaired.</li>
-      <li>Skills Lab: demos, original links and Blender asset gallery.</li>
+      <li>Reduced bright siding reveals on both Blender houses.</li>
+      <li>Interior light fixtures aligned with the authored ceilings.</li>
+      <li>Updated house assets and thumbnails in the Skills Lab gallery.</li>
     </ul></div>
   </div>`;
 }

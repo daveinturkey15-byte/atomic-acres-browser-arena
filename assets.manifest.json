@@ -6,52 +6,52 @@
       "kind": "project-authored-blender-assets",
       "creator": "Atomic Acres / claude-opus-5",
       "source": "scripts/blender/world-studio/houses/",
-      "generatedAsOf": "2026-09-12",
+      "generatedAsOf": "2026-09-13",
       "license": "Original project work",
       "files": "public/assets/world-studio/blender/houses/*",
       "sourceProvenance": "public/assets/world-studio/blender/houses/catalog.json",
-      "modifications": "Revision3 includes exact internal partitions, 16-tread stair and slab aperture. CPU loader/route checks pass; level integration and visual acceptance remain open.",
+      "modifications": "Revision4 corrects the sheathing material behind siding reveals and opaque export sidedness. Geometry and gameplay authority unchanged. Residual coplanar facade seams remain an OPEN visual defect; not a visual acceptance.",
       "attributionRequired": false,
       "runtimeFiles": [
         {
           "path": "public/assets/world-studio/blender/houses/house-teal-shell.glb",
-          "sha256": "0748813fa082fb694978168c55a896124ac4d052237d226cccafc241df7ccd50"
+          "sha256": "38cc4c2d941524434bad5a51772e07fe3a35a7775c0ccca9a239fbb9731a5c27"
         },
         {
           "path": "public/assets/world-studio/blender/houses/house-teal-street.png",
-          "sha256": "19c6a88802c26f05c0e203a7573147491481b3a88ff83a56be8f109da16d5f34"
+          "sha256": "d81ced3ed22815a2b1043a2c711cc2f9ae3619d24e6e3d6130d4fc6eaa3868b2"
         },
         {
           "path": "public/assets/world-studio/blender/houses/house-teal-backyard.png",
-          "sha256": "02cd7ac8c0abe08d09a7183e7fdcf35dbfc8919240369e2c236b438623713b85"
+          "sha256": "022d215da166abf20f0967b65fe869e69018d27acebc2a5c080eb7d57cb5c0a4"
         },
         {
           "path": "public/assets/world-studio/blender/houses/house-teal-interior-stair.png",
-          "sha256": "0379235ef9a39b9e11f89e94528b080c3bd8777dcd8c28112e1151c0e77d53d5"
+          "sha256": "3bb86ba45cce8fcfc8b4e581c04796b9a1e51ac888cfa6d45c5178678f101dfb"
         },
         {
           "path": "public/assets/world-studio/blender/houses/house-teal-interior-living.png",
-          "sha256": "265124b7f9d98e0198e4b661fc23e3c8160cfc3555c9ce237939374c6b18f42e"
+          "sha256": "7258ce33946eddfc61e4e97032ca77820a154d9db7e172a7bb5c836cd1131a75"
         },
         {
           "path": "public/assets/world-studio/blender/houses/house-yellow-shell.glb",
-          "sha256": "bdd2867e05a36266cca8d468fdc56b01168e7eea65ebe29b6a5ee4a91dcc5ee6"
+          "sha256": "c7d7c219978a6e0738faa338e40f96e861e6a316a2560576c9bd55d90540b08f"
         },
         {
           "path": "public/assets/world-studio/blender/houses/house-yellow-street.png",
-          "sha256": "c24ab9523c9e0705fdcf1a3b806663c90ff27c3b0db51fa6bd80b03031bea40e"
+          "sha256": "00f51da9c67d56375279ee1702af12dfc389b1a600217def02cc77332fd9cb44"
         },
         {
           "path": "public/assets/world-studio/blender/houses/house-yellow-backyard.png",
-          "sha256": "7ed7d61335e98b90428b519bfaab7ff2a40fab133a07c3e1a5e7ce6e30666a8e"
+          "sha256": "1bd6867f77eeb1898af56e92548c960b52d16090a5a08f00f99a911458ba7660"
         },
         {
           "path": "public/assets/world-studio/blender/houses/house-yellow-interior-stair.png",
-          "sha256": "9ba274e0d7ffc1dac5788883465c0d78db45e0063a493af0fed73c9cc49cbd68"
+          "sha256": "1beb8470efc148f8d0f6053c2b4f8a92ba6f2a156304b032648e173bd989e0e3"
         },
         {
           "path": "public/assets/world-studio/blender/houses/house-yellow-interior-living.png",
-          "sha256": "64d1a532a9154272c6a65935e306e1d0227afbfcca7cd2c1201d9655e24ddfbc"
+          "sha256": "22ba6e067ad5a413da974858d20ba85c00cc2ebbd67a75ac3b2e73a7bff39d8a"
         }
       ]
     },
@@ -1499,6 +1499,135 @@
       "placeholderStatus": "production",
       "format": "1536x864 lossy WebP (Pillow, method 6, quality 88), matching the eight shipped backdrops in format, resampler, output size and payload budget. Measured 42.49 dB PSNR against its own PNG master, over the 40.0 dB floor. PNG master preserved byte-for-byte under source-assets/loading/pass87-raid2-loading/",
       "modifications": "Captured offline at native 1440p from the actual authoritative Raid Rebuild production WebGPU arena with deterministic camera and visual time, then Lanczos-downscaled to 1536x864 and encoded with the shipped Lane I WebP profile. No downloaded or sampled art is used."
+    },
+    {
+      "id": "atomic-acres-world-studio-pbr-cc0-polyhaven-20260912",
+      "kind": "project-hosted-cc0-pbr-textures",
+      "creator": "Atomic Acres project / Poly Haven source assets",
+      "source": "public/assets/original/world-studio/pbr/manifest.json",
+      "license": "CC0-1.0",
+      "licenseSource": "https://polyhaven.com/license",
+      "sourceManifest": "public/assets/original/world-studio/pbr/manifest.json",
+      "files": [
+        {
+          "path": "public/assets/original/world-studio/pbr/manifest.json",
+          "sha256": "197de6a0ff21155639bc45c34e5aca2862420c98e71a5fdd6a17c0d01cdf1798",
+          "bytes": 4542
+        },
+        {
+          "path": "public/assets/original/world-studio/pbr/brushed_concrete_03/brushed_concrete_03_diff_1k.jpg",
+          "sha256": "1b76a9867b410e295e5df09fe2b667a9280ac1145bf4b66e96015594421fc6a0",
+          "bytes": 892099
+        },
+        {
+          "path": "public/assets/original/world-studio/pbr/brushed_concrete_03/brushed_concrete_03_nor_gl_1k.png",
+          "sha256": "0be625d4de0f4f951fae75c5c6ed31d032f1bcf4fb51df211439ae0b5486e384",
+          "bytes": 5852392
+        },
+        {
+          "path": "public/assets/original/world-studio/pbr/brushed_concrete_03/brushed_concrete_03_rough_1k.jpg",
+          "sha256": "67a2db32e7fdde4a56c2443161972eea0fa6ee6830c9a9b5e451902d4a1b5f2c",
+          "bytes": 530188
+        },
+        {
+          "path": "public/assets/original/world-studio/pbr/asphalt_02/asphalt_02_diff_1k.jpg",
+          "sha256": "1aa5ce99f58a625c71d48cfc3e68b65ca85ccb00f39e045c0a928608a0ea25ed",
+          "bytes": 731707
+        },
+        {
+          "path": "public/assets/original/world-studio/pbr/asphalt_02/asphalt_02_nor_gl_1k.png",
+          "sha256": "b2069741070f0107c81d001eabfffd6d6644f249cd4ffdf52852e4b5e746a959",
+          "bytes": 2323825
+        },
+        {
+          "path": "public/assets/original/world-studio/pbr/asphalt_02/asphalt_02_rough_1k.jpg",
+          "sha256": "70ba3edc65525eb4dc366cf010ca7ae0bd34e0251ff0225c2dad627a873d0712",
+          "bytes": 544032
+        }
+      ],
+      "provenanceState": "VERIFIED_FROM_CHECKED_IN_PBR_MANIFEST"
+    },
+    {
+      "id": "atomic-acres-world-studio-blender-hero-vehicles-20260912",
+      "kind": "project-authored-blender-presentation-assets",
+      "creator": "Atomic Acres project",
+      "source": "scripts/blender/world-studio/build_hero_bus.py + scripts/blender/world-studio/build_hero_truck.py",
+      "license": "Original project work",
+      "sourceProvenance": "docs/world-studio-blender-assets.md",
+      "files": [
+        {
+          "path": "public/assets/world-studio/blender/bus_body_basecolor.png",
+          "sha256": "7925c38c10361b215febbad4919f994a31f7083642d4b2ec90030c2ab8ce6478",
+          "bytes": 103299
+        },
+        {
+          "path": "public/assets/world-studio/blender/bus_body_normal.png",
+          "sha256": "0c3ac3fa27d942fb1553c4073e5a7ad8ab17b993f217e32b576234def55c7d36",
+          "bytes": 164359
+        },
+        {
+          "path": "public/assets/world-studio/blender/bus_body_roughness.png",
+          "sha256": "39d5920d3eea908af5693b4d5f20d483397627b210f18f6b698ee62719108f2b",
+          "bytes": 70583
+        },
+        {
+          "path": "public/assets/world-studio/blender/hero-bus.glb",
+          "sha256": "a7059b50bdd41281377a54cb65f51c51b06d67c4ca2ae03d7e0ee9982a6b0ff5",
+          "bytes": 1339668
+        },
+        {
+          "path": "public/assets/world-studio/blender/hero-truck.glb",
+          "sha256": "b602d3037c5d6c23d174e17006a9b5ae6abb9de4835fba5d23fee377fdd74199",
+          "bytes": 1554816
+        },
+        {
+          "path": "public/assets/world-studio/blender/trailer_white_basecolor.png",
+          "sha256": "612c1d57d66302fcd9a88171e6d4116100a5c995e4837012c30cbe398371b586",
+          "bytes": 95068
+        },
+        {
+          "path": "public/assets/world-studio/blender/trailer_white_roughness.png",
+          "sha256": "5a4e7079462741e39822201fdb2696e1594b03ff93ad426995b79c38b66f5411",
+          "bytes": 71128
+        },
+        {
+          "path": "public/assets/world-studio/blender/truck_panel_normal.png",
+          "sha256": "5a6dfbe62390c176de6ffd883bb2a344ad06100c667c170fb9bfecb078edb56e",
+          "bytes": 161011
+        },
+        {
+          "path": "public/assets/world-studio/blender/truck_red_basecolor.png",
+          "sha256": "6827ec7d474e00106711b93db0bf3ed979e39c82990f3885d33182343ce985cb",
+          "bytes": 83395
+        },
+        {
+          "path": "public/assets/world-studio/blender/truck_red_roughness.png",
+          "sha256": "8cd7548d2e0ea80a851fc060bc65d92313e577d4d4ab6f3bce39f427b9710130",
+          "bytes": 71875
+        }
+      ],
+      "provenanceState": "VERIFIED_FROM_CHECKED_IN_GENERATION_DOC_AND_SCRIPTS",
+      "openQuestions": [
+        "The checked-in docs establish project-authored CPU Blender generation and no third-party content; root integrator should decide whether to add sourceScript/sourceBlend revision pins before merge."
+      ]
+    },
+    {
+      "id": "atomic-acres-skills-lab-source-catalog-20260912",
+      "kind": "project-authored-skills-lab-catalog",
+      "creator": "Atomic Acres Skills Lab lane (catalog metadata)",
+      "source": "public/assets/skills-lab/source-catalog.json",
+      "license": "OPEN: no file-specific license statement found in the catalog",
+      "files": [
+        {
+          "path": "public/assets/skills-lab/source-catalog.json",
+          "sha256": "01c77191897d8d9178705226e12504465836e57fb9659bef7cb34cbe7b99475b",
+          "bytes": 109308
+        }
+      ],
+      "provenanceState": "OPEN_LICENSE_AND_ORIGIN_REVIEW",
+      "openQuestions": [
+        "Catalog content is a project research catalog; its rows must not be treated as provenance for unrelated runtime assets. Integrator should confirm whether this document belongs in the public asset manifest."
+      ]
     }
   ],
   "rejectedCandidates": [
