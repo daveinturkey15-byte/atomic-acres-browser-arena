@@ -60,6 +60,12 @@ TILE_M = {
     "door": T.TRIM_M,
 }
 
+# Material slot for the structural leaf behind the lap siding. Named because the wave-3 value
+# ("trim", i.e. painted white) is the white comb in the Build 16 facade, and because
+# ``facade_preview.py`` re-renders the old value to hold the before/after record. The build
+# itself never reads anything but this constant.
+SHEATHING_SLOT = "siding"
+
 
 # ---------------------------------------------------------------- deterministic PRNG
 
@@ -297,7 +303,17 @@ def build_exterior_wall(b: Builder, frame: C.WallFrame, openings: Sequence[C.Ope
 
     for rect in solids:
         # Structural leaf — the surface the siding hangs on and the interior lining covers.
-        _wall_box(b, frame, "trim", rect, -half, half - out * 0.012)
+        #
+        # Wave 4, and this is the white comb. The leaf shipped in the ``trim`` slot, i.e. in
+        # painted white, and it sits 12 mm behind a lap siding course that leaves a 3 mm reveal
+        # at every joint. So every one of those joints is a 3 mm window onto a white board.
+        # Cycles hid it: the review sun puts a 15 mm slot in shadow. The runtime does not, so
+        # under near-uniform ambient each joint lights up, and at street distance a 3 mm line is
+        # a fraction of a pixel and breaks into the dashes the Build 16 capture shows. Real
+        # clapboard shows shadow in that gap, not paint. The leaf now carries the siding slot,
+        # which is also what it physically is — sheathing behind the boards, never seen except
+        # through the reveal. The interior face is unaffected: the lining below covers it.
+        _wall_box(b, frame, SHEATHING_SLOT, rect, -half, half - out * 0.012)
         # Interior lining, inboard of the structure (shell only: paint, no furniture).
         _wall_box(b, frame, "trim", rect, -out * (half + C.LINING), -out * half, opaque=False)
         # Lap siding: one real course per 152.4 mm, 3 mm reveal between courses, 18 mm proud.
@@ -1015,6 +1031,19 @@ def make_material(name: str, maps: Dict[str, Path], *, glass: bool = False, base
     mat.use_nodes = True
     nodes, links = mat.node_tree.nodes, mat.node_tree.links
     bsdf = nodes["Principled BSDF"]
+
+    # Wave 4. Blender defaults ``use_backface_culling`` to False, so the glTF exporter wrote
+    # every material ``doubleSided: true``. ``src/world-studio/houses/index.ts:211`` then has to
+    # walk the loaded scene and force ``FrontSide`` back onto every opaque material, i.e. the
+    # export has been shipping a flag the only consumer immediately overrides. Worse, it is a
+    # flag with teeth: every solid here is a closed box, so a double-sided export puts each
+    # box's back face at the same depth as whatever it is mounted on, and a coincident back
+    # face renders at grazing angles. Declaring it at the source makes the file and its
+    # contract agree, and ``audit_surfaces.py`` checks the winding that makes it safe.
+    # Glass is the deliberate exception: the loader forces ``DoubleSide`` on it too, and the
+    # wave-2 alpha 0.42 film was solved with both faces blending. Culling it would halve the
+    # density that measurement fixed, so it stays as it was.
+    mat.use_backface_culling = not glass
 
     if glass:
         # Wave 2: "glass reads flat light-gray in all views". A near-white pane at alpha 0.28 is
