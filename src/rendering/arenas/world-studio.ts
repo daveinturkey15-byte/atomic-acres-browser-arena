@@ -4,7 +4,7 @@ import { budgets, camera, colorPipeline, SHARED_GAMEPLAY_ASSETS } from './shared
 
 /** Fresh arena presentation adopts the builder's exact gameplay root. */
 export const definition = createProceduralArenaVisualDefinition({
-  id: 'world-studio', displayLabel: 'Nuke Town · New World', moduleId: 'arena.visual.world-studio.v1',
+  id: 'world-studio', displayLabel: 'Atomic Acres - New World', moduleId: 'arena.visual.world-studio.v1',
   assetDependencies: [], sharedAssetDependencies: SHARED_GAMEPLAY_ASSETS,
   lighting: {
     sunColor: 0xfff2dc, sunIntensity: 2.62,

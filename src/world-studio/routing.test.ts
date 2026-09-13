@@ -69,7 +69,7 @@ describe('New World selection and retained multiplayer identity', () => {
     const lobbyOptions = html.match(/<select id="lobby-arena">([\s\S]*?)<\/select>/)?.[1];
     expect(lobbyOptions).toContain('value="world-studio"');
     expect((lobbyOptions?.match(/<option /g) ?? [])).toHaveLength(1);
-    expect(html).toContain('aria-label="Nuke Town · New World multiplayer arena"');
+    expect(html).toContain('aria-label="Atomic Acres - New World multiplayer arena"');
     expect(html).toContain('data-arena="world-studio"');
     expect(html).toContain('PREVIEW STANDBY');
     const preview = menuPreviewVideoDefinition('world-studio');

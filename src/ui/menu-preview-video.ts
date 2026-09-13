@@ -57,7 +57,7 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
   // No new-arena footage has been captured. Standby never borrows older map bytes.
   'world-studio': Object.freeze({
     arenaId: 'world-studio', frame: 'helicopter',
-    label: 'PREVIEW STANDBY // NUKE TOWN · NEW WORLD',
+    label: 'PREVIEW STANDBY // ATOMIC ACRES - NEW WORLD',
     motionLabel: 'NEW WORLD PREVIEW PENDING', reducedMotionLabel: 'PREVIEW STANDBY',
     presentationId: 'menu-video-runtime-helo-world-studio-v1',
     mediaAvailable: false, webm: '', mp4: '', poster: '',

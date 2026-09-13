@@ -187,7 +187,7 @@ export function buildWorldStudio(scene: THREE.Scene, housePresentationOptions?: 
   const surfaceBase = ground.surfaces.map(material => material.color.clone());
   scene.add(root);
   return {
-    id: 'world-studio', label: 'Nuke Town · New World', root,
+    id: 'world-studio', label: 'Atomic Acres - New World', root,
     colliders: physicsColliders, physicsColliders, raycastMeshes, shotSurfaces,
     spawns: { 0: studioSpawnPositions(0).map(p => new THREE.Vector3(...p)), 1: studioSpawnPositions(1).map(p => new THREE.Vector3(...p)) },
     patrolPoints: [
