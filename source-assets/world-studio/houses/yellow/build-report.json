@@ -4,8 +4,8 @@
   "partition": "world-studio.house.yellow.shell",
   "blender": "5.1.2",
   "glb": "public/assets/world-studio/blender/houses/house-yellow-shell.glb",
-  "sha256": "bdd2867e05a36266cca8d468fdc56b01168e7eea65ebe29b6a5ee4a91dcc5ee6",
-  "bytes": 5644996,
+  "sha256": "c7d7c219978a6e0738faa338e40f96e861e6a316a2560576c9bd55d90540b08f",
+  "bytes": 5644860,
   "localBounds": {
     "min": [
       -9.049999999999999,
@@ -31,8 +31,8 @@
     "masonry": 5484,
     "metal": 636,
     "shingle": 1320,
-    "siding": 21228,
-    "trim": 8628
+    "siding": 22236,
+    "trim": 7620
   },
   "materials": 8,
   "drawGroups": 8,

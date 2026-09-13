@@ -1,0 +1,9156 @@
+{
+  "teal": {
+    "bytes": 5670156,
+    "coincidentPairs": 33571,
+    "conflictArea": 6391.281799,
+    "conflictPairs": 33683,
+    "conflictRegions": 174,
+    "epsilon": 0.0015,
+    "glb": "house-teal-shell.glb",
+    "oppositeFacingPairs": 21174,
+    "regions": [
+      {
+        "area": 1078.741211,
+        "bounds": [
+          -7.0,
+          -0.42,
+          -9.4,
+          -7.0,
+          6.45,
+          9.4
+        ],
+        "materials": [
+          "teal-concrete",
+          "teal-door",
+          "teal-metal",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "pairs": 3840,
+        "plane_d": -7.0,
+        "sameFacingArea": 429.89719,
+        "sameFacingPairs": 2208
+      },
+      {
+        "area": 1015.406913,
+        "bounds": [
+          -7.0,
+          0.02,
+          -9.2908,
+          7.0,
+          0.02,
+          9.0
+        ],
+        "materials": [
+          "teal-concrete",
+          "teal-door",
+          "teal-masonry",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 400,
+        "plane_d": 0.02,
+        "sameFacingArea": 22.499999,
+        "sameFacingPairs": 128
+      },
+      {
+        "area": 777.196612,
+        "bounds": [
+          6.78,
+          0.0,
+          -9.0,
+          6.78,
+          6.45,
+          9.0
+        ],
+        "materials": [
+          "teal-door",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 792,
+        "plane_d": 6.78,
+        "sameFacingArea": 26.039999,
+        "sameFacingPairs": 40
+      },
+      {
+        "area": 689.484782,
+        "bounds": [
+          -7.0,
+          0.0,
+          8.78,
+          7.0,
+          7.5945,
+          8.78
+        ],
+        "materials": [
+          "teal-door",
+          "teal-shingle",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 960,
+        "plane_d": 8.78,
+        "sameFacingArea": 55.752794,
+        "sameFacingPairs": 104
+      },
+      {
+        "area": 499.201502,
+        "bounds": [
+          -7.0,
+          -0.42,
+          -9.0,
+          7.0,
+          7.5945,
+          -8.9988
+        ],
+        "materials": [
+          "teal-concrete",
+          "teal-masonry",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.00119972,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 1656,
+        "plane_d": -9.0,
+        "sameFacingArea": 170.683409,
+        "sameFacingPairs": 576
+      },
+      {
+        "area": 380.528059,
+        "bounds": [
+          -4.22,
+          3.5,
+          8.78,
+          4.22,
+          3.5,
+          19.28
+        ],
+        "materials": [
+          "teal-shingle",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 272,
+        "plane_d": 3.5,
+        "sameFacingArea": 2.015999,
+        "sameFacingPairs": 88
+      },
+      {
+        "area": 349.848543,
+        "bounds": [
+          7.0,
+          -0.42,
+          -9.4,
+          7.0,
+          6.45,
+          9.4
+        ],
+        "materials": [
+          "teal-concrete",
+          "teal-door",
+          "teal-metal",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 3192,
+        "plane_d": 7.0,
+        "sameFacingArea": 219.948792,
+        "sameFacingPairs": 2168
+      },
+      {
+        "area": 257.684574,
+        "bounds": [
+          -7.0,
+          -0.42,
+          9.0,
+          7.0,
+          7.5945,
+          9.0
+        ],
+        "materials": [
+          "teal-concrete",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 1864,
+        "plane_d": 9.0,
+        "sameFacingArea": 95.155298,
+        "sameFacingPairs": 896
+      },
+      {
+        "area": 229.637829,
+        "bounds": [
+          -4.0,
+          -0.42,
+          8.78,
+          -4.0,
+          6.45,
+          19.0
+        ],
+        "materials": [
+          "teal-concrete",
+          "teal-metal",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 1264,
+        "plane_d": -4.0,
+        "sameFacingArea": 68.245225,
+        "sameFacingPairs": 152
+      },
+      {
+        "area": 129.298251,
+        "bounds": [
+          7.018,
+          0.0,
+          -9.0,
+          7.018,
+          5.9406,
+          9.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "pairs": 2112,
+        "plane_d": 7.018,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 112.846421,
+        "bounds": [
+          -7.018,
+          0.0,
+          -9.0,
+          -7.018,
+          5.7882,
+          9.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 2040,
+        "plane_d": -7.018,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 106.590188,
+        "bounds": [
+          -7.0,
+          0.9144,
+          -9.018,
+          7.0,
+          5.7882,
+          -9.018
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 1704,
+        "plane_d": -9.018,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 89.633348,
+        "bounds": [
+          -7.0,
+          0.0,
+          9.018,
+          7.0,
+          5.7882,
+          9.018
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 1200,
+        "plane_d": 9.018,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 69.589709,
+        "bounds": [
+          -7.0,
+          0.0,
+          -8.78,
+          7.0,
+          7.5945,
+          -8.78
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 272,
+        "plane_d": -8.78,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 55.93919,
+        "bounds": [
+          -9.44,
+          3.18,
+          -6.64,
+          -7.0,
+          3.18,
+          -0.76
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 24,
+        "plane_d": 3.18,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 54.33424,
+        "bounds": [
+          -4.0,
+          -0.42,
+          19.0,
+          4.0,
+          3.5,
+          19.0
+        ],
+        "materials": [
+          "teal-concrete",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 400,
+        "plane_d": 19.0,
+        "sameFacingArea": 5.599998,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 49.816023,
+        "bounds": [
+          4.0,
+          -0.42,
+          9.0,
+          4.0,
+          3.5,
+          19.0
+        ],
+        "materials": [
+          "teal-concrete",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 216,
+        "plane_d": 4.0,
+        "sameFacingArea": 2.632023,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 45.877214,
+        "bounds": [
+          -7.08,
+          6.45,
+          -9.08,
+          7.08,
+          6.45,
+          9.08
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 1032,
+        "plane_d": 6.45,
+        "sameFacingArea": 45.877214,
+        "sameFacingPairs": 1032
+      },
+      {
+        "area": 41.220484,
+        "bounds": [
+          -4.0,
+          0.0,
+          19.018,
+          4.0,
+          2.7402,
+          19.018
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 320,
+        "plane_d": 19.018,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 41.18401,
+        "bounds": [
+          7.0,
+          3.24,
+          0.6,
+          8.6,
+          3.24,
+          7.2
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 3.24,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 38.102243,
+        "bounds": [
+          -4.018,
+          0.0,
+          9.0,
+          -4.018,
+          2.4354,
+          19.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 496,
+        "plane_d": -4.018,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 13.975237,
+        "bounds": [
+          -7.0,
+          0.0,
+          -10.0,
+          8.6,
+          0.0,
+          19.04
+        ],
+        "materials": [
+          "teal-concrete",
+          "teal-masonry",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 352,
+        "plane_d": 0.0,
+        "sameFacingArea": 13.975237,
+        "sameFacingPairs": 352
+      },
+      {
+        "area": 13.322021,
+        "bounds": [
+          4.018,
+          1.0668,
+          9.0,
+          4.018,
+          2.4354,
+          19.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "pairs": 224,
+        "plane_d": 4.018,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 12.846413,
+        "bounds": [
+          -7.0,
+          5.6,
+          -9.0,
+          4.6,
+          5.6,
+          9.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 256,
+        "plane_d": 5.6,
+        "sameFacingArea": 1.664011,
+        "sameFacingPairs": 64
+      },
+      {
+        "area": 10.334404,
+        "bounds": [
+          -9.4,
+          3.3,
+          -8.78,
+          8.6,
+          3.3,
+          9.0
+        ],
+        "materials": [
+          "teal-door",
+          "teal-metal",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 1600,
+        "plane_d": 3.3,
+        "sameFacingArea": 2.984004,
+        "sameFacingPairs": 256
+      },
+      {
+        "area": 7.955237,
+        "bounds": [
+          -7.0,
+          0.0,
+          3.6,
+          7.0,
+          6.45,
+          3.6
+        ],
+        "materials": [
+          "teal-metal",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 104,
+        "plane_d": 3.6,
+        "sameFacingArea": 1.88002,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 7.493602,
+        "bounds": [
+          4.6,
+          0.0,
+          -9.0,
+          4.6,
+          6.45,
+          -8.74
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 112,
+        "plane_d": 4.6,
+        "sameFacingArea": 1.607998,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 7.456002,
+        "bounds": [
+          -3.6,
+          0.0,
+          -9.0,
+          -3.6,
+          6.45,
+          -8.74
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 112,
+        "plane_d": -3.6,
+        "sameFacingArea": 1.631998,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 6.739205,
+        "bounds": [
+          -7.0,
+          2.35,
+          -7.6,
+          7.0,
+          2.35,
+          9.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 152,
+        "plane_d": 2.35,
+        "sameFacingArea": 0.544006,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 6.263234,
+        "bounds": [
+          -7.0,
+          0.0,
+          -4.2,
+          -6.74,
+          6.45,
+          -4.2
+        ],
+        "materials": [
+          "teal-metal",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 88,
+        "plane_d": -4.2,
+        "sameFacingArea": 1.712019,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 5.8664,
+        "bounds": [
+          2.0,
+          0.0,
+          -9.0,
+          2.0,
+          6.45,
+          -8.74
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 72,
+        "plane_d": 2.0,
+        "sameFacingArea": 1.839998,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 5.838439,
+        "bounds": [
+          -7.0,
+          0.0,
+          -6.0,
+          -6.74,
+          6.45,
+          -6.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 72,
+        "plane_d": -6.0,
+        "sameFacingArea": 1.84802,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 5.828839,
+        "bounds": [
+          -7.0,
+          0.0,
+          5.6,
+          -6.74,
+          6.45,
+          5.6
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 72,
+        "plane_d": 5.6,
+        "sameFacingArea": 1.86402,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 5.828799,
+        "bounds": [
+          -5.6,
+          0.0,
+          -9.0,
+          -5.6,
+          6.45,
+          -8.74
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 72,
+        "plane_d": -5.6,
+        "sameFacingArea": 1.863998,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 5.762402,
+        "bounds": [
+          -7.0,
+          0.08,
+          -8.78,
+          7.0,
+          0.08,
+          9.0
+        ],
+        "materials": [
+          "teal-door",
+          "teal-metal",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 152,
+        "plane_d": 0.08,
+        "sameFacingArea": 2.319204,
+        "sameFacingPairs": 56
+      },
+      {
+        "area": 5.755238,
+        "bounds": [
+          -7.0,
+          0.0,
+          -7.8,
+          -6.74,
+          6.45,
+          -7.8
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 72,
+        "plane_d": -7.8,
+        "sameFacingArea": 1.83202,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 5.755238,
+        "bounds": [
+          -7.0,
+          0.0,
+          6.0,
+          -6.74,
+          6.45,
+          6.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 72,
+        "plane_d": 6.0,
+        "sameFacingArea": 1.83202,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 5.755238,
+        "bounds": [
+          -7.0,
+          0.0,
+          7.6,
+          -6.74,
+          6.45,
+          7.6
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 72,
+        "plane_d": 7.6,
+        "sameFacingArea": 1.83202,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 5.727238,
+        "bounds": [
+          -7.0,
+          0.0,
+          1.0,
+          -6.74,
+          6.45,
+          1.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 72,
+        "plane_d": 1.0,
+        "sameFacingArea": 1.84002,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 5.727238,
+        "bounds": [
+          -7.0,
+          0.0,
+          2.4,
+          -6.74,
+          6.45,
+          2.4
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 72,
+        "plane_d": 2.4,
+        "sameFacingArea": 1.84002,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 5.531875,
+        "bounds": [
+          -7.0,
+          0.0,
+          -2.1,
+          -6.74,
+          6.45,
+          -2.1
+        ],
+        "materials": [
+          "teal-metal",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 88,
+        "plane_d": -2.1,
+        "sameFacingArea": 1.716819,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 5.299483,
+        "bounds": [
+          -7.534,
+          6.3223,
+          -9.4,
+          7.534,
+          8.16,
+          -9.4
+        ],
+        "materials": [
+          "teal-shingle",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 1281,
+        "plane_d": -9.4,
+        "sameFacingArea": 4.190684,
+        "sameFacingPairs": 1263
+      },
+      {
+        "area": 4.983994,
+        "bounds": [
+          6.78,
+          5.65,
+          -6.6,
+          7.0,
+          5.65,
+          5.4
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 104,
+        "plane_d": 5.65,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 4.830398,
+        "bounds": [
+          -5.4,
+          0.0,
+          -9.0,
+          -5.4,
+          6.45,
+          -8.74
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 104,
+        "plane_d": -5.4,
+        "sameFacingArea": 1.431999,
+        "sameFacingPairs": 40
+      },
+      {
+        "area": 4.768012,
+        "bounds": [
+          -4.22,
+          3.28,
+          8.78,
+          4.22,
+          3.28,
+          19.28
+        ],
+        "materials": [
+          "teal-metal",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 24,
+        "plane_d": 3.28,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 4.758436,
+        "bounds": [
+          -7.0,
+          0.0,
+          -6.2,
+          -6.74,
+          6.45,
+          -6.2
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 104,
+        "plane_d": -6.2,
+        "sameFacingArea": 1.400015,
+        "sameFacingPairs": 40
+      },
+      {
+        "area": 4.718398,
+        "bounds": [
+          2.4,
+          0.0,
+          -9.0,
+          2.4,
+          6.45,
+          -8.74
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 104,
+        "plane_d": 2.4,
+        "sameFacingArea": 1.383999,
+        "sameFacingPairs": 40
+      },
+      {
+        "area": 4.677626,
+        "bounds": [
+          -7.0,
+          0.0,
+          -2.4,
+          -6.74,
+          6.45,
+          -2.4
+        ],
+        "materials": [
+          "teal-metal",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 120,
+        "plane_d": -2.4,
+        "sameFacingArea": 0.985611,
+        "sameFacingPairs": 48
+      },
+      {
+        "area": 4.646436,
+        "bounds": [
+          -7.0,
+          0.0,
+          -7.6,
+          -6.74,
+          6.45,
+          -7.6
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 104,
+        "plane_d": -7.6,
+        "sameFacingArea": 1.384015,
+        "sameFacingPairs": 40
+      },
+      {
+        "area": 4.361604,
+        "bounds": [
+          -7.0,
+          2.3,
+          -9.0,
+          -3.6,
+          2.3,
+          5.6
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 80,
+        "plane_d": 2.3,
+        "sameFacingArea": 0.640003,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 4.059859,
+        "bounds": [
+          -7.0,
+          0.0,
+          -3.9,
+          -6.74,
+          6.45,
+          -3.9
+        ],
+        "materials": [
+          "teal-metal",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 120,
+        "plane_d": -3.9,
+        "sameFacingArea": 0.980811,
+        "sameFacingPairs": 48
+      },
+      {
+        "area": 3.532989,
+        "bounds": [
+          -7.534,
+          6.3223,
+          9.4,
+          7.534,
+          8.16,
+          9.4
+        ],
+        "materials": [
+          "teal-shingle",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 854,
+        "plane_d": 9.4,
+        "sameFacingArea": 2.79379,
+        "sameFacingPairs": 842
+      },
+      {
+        "area": 3.380795,
+        "bounds": [
+          6.78,
+          2.45,
+          -6.6,
+          7.0,
+          2.45,
+          -2.6
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 40,
+        "plane_d": 2.45,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 3.080033,
+        "bounds": [
+          7.6,
+          5.98,
+          -9.4,
+          7.6,
+          6.41,
+          9.4
+        ],
+        "materials": [
+          "teal-metal",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 24,
+        "plane_d": 7.6,
+        "sameFacingArea": 0.072,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 3.080033,
+        "bounds": [
+          -7.6,
+          5.98,
+          -9.4,
+          -7.6,
+          6.41,
+          9.4
+        ],
+        "materials": [
+          "teal-metal",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "pairs": 24,
+        "plane_d": -7.6,
+        "sameFacingArea": 0.072,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 2.881603,
+        "bounds": [
+          2.0,
+          2.4,
+          -9.0,
+          4.6,
+          2.4,
+          -8.74
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 48,
+        "plane_d": 2.4,
+        "sameFacingArea": 0.416,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 2.692798,
+        "bounds": [
+          6.78,
+          0.0,
+          -6.6,
+          7.0,
+          6.45,
+          -6.6
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 32,
+        "plane_d": -6.6,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 2.182,
+        "bounds": [
+          6.78,
+          0.0,
+          4.5,
+          7.0,
+          5.61,
+          4.5
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 24,
+        "plane_d": 4.5,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 2.126398,
+        "bounds": [
+          6.78,
+          0.0,
+          5.4,
+          7.0,
+          6.45,
+          5.4
+        ],
+        "materials": [
+          "teal-metal",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 32,
+        "plane_d": 5.4,
+        "sameFacingArea": 0.016,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 2.099998,
+        "bounds": [
+          4.22,
+          3.2,
+          8.72,
+          4.22,
+          3.56,
+          19.34
+        ],
+        "materials": [
+          "teal-shingle",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 4.22,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 2.099998,
+        "bounds": [
+          -4.22,
+          3.2,
+          8.72,
+          -4.22,
+          3.56,
+          19.34
+        ],
+        "materials": [
+          "teal-shingle",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": -4.22,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 2.038403,
+        "bounds": [
+          -2.2,
+          0.0,
+          8.78,
+          -2.2,
+          6.45,
+          9.0
+        ],
+        "materials": [
+          "teal-metal",
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 32,
+        "plane_d": -2.2,
+        "sameFacingArea": 0.016,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 1.909598,
+        "bounds": [
+          6.78,
+          0.0,
+          3.4,
+          7.0,
+          6.45,
+          3.4
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": 3.4,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.892002,
+        "bounds": [
+          -3.5,
+          0.0,
+          8.78,
+          -3.5,
+          3.3,
+          9.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": -3.5,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.892002,
+        "bounds": [
+          -4.6,
+          0.0,
+          8.78,
+          -4.6,
+          6.45,
+          9.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": -4.6,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.687998,
+        "bounds": [
+          -4.28,
+          3.2,
+          19.28,
+          4.28,
+          3.56,
+          19.28
+        ],
+        "materials": [
+          "teal-shingle",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 19.28,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.583998,
+        "bounds": [
+          8.6,
+          3.06,
+          0.54,
+          8.6,
+          3.32,
+          7.26
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": 8.6,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.550401,
+        "bounds": [
+          -4.0,
+          5.55,
+          8.78,
+          -2.2,
+          5.55,
+          9.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 32,
+        "plane_d": 5.55,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.5424,
+        "bounds": [
+          -4.28,
+          3.2,
+          19.34,
+          4.28,
+          3.56,
+          19.34
+        ],
+        "materials": [
+          "teal-metal",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 24,
+        "plane_d": 19.34,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.451999,
+        "bounds": [
+          6.78,
+          0.0,
+          4.72,
+          7.0,
+          3.3,
+          4.72
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": 4.72,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.451999,
+        "bounds": [
+          6.78,
+          0.0,
+          5.12,
+          7.0,
+          3.3,
+          5.12
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": 5.12,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.390399,
+        "bounds": [
+          6.78,
+          2.45,
+          -4.6,
+          7.0,
+          6.45,
+          -4.6
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": -4.6,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.390399,
+        "bounds": [
+          6.78,
+          2.45,
+          -3.4,
+          7.0,
+          6.45,
+          -3.4
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": -3.4,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.390399,
+        "bounds": [
+          6.78,
+          0.0,
+          -1.4,
+          7.0,
+          6.45,
+          -1.4
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": -1.4,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.363206,
+        "bounds": [
+          -7.0,
+          4.15,
+          -9.0,
+          4.6,
+          4.15,
+          7.6
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 104,
+        "plane_d": 4.15,
+        "sameFacingArea": 1.152005,
+        "sameFacingPairs": 40
+      },
+      {
+        "area": 1.353598,
+        "bounds": [
+          6.78,
+          2.22,
+          3.4,
+          7.0,
+          2.22,
+          5.12
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 56,
+        "plane_d": 2.22,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.302399,
+        "bounds": [
+          6.78,
+          0.0,
+          -2.6,
+          7.0,
+          4.1,
+          -2.6
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": -2.6,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.2936,
+        "bounds": [
+          0.08,
+          0.02,
+          6.7,
+          1.55,
+          3.3,
+          6.7
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 6.7,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.2888,
+        "bounds": [
+          -4.0,
+          0.06,
+          9.0,
+          4.0,
+          0.06,
+          19.0
+        ],
+        "materials": [
+          "teal-concrete",
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 32,
+        "plane_d": 0.06,
+        "sameFacingArea": 0.9328,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 1.258401,
+        "bounds": [
+          2.6,
+          0.0,
+          8.78,
+          2.6,
+          6.45,
+          9.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": 2.6,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.258401,
+        "bounds": [
+          4.4,
+          2.35,
+          8.78,
+          4.4,
+          6.45,
+          9.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": 4.4,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.214401,
+        "bounds": [
+          3.4,
+          0.0,
+          8.78,
+          3.4,
+          4.2,
+          9.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": 3.4,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.214401,
+        "bounds": [
+          5.4,
+          0.0,
+          8.78,
+          5.4,
+          6.45,
+          9.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": 5.4,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.214399,
+        "bounds": [
+          6.78,
+          0.0,
+          6.4,
+          7.0,
+          6.45,
+          6.4
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": 6.4,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.214399,
+        "bounds": [
+          6.78,
+          0.0,
+          7.8,
+          7.0,
+          6.45,
+          7.8
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": 7.8,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.163926,
+        "bounds": [
+          -9.44,
+          3.0988,
+          -6.64,
+          1.4,
+          3.1,
+          6.4187
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.00124979,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 12,
+        "plane_d": 3.0988,
+        "sameFacingArea": 0.460801,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.968001,
+        "bounds": [
+          -4.6,
+          2.2,
+          8.78,
+          -3.5,
+          2.2,
+          9.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 32,
+        "plane_d": 2.2,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.959994,
+        "bounds": [
+          -7.6,
+          5.98,
+          -9.4,
+          7.6,
+          5.98,
+          9.4
+        ],
+        "materials": [
+          "teal-metal",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 32,
+        "plane_d": 5.98,
+        "sameFacingArea": 0.959994,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 0.936002,
+        "bounds": [
+          -7.0,
+          1.0,
+          -9.0,
+          7.0,
+          1.0,
+          9.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 112,
+        "plane_d": 1.0,
+        "sameFacingArea": 0.672002,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 0.820784,
+        "bounds": [
+          -4.0,
+          2.74,
+          18.72,
+          4.0,
+          2.7402,
+          19.04
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.00020003,
+        "min_gap": 0.00020003,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 40,
+        "plane_d": 2.74,
+        "sameFacingArea": 0.820784,
+        "sameFacingPairs": 40
+      },
+      {
+        "area": 0.745603,
+        "bounds": [
+          -7.0,
+          1.05,
+          -9.0,
+          -3.6,
+          1.05,
+          5.6
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 56,
+        "plane_d": 1.05,
+        "sameFacingArea": 0.640003,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 0.691201,
+        "bounds": [
+          0.12,
+          2.8975,
+          5.8263,
+          1.4,
+          2.8975,
+          6.1375
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 12,
+        "plane_d": 2.8975,
+        "sameFacingArea": 0.691201,
+        "sameFacingPairs": 12
+      },
+      {
+        "area": 0.575999,
+        "bounds": [
+          7.0,
+          0.16,
+          0.6,
+          8.6,
+          0.16,
+          7.2
+        ],
+        "materials": [
+          "teal-concrete",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 32,
+        "plane_d": 0.16,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.54,
+        "bounds": [
+          6.71,
+          0.08,
+          4.52,
+          6.71,
+          2.18,
+          5.62
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 6.71,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.54,
+        "bounds": [
+          -5.72,
+          0.08,
+          8.71,
+          -4.62,
+          2.16,
+          8.71
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 8.71,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.54,
+        "bounds": [
+          -3.73,
+          0.06,
+          13.12,
+          -3.73,
+          2.06,
+          14.22
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": -3.73,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.475201,
+        "bounds": [
+          -6.94,
+          3.34,
+          -4.2,
+          6.94,
+          3.34,
+          8.94
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-metal",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 96,
+        "plane_d": 3.34,
+        "sameFacingArea": 0.0504,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 0.460801,
+        "bounds": [
+          0.12,
+          1.69,
+          4.1388,
+          1.4,
+          1.69,
+          4.45
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 1.69,
+        "sameFacingArea": 0.460801,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.460801,
+        "bounds": [
+          0.12,
+          1.8913,
+          4.42,
+          1.4,
+          1.8913,
+          4.7312
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 1.8913,
+        "sameFacingArea": 0.460801,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.460801,
+        "bounds": [
+          0.12,
+          2.0925,
+          4.7013,
+          1.4,
+          2.0925,
+          5.0125
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 2.0925,
+        "sameFacingArea": 0.460801,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.460801,
+        "bounds": [
+          0.12,
+          2.2938,
+          4.9825,
+          1.4,
+          2.2938,
+          5.2937
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 2.2938,
+        "sameFacingArea": 0.460801,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.460801,
+        "bounds": [
+          0.12,
+          2.495,
+          5.2638,
+          1.4,
+          2.495,
+          5.575
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 2.495,
+        "sameFacingArea": 0.460801,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.460801,
+        "bounds": [
+          0.12,
+          2.6962,
+          5.545,
+          1.4,
+          2.6962,
+          5.8562
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 2.6962,
+        "sameFacingArea": 0.460801,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.4608,
+        "bounds": [
+          0.12,
+          0.2812,
+          2.17,
+          1.4,
+          0.2812,
+          2.4813
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 0.2812,
+        "sameFacingArea": 0.4608,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.4608,
+        "bounds": [
+          0.12,
+          0.4825,
+          2.4513,
+          1.4,
+          0.4825,
+          2.7625
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 0.4825,
+        "sameFacingArea": 0.4608,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.4608,
+        "bounds": [
+          0.12,
+          0.6837,
+          2.7325,
+          1.4,
+          0.6837,
+          3.0438
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 0.6837,
+        "sameFacingArea": 0.4608,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.4608,
+        "bounds": [
+          0.12,
+          0.885,
+          3.0138,
+          1.4,
+          0.885,
+          3.325
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 0.885,
+        "sameFacingArea": 0.4608,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.4608,
+        "bounds": [
+          0.12,
+          1.0862,
+          3.295,
+          1.4,
+          1.0862,
+          3.6063
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 1.0862,
+        "sameFacingArea": 0.4608,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.4608,
+        "bounds": [
+          0.12,
+          1.2875,
+          3.5763,
+          1.4,
+          1.2875,
+          3.8875
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 1.2875,
+        "sameFacingArea": 0.4608,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.4608,
+        "bounds": [
+          0.12,
+          1.4887,
+          3.8575,
+          1.4,
+          1.4887,
+          4.1687
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 1.4887,
+        "sameFacingArea": 0.4608,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.3912,
+        "bounds": [
+          7.0,
+          0.0,
+          7.2,
+          8.63,
+          0.16,
+          7.2
+        ],
+        "materials": [
+          "teal-concrete",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 7.2,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.3456,
+        "bounds": [
+          0.12,
+          0.02,
+          2.17,
+          0.12,
+          3.3,
+          6.7
+        ],
+        "materials": [
+          "teal-door",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "pairs": 192,
+        "plane_d": 0.12,
+        "sameFacingArea": 0.3456,
+        "sameFacingPairs": 192
+      },
+      {
+        "area": 0.331194,
+        "bounds": [
+          -2.48,
+          2.55,
+          18.72,
+          2.48,
+          2.55,
+          19.04
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 2.55,
+        "sameFacingArea": 0.331194,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.329603,
+        "bounds": [
+          -7.0,
+          4.2,
+          1.0,
+          4.4,
+          4.2,
+          9.0
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 40,
+        "plane_d": 4.2,
+        "sameFacingArea": 0.224002,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.266402,
+        "bounds": [
+          -6.935,
+          3.34,
+          -3.3,
+          -6.845,
+          5.56,
+          -3.3
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -3.3,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.262802,
+        "bounds": [
+          -6.935,
+          0.12,
+          -3.0,
+          -6.845,
+          2.31,
+          -3.0
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -3.0,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.260398,
+        "bounds": [
+          -3.1,
+          3.34,
+          8.845,
+          -3.1,
+          5.51,
+          8.935
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": -3.1,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.258115,
+        "bounds": [
+          -3.6,
+          1.98,
+          -9.4962,
+          2.0,
+          1.9812,
+          -8.94
+        ],
+        "materials": [
+          "teal-masonry",
+          "teal-siding"
+        ],
+        "max_gap": 0.00119996,
+        "min_gap": 0.00119996,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 16,
+        "plane_d": 1.98,
+        "sameFacingArea": 0.258115,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.207097,
+        "bounds": [
+          2.3,
+          0.0,
+          18.72,
+          2.3,
+          2.7402,
+          19.04
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "pairs": 160,
+        "plane_d": 2.3,
+        "sameFacingArea": 0.193619,
+        "sameFacingPairs": 144
+      },
+      {
+        "area": 0.207097,
+        "bounds": [
+          -2.3,
+          0.0,
+          18.72,
+          -2.3,
+          2.7402,
+          19.04
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 160,
+        "plane_d": -2.3,
+        "sameFacingArea": 0.193619,
+        "sameFacingPairs": 144
+      },
+      {
+        "area": 0.158401,
+        "bounds": [
+          -6.94,
+          0.12,
+          -3.9,
+          -6.84,
+          0.12,
+          -2.1
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-metal",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 32,
+        "plane_d": 0.12,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.150147,
+        "bounds": [
+          -7.0,
+          0.3,
+          -9.3803,
+          7.0,
+          0.3,
+          -8.94
+        ],
+        "materials": [
+          "teal-masonry",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 24,
+        "plane_d": 0.3,
+        "sameFacingArea": 0.150147,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 0.128,
+        "bounds": [
+          -4.0,
+          0.0,
+          18.8,
+          4.0,
+          3.5,
+          18.8
+        ],
+        "materials": [
+          "teal-metal",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 32,
+        "plane_d": 18.8,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.122087,
+        "bounds": [
+          -7.5223,
+          6.3223,
+          -9.4002,
+          0.0223,
+          8.1,
+          -9.4
+        ],
+        "materials": [
+          "teal-masonry",
+          "teal-trim"
+        ],
+        "max_gap": 0.00018787,
+        "min_gap": 0.00018787,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 12,
+        "plane_d": -9.4002,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.117601,
+        "bounds": [
+          -6.925,
+          1.04,
+          -8.925,
+          6.925,
+          1.04,
+          8.925
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 56,
+        "plane_d": 1.04,
+        "sameFacingArea": 0.117601,
+        "sameFacingPairs": 56
+      },
+      {
+        "area": 0.117601,
+        "bounds": [
+          -6.925,
+          5.56,
+          -8.925,
+          4.56,
+          5.56,
+          8.925
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 56,
+        "plane_d": 5.56,
+        "sameFacingArea": 0.117601,
+        "sameFacingPairs": 56
+      },
+      {
+        "area": 0.115198,
+        "bounds": [
+          -4.6,
+          3.2,
+          8.72,
+          4.4,
+          3.2004,
+          19.34
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.00040007,
+        "min_gap": 0.00040007,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 16,
+        "plane_d": 3.2,
+        "sameFacingArea": 0.115198,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.1056,
+        "bounds": [
+          6.78,
+          4.1,
+          -6.6,
+          7.0,
+          4.1,
+          -1.4
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 32,
+        "plane_d": 4.1,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.067201,
+        "bounds": [
+          -6.925,
+          4.19,
+          -8.925,
+          4.56,
+          4.19,
+          7.56
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 32,
+        "plane_d": 4.19,
+        "sameFacingArea": 0.067201,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 0.0672,
+        "bounds": [
+          -6.925,
+          2.31,
+          -7.56,
+          6.925,
+          2.31,
+          8.925
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 32,
+        "plane_d": 2.31,
+        "sameFacingArea": 0.0672,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 0.0528,
+        "bounds": [
+          6.78,
+          0.6,
+          4.72,
+          7.0,
+          0.6,
+          5.12
+        ],
+        "materials": [
+          "teal-siding",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": 0.6,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.0504,
+        "bounds": [
+          6.855,
+          5.61,
+          -6.56,
+          6.925,
+          5.61,
+          4.5
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 24,
+        "plane_d": 5.61,
+        "sameFacingArea": 0.0504,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          6.855,
+          2.41,
+          -6.56,
+          6.925,
+          2.41,
+          -2.64
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": 2.41,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          6.855,
+          1.04,
+          -6.56,
+          6.925,
+          5.61,
+          -6.56
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": -6.56,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          6.855,
+          4.14,
+          -6.56,
+          6.925,
+          4.14,
+          -1.44
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 16,
+        "plane_d": 4.14,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          -6.925,
+          2.26,
+          -8.925,
+          -3.64,
+          2.26,
+          5.56
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": 2.26,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          -6.925,
+          1.09,
+          -8.925,
+          -3.64,
+          1.09,
+          5.56
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 16,
+        "plane_d": 1.09,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          -6.925,
+          4.24,
+          1.04,
+          4.36,
+          4.24,
+          8.925
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 16,
+        "plane_d": 4.24,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          2.04,
+          2.36,
+          -8.925,
+          4.56,
+          2.36,
+          -8.855
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": 2.36,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          4.56,
+          1.04,
+          -8.925,
+          4.56,
+          5.56,
+          -8.855
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": 4.56,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          -3.64,
+          1.09,
+          -8.925,
+          -3.64,
+          5.56,
+          -8.855
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": -3.64,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          -3.935,
+          2.16,
+          14.54,
+          3.935,
+          2.16,
+          16.76
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": 2.16,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          -3.935,
+          1.24,
+          14.54,
+          3.935,
+          1.24,
+          16.76
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 16,
+        "plane_d": 1.24,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          6.855,
+          1.04,
+          -2.64,
+          6.925,
+          2.41,
+          -2.64
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -2.64,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          6.855,
+          0.64,
+          5.08,
+          6.925,
+          2.18,
+          5.08
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 5.08,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          6.855,
+          0.64,
+          4.76,
+          6.925,
+          2.18,
+          4.76
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 4.76,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          6.855,
+          1.04,
+          7.76,
+          6.925,
+          2.31,
+          7.76
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 7.76,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          6.855,
+          1.04,
+          6.44,
+          6.925,
+          2.31,
+          6.44
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 6.44,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          6.855,
+          4.14,
+          -4.64,
+          6.925,
+          5.61,
+          -4.64
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -4.64,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          6.855,
+          4.14,
+          -1.44,
+          6.925,
+          5.61,
+          -1.44
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -1.44,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          6.855,
+          4.14,
+          -3.36,
+          6.925,
+          5.61,
+          -3.36
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -3.36,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -6.925,
+          1.04,
+          -6.04,
+          -6.855,
+          2.31,
+          -6.04
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -6.04,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -6.925,
+          1.04,
+          -7.56,
+          -6.855,
+          2.31,
+          -7.56
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -7.56,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -6.925,
+          1.09,
+          5.56,
+          -6.855,
+          2.26,
+          5.56
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 5.56,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -6.925,
+          1.09,
+          3.64,
+          -6.855,
+          2.26,
+          3.64
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 3.64,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -6.925,
+          4.19,
+          -6.24,
+          -6.855,
+          5.56,
+          -6.24
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -6.24,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -6.925,
+          4.19,
+          -7.76,
+          -6.855,
+          5.56,
+          -7.76
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -7.76,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -6.925,
+          4.24,
+          2.36,
+          -6.855,
+          5.56,
+          2.36
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 2.36,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -6.925,
+          4.24,
+          1.04,
+          -6.855,
+          5.56,
+          1.04
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 1.04,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -6.925,
+          4.19,
+          7.56,
+          -6.855,
+          5.56,
+          7.56
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 7.56,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -6.925,
+          4.19,
+          6.04,
+          -6.855,
+          5.56,
+          6.04
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 6.04,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          2.04,
+          1.04,
+          -8.925,
+          2.04,
+          2.36,
+          -8.855
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": 2.04,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -5.56,
+          1.09,
+          -8.925,
+          -5.56,
+          2.26,
+          -8.855
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": -5.56,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          2.44,
+          4.19,
+          -8.925,
+          2.44,
+          5.56,
+          -8.855
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": 2.44,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -5.36,
+          4.19,
+          -8.925,
+          -5.36,
+          5.56,
+          -8.855
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": -5.36,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          5.36,
+          1.04,
+          8.855,
+          5.36,
+          2.31,
+          8.925
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 5.36,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          3.44,
+          1.04,
+          8.855,
+          3.44,
+          2.31,
+          8.925
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": 3.44,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -3.96,
+          5.51,
+          8.855,
+          -3.1,
+          5.51,
+          8.925
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 5.51,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          4.36,
+          4.24,
+          8.855,
+          4.36,
+          5.56,
+          8.925
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 4.36,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          2.64,
+          4.24,
+          8.855,
+          2.64,
+          5.56,
+          8.925
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": 2.64,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -3.935,
+          1.24,
+          16.76,
+          -3.865,
+          2.16,
+          16.76
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 16.76,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -3.935,
+          1.24,
+          15.54,
+          -3.865,
+          2.16,
+          15.54
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 15.54,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          3.865,
+          1.24,
+          15.96,
+          3.935,
+          2.16,
+          15.96
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 15.96,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          3.865,
+          1.24,
+          14.54,
+          3.935,
+          2.16,
+          14.54
+        ],
+        "materials": [
+          "teal-glass",
+          "teal-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 14.54,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      }
+    ],
+    "sameFacingArea": 1222.267412,
+    "sameFacingByMaterialPair": {
+      "concrete+siding": 393.726314,
+      "concrete+trim": 89.756878,
+      "door+metal": 0.0896,
+      "door+siding": 14.034238,
+      "door+trim": 66.006403,
+      "glass+trim": 1.377608,
+      "masonry+siding": 5.989533,
+      "masonry+trim": 0.150147,
+      "metal+siding": 148.348744,
+      "metal+trim": 20.419085,
+      "shingle+siding": 6.751993,
+      "shingle+trim": 7.524474,
+      "siding+trim": 468.092396
+    },
+    "sameFacingPairs": 12509,
+    "triangles": 37944
+  },
+  "yellow": {
+    "bytes": 5644860,
+    "coincidentPairs": 33547,
+    "conflictArea": 6391.799547,
+    "conflictPairs": 33615,
+    "conflictRegions": 173,
+    "epsilon": 0.0015,
+    "glb": "house-yellow-shell.glb",
+    "oppositeFacingPairs": 21186,
+    "regions": [
+      {
+        "area": 1078.741211,
+        "bounds": [
+          7.0,
+          -0.42,
+          -9.4,
+          7.0,
+          6.45,
+          9.4
+        ],
+        "materials": [
+          "yellow-concrete",
+          "yellow-door",
+          "yellow-metal",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          0.0
+        ],
+        "pairs": 3840,
+        "plane_d": 7.0,
+        "sameFacingArea": 429.89719,
+        "sameFacingPairs": 2208
+      },
+      {
+        "area": 1015.487121,
+        "bounds": [
+          -7.0,
+          0.02,
+          -9.3369,
+          7.0,
+          0.02,
+          9.0
+        ],
+        "materials": [
+          "yellow-concrete",
+          "yellow-door",
+          "yellow-masonry",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 408,
+        "plane_d": 0.02,
+        "sameFacingArea": 22.499999,
+        "sameFacingPairs": 128
+      },
+      {
+        "area": 777.196612,
+        "bounds": [
+          -6.78,
+          0.0,
+          -9.0,
+          -6.78,
+          6.45,
+          9.0
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 792,
+        "plane_d": -6.78,
+        "sameFacingArea": 26.039999,
+        "sameFacingPairs": 40
+      },
+      {
+        "area": 689.484782,
+        "bounds": [
+          -7.0,
+          0.0,
+          8.78,
+          7.0,
+          7.5945,
+          8.78
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-shingle",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 960,
+        "plane_d": 8.78,
+        "sameFacingArea": 55.752794,
+        "sameFacingPairs": 104
+      },
+      {
+        "area": 499.004375,
+        "bounds": [
+          -7.0,
+          -0.42,
+          -9.0,
+          7.0,
+          7.5945,
+          -9.0
+        ],
+        "materials": [
+          "yellow-concrete",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 1632,
+        "plane_d": -9.0,
+        "sameFacingArea": 170.551991,
+        "sameFacingPairs": 560
+      },
+      {
+        "area": 380.528059,
+        "bounds": [
+          -4.22,
+          3.5,
+          8.78,
+          4.22,
+          3.5,
+          19.28
+        ],
+        "materials": [
+          "yellow-shingle",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 272,
+        "plane_d": 3.5,
+        "sameFacingArea": 2.015999,
+        "sameFacingPairs": 88
+      },
+      {
+        "area": 349.848543,
+        "bounds": [
+          -7.0,
+          -0.42,
+          -9.4,
+          -7.0,
+          6.45,
+          9.4
+        ],
+        "materials": [
+          "yellow-concrete",
+          "yellow-door",
+          "yellow-metal",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 3192,
+        "plane_d": -7.0,
+        "sameFacingArea": 219.948792,
+        "sameFacingPairs": 2168
+      },
+      {
+        "area": 257.684574,
+        "bounds": [
+          -7.0,
+          -0.42,
+          9.0,
+          7.0,
+          7.5945,
+          9.0
+        ],
+        "materials": [
+          "yellow-concrete",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 1864,
+        "plane_d": 9.0,
+        "sameFacingArea": 95.155298,
+        "sameFacingPairs": 896
+      },
+      {
+        "area": 230.59242,
+        "bounds": [
+          4.0,
+          -0.42,
+          7.6,
+          4.0,
+          6.45,
+          19.0
+        ],
+        "materials": [
+          "yellow-concrete",
+          "yellow-door",
+          "yellow-metal",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 1304,
+        "plane_d": 4.0,
+        "sameFacingArea": 68.634521,
+        "sameFacingPairs": 168
+      },
+      {
+        "area": 129.298251,
+        "bounds": [
+          -7.018,
+          0.0,
+          -9.0,
+          -7.018,
+          5.9406,
+          9.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          0.0
+        ],
+        "pairs": 2112,
+        "plane_d": -7.018,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 112.846421,
+        "bounds": [
+          7.018,
+          0.0,
+          -9.0,
+          7.018,
+          5.7882,
+          9.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 2040,
+        "plane_d": 7.018,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 106.590188,
+        "bounds": [
+          -7.0,
+          0.9144,
+          -9.018,
+          7.0,
+          5.7882,
+          -9.018
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 1704,
+        "plane_d": -9.018,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 89.633348,
+        "bounds": [
+          -7.0,
+          0.0,
+          9.018,
+          7.0,
+          5.7882,
+          9.018
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 1200,
+        "plane_d": 9.018,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 69.589709,
+        "bounds": [
+          -7.0,
+          0.0,
+          -8.78,
+          7.0,
+          7.5945,
+          -8.78
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 272,
+        "plane_d": -8.78,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 55.93919,
+        "bounds": [
+          7.0,
+          3.18,
+          -6.64,
+          9.44,
+          3.18,
+          -0.76
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 24,
+        "plane_d": 3.18,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 54.33424,
+        "bounds": [
+          -4.0,
+          -0.42,
+          19.0,
+          4.0,
+          3.5,
+          19.0
+        ],
+        "materials": [
+          "yellow-concrete",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 400,
+        "plane_d": 19.0,
+        "sameFacingArea": 5.599998,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 49.816023,
+        "bounds": [
+          -4.0,
+          -0.42,
+          9.0,
+          -4.0,
+          3.5,
+          19.0
+        ],
+        "materials": [
+          "yellow-concrete",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 216,
+        "plane_d": -4.0,
+        "sameFacingArea": 2.632023,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 45.877214,
+        "bounds": [
+          -7.08,
+          6.45,
+          -9.08,
+          7.08,
+          6.45,
+          9.08
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 1032,
+        "plane_d": 6.45,
+        "sameFacingArea": 45.877214,
+        "sameFacingPairs": 1032
+      },
+      {
+        "area": 41.220484,
+        "bounds": [
+          -4.0,
+          0.0,
+          19.018,
+          4.0,
+          2.7402,
+          19.018
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 320,
+        "plane_d": 19.018,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 41.18401,
+        "bounds": [
+          -8.6,
+          3.24,
+          0.6,
+          -7.0,
+          3.24,
+          7.2
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 3.24,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 38.102243,
+        "bounds": [
+          4.018,
+          0.0,
+          9.0,
+          4.018,
+          2.4354,
+          19.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 496,
+        "plane_d": 4.018,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 13.975237,
+        "bounds": [
+          -8.6,
+          0.0,
+          -10.0,
+          7.0,
+          0.0,
+          19.04
+        ],
+        "materials": [
+          "yellow-concrete",
+          "yellow-masonry",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 352,
+        "plane_d": 0.0,
+        "sameFacingArea": 13.975237,
+        "sameFacingPairs": 352
+      },
+      {
+        "area": 13.322021,
+        "bounds": [
+          -4.018,
+          1.0668,
+          9.0,
+          -4.018,
+          2.4354,
+          19.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          0.0
+        ],
+        "pairs": 224,
+        "plane_d": -4.018,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 12.846413,
+        "bounds": [
+          -4.6,
+          5.6,
+          -9.0,
+          7.0,
+          5.6,
+          9.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 256,
+        "plane_d": 5.6,
+        "sameFacingArea": 1.664011,
+        "sameFacingPairs": 64
+      },
+      {
+        "area": 10.334404,
+        "bounds": [
+          -8.6,
+          3.3,
+          -8.78,
+          9.4,
+          3.3,
+          9.0
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-metal",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 1600,
+        "plane_d": 3.3,
+        "sameFacingArea": 2.984004,
+        "sameFacingPairs": 256
+      },
+      {
+        "area": 7.955237,
+        "bounds": [
+          -7.0,
+          0.0,
+          3.6,
+          7.0,
+          6.45,
+          3.6
+        ],
+        "materials": [
+          "yellow-metal",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 104,
+        "plane_d": 3.6,
+        "sameFacingArea": 1.88002,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 7.493602,
+        "bounds": [
+          -4.6,
+          0.0,
+          -9.0,
+          -4.6,
+          6.45,
+          -8.74
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 112,
+        "plane_d": -4.6,
+        "sameFacingArea": 1.607998,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 7.456002,
+        "bounds": [
+          3.6,
+          0.0,
+          -9.0,
+          3.6,
+          6.45,
+          -8.74
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 112,
+        "plane_d": 3.6,
+        "sameFacingArea": 1.631998,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 6.739205,
+        "bounds": [
+          -7.0,
+          2.35,
+          -7.6,
+          7.0,
+          2.35,
+          9.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 152,
+        "plane_d": 2.35,
+        "sameFacingArea": 0.544006,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 6.263234,
+        "bounds": [
+          6.74,
+          0.0,
+          -4.2,
+          7.0,
+          6.45,
+          -4.2
+        ],
+        "materials": [
+          "yellow-metal",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 88,
+        "plane_d": -4.2,
+        "sameFacingArea": 1.712019,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 5.8664,
+        "bounds": [
+          -2.0,
+          0.0,
+          -9.0,
+          -2.0,
+          6.45,
+          -8.74
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 72,
+        "plane_d": -2.0,
+        "sameFacingArea": 1.839998,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 5.838439,
+        "bounds": [
+          6.74,
+          0.0,
+          -6.0,
+          7.0,
+          6.45,
+          -6.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 72,
+        "plane_d": -6.0,
+        "sameFacingArea": 1.84802,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 5.828839,
+        "bounds": [
+          6.74,
+          0.0,
+          5.6,
+          7.0,
+          6.45,
+          5.6
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 72,
+        "plane_d": 5.6,
+        "sameFacingArea": 1.86402,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 5.828799,
+        "bounds": [
+          5.6,
+          0.0,
+          -9.0,
+          5.6,
+          6.45,
+          -8.74
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 72,
+        "plane_d": 5.6,
+        "sameFacingArea": 1.863998,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 5.762402,
+        "bounds": [
+          -7.0,
+          0.08,
+          -8.78,
+          7.0,
+          0.08,
+          9.0
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-metal",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 152,
+        "plane_d": 0.08,
+        "sameFacingArea": 2.319204,
+        "sameFacingPairs": 56
+      },
+      {
+        "area": 5.755238,
+        "bounds": [
+          6.74,
+          0.0,
+          -7.8,
+          7.0,
+          6.45,
+          -7.8
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 72,
+        "plane_d": -7.8,
+        "sameFacingArea": 1.83202,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 5.755238,
+        "bounds": [
+          6.74,
+          0.0,
+          6.0,
+          7.0,
+          6.45,
+          6.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 72,
+        "plane_d": 6.0,
+        "sameFacingArea": 1.83202,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 5.755238,
+        "bounds": [
+          6.74,
+          0.0,
+          7.6,
+          7.0,
+          6.45,
+          7.6
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 72,
+        "plane_d": 7.6,
+        "sameFacingArea": 1.83202,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 5.727238,
+        "bounds": [
+          6.74,
+          0.0,
+          1.0,
+          7.0,
+          6.45,
+          1.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 72,
+        "plane_d": 1.0,
+        "sameFacingArea": 1.84002,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 5.727238,
+        "bounds": [
+          6.74,
+          0.0,
+          2.4,
+          7.0,
+          6.45,
+          2.4
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 72,
+        "plane_d": 2.4,
+        "sameFacingArea": 1.84002,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 5.531875,
+        "bounds": [
+          6.74,
+          0.0,
+          -2.1,
+          7.0,
+          6.45,
+          -2.1
+        ],
+        "materials": [
+          "yellow-metal",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 88,
+        "plane_d": -2.1,
+        "sameFacingArea": 1.716819,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 5.299483,
+        "bounds": [
+          -7.534,
+          6.3223,
+          -9.4,
+          7.534,
+          8.16,
+          -9.4
+        ],
+        "materials": [
+          "yellow-shingle",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 1281,
+        "plane_d": -9.4,
+        "sameFacingArea": 4.190684,
+        "sameFacingPairs": 1263
+      },
+      {
+        "area": 4.983994,
+        "bounds": [
+          -7.0,
+          5.65,
+          -6.6,
+          -6.78,
+          5.65,
+          5.4
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 104,
+        "plane_d": 5.65,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 4.830398,
+        "bounds": [
+          5.4,
+          0.0,
+          -9.0,
+          5.4,
+          6.45,
+          -8.74
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 104,
+        "plane_d": 5.4,
+        "sameFacingArea": 1.431999,
+        "sameFacingPairs": 40
+      },
+      {
+        "area": 4.768012,
+        "bounds": [
+          -4.22,
+          3.28,
+          8.78,
+          4.22,
+          3.28,
+          19.28
+        ],
+        "materials": [
+          "yellow-metal",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 24,
+        "plane_d": 3.28,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 4.758436,
+        "bounds": [
+          6.74,
+          0.0,
+          -6.2,
+          7.0,
+          6.45,
+          -6.2
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 104,
+        "plane_d": -6.2,
+        "sameFacingArea": 1.400015,
+        "sameFacingPairs": 40
+      },
+      {
+        "area": 4.718398,
+        "bounds": [
+          -2.4,
+          0.0,
+          -9.0,
+          -2.4,
+          6.45,
+          -8.74
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 104,
+        "plane_d": -2.4,
+        "sameFacingArea": 1.383999,
+        "sameFacingPairs": 40
+      },
+      {
+        "area": 4.677626,
+        "bounds": [
+          6.74,
+          0.0,
+          -2.4,
+          7.0,
+          6.45,
+          -2.4
+        ],
+        "materials": [
+          "yellow-metal",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 120,
+        "plane_d": -2.4,
+        "sameFacingArea": 0.985611,
+        "sameFacingPairs": 48
+      },
+      {
+        "area": 4.646436,
+        "bounds": [
+          6.74,
+          0.0,
+          -7.6,
+          7.0,
+          6.45,
+          -7.6
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 104,
+        "plane_d": -7.6,
+        "sameFacingArea": 1.384015,
+        "sameFacingPairs": 40
+      },
+      {
+        "area": 4.361604,
+        "bounds": [
+          3.6,
+          2.3,
+          -9.0,
+          7.0,
+          2.3,
+          5.6
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 80,
+        "plane_d": 2.3,
+        "sameFacingArea": 0.640003,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 4.059859,
+        "bounds": [
+          6.74,
+          0.0,
+          -3.9,
+          7.0,
+          6.45,
+          -3.9
+        ],
+        "materials": [
+          "yellow-metal",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 120,
+        "plane_d": -3.9,
+        "sameFacingArea": 0.980811,
+        "sameFacingPairs": 48
+      },
+      {
+        "area": 3.532989,
+        "bounds": [
+          -7.534,
+          6.3223,
+          9.4,
+          7.534,
+          8.16,
+          9.4
+        ],
+        "materials": [
+          "yellow-shingle",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 854,
+        "plane_d": 9.4,
+        "sameFacingArea": 2.79379,
+        "sameFacingPairs": 842
+      },
+      {
+        "area": 3.380795,
+        "bounds": [
+          -7.0,
+          2.45,
+          -6.6,
+          -6.78,
+          2.45,
+          -2.6
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 40,
+        "plane_d": 2.45,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 3.080033,
+        "bounds": [
+          -7.6,
+          5.98,
+          -9.4,
+          -7.6,
+          6.41,
+          9.4
+        ],
+        "materials": [
+          "yellow-metal",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 24,
+        "plane_d": -7.6,
+        "sameFacingArea": 0.072,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 3.080033,
+        "bounds": [
+          7.6,
+          5.98,
+          -9.4,
+          7.6,
+          6.41,
+          9.4
+        ],
+        "materials": [
+          "yellow-metal",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          0.0
+        ],
+        "pairs": 24,
+        "plane_d": 7.6,
+        "sameFacingArea": 0.072,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 2.881603,
+        "bounds": [
+          -4.6,
+          2.4,
+          -9.0,
+          -2.0,
+          2.4,
+          -8.74
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 48,
+        "plane_d": 2.4,
+        "sameFacingArea": 0.416,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 2.692798,
+        "bounds": [
+          -7.0,
+          0.0,
+          -6.6,
+          -6.78,
+          6.45,
+          -6.6
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 32,
+        "plane_d": -6.6,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 2.182,
+        "bounds": [
+          -7.0,
+          0.0,
+          4.5,
+          -6.78,
+          5.61,
+          4.5
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 24,
+        "plane_d": 4.5,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 2.126398,
+        "bounds": [
+          -7.0,
+          0.0,
+          5.4,
+          -6.78,
+          6.45,
+          5.4
+        ],
+        "materials": [
+          "yellow-metal",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 32,
+        "plane_d": 5.4,
+        "sameFacingArea": 0.016,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 2.099998,
+        "bounds": [
+          -4.22,
+          3.2,
+          8.72,
+          -4.22,
+          3.56,
+          19.34
+        ],
+        "materials": [
+          "yellow-shingle",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": -4.22,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 2.099998,
+        "bounds": [
+          4.22,
+          3.2,
+          8.72,
+          4.22,
+          3.56,
+          19.34
+        ],
+        "materials": [
+          "yellow-shingle",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": 4.22,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 2.038403,
+        "bounds": [
+          2.2,
+          0.0,
+          8.78,
+          2.2,
+          6.45,
+          9.0
+        ],
+        "materials": [
+          "yellow-metal",
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 32,
+        "plane_d": 2.2,
+        "sameFacingArea": 0.016,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 1.909598,
+        "bounds": [
+          -7.0,
+          0.0,
+          3.4,
+          -6.78,
+          6.45,
+          3.4
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": 3.4,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.892002,
+        "bounds": [
+          3.5,
+          0.0,
+          8.78,
+          3.5,
+          3.3,
+          9.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": 3.5,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.892002,
+        "bounds": [
+          4.6,
+          0.0,
+          8.78,
+          4.6,
+          6.45,
+          9.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": 4.6,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.687998,
+        "bounds": [
+          -4.28,
+          3.2,
+          19.28,
+          4.28,
+          3.56,
+          19.28
+        ],
+        "materials": [
+          "yellow-shingle",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 19.28,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.583998,
+        "bounds": [
+          -8.6,
+          3.06,
+          0.54,
+          -8.6,
+          3.32,
+          7.26
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": -8.6,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.550401,
+        "bounds": [
+          2.2,
+          5.55,
+          8.78,
+          4.0,
+          5.55,
+          9.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 32,
+        "plane_d": 5.55,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.5424,
+        "bounds": [
+          -4.28,
+          3.2,
+          19.34,
+          4.28,
+          3.56,
+          19.34
+        ],
+        "materials": [
+          "yellow-metal",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 24,
+        "plane_d": 19.34,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.451999,
+        "bounds": [
+          -7.0,
+          0.0,
+          4.72,
+          -6.78,
+          3.3,
+          4.72
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": 4.72,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.451999,
+        "bounds": [
+          -7.0,
+          0.0,
+          5.12,
+          -6.78,
+          3.3,
+          5.12
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": 5.12,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.390399,
+        "bounds": [
+          -7.0,
+          2.45,
+          -4.6,
+          -6.78,
+          6.45,
+          -4.6
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": -4.6,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.390399,
+        "bounds": [
+          -7.0,
+          2.45,
+          -3.4,
+          -6.78,
+          6.45,
+          -3.4
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": -3.4,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.390399,
+        "bounds": [
+          -7.0,
+          0.0,
+          -1.4,
+          -6.78,
+          6.45,
+          -1.4
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": -1.4,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.363206,
+        "bounds": [
+          -4.6,
+          4.15,
+          -9.0,
+          7.0,
+          4.15,
+          7.6
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 104,
+        "plane_d": 4.15,
+        "sameFacingArea": 1.152005,
+        "sameFacingPairs": 40
+      },
+      {
+        "area": 1.353598,
+        "bounds": [
+          -7.0,
+          2.22,
+          3.4,
+          -6.78,
+          2.22,
+          5.12
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 56,
+        "plane_d": 2.22,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.302399,
+        "bounds": [
+          -7.0,
+          0.0,
+          -2.6,
+          -6.78,
+          4.1,
+          -2.6
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": -2.6,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.2936,
+        "bounds": [
+          -1.55,
+          0.02,
+          6.7,
+          -0.08,
+          3.3,
+          6.7
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 6.7,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.2888,
+        "bounds": [
+          -4.0,
+          0.06,
+          9.0,
+          4.0,
+          0.06,
+          19.0
+        ],
+        "materials": [
+          "yellow-concrete",
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 32,
+        "plane_d": 0.06,
+        "sameFacingArea": 0.9328,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 1.258401,
+        "bounds": [
+          -2.6,
+          0.0,
+          8.78,
+          -2.6,
+          6.45,
+          9.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": -2.6,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.258401,
+        "bounds": [
+          -4.4,
+          2.35,
+          8.78,
+          -4.4,
+          6.45,
+          9.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": -4.4,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.214401,
+        "bounds": [
+          -3.4,
+          0.0,
+          8.78,
+          -3.4,
+          4.2,
+          9.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": -3.4,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.214401,
+        "bounds": [
+          -5.4,
+          0.0,
+          8.78,
+          -5.4,
+          6.45,
+          9.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": -5.4,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.214399,
+        "bounds": [
+          -7.0,
+          0.0,
+          6.4,
+          -6.78,
+          6.45,
+          6.4
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": 6.4,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.214399,
+        "bounds": [
+          -7.0,
+          0.0,
+          7.8,
+          -6.78,
+          6.45,
+          7.8
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": 7.8,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 1.163926,
+        "bounds": [
+          -1.4,
+          3.0988,
+          -6.64,
+          9.44,
+          3.1,
+          6.4187
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.00124979,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 12,
+        "plane_d": 3.0988,
+        "sameFacingArea": 0.460801,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.968001,
+        "bounds": [
+          3.5,
+          2.2,
+          8.78,
+          4.6,
+          2.2,
+          9.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 32,
+        "plane_d": 2.2,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.959994,
+        "bounds": [
+          -7.6,
+          5.98,
+          -9.4,
+          7.6,
+          5.98,
+          9.4
+        ],
+        "materials": [
+          "yellow-metal",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 32,
+        "plane_d": 5.98,
+        "sameFacingArea": 0.959994,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 0.936002,
+        "bounds": [
+          -7.0,
+          1.0,
+          -9.0,
+          7.0,
+          1.0,
+          9.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 112,
+        "plane_d": 1.0,
+        "sameFacingArea": 0.672002,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 0.820784,
+        "bounds": [
+          -4.0,
+          2.74,
+          18.72,
+          4.0,
+          2.7402,
+          19.04
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.00020003,
+        "min_gap": 0.00020003,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 40,
+        "plane_d": 2.74,
+        "sameFacingArea": 0.820784,
+        "sameFacingPairs": 40
+      },
+      {
+        "area": 0.745603,
+        "bounds": [
+          3.6,
+          1.05,
+          -9.0,
+          7.0,
+          1.05,
+          5.6
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 56,
+        "plane_d": 1.05,
+        "sameFacingArea": 0.640003,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 0.691201,
+        "bounds": [
+          -1.4,
+          2.8975,
+          5.8263,
+          -0.12,
+          2.8975,
+          6.1375
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 12,
+        "plane_d": 2.8975,
+        "sameFacingArea": 0.691201,
+        "sameFacingPairs": 12
+      },
+      {
+        "area": 0.575999,
+        "bounds": [
+          -8.6,
+          0.16,
+          0.6,
+          -7.0,
+          0.16,
+          7.2
+        ],
+        "materials": [
+          "yellow-concrete",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 32,
+        "plane_d": 0.16,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.54,
+        "bounds": [
+          -6.71,
+          0.08,
+          4.52,
+          -6.71,
+          2.18,
+          5.62
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": -6.71,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.54,
+        "bounds": [
+          4.62,
+          0.08,
+          8.71,
+          5.72,
+          2.16,
+          8.71
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 8.71,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.54,
+        "bounds": [
+          3.73,
+          0.06,
+          13.12,
+          3.73,
+          2.06,
+          14.22
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": 3.73,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.475201,
+        "bounds": [
+          -6.94,
+          3.34,
+          -4.2,
+          6.94,
+          3.34,
+          8.94
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-metal",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 96,
+        "plane_d": 3.34,
+        "sameFacingArea": 0.0504,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 0.460801,
+        "bounds": [
+          -1.4,
+          1.69,
+          4.1388,
+          -0.12,
+          1.69,
+          4.45
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 1.69,
+        "sameFacingArea": 0.460801,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.460801,
+        "bounds": [
+          -1.4,
+          1.8913,
+          4.42,
+          -0.12,
+          1.8913,
+          4.7312
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 1.8913,
+        "sameFacingArea": 0.460801,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.460801,
+        "bounds": [
+          -1.4,
+          2.0925,
+          4.7013,
+          -0.12,
+          2.0925,
+          5.0125
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 2.0925,
+        "sameFacingArea": 0.460801,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.460801,
+        "bounds": [
+          -1.4,
+          2.2938,
+          4.9825,
+          -0.12,
+          2.2938,
+          5.2937
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 2.2938,
+        "sameFacingArea": 0.460801,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.460801,
+        "bounds": [
+          -1.4,
+          2.495,
+          5.2638,
+          -0.12,
+          2.495,
+          5.575
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 2.495,
+        "sameFacingArea": 0.460801,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.460801,
+        "bounds": [
+          -1.4,
+          2.6962,
+          5.545,
+          -0.12,
+          2.6962,
+          5.8562
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 2.6962,
+        "sameFacingArea": 0.460801,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.4608,
+        "bounds": [
+          -1.4,
+          0.2812,
+          2.17,
+          -0.12,
+          0.2812,
+          2.4813
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 0.2812,
+        "sameFacingArea": 0.4608,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.4608,
+        "bounds": [
+          -1.4,
+          0.4825,
+          2.4513,
+          -0.12,
+          0.4825,
+          2.7625
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 0.4825,
+        "sameFacingArea": 0.4608,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.4608,
+        "bounds": [
+          -1.4,
+          0.6837,
+          2.7325,
+          -0.12,
+          0.6837,
+          3.0438
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 0.6837,
+        "sameFacingArea": 0.4608,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.4608,
+        "bounds": [
+          -1.4,
+          0.885,
+          3.0138,
+          -0.12,
+          0.885,
+          3.325
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 0.885,
+        "sameFacingArea": 0.4608,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.4608,
+        "bounds": [
+          -1.4,
+          1.0862,
+          3.295,
+          -0.12,
+          1.0862,
+          3.6063
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 1.0862,
+        "sameFacingArea": 0.4608,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.4608,
+        "bounds": [
+          -1.4,
+          1.2875,
+          3.5763,
+          -0.12,
+          1.2875,
+          3.8875
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 1.2875,
+        "sameFacingArea": 0.4608,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.4608,
+        "bounds": [
+          -1.4,
+          1.4887,
+          3.8575,
+          -0.12,
+          1.4887,
+          4.1687
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 1.4887,
+        "sameFacingArea": 0.4608,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.3912,
+        "bounds": [
+          -8.63,
+          0.0,
+          7.2,
+          -7.0,
+          0.16,
+          7.2
+        ],
+        "materials": [
+          "yellow-concrete",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 7.2,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.331194,
+        "bounds": [
+          -2.48,
+          2.55,
+          18.72,
+          2.48,
+          2.55,
+          19.04
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 2.55,
+        "sameFacingArea": 0.331194,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.329603,
+        "bounds": [
+          -4.4,
+          4.2,
+          1.0,
+          7.0,
+          4.2,
+          9.0
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 40,
+        "plane_d": 4.2,
+        "sameFacingArea": 0.224002,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.266402,
+        "bounds": [
+          6.845,
+          3.34,
+          -3.3,
+          6.935,
+          5.56,
+          -3.3
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -3.3,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.262802,
+        "bounds": [
+          6.845,
+          0.12,
+          -3.0,
+          6.935,
+          2.31,
+          -3.0
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -3.0,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.261082,
+        "bounds": [
+          -7.0,
+          0.3,
+          -9.4709,
+          7.0,
+          0.3,
+          -8.9577
+        ],
+        "materials": [
+          "yellow-masonry",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 16,
+        "plane_d": 0.3,
+        "sameFacingArea": 0.261082,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.260398,
+        "bounds": [
+          3.1,
+          3.34,
+          8.845,
+          3.1,
+          5.51,
+          8.935
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": 3.1,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.2304,
+        "bounds": [
+          -0.12,
+          0.02,
+          2.17,
+          -0.12,
+          3.3,
+          6.7
+        ],
+        "materials": [
+          "yellow-door",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          0.0
+        ],
+        "pairs": 128,
+        "plane_d": -0.12,
+        "sameFacingArea": 0.2304,
+        "sameFacingPairs": 128
+      },
+      {
+        "area": 0.207097,
+        "bounds": [
+          -2.3,
+          0.0,
+          18.72,
+          -2.3,
+          2.7402,
+          19.04
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          0.0
+        ],
+        "pairs": 160,
+        "plane_d": -2.3,
+        "sameFacingArea": 0.193619,
+        "sameFacingPairs": 144
+      },
+      {
+        "area": 0.207097,
+        "bounds": [
+          2.3,
+          0.0,
+          18.72,
+          2.3,
+          2.7402,
+          19.04
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 160,
+        "plane_d": 2.3,
+        "sameFacingArea": 0.193619,
+        "sameFacingPairs": 144
+      },
+      {
+        "area": 0.158401,
+        "bounds": [
+          6.84,
+          0.12,
+          -3.9,
+          6.94,
+          0.12,
+          -2.1
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-metal",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 32,
+        "plane_d": 0.12,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.128,
+        "bounds": [
+          -4.0,
+          0.0,
+          18.8,
+          4.0,
+          3.5,
+          18.8
+        ],
+        "materials": [
+          "yellow-metal",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 32,
+        "plane_d": 18.8,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.117601,
+        "bounds": [
+          -6.925,
+          1.04,
+          -8.925,
+          6.925,
+          1.04,
+          8.925
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 56,
+        "plane_d": 1.04,
+        "sameFacingArea": 0.117601,
+        "sameFacingPairs": 56
+      },
+      {
+        "area": 0.117601,
+        "bounds": [
+          -4.56,
+          5.56,
+          -8.925,
+          6.925,
+          5.56,
+          8.925
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 56,
+        "plane_d": 5.56,
+        "sameFacingArea": 0.117601,
+        "sameFacingPairs": 56
+      },
+      {
+        "area": 0.115198,
+        "bounds": [
+          -4.4,
+          3.2,
+          8.72,
+          4.6,
+          3.2004,
+          19.34
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.00040007,
+        "min_gap": 0.00040007,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 16,
+        "plane_d": 3.2,
+        "sameFacingArea": 0.115198,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.1056,
+        "bounds": [
+          -7.0,
+          4.1,
+          -6.6,
+          -6.78,
+          4.1,
+          -1.4
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 32,
+        "plane_d": 4.1,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.067201,
+        "bounds": [
+          -4.56,
+          4.19,
+          -8.925,
+          6.925,
+          4.19,
+          7.56
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 32,
+        "plane_d": 4.19,
+        "sameFacingArea": 0.067201,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 0.0672,
+        "bounds": [
+          -6.925,
+          2.31,
+          -7.56,
+          6.925,
+          2.31,
+          8.925
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 32,
+        "plane_d": 2.31,
+        "sameFacingArea": 0.0672,
+        "sameFacingPairs": 32
+      },
+      {
+        "area": 0.064543,
+        "bounds": [
+          -2.0,
+          1.98,
+          -9.1374,
+          3.6,
+          1.9812,
+          -8.94
+        ],
+        "materials": [
+          "yellow-masonry",
+          "yellow-siding"
+        ],
+        "max_gap": 0.00119996,
+        "min_gap": 0.00119996,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": 1.98,
+        "sameFacingArea": 0.064543,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0528,
+        "bounds": [
+          -7.0,
+          0.6,
+          4.72,
+          -6.78,
+          0.6,
+          5.12
+        ],
+        "materials": [
+          "yellow-siding",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": 0.6,
+        "sameFacingArea": 0.0,
+        "sameFacingPairs": 0
+      },
+      {
+        "area": 0.0504,
+        "bounds": [
+          -6.925,
+          5.61,
+          -6.56,
+          -6.855,
+          5.61,
+          4.5
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 24,
+        "plane_d": 5.61,
+        "sameFacingArea": 0.0504,
+        "sameFacingPairs": 24
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          -6.925,
+          2.41,
+          -6.56,
+          -6.855,
+          2.41,
+          -2.64
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": 2.41,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          -6.925,
+          1.04,
+          -6.56,
+          -6.855,
+          5.61,
+          -6.56
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 16,
+        "plane_d": -6.56,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          -6.925,
+          4.14,
+          -6.56,
+          -6.855,
+          4.14,
+          -1.44
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 16,
+        "plane_d": 4.14,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          3.64,
+          2.26,
+          -8.925,
+          6.925,
+          2.26,
+          5.56
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": 2.26,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          3.64,
+          1.09,
+          -8.925,
+          6.925,
+          1.09,
+          5.56
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 16,
+        "plane_d": 1.09,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          -4.36,
+          4.24,
+          1.04,
+          6.925,
+          4.24,
+          8.925
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 16,
+        "plane_d": 4.24,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          -4.56,
+          2.36,
+          -8.925,
+          -2.04,
+          2.36,
+          -8.855
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": 2.36,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          -4.56,
+          1.04,
+          -8.925,
+          -4.56,
+          5.56,
+          -8.855
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": -4.56,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          3.64,
+          1.09,
+          -8.925,
+          3.64,
+          5.56,
+          -8.855
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": 3.64,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          -3.935,
+          2.16,
+          14.54,
+          3.935,
+          2.16,
+          16.76
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 16,
+        "plane_d": 2.16,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0336,
+        "bounds": [
+          -3.935,
+          1.24,
+          14.54,
+          3.935,
+          1.24,
+          16.76
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "pairs": 16,
+        "plane_d": 1.24,
+        "sameFacingArea": 0.0336,
+        "sameFacingPairs": 16
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -6.925,
+          1.04,
+          -2.64,
+          -6.855,
+          2.41,
+          -2.64
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -2.64,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -6.925,
+          0.64,
+          5.08,
+          -6.855,
+          2.18,
+          5.08
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 5.08,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -6.925,
+          0.64,
+          4.76,
+          -6.855,
+          2.18,
+          4.76
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 4.76,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -6.925,
+          1.04,
+          7.76,
+          -6.855,
+          2.31,
+          7.76
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 7.76,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -6.925,
+          1.04,
+          6.44,
+          -6.855,
+          2.31,
+          6.44
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 6.44,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -6.925,
+          4.14,
+          -4.64,
+          -6.855,
+          5.61,
+          -4.64
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -4.64,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -6.925,
+          4.14,
+          -1.44,
+          -6.855,
+          5.61,
+          -1.44
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -1.44,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -6.925,
+          4.14,
+          -3.36,
+          -6.855,
+          5.61,
+          -3.36
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -3.36,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          6.855,
+          1.04,
+          -6.04,
+          6.925,
+          2.31,
+          -6.04
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -6.04,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          6.855,
+          1.04,
+          -7.56,
+          6.925,
+          2.31,
+          -7.56
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -7.56,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          6.855,
+          1.09,
+          5.56,
+          6.925,
+          2.26,
+          5.56
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 5.56,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          6.855,
+          1.09,
+          3.64,
+          6.925,
+          2.26,
+          3.64
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 3.64,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          6.855,
+          4.19,
+          -6.24,
+          6.925,
+          5.56,
+          -6.24
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -6.24,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          6.855,
+          4.19,
+          -7.76,
+          6.925,
+          5.56,
+          -7.76
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": -7.76,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          6.855,
+          4.24,
+          2.36,
+          6.925,
+          5.56,
+          2.36
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 2.36,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          6.855,
+          4.24,
+          1.04,
+          6.925,
+          5.56,
+          1.04
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 1.04,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          6.855,
+          4.19,
+          7.56,
+          6.925,
+          5.56,
+          7.56
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 7.56,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          6.855,
+          4.19,
+          6.04,
+          6.925,
+          5.56,
+          6.04
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 6.04,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -2.04,
+          1.04,
+          -8.925,
+          -2.04,
+          2.36,
+          -8.855
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": -2.04,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          5.56,
+          1.09,
+          -8.925,
+          5.56,
+          2.26,
+          -8.855
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": 5.56,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -2.44,
+          4.19,
+          -8.925,
+          -2.44,
+          5.56,
+          -8.855
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": -2.44,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          5.36,
+          4.19,
+          -8.925,
+          5.36,
+          5.56,
+          -8.855
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": 5.36,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -5.36,
+          1.04,
+          8.855,
+          -5.36,
+          2.31,
+          8.925
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": -5.36,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -3.44,
+          1.04,
+          8.855,
+          -3.44,
+          2.31,
+          8.925
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": -3.44,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          3.1,
+          5.51,
+          8.855,
+          3.96,
+          5.51,
+          8.925
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          1.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": 5.51,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -4.36,
+          4.24,
+          8.855,
+          -4.36,
+          5.56,
+          8.925
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "pairs": 8,
+        "plane_d": -4.36,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -2.64,
+          4.24,
+          8.855,
+          -2.64,
+          5.56,
+          8.925
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          1.0,
+          -0.0,
+          0.0
+        ],
+        "pairs": 8,
+        "plane_d": -2.64,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          3.865,
+          1.24,
+          16.76,
+          3.935,
+          2.16,
+          16.76
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 16.76,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          3.865,
+          1.24,
+          15.54,
+          3.935,
+          2.16,
+          15.54
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 15.54,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -3.935,
+          1.24,
+          15.96,
+          -3.865,
+          2.16,
+          15.96
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          -0.0,
+          -0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 15.96,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      },
+      {
+        "area": 0.0168,
+        "bounds": [
+          -3.935,
+          1.24,
+          14.54,
+          -3.865,
+          2.16,
+          14.54
+        ],
+        "materials": [
+          "yellow-glass",
+          "yellow-trim"
+        ],
+        "max_gap": 0.0,
+        "min_gap": 0.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "pairs": 8,
+        "plane_d": 14.54,
+        "sameFacingArea": 0.0168,
+        "sameFacingPairs": 8
+      }
+    ],
+    "sameFacingArea": 1222.327453,
+    "sameFacingByMaterialPair": {
+      "concrete+siding": 393.726314,
+      "concrete+trim": 89.756878,
+      "door+metal": 0.0896,
+      "door+siding": 14.228885,
+      "door+trim": 66.085851,
+      "glass+trim": 1.377608,
+      "masonry+siding": 5.664543,
+      "masonry+trim": 0.261082,
+      "metal+siding": 148.348744,
+      "metal+trim": 20.419085,
+      "shingle+siding": 6.751993,
+      "shingle+trim": 7.524474,
+      "siding+trim": 468.092396
+    },
+    "sameFacingPairs": 12429,
+    "triangles": 38112
+  }
+}

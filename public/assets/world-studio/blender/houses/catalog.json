@@ -40,7 +40,7 @@
         "materials": 8,
         "textureBytes": 2843343,
         "drawGroups": 8,
-        "glbBytes": 5670288,
+        "glbBytes": 5670156,
         "panes": 22,
         "apertureMarkers": 26,
         "routeLandmarks": 3,
@@ -51,8 +51,8 @@
           "masonry": 5316,
           "metal": 636,
           "shingle": 1320,
-          "siding": 21228,
-          "trim": 8628
+          "siding": 22236,
+          "trim": 7620
         },
         "localBounds": {
           "min": [
@@ -75,7 +75,7 @@
       "interiorApertureMismatches": [],
       "stairTreadProblems": [],
       "blockedRuntimeProbes": [],
-      "sha256": "0748813fa082fb694978168c55a896124ac4d052237d226cccafc241df7ccd50",
+      "sha256": "38cc4c2d941524434bad5a51772e07fe3a35a7775c0ccca9a239fbb9731a5c27",
       "partition": "world-studio.house.teal.shell",
       "houseId": "teal-house",
       "placement": [
@@ -124,7 +124,7 @@
         "materials": 8,
         "textureBytes": 2806733,
         "drawGroups": 8,
-        "glbBytes": 5644996,
+        "glbBytes": 5644860,
         "panes": 22,
         "apertureMarkers": 26,
         "routeLandmarks": 3,
@@ -135,8 +135,8 @@
           "masonry": 5484,
           "metal": 636,
           "shingle": 1320,
-          "siding": 21228,
-          "trim": 8628
+          "siding": 22236,
+          "trim": 7620
         },
         "localBounds": {
           "min": [
@@ -159,7 +159,7 @@
       "interiorApertureMismatches": [],
       "stairTreadProblems": [],
       "blockedRuntimeProbes": [],
-      "sha256": "bdd2867e05a36266cca8d468fdc56b01168e7eea65ebe29b6a5ee4a91dcc5ee6",
+      "sha256": "c7d7c219978a6e0738faa338e40f96e861e6a316a2560576c9bd55d90540b08f",
       "partition": "world-studio.house.yellow.shell",
       "houseId": "yellow-house",
       "placement": [

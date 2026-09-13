@@ -17,6 +17,21 @@ audit records a depth conflict: the two surfaces occupy the same depth range
 and the winner is decided by depth quantisation. Coincident pairs (separation
 below ``--coincident``) always fight; near pairs fight at distance.
 
+Each conflicting pair is then split by *relative facing*, because the two halves
+have different cures and only one of them is a runtime defect:
+
+* **opposite-facing** — a box's back face lying in the plane of whatever it is
+  mounted on. Backface culling removes one of the two, so the pair cannot fight
+  in a renderer that culls. The loader forces ``THREE.FrontSide`` on every
+  opaque material (``src/world-studio/houses/index.ts:229``) and wave 4 also
+  declares ``use_backface_culling`` at export, so these are cured in the runtime.
+* **same-facing** — two front faces in one plane. Nothing culls either of them
+  and the depth buffer picks a winner per pixel, which is the dashed vertical
+  seam. This is the number that has to reach zero, and it has not.
+
+``conflictArea`` — the gate below — deliberately counts *both*, because it is a
+claim about the geometry rather than about any one renderer. It fails today.
+
 Usage
 -----
     python scripts/blender/world-studio/houses/audit_surfaces.py
@@ -73,21 +88,24 @@ def _triangles(glb: Glb):
 
 
 def _plane(tri):
+    """``(canonical_normal, plane_offset, geometric_normal)`` for one triangle."""
     (ax, ay, az), (bx, by, bz), (cx, cy, cz) = tri
     ux, uy, uz = bx - ax, by - ay, bz - az
     vx, vy, vz = cx - ax, cy - ay, cz - az
-    n = _normalise((uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx))
-    if n is None:
+    raw = _normalise((uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx))
+    if raw is None:
         return None
     # Canonical sign so a front face and the back face behind it land together:
-    # both occupy the same depth, and both fight.
+    # both occupy the same depth, and both fight. The geometric normal is kept
+    # alongside it so the pair can afterwards be split by relative facing.
+    n = raw
     for component in n:
         if abs(component) > 1e-9:
             if component < 0:
                 n = (-n[0], -n[1], -n[2])
             break
     d = n[0] * ax + n[1] * ay + n[2] * az
-    return n, d
+    return n, d, raw
 
 
 def _area(tri):
@@ -145,15 +163,18 @@ def audit_glb(path: str, epsilon: float = DEFAULT_EPSILON, coincident: float = D
         if plane is None:
             continue
         total += 1
-        n, d = plane
+        n, d, raw = plane
         nk = (round(n[0], normal_key), round(n[1], normal_key), round(n[2], normal_key))
-        faces[(nk, int(math.floor(d / depth_bucket)))].append((material, tri, n, d))
+        faces[(nk, int(math.floor(d / depth_bucket)))].append((material, tri, n, d, raw))
 
     conflicts = defaultdict(lambda: {
         "materials": set(), "pairs": 0, "area": 0.0, "min_gap": None, "max_gap": 0.0,
-        "bounds": [math.inf] * 3 + [-math.inf] * 3,
+        "bounds": [math.inf] * 3 + [-math.inf] * 3, "same": 0, "same_area": 0.0,
     })
     coincident_pairs = 0
+    same_facing_pairs = 0
+    same_facing_area = 0.0
+    same_by_pair = defaultdict(float)
 
     seen_buckets = set()
     for (nk, slab), entries in faces.items():
@@ -174,9 +195,9 @@ def audit_glb(path: str, epsilon: float = DEFAULT_EPSILON, coincident: float = D
             u, v = _basis(pool[0][2])
             boxes = [_bounds_2d(item[1], u, v) for item in pool]
             for i in range(len(pool)):
-                mat_i, tri_i, _n_i, d_i = pool[i]
+                mat_i, tri_i, _n_i, d_i, raw_i = pool[i]
                 for j in range(i + 1, len(pool)):
-                    mat_j, tri_j, _n_j, d_j = pool[j]
+                    mat_j, tri_j, _n_j, d_j, raw_j = pool[j]
                     if mat_i == mat_j:
                         continue
                     gap = abs(d_i - d_j)
@@ -187,7 +208,17 @@ def audit_glb(path: str, epsilon: float = DEFAULT_EPSILON, coincident: float = D
                     bucket = conflicts[(nk, round(min(d_i, d_j), 4))]
                     bucket["materials"].update((mat_i, mat_j))
                     bucket["pairs"] += 1
-                    bucket["area"] += min(_area(tri_i), _area(tri_j))
+                    overlap_area = min(_area(tri_i), _area(tri_j))
+                    bucket["area"] += overlap_area
+                    if raw_i[0] * raw_j[0] + raw_i[1] * raw_j[1] + raw_i[2] * raw_j[2] > 0.0:
+                        # Both front faces: culling removes neither and the depth
+                        # buffer decides per pixel. This is the seam.
+                        same_facing_pairs += 1
+                        same_facing_area += overlap_area
+                        bucket["same"] += 1
+                        bucket["same_area"] += overlap_area
+                        key = tuple(sorted((mat_i.split("-")[-1], mat_j.split("-")[-1])))
+                        same_by_pair[key] += overlap_area
                     bucket["min_gap"] = gap if bucket["min_gap"] is None else min(bucket["min_gap"], gap)
                     bucket["max_gap"] = max(bucket["max_gap"], gap)
                     for point in tri_i + tri_j:
@@ -204,6 +235,8 @@ def audit_glb(path: str, epsilon: float = DEFAULT_EPSILON, coincident: float = D
             "plane_d": depth,
             "materials": sorted(bucket["materials"]),
             "pairs": bucket["pairs"],
+            "sameFacingPairs": bucket["same"],
+            "sameFacingArea": round(bucket["same_area"], 6),
             "area": round(bucket["area"], 6),
             "min_gap": round(bucket["min_gap"], 8),
             "max_gap": round(bucket["max_gap"], 8),
@@ -220,6 +253,13 @@ def audit_glb(path: str, epsilon: float = DEFAULT_EPSILON, coincident: float = D
         "conflictPairs": sum(r["pairs"] for r in regions),
         "coincidentPairs": coincident_pairs,
         "conflictArea": round(sum(r["area"] for r in regions), 6),
+        "sameFacingPairs": same_facing_pairs,
+        "sameFacingArea": round(same_facing_area, 6),
+        "oppositeFacingPairs": sum(r["pairs"] for r in regions) - same_facing_pairs,
+        "sameFacingByMaterialPair": {
+            "+".join(k): round(v, 6)
+            for k, v in sorted(same_by_pair.items(), key=lambda kv: -kv[1])
+        },
         "regions": regions,
     }
 
@@ -255,6 +295,11 @@ def main(argv=None) -> int:
         print(f"  conflicting face pairs : {report['conflictPairs']}")
         print(f"  coincident pairs       : {report['coincidentPairs']}")
         print(f"  conflicting area       : {report['conflictArea']:.4f} m^2")
+        print(f"  same-facing pairs      : {report['sameFacingPairs']} "
+              f"({report['sameFacingArea']:.4f} m^2) — fight even with culling")
+        print(f"  opposite-facing pairs  : {report['oppositeFacingPairs']} — cured by culling")
+        for pair, area in list(report["sameFacingByMaterialPair"].items())[:6]:
+            print(f"      same-facing {pair:20s} {area:9.3f} m^2")
         for region in report["regions"][:args.top]:
             b = region["bounds"]
             print(

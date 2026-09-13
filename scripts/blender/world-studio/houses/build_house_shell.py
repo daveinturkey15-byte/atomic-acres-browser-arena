@@ -306,13 +306,19 @@ def build_exterior_wall(b: Builder, frame: C.WallFrame, openings: Sequence[C.Ope
         #
         # Wave 4, and this is the white comb. The leaf shipped in the ``trim`` slot, i.e. in
         # painted white, and it sits 12 mm behind a lap siding course that leaves a 3 mm reveal
-        # at every joint. So every one of those joints is a 3 mm window onto a white board.
-        # Cycles hid it: the review sun puts a 15 mm slot in shadow. The runtime does not, so
-        # under near-uniform ambient each joint lights up, and at street distance a 3 mm line is
-        # a fraction of a pixel and breaks into the dashes the Build 16 capture shows. Real
-        # clapboard shows shadow in that gap, not paint. The leaf now carries the siding slot,
-        # which is also what it physically is — sheathing behind the boards, never seen except
-        # through the reveal. The interior face is unaffected: the lining below covers it.
+        # at every joint. So every one of those joints is a 3 mm window onto a white board, and
+        # at street distance a 3 mm line is a fraction of a pixel and breaks into dashes — the
+        # comb the Build 16 capture shows. Real clapboard shows shadow in that gap, not paint.
+        # The leaf now carries the siding slot, which is also what it physically is: sheathing
+        # behind the boards, never seen except through the reveal. The interior face is
+        # unaffected, because the lining below covers it.
+        #
+        # Measured, not argued: ``facade_evidence.py`` rasterises both states through one
+        # instrument and the light slivers inside the siding field fall 2,095 -> 807 across six
+        # camera/variant pairs, with the leaf's own planes leaving the guilty list entirely.
+        # Why the lane's Cycles review frames never showed it is *not* established — a 15 mm
+        # slot in sun shadow is the likely reason but no runtime capture exists to confirm it
+        # (falsifier 1), so treat the runtime lighting story as a hypothesis, not a result.
         _wall_box(b, frame, SHEATHING_SLOT, rect, -half, half - out * 0.012)
         # Interior lining, inboard of the structure (shell only: paint, no furniture).
         _wall_box(b, frame, "trim", rect, -out * (half + C.LINING), -out * half, opaque=False)
@@ -1033,13 +1039,19 @@ def make_material(name: str, maps: Dict[str, Path], *, glass: bool = False, base
     bsdf = nodes["Principled BSDF"]
 
     # Wave 4. Blender defaults ``use_backface_culling`` to False, so the glTF exporter wrote
-    # every material ``doubleSided: true``. ``src/world-studio/houses/index.ts:211`` then has to
-    # walk the loaded scene and force ``FrontSide`` back onto every opaque material, i.e. the
-    # export has been shipping a flag the only consumer immediately overrides. Worse, it is a
-    # flag with teeth: every solid here is a closed box, so a double-sided export puts each
-    # box's back face at the same depth as whatever it is mounted on, and a coincident back
-    # face renders at grazing angles. Declaring it at the source makes the file and its
-    # contract agree, and ``audit_surfaces.py`` checks the winding that makes it safe.
+    # every material ``doubleSided: true``, and ``src/world-studio/houses/index.ts:229`` then
+    # walks the loaded scene and forces ``FrontSide`` back onto every opaque material. The
+    # export has been shipping a flag its only consumer immediately overrides.
+    #
+    # Be precise about what this buys, because it is easy to overclaim. Every solid here is a
+    # closed box, so each box's back face lies in the plane of whatever it is mounted on; those
+    # coincident pairs would fight in a renderer that draws both sides. ``audit_surfaces.py``
+    # counts 21,174 such opposite-facing pairs. They were *already* cured in this project's
+    # runtime by that ``FrontSide`` assignment, so this line fixes no pixel there — it makes
+    # the file honest for any other consumer and removes a silent dependency on loader repair.
+    # It does **not** touch the 12,509 same-facing pairs, which no culling rule can resolve;
+    # those are still open (HANDOFF falsifier 13).
+    #
     # Glass is the deliberate exception: the loader forces ``DoubleSide`` on it too, and the
     # wave-2 alpha 0.42 film was solved with both faces blending. Culling it would halve the
     # density that measurement fixed, so it stays as it was.
