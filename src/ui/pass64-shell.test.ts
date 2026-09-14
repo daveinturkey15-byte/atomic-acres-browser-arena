@@ -31,6 +31,7 @@ describe('Pass 66 command shell', () => {
     // the offered sequence explicitly too.
     expect([...markup.matchAll(/data-arena-route="([^"]+)"/g)].map((match) => match[1])).toEqual([
       'world-studio',
+      'new-world-prime',
     ]);
     // HF-429 (owner, 2026-09-03): farcrysis is PARKED, so it is not rendered.
     // This pin has now swung three times - absent, present-and-PREVIEW, absent

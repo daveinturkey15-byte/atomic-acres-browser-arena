@@ -48,8 +48,11 @@ describe('opening arena selection', () => {
     expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town · New World', 'Nuketown', 'Raid Rebuild', 'Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3', 'New World Prime']);
     // HF-495 (owner, 2026-09-04): selectability derives the menu order from
     // this catalog; the retired original Raid is absent without a second list.
+    // PASS 97 Day-2 (2026-09-14): authority landed, New World Prime promoted
+    // to selectable; the standby asserts below moved to the promotion test.
     expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toEqual([
       'world-studio',
+      'newworld-prime',
     ]);
     // PASS 97 (2026-09-14): twelve became THIRTEEN with the New World Prime
     // standby row. Raised, never lowered.
@@ -506,33 +509,30 @@ describe('opening arena selection', () => {
     expect(arenaSelection(null).id).toBe('nuketown2');
   });
 
-  // PASS 97 (2026-09-14): New World Prime registers Day-1 STANDBY. The id
-  // decodes everywhere (network/replay/storage boundary) but the row is never
-  // offered: no menu card, no host-control entry, no second page, and the
-  // menu boundary falls back to the default. Promotion day flips one field.
-  it('registers New World Prime standby: decoded but never offered', () => {
-    const standby = arenaSelection('newworld-prime');
-    expect(standby.id).toBe('newworld-prime');
-    expect(standby.routeId).toBe('new-world-prime');
-    expect(standby.displayName).toBe('New World Prime');
-    expect(standby.kind).toBe('team');
-    expect(standby.selectable).toBe(false);
-    expect(standby.legacyAliases).toEqual([]);
-    expect(standby.showcasePath).toBeUndefined();
-    expect(standby.selectorLabel).toContain('STANDBY');
-    expect(standby.rulesLabel).toContain('STANDBY');
-    expect(standby.authoring).toBe('code');
-    // Decoded, like every hidden arena - saved matches and shared links keep
-    // resolving.
+  // PASS 97 (2026-09-14): New World Prime registered Day-1 standby; Day-2
+  // (authority landed) promotes it: offered everywhere, decodable as before.
+  it('registers New World Prime playable: decoded AND offered', () => {
+    const live = arenaSelection('newworld-prime');
+    expect(live.id).toBe('newworld-prime');
+    expect(live.routeId).toBe('new-world-prime');
+    expect(live.displayName).toBe('New World Prime');
+    expect(live.kind).toBe('team');
+    expect(live.selectable).toBe(true);
+    expect(live.legacyAliases).toEqual([]);
+    expect(live.showcasePath).toBeUndefined();
+    expect(live.selectorLabel).not.toContain('STANDBY');
+    expect(live.rulesLabel).not.toContain('STANDBY');
+    expect(live.authoring).toBe('code');
+    // Decoded, like every arena - saved matches and shared links resolve.
     expect(decodeArenaId('newworld-prime')).toBe('newworld-prime');
     expect(decodeArenaId('new-world-prime')).toBe('newworld-prime');
     expect(isArenaId('newworld-prime')).toBe(true);
     expect(ARENA_IDS).toContain('newworld-prime');
-    // Never offered: not selectable, not a menu multiplayer id, and the menu
-    // boundary falls back to the default for it and its route.
-    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).not.toContain('newworld-prime');
-    expect(isMenuMultiplayerArenaId('newworld-prime')).toBe(false);
-    expect(menuArenaSelection('newworld-prime').id).toBe('world-studio');
-    expect(menuArenaSelection('new-world-prime').id).toBe('world-studio');
+    // Offered: selectable, menu multiplayer id, and the menu boundary admits
+    // it and its route instead of falling back to the default.
+    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toContain('newworld-prime');
+    expect(isMenuMultiplayerArenaId('newworld-prime')).toBe(true);
+    expect(menuArenaSelection('newworld-prime').id).toBe('newworld-prime');
+    expect(menuArenaSelection('new-world-prime').id).toBe('newworld-prime');
   });
 });
