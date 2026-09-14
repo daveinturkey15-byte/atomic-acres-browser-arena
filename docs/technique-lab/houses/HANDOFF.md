@@ -1,3 +1,153 @@
+# Houses lane handoff — wave 5 seam geometry repair, 2026-09-13
+
+> **Wave 5 summary.** Falsifier 13 is **narrowed, not closed**. The same-facing coincident
+> seam geometry is a *surface-ownership* defect in the wall assembly: four different members
+> all put a face on the same wall plane. One of them now owns it and the rest stand off by
+> 4 mm. Same-facing pairs fall **12,509 → 7,941** (teal) and **12,429 → 7,861** (yellow), and
+> same-facing overlap area falls **1,222.3 → 310.3 m²**, a **74.6%** cut. The mechanical gate
+> is **still RED** — `MAX_CONFLICT_AREA` was not touched and 7,941 pairs remain. Every
+> contract value is byte-identical: each `build-report.json` differs from wave 4 by exactly
+> one line, the GLB hash. **Still not integrated, not observed in the runtime, not visually
+> accepted.**
+>
+> | | wave 4 | wave 5 |
+> |---|---|---|
+> | teal GLB | 5,670,156 B `38cc4c2d…` | **5,670,156 B `bc7c4667062a10f6c4878ccea3e99d148dc8296b9c9aa238799802e260f81698`** |
+> | yellow GLB | 5,644,860 B `c7d7c219…` | **5,644,860 B `2fec2939227a60aab7234173ac9eee72a8c0e8f111de024e353e261fab4f1042`** |
+> | triangles / materials / texture images / texture bytes | 37,944 / 38,112 · 8 · 18 | **all unchanged** |
+> | panes / aperture markers / route landmarks | 22 / 26 / 3 | **unchanged** |
+> | partitions / cased openings / treads | 7 / 9 / 16 | **unchanged** |
+> | **same-facing pairs** | 12,509 / 12,429 | **7,941 / 7,861 (−36.5% / −36.7%)** |
+> | **same-facing area** | 1,222.27 / 1,222.33 m² | **310.30 / 310.37 m² (−74.6%)** |
+> | conflicting pairs (gate metric) | 33,683 / 33,615 | **31,475 / 31,415** |
+> | conflictArea (teal) | 6,391.28 | **5,457.88 — still RED against budget 0.0** |
+
+---
+
+# Wave 5 — the actual geometry correction
+
+Lane `houses-night-20260912` · harness `claude` · model `claude-opus-5` · effort `xhigh` ·
+machine `dave-gaming-pc` · run `recovery-houses-geometry-opus-xhigh-r1`. Authored on the
+preserved wave-4 checkpoint `25bf9cacb`.
+
+## What the defect actually was
+
+Wave 4 proved a material change could not close falsifier 13 and named the cure as "give
+every mounted box a sub-millimetre standoff". That framing was wrong in two ways, and the
+second one is why the seams survived: a *sub-millimetre* standoff is below the audit's
+1.5 mm epsilon and below the depth resolution it models, so it would have moved the report
+without moving the defect; and the dominant conflict is not mounted boxes against the wall,
+it is **four members of the wall itself all claiming one plane**.
+
+Reading `build_exterior_wall`, `_emit_lap_siding` and `dress_opening` against the shipped
+region list, the outboard wall plane (|x| = 7.0, |z| = 9.0) carried, all at once:
+
+1. **the sheathing leaf** — but only on two of the four walls. `-half, half - out * 0.012`
+   sets the leaf back 12 mm on an `out = +1` wall and does the *opposite* on an `out = -1`
+   wall: there the leaf's outboard face lands exactly on the wall plane, and its other end
+   pushes 12 mm *through* the interior lining, putting a siding-slot face in the lining's
+   own plane. The wave-4 reveal-shadow repair was therefore only ever applied to half the
+   house. This is a sign bug, not a tuning choice.
+2. **every lap-siding course's inboard face**, at exactly `out * half`.
+3. **the opening reveal lining**, which spanned `-half..half` and so put a face on *both*
+   wall planes — and that one is visible straight down the opening from a street camera.
+4. **the back face of everything mounted outboard** — casings, watertable, beltcourse,
+   downspouts, aprons — which is where wave 4 expected the whole problem to live.
+
+## The correction
+
+One rule, stated as `SEAM_STANDOFF = 0.004` and `SHEATHING_SETBACK = 0.012` in
+`build_house_shell.py`: **exactly one member owns each plane; every other member stands off
+by more than the audit's epsilon.** The outboard wall plane is owned by the siding face, the
+inboard plane by the lining.
+
+* Leaf: `-out * half, out * (half - SHEATHING_SETBACK)` — sign-correct on all four walls.
+* Siding course: inboard face bites 4 mm into the cavity. It still overlaps the leaf's 12 mm
+  setback by 8 mm, so no gap opens behind the boards.
+* Reveal lining: runs from the inboard plane to 4 mm proud of the outboard plane, covering
+  4 mm *more* of the cut edge than before.
+
+**Not one outward-visible surface moved.** Every face that moved was already buried in the
+wall cavity, and each moved inwards. That is why the vertex count, the triangle count and
+the GLB byte count are all identical, and why the census is identical.
+
+## Measured, not asserted
+
+* `python scripts/blender/world-studio/houses/run_houses.py --variant all` → returncode **0**,
+  process-reported **`Blender 5.1.2 (hash ec6e62d40fa9 built 2026-05-19 01:37:34)`**,
+  `--background --factory-startup --threads 2 --python-exit-code 9`, 2.3 s per house.
+* **Determinism.** The full `--variant all` build was run twice; both runs reproduced
+  `bc7c4667…` and `2fec2939…` byte for byte.
+* `python scripts/blender/world-studio/houses/audit_maps.py` → **all checks passed**, both
+  houses, all 28 census checks each. `apertureMismatches`, `interiorApertureMismatches`,
+  `stairTreadProblems` and `blockedRuntimeProbes` all empty; 22 panes with 22 unique window
+  ids and `opaqueBehind: 0`; 16 treads on the contract; palette and normal tilts unchanged to
+  the reported decimal.
+* `python scripts/blender/world-studio/houses/audit_surfaces.py --variant all` → **exit 1,
+  RED, by design.** `MAX_CONFLICT_AREA` is still `0.0`; nothing was relaxed.
+* **Canonical invariance, the strongest form available:** `git diff` on each
+  `build-report.json` is **one line — the sha256**. Bounds, apertures, panes, markers, probes,
+  partitions, treads, triangles and texture bytes are byte-identical to wave 4.
+* `python scripts/blender/world-studio/houses/write_catalog.py` → 2 assets, hashes recomputed
+  from the shipped bytes.
+
+**Not run in this pass, and therefore not claimed:** Blender thumbnail and review renders
+(the shipped PNGs are wave-4 renders; the geometry they depict differs only in buried faces,
+but they were *not* re-shot and are stale by that much), `facade_evidence.py` (its A/B forces
+`SHEATHING_SLOT` back to `trim`, which no longer describes this state), Vitest, `tsc`, and any
+browser or GPU capture.
+
+## Falsifier 13 — narrowed, still open
+
+7,941 / 7,861 same-facing pairs remain, 310.3 m². The audit's own material-pair breakdown
+names what is left, and none of it is the wall field:
+
+| same-facing pair | area (teal) | what it is |
+|---|---|---|
+| `concrete+trim` | 89.76 m² | the `y = 0.02` apron/foundation plane — 400 pairs, the single largest region |
+| `siding+trim` | 68.35 m² | the `y = 6.45` wall-top plane (frieze top vs course/leaf tops) and the `y = 3.5` garage-roof plane |
+| `door+trim` | 66.01 m² | deck, stair and door-slot members sharing planes with their trim |
+| `concrete+siding` | 44.03 m² | apron against the siding field at grade |
+| `metal+trim` | 20.42 m² | gutter/downspout against the frieze |
+| `shingle+trim` | 7.52 m² | rake board coplanar with the gable plane at `z = ±9.4` |
+
+Each of these lives in a different builder function — `build_shell`'s apron and frieze,
+`build_roof`'s rake, `build_garage`'s roof plane — and each needs the same ownership rule
+applied at *its* call site. That is mechanical work, but it is not this call's bounded scope,
+and three of the six touch planes that define canonical bounds (`y = 0`, `z = ±9.4`), so they
+need the standoff taken off the *inboard* member every time or the bounds move.
+
+Falsifier, unchanged in form and now much closer: apply the ownership rule to the apron,
+frieze, rake and garage-roof planes, require `sameFacingPairs` to reach 0, then confirm in a
+runtime capture that the vertical seams are gone.
+
+**Is the seam defect closed? No.** It is measurably reduced by three quarters of its area and
+the wall field — the surface the street camera actually sees most of — is now clean of
+same-facing conflict, but the gate is red, six named residues remain, and falsifier 1 still
+stands: no runtime capture of this asset exists, so nothing here has been *seen* to improve.
+The root capture `quality-house.png` that motivated this call is a frame of the **procedural
+TypeScript house**, not of these GLBs, which are still not wired into the arena; it is
+evidence that the authoring pattern is defective, not evidence about these bytes.
+
+## Files changed in wave 5
+
+```
+scripts/blender/world-studio/houses/build_house_shell.py   SEAM_STANDOFF/SHEATHING_SETBACK;
+                                                           leaf sign fix; course inboard face;
+                                                           reveal lining depth
+public/assets/world-studio/blender/houses/house-teal-shell.glb    5,670,156 B  bc7c4667…
+public/assets/world-studio/blender/houses/house-yellow-shell.glb  5,644,860 B  2fec2939…
+public/assets/world-studio/blender/houses/catalog.json            regenerated (hashes only)
+source-assets/world-studio/houses/{teal,yellow}/build-report.json regenerated (sha256 only)
+docs/technique-lab/houses/surface-conflict-audit.json             regenerated
+docs/technique-lab/houses/HANDOFF.md                              this file
+```
+
+`src/**`, `arena.ts`, `assets.manifest.json`, the registry, shared config, the root checkout
+and every other lane were **not** touched. No commit, push or deploy was made.
+
+---
+
 # Houses lane handoff — wave 4 facade repair, 2026-09-13
 
 > **Wave 4 summary.** One defect closed, one defect named and left open. The white comb-like
