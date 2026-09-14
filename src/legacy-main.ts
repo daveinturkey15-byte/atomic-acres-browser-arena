@@ -3092,6 +3092,7 @@ let sunLight: THREE.DirectionalLight;
 let fillLight: THREE.DirectionalLight;
 buildSky();
 let selectedArena: ArenaSelection = arenaSelection(new URLSearchParams(window.location.search).get('map'));
+if (selectedArena.standbyPreviewOnly) selectedArena = arenaSelection('atomic-acres');
 audio.setArena(selectedArena.id);
 const arenaFactories: Readonly<Record<ArenaId, (target: THREE.Scene) => ArenaMap>> = Object.freeze({
   'atomic-acres': buildArena,
@@ -24580,6 +24581,7 @@ async function performArenaSelection(
   if (gameStarted
     || matchStartPreparing && !allowWhilePreparing
     || !arenaSelectionReady
+    || arenaSelection(id).standbyPreviewOnly
     || gameplayArenaPrepared && id === arena.id) return;
   arenaTransitionGeneration += 1;
   const nextSelection = arenaSelection(id);

@@ -436,13 +436,17 @@ export const NEWWORLD_PRIME_HEDGE_RUNS: readonly (NewworldPrimePropPlacement & R
   Object.freeze({ id: 'newworld-prime-hedge-south', x: 14.0, z: 24.0, rotationY: Math.PI, blobs: 5 }),
 ]);
 
-/** Fact 8: concrete pads under sheds, center pair, and entrance. */
+/** Fact 7 + fact 8: four front-yard pads (2 per lawn) plus pads under sheds, center pair, and entrance. */
 export const NEWWORLD_PRIME_CONCRETE_PAD_PLACEMENTS: readonly NewworldPrimePropPlacement[] = Object.freeze([
   Object.freeze({ id: 'newworld-prime-pad-bus', x: -3.4, z: 1.2, rotationY: Math.PI / 2 + 0.14 }),
   Object.freeze({ id: 'newworld-prime-pad-truck', x: 3.6, z: -1.4, rotationY: -Math.PI / 2 - 0.1 }),
   Object.freeze({ id: 'newworld-prime-pad-shed-northwest', x: -18.5, z: -14.0, rotationY: 0.35 }),
   Object.freeze({ id: 'newworld-prime-pad-shed-southeast', x: 18.0, z: 15.5, rotationY: Math.PI + 0.3 }),
   Object.freeze({ id: 'newworld-prime-pad-entrance', x: 0, z: 32.5, rotationY: 0 }),
+  Object.freeze({ id: 'newworld-prime-pad-west-lawn-south', x: -13.5, z: 6.0, rotationY: 0 }),
+  Object.freeze({ id: 'newworld-prime-pad-west-lawn-north', x: -13.5, z: -8.0, rotationY: 0 }),
+  Object.freeze({ id: 'newworld-prime-pad-east-lawn-south', x: 13.5, z: 5.0, rotationY: 0 }),
+  Object.freeze({ id: 'newworld-prime-pad-east-lawn-north', x: 13.5, z: -8.0, rotationY: 0 }),
 ]);
 
 /** Fact 9a: welcome sign at the north entrance (faces incoming players). */
