@@ -12,6 +12,7 @@ import {
   type StudioLightingMode,
 } from './index';
 import { createStudioPbrLibrary, type StudioPbrConsumer } from '../pbr-library';
+import { GARAGE_ROOF_Y, GROUND_FLOOR_Y, UPPER_CEILING_Y, UPPER_FLOOR_Y } from '../architecture/house';
 
 const preset = (id: StudioPresetId): StudioEnvironment =>
   STUDIO_ENVIRONMENTS.find((environment) => environment.id === id)!;
@@ -121,6 +122,104 @@ describe('room practical planning', () => {
     expect(() => planStudioRoomPracticals([
       { id: 'x-room', room: 'living', position: [Number.NaN, 0, 0], yaw: 0, footprint: [1, 1] },
     ])).toThrow(/invalid/i);
+  });
+});
+
+describe('practical mount plane', () => {
+  /** Fixture drop below the mount plane, per room's fixture kind (index.ts FIXTURE_DROP). */
+  const DROP: Readonly<Record<string, number>> = {
+    living: 0.35, dining: 0.35, // pendant
+    kitchen: 0.02, bedroom: 0.02, bedroom2: 0.02, study: 0.02, // flush
+    garage: 0.05, // batten
+  };
+  /** Pass-1 mount heights and candela, before the 2026-09-13 mount correction. */
+  const PASS1_HEIGHT: Readonly<Record<string, number>> = {
+    living: 2.55, dining: 2.55, kitchen: 2.55, bedroom: 2.1, bedroom2: 2.1, study: 2.1, garage: 2.4,
+  };
+  const PASS1_BASE: Readonly<Record<string, number>> = {
+    living: 20, dining: 6.5, kitchen: 6.5, bedroom: 14, bedroom2: 6.5, study: 6.5, garage: 5,
+  };
+  /**
+   * Authored ceiling planes, derived from the exported house constants rather
+   * than restated: "3.0 m clear per storey" (house.ts:14-15) puts the
+   * ground-floor ceiling at the upper slab's underside and the upper ceiling at
+   * UPPER_CEILING_Y. SLAB (0.22) and the garage roof thickness (0.2) are not
+   * exported, so those two appear as literals and are cross-checked below.
+   */
+  const CLEAR_STOREY = UPPER_CEILING_Y - UPPER_FLOOR_Y;
+  const CEILING_Y: Readonly<Record<string, number>> = {
+    living: GROUND_FLOOR_Y + CLEAR_STOREY, dining: GROUND_FLOOR_Y + CLEAR_STOREY,
+    kitchen: GROUND_FLOOR_Y + CLEAR_STOREY,
+    bedroom: UPPER_CEILING_Y, bedroom2: UPPER_CEILING_Y, study: UPPER_CEILING_Y,
+    garage: GARAGE_ROOF_Y - 0.2,
+  };
+
+  const rigOf = (): { scene: THREE.Scene; controller: ReturnType<typeof createStudioLighting> } => {
+    const scene = new THREE.Scene();
+    const controller = createStudioLighting({
+      root: new THREE.Object3D(), scene, anchors: ALL_ANCHORS, mode: 'presentation',
+      getEnvironment: () => preset('clear-noon'),
+    });
+    controller.update();
+    return { scene, controller };
+  };
+
+  it('keeps the anchor fixture in step with the authored house floor lines', () => {
+    // The mount planes below are only meaningful if these anchors are real.
+    expect(CLEAR_STOREY).toBeCloseTo(3, 9);
+    expect(GROUND_FLOOR_Y + CLEAR_STOREY).toBeCloseTo(UPPER_FLOOR_Y - 0.22, 9); // SLAB, house.ts
+    for (const anchor of ALL_ANCHORS) {
+      const expected = anchor.room === 'garage' ? 0.06
+        : ['bedroom', 'bedroom2', 'study'].includes(anchor.room) ? UPPER_FLOOR_Y : GROUND_FLOOR_Y;
+      expect(anchor.position[1], anchor.id).toBeCloseTo(expected, 9);
+    }
+  });
+
+  it('hangs every lamp its own fixture drop below the authored ceiling, not in mid-air', () => {
+    const { scene, controller } = rigOf();
+    const rig = scene.getObjectByName('world-studio-lighting')!;
+    for (const room of Object.keys(CEILING_Y)) {
+      const light = rig.children.find((node) => node.name === `world-studio-practical-teal-${room}`)!;
+      const mountY = light.position.y + DROP[room]!;
+      expect(mountY, `${room} mount plane`).toBeCloseTo(CEILING_Y[room]!, 9);
+      // Pass 1 floated these by 0.45 m (ground), 0.90 m (upper), 0.84 m (garage).
+      const anchorY = ALL_ANCHORS.find((anchor) => anchor.room === room)!.position[1]!;
+      expect(CEILING_Y[room]! - (anchorY + PASS1_HEIGHT[room]!), `${room} pass-1 float`).toBeGreaterThan(0.4);
+    }
+    controller.dispose();
+  });
+
+  it('places each visible fixture instance on its own lamp, never on a stale plane', () => {
+    const { scene, controller } = rigOf();
+    const rig = scene.getObjectByName('world-studio-lighting')!;
+    const lampYs = rig.children.filter((node): node is THREE.Light => node instanceof THREE.Light)
+      .map((light) => light.position.y);
+    const matrix = new THREE.Matrix4();
+    const offset = new THREE.Vector3();
+    for (const mesh of rig.children.filter((node): node is THREE.InstancedMesh => node instanceof THREE.InstancedMesh)) {
+      for (let index = 0; index < mesh.count; index += 1) {
+        mesh.getMatrixAt(index, matrix);
+        offset.setFromMatrixPosition(matrix);
+        // instanceMatrix is a Float32Array, so the lamp Y round-trips to ~2.4e-7 at this scale.
+        expect(lampYs.some((y) => Math.abs(y - offset.y) < 1e-6), `${mesh.name}[${index}] y=${offset.y}`).toBe(true);
+      }
+    }
+    controller.dispose();
+  });
+
+  it('delivers the illuminance pass 1 authored at every focal plane', () => {
+    const { scene, controller } = rigOf();
+    const presence = derivePracticalTuning(preset('clear-noon')).presence;
+    const rig = scene.getObjectByName('world-studio-lighting')!;
+    for (const room of Object.keys(CEILING_Y)) {
+      const light = rig.children.find((node) => node.name === `world-studio-practical-teal-${room}`) as THREE.Light;
+      const anchorY = ALL_ANCHORS.find((anchor) => anchor.room === room)!.position[1]!;
+      const authored = PASS1_BASE[room]! / (PASS1_HEIGHT[room]! - DROP[room]!) ** 2;
+      const delivered = (light.intensity / presence) / (light.position.y - anchorY) ** 2;
+      expect(delivered, `${room} illuminance`).toBeCloseTo(authored, 9);
+      expect(light.intensity).toBeGreaterThan(PASS1_BASE[room]!); // longer throw needs more candela
+    }
+    controller.dispose();
   });
 });
 
