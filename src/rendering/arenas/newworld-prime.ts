@@ -34,6 +34,7 @@ export const definition = createProceduralArenaVisualDefinition({
     camera('newworld-prime-yard-geometry', [0, 5, 26], [0, 2.5, -6], 'geometry', NEWWORLD_PRIME_EXPOSURE_LATE_MORNING),
     camera('newworld-prime-depot-wall-closed', [-19, 1.9, 12], [-27, 1.9, 10], 'light-occlusion', NEWWORLD_PRIME_EXPOSURE_LATE_MORNING),
     camera('newworld-prime-depot-door-open', [0, 5, 2], [0, 3.5, 14], 'portal', NEWWORLD_PRIME_EXPOSURE_LATE_MORNING),
+    camera('newworld-prime-topdown', [0, 78, -8], [0, 0, -8], 'overview', NEWWORLD_PRIME_EXPOSURE_LATE_MORNING),
   ],
   collisionIdentity: { authoritativeArenaId: 'newworld-prime', evidence: 'ArenaMap newworld-prime collider, portal and shot-surface identity', presentationMayMutateAuthority: false },
   exceptions: ['bus glazing, depot doors and yard markings may remain presentation-only when authoritative hull surfaces remain unchanged'],

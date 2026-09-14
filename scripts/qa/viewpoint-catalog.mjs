@@ -181,15 +181,16 @@ export const VIEWPOINT_CATALOG = Object.freeze({
     'raid2-drive-balcony',
     'raid2-drive-approach',
   ]),
-  // PASS 97 (2026-09-14): New World Prime Day-1 standby. Four authored review
-  // cameras, landed in the SAME commit as the arena module per the note at the
-  // top of this file. Derived from src/rendering/arenas/newworld-prime.ts, in
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby. Five authored review
+  // cameras (four + topdown map-read), landed in the SAME commit as the arena
+  // module per the note at the top of this file. Derived from src/rendering/arenas/newworld-prime.ts, in
   // authored order.
   'newworld-prime': Object.freeze([
     'newworld-prime-overview',
     'newworld-prime-yard-geometry',
     'newworld-prime-depot-wall-closed',
     'newworld-prime-depot-door-open',
+    'newworld-prime-topdown',
   ]),
 });
 
