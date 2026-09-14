@@ -3545,6 +3545,9 @@ function constructArena(arenaId: ArenaId, recordConstruction = true): ArenaMap {
     // Factory exceptions can occur after meshes have already been attached to
     // the staging scene. Retire all reachable partial construction behind the
     // same GPU fence instead of leaking or reusing a poisoned generation.
+    // World-studio (wave 3): explicit terminal retirement first; the staging
+    // detach above no longer disposes anything by itself.
+    if (candidate) candidate.root.userData.worldStudioRetire?.();
     if (candidate) scheduleDeferredGpuRetirement(candidate.root);
     for (const partialRoot of [...stagingScene.children]) scheduleDeferredGpuRetirement(partialRoot);
     throw error;
@@ -3566,6 +3569,10 @@ function ensureArenaConstructed(arenaId: ArenaId): ArenaMap {
 }
 
 function retireArenaAfterGpuFence(arenaId: ArenaId, candidate: ArenaMap): void {
+  // World-studio (wave 3): explicit terminal retirement behind the GPU fence. Ordinary detaches
+  // (staging, cache moves, live adoption) never dispose; this fenced path does, exactly once,
+  // restoring PBR originals before the deferred disposer walks materials.
+  candidate.root.userData.worldStudioRetire?.();
   const geometries = new Set<THREE.BufferGeometry>();
   const materials = new Set<THREE.Material>();
   const textures = new Set<THREE.Texture>();
@@ -3598,6 +3605,8 @@ function retireArenaAfterGpuFence(arenaId: ArenaId, candidate: ArenaMap): void {
 }
 
 function disposeRetiredArena(arenaId: ArenaId, candidate: ArenaMap): void {
+  // Same explicit retirement as retireArenaAfterGpuFence, before the synchronous walk.
+  candidate.root.userData.worldStudioRetire?.();
   candidate.root.removeFromParent();
   const geometries = new Set<THREE.BufferGeometry>();
   const materials = new Set<THREE.Material>();
