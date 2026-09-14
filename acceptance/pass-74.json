@@ -6,7 +6,7 @@
   "preview": {
     "kind": "local-candidate",
     "ref": "contrib/dave-gaming-pc/omp/newworld-prime-20260914 (PR preview pending CI artifact)",
-    "sourceSha": "TBD-at-PR-head",
+    "sourceSha": "19fbd559cdbf329c54f10d1f9a3c01412d9a6549",
     "createdAt": "2026-09-14T07:00:00Z"
   },
   "humanAcceptance": {
