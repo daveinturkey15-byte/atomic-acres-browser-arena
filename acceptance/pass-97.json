@@ -114,7 +114,7 @@
           "kind": "unit",
           "ref": "src/spawn-layout-quality.test.ts",
           "command": "npx vitest run src/spawn-layout-quality.test.ts src/collider-visual-parity-gate.test.ts src/walkable-surface-parity-gate.test.ts src/rendering/raytracing/arena-proxy-coverage.test.ts",
-          "note": "NOT YET RUN AT THIS HEAD. Expected reds, each with its flip condition: solved spawn table + real colliders/shot surfaces from the authority pass clear them; the ledger/ceiling rows then hold at zero. Pre-existing gap, not Shell-owned: ACCEPTED_FALL_THROUGH still lacks a world-studio row, so the walkable explicit-ledger case cannot go green on this line regardless."
+          "note": "RUN 2026-09-14 (lieutenant pack + Main judgment). Interiors pilot: 15/15 focused, tsc 0, rendering pair 18/18, walkable failures world-studio-only (pre-existing). Open Day-2 debts (predate interiors, owned by follow-ups, no gate weakened): spawn team-0 count 3 vs >=6 pin + lobby-spread + span 0.174 vs 0.18 + HF-402 cover rows; collider gate names fence-bay/hedge/chimney presentation meshes (fences want solid-per-fact-9 decision) + Direction C gunfire/ratchet rows; world-studio orphan/underlay debt unchanged (61 orphans, 786 unbacked). Interiors add zero new findings: interior/house lines absent from collider output, zero newworld lines in walkable."
         }
       ]
     }

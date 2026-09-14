@@ -19,17 +19,7 @@ import {
   NEWWORLD_PRIME_SHED_PLACEMENTS,
   NEWWORLD_PRIME_SHED_WIDTH_METRES,
 } from './newworld-prime-props';
-import {
-  NEWWORLD_PRIME_BED_IN_MM,
-  NEWWORLD_PRIME_EAST_YELLOW_D_M,
-  NEWWORLD_PRIME_EAST_YELLOW_W_M,
-  NEWWORLD_PRIME_FOUNDATION_ABOVE_GRADE_M,
-  NEWWORLD_PRIME_ROOF_RISE_M,
-  NEWWORLD_PRIME_STOREY_HEIGHT_M,
-  NEWWORLD_PRIME_WEST_TEAL_D_M,
-  NEWWORLD_PRIME_WEST_TEAL_W_M,
-} from './newworld-prime-structures';
-import { newworldPrimeInteriorWallSolids } from './newworld-prime-interiors';
+import { newworldPrimeHouseShellSolids, newworldPrimeInteriorWallSolids } from './newworld-prime-interiors';
 
 /**
  * newworld-prime Day-2 gameplay authority (movement + shot).
@@ -48,9 +38,9 @@ import { newworldPrimeInteriorWallSolids } from './newworld-prime-interiors';
  * - LAYOUT_CONTRACT fact 5: 2 field sheds (northwest + southeast)
  * - LAYOUT_CONTRACT fact 6: 3 lot-division privacy fence runs
  * - INTERIORS PILOT: ground-floor partitions inside both houses (6 walls each,
- *   appended from newworld-prime-interiors; the full-footprint house boxes
- *   above stay solid — physical ingress through the siding is a later pass,
- *   so these walls validate layout + shot cover, not entry)
+ *   data-owned by newworld-prime-interiors) plus the carved shell boxes above:
+ *   full-height perimeter walls with a 1.0 m front-door portal per house and a
+ *   shot-only door-leaf box across each portal (bullets stop, players pass).
  *
  * Deliberately non-solid (dressing / flat / reserved — no authority):
  * - LAYOUT_CONTRACT fact 7: concrete pads (150 mm slabs, walkable),
@@ -59,19 +49,10 @@ import { newworldPrimeInteriorWallSolids } from './newworld-prime-interiors';
  *   jeep + sandbag reservations (footprints kept clear, built later)
  */
 
-// House ground-centre origins, restated (not imported) so this authority
-// module never cycles back into newworld-prime-arena.ts, which the
-// orchestrator wires this bundle into. Values equal
-// NEWWORLD_PRIME_WEST_TEAL_ORIGIN (-13.5, 1.5) and
-// NEWWORLD_PRIME_EAST_YELLOW_ORIGIN (13.5, -1.5).
-const WEST_TEAL_ORIGIN = Object.freeze({ x: -13.5, z: 1.5 });
-const EAST_YELLOW_ORIGIN = Object.freeze({ x: 13.5, z: -1.5 });
-
 // Two full storeys (STOREY_HEIGHT_M 2.7 x2, upper sill owned) over a 0.45 m
-// foundation stem wall, capped by the 1.6 m gable rise.
-const HOUSE_MAX_Y_M =
-  NEWWORLD_PRIME_FOUNDATION_ABOVE_GRADE_M + 2 * NEWWORLD_PRIME_STOREY_HEIGHT_M + NEWWORLD_PRIME_ROOF_RISE_M;
-const HOUSE_MIN_Y_M = -(NEWWORLD_PRIME_BED_IN_MM / 1000);
+// foundation stem wall, capped by the 1.6 m gable rise. (Shell-carve heights
+// are derived identically in newworld-prime-interiors; these consts serve the
+// non-house solids below.)
 
 // Bus glass band tops out at the 3.28 m roof slab + 0.12 m half-thickness.
 const BUS_MAX_Y_M = 3.4;
@@ -103,6 +84,8 @@ type SolidSpec = Readonly<{
   minY: number;
   maxY: number;
   yaw?: number;
+  /** False for shot-only boxes (door leaves): no movement, no cover. */
+  movement?: boolean;
   ballisticMaterial: BallisticMaterialId;
 }>;
 
@@ -120,21 +103,17 @@ function yawedOffset(lx: number, lz: number, yaw: number): readonly [number, num
 
 function solidSpecs(): SolidSpec[] {
   const specs: SolidSpec[] = [
-    // Fact 2: street houses — full structural footprints, both profiles.
-    {
-      id: 'newworld-prime-house-west-teal',
-      x: WEST_TEAL_ORIGIN.x, z: WEST_TEAL_ORIGIN.z,
-      sizeX: NEWWORLD_PRIME_WEST_TEAL_W_M, sizeZ: NEWWORLD_PRIME_WEST_TEAL_D_M,
-      minY: HOUSE_MIN_Y_M, maxY: HOUSE_MAX_Y_M,
-      ballisticMaterial: 'interior-wall',
-    },
-    {
-      id: 'newworld-prime-house-east-yellow',
-      x: EAST_YELLOW_ORIGIN.x, z: EAST_YELLOW_ORIGIN.z,
-      sizeX: NEWWORLD_PRIME_EAST_YELLOW_W_M, sizeZ: NEWWORLD_PRIME_EAST_YELLOW_D_M,
-      minY: HOUSE_MIN_Y_M, maxY: HOUSE_MAX_Y_M,
-      ballisticMaterial: 'interior-wall',
-    },
+    // Fact 2: street houses — full-height perimeter walls with a carved
+    // front-door portal (porch-to-living, 1.0 m at local x=0), plus a
+    // shot-only door-leaf box across each portal. Data-owned by
+    // newworld-prime-interiors; side/rear walls stay solid.
+    ...newworldPrimeHouseShellSolids().map((shell) => ({
+      id: shell.id,
+      x: shell.x, z: shell.z, sizeX: shell.sizeX, sizeZ: shell.sizeZ,
+      minY: shell.minY, maxY: shell.maxY,
+      ...(shell.movement ? {} : { movement: false as const }),
+      ballisticMaterial: 'interior-wall' as const,
+    })),
   ];
 
   // Fact 4: school bus — 11.2 m hull yawed ~90 deg, long axis along world x.
@@ -299,6 +278,9 @@ export function newworldPrimeAuthority(scene: THREE.Scene): NewworldPrimeAuthori
     mesh.userData.ballisticMaterial = surface.material;
 
     // Movement authority in BOTH profiles: planar + physics share the box.
+    // Shot-only boxes (door leaves) skip movement and cover: bullets stop at
+    // the closed-leaf read, players walk the portal.
+    if (spec.movement === false) continue;
     colliders.push(bounds);
     physicsColliders.push(bounds);
     physicalCover.push({ id: spec.id, bounds, blocksMovement: true, blocksShots: true });

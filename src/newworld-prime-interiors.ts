@@ -28,26 +28,28 @@
  *     ground-storey ceiling (2.7 m); thickness 0.14 m (structural module).
  * A4. Openings are plain 1.0 m gaps (front door keeps the 0.95 m leaf width);
  *     no casing/trim geometry this pilot.
- * A5. Physical ingress is a LATER pass: the full-footprint exterior authority
- *     boxes stay solid, so these rooms are layout-validation geometry whose
- *     reachability is proven on the room graph (see below), not by walking
- *     through the uncut siding. This module appends authority; it never
- *     carves shells.
+ * A5. Ingress carved at the front doors only (porch-to-living portal, 1.0 m):
+ *     the full-footprint exterior boxes are replaced by full-height perimeter
+ *     walls with a door gap plus a shot-only door-leaf box; side/rear walls
+ *     stay solid. Porch step-up grading (0.45 m vs 0.42 m autostep) is flagged
+ *     for the exterior porch pass, not solved here.
  * A6. Garage side wings (both plates) are out of scope: house-proper only.
  *
  * Authority model: this module is pure data + world-space derivation. It emits
  * NOTHING itself — the arena assembler emits the meshes (counting against the
- * 1024 assembly lane) and `newworld-prime-authority` appends the wall
- * colliders/shot surfaces (both profiles, `interior-wall` material). Floor
- * slabs are presentation-only underfoot (support comes from the retained
- * full-footprint house solids beneath them).
+ * 1024 assembly lane) and `newworld-prime-authority` emits the wall
+ * colliders/shot surfaces (both profiles, `interior-wall` material) plus the
+ * shell-carve boxes below. Floor slabs are presentation-only underfoot (their
+ * 0.45 m top sits below the walkable census floor, so no support authority).
  *
  * Deterministic: frozen data, no Math.random, no Date.
  */
 import {
+  NEWWORLD_PRIME_BED_IN_MM,
   NEWWORLD_PRIME_EAST_YELLOW_D_M,
   NEWWORLD_PRIME_EAST_YELLOW_W_M,
   NEWWORLD_PRIME_FOUNDATION_ABOVE_GRADE_M,
+  NEWWORLD_PRIME_ROOF_RISE_M,
   NEWWORLD_PRIME_STOREY_HEIGHT_M,
   NEWWORLD_PRIME_WALL_THICKNESS_MM,
   NEWWORLD_PRIME_WEST_TEAL_D_M,
@@ -199,34 +201,34 @@ export function newworldPrimeInteriorOpenings(): readonly NewworldPrimeInteriorO
 }
 
 /**
- * Room-graph reachability: BFS from the living room (the front door lands
- * porch-to-living, so living-reachable == front-door-reachable). Returns the
- * reachable room ids. The contract is every room of the house is in the set
- * (no sealed pockets); the focused test pins it.
+ * Ingress reachability: BFS from the porch THROUGH the carved front-door
+ * portal (porch-to-living edge), so the returned node set proves physical
+ * ingress, not just room-to-room connection. Returns every reachable node id
+ * including 'porch'. The contract: the set equals porch + all 4 rooms of the
+ * house (no sealed pockets, front door is the way in); the focused test pins
+ * the exact sets.
  */
-export function newworldPrimeInteriorRoomsReachableFromFrontDoor(
+export function newworldPrimeInteriorReachableFromPorch(
   house: NewworldPrimeInteriorHouse,
 ): readonly string[] {
   const plan = PLANS[house];
-  const living = plan.rooms.find((room) => room.kind === 'living')!;
-  const adjacency = new Map<string, string[]>();
+  const adjacency: Record<string, string[]> = {};
   const link = (a: string, b: string): void => {
-    adjacency.set(a, [...(adjacency.get(a) ?? []), b]);
-    adjacency.set(b, [...(adjacency.get(b) ?? []), a]);
+    adjacency[a] = [...(adjacency[a] ?? []), b];
+    adjacency[b] = [...(adjacency[b] ?? []), a];
   };
   for (const opening of plan.openings) link(opening.connects[0]!, opening.connects[1]!);
-  const seen = new Set<string>([living.id]);
-  const queue: string[] = [living.id];
+  const seen: Record<string, true> = { porch: true };
+  const queue: string[] = ['porch'];
   while (queue.length > 0) {
     const current = queue.pop()!;
-    for (const next of adjacency.get(current) ?? []) {
-      if (seen.has(next)) continue;
-      seen.add(next);
+    for (const next of adjacency[current] ?? []) {
+      if (seen[next]) continue;
+      seen[next] = true;
       queue.push(next);
     }
   }
-  // 'porch' is the outside node, not a room: report rooms only.
-  return Object.freeze(plan.rooms.map((room) => room.id).filter((id) => seen.has(id)));
+  return Object.freeze(Object.keys(seen));
 }
 
 /** World-space presentation parts for the arena assembler (floors + walls). */
@@ -292,4 +294,84 @@ export function newworldPrimeInteriorWallSolids(): readonly NewworldPrimeInterio
     }
   }
   return Object.freeze(solids);
+}
+
+/**
+ * Front-door shell carve: replaces each full-footprint exterior authority box
+ * with full-height perimeter walls (siding centrelines, 0.14 m thick) leaving
+ * a 1.0 m door portal at local x=0 on the street (+z) face, plus a shot-only
+ * door-leaf box across the portal (closed-leaf read blocks bullets; movement
+ * passes). Side/rear walls stay solid; heights match the retired boxes
+ * exactly (bed-in floor to roof cap) so upper shells keep their rating.
+ */
+export type NewworldPrimeHouseShellSolid = Readonly<{
+  id: string;
+  house: NewworldPrimeInteriorHouse;
+  /** False for the door-leaf box: shot surface + proxy only, no movement. */
+  movement: boolean;
+  x: number;
+  z: number;
+  sizeX: number;
+  sizeZ: number;
+  minY: number;
+  maxY: number;
+}>;
+
+/** Half-gap of the door portal (1.0 m clear at local x=0, both houses). */
+export const NEWWORLD_PRIME_INTERIOR_PORTAL_HALF_W_M = 0.5;
+
+/** World-space shell-carve boxes for `newworld-prime-authority`. */
+export function newworldPrimeHouseShellSolids(): readonly NewworldPrimeHouseShellSolid[] {
+  const minY = -(NEWWORLD_PRIME_BED_IN_MM / 1000);
+  const maxY = NEWWORLD_PRIME_FOUNDATION_ABOVE_GRADE_M
+    + 2 * NEWWORLD_PRIME_STOREY_HEIGHT_M
+    + NEWWORLD_PRIME_ROOF_RISE_M;
+  const t = NEWWORLD_PRIME_WALL_THICKNESS_MM / 1000;
+  const setback = 0.008;
+  const build = (
+    house: NewworldPrimeInteriorHouse,
+    widthM: number,
+    depthM: number,
+  ): readonly NewworldPrimeHouseShellSolid[] => {
+    const origin = ORIGINS[house];
+    const tag = house === 'west-teal' ? 'west-teal' : 'east-yellow';
+    const hx = widthM / 2 + setback;
+    const hz = depthM / 2 + setback;
+    const side = (sideId: string, lx: number): NewworldPrimeHouseShellSolid => Object.freeze({
+      id: `newworld-prime-house-${tag}-${sideId}`,
+      house, movement: true,
+      x: origin.x + lx, z: origin.z,
+      sizeX: t, sizeZ: depthM + 2 * (setback + t / 2),
+      minY, maxY,
+    });
+    const run = (
+      runId: string, minLx: number, maxLx: number, lz: number,
+    ): NewworldPrimeHouseShellSolid => Object.freeze({
+      id: `newworld-prime-house-${tag}-${runId}`,
+      house, movement: true,
+      x: origin.x + (minLx + maxLx) / 2, z: origin.z + lz,
+      sizeX: maxLx - minLx, sizeZ: t,
+      minY, maxY,
+    });
+    const gap = NEWWORLD_PRIME_INTERIOR_PORTAL_HALF_W_M;
+    const inner = hx - t / 2 - 0.008;
+    return Object.freeze([
+      side('wall-west', -hx),
+      side('wall-east', hx),
+      run('wall-north', -inner, inner, -hz),
+      run('wall-south-left', -inner, -gap, hz),
+      run('wall-south-right', gap, inner, hz),
+      Object.freeze({
+        id: `newworld-prime-house-${tag}-door-leaf`,
+        house, movement: false,
+        x: origin.x, z: origin.z + hz,
+        sizeX: gap * 2, sizeZ: t,
+        minY: 0, maxY: NEWWORLD_PRIME_STOREY_HEIGHT_M,
+      }),
+    ]);
+  };
+  return Object.freeze([
+    ...build('west-teal', NEWWORLD_PRIME_WEST_TEAL_W_M, NEWWORLD_PRIME_WEST_TEAL_D_M),
+    ...build('east-yellow', NEWWORLD_PRIME_EAST_YELLOW_W_M, NEWWORLD_PRIME_EAST_YELLOW_D_M),
+  ]);
 }

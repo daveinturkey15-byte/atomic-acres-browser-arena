@@ -54,6 +54,7 @@ import {
   type NewworldPrimeScaleReadBox,
   type NewworldPrimeScaleReadFlags,
 } from './newworld-prime-scale-read';
+import { newworldPrimeInteriorParts } from './newworld-prime-interiors';
 import { newworldPrimeAuthority } from './newworld-prime-authority';
 
 /**
@@ -657,6 +658,19 @@ function buildScaleReadDressing(
   }
 }
 
+/**
+ * INTERIORS PILOT: ground-floor partition walls + floor slabs, both houses.
+ * Data-owned by newworld-prime-interiors (room/wall/doorway truth); emitted
+ * here through the shared structure-part path so the meshes count against the
+ * 1024 assembly lane. Authority for the walls lands in newworld-prime-authority.
+ */
+function buildInteriors(ctx: BlockoutContext): number {
+  const parts = orEmpty(newworldPrimeInteriorParts());
+  for (const part of parts) emitStructurePart(ctx, part);
+  return parts.length;
+}
+
+
 // Day-2: live spawns come from newworld-prime-authority (standby set retired).
 
 // ---------------------------------------------------------------------------
@@ -701,6 +715,7 @@ export function buildNewworldPrime(
   buildClotheslines(ctx); // fact 8 (local massing)
   const lighting = newworldPrimeLightingFor(opts?.lightingVariant ?? 'late-morning');
   buildScaleReadDressing(ctx, scaleRead, lighting.variant); // scale-read wave
+  buildInteriors(ctx); // interiors pilot (ground-floor outlines, both houses)
 
 
   const propBudgetErrors = validateNewworldPrimePropBudgets();
