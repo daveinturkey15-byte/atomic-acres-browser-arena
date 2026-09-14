@@ -7,6 +7,7 @@ export const PASS65_SHED_ELIGIBILITY = Object.freeze([
   Object.freeze({ arenaId: 'skyline-terminal' as const, zone: 'terminal-apron' as const, minimumSheds: 2 }),
   Object.freeze({ arenaId: 'rustworks-1v1' as const, zone: 'whole-arena' as const, minimumSheds: 2 }),
   Object.freeze({ arenaId: 'gun-range' as const, zone: null, minimumSheds: 0 }),
+  Object.freeze({ arenaId: 'newworld-prime' as const, zone: null, minimumSheds: 0 }),
 ]);
 
 /**

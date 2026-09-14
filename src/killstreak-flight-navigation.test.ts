@@ -53,7 +53,7 @@ describe('support flight navigation', () => {
 
   it('declares arena-owned nav data for every stable arena identity', () => {
     expect(Object.keys(PASS65_FLIGHT_NAVIGATION).sort()).toEqual([
-      'atomic-acres', 'gun-range', 'rustworks-1v1', 'skyline-terminal',
+      'atomic-acres', 'gun-range', 'newworld-prime', 'rustworks-1v1', 'skyline-terminal',
     ]);
     for (const entry of Object.values(PASS65_FLIGHT_NAVIGATION)) {
       expect(entry.noFlyPolicy).toBe('authoritative-static-and-dynamic-solids');

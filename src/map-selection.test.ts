@@ -10,15 +10,16 @@ import {
 } from './map-selection';
 
 describe('opening arena selection', () => {
-  it('publishes four unique, fully described maps', () => {
+  it('publishes five unique, fully described maps', () => {
     expect(ARENA_SELECTIONS.map((entry) => entry.id)).toEqual([
       'atomic-acres',
       'skyline-terminal',
       'rustworks-1v1',
       'gun-range',
+      'newworld-prime',
     ]);
-    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range']);
-    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(4);
+    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'New World Prime']);
+    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(5);
     for (const entry of ARENA_SELECTIONS) {
       expect(entry.selectorLabel.length).toBeGreaterThan(3);
       expect(entry.summary.length).toBeGreaterThan(12);
@@ -65,12 +66,13 @@ describe('opening arena selection', () => {
 
   it('binds hosted round clocks and canvas labels to the selected arena', () => {
     expect(ARENA_SELECTIONS.map((selection) => hostedArenaDurationMs(selection)))
-      .toEqual([300_000, 300_000, 300_000, 120_000]);
+      .toEqual([300_000, 300_000, 300_000, 120_000, 300_000]);
     expect(ARENA_SELECTIONS.map((selection) => arenaCanvasLabel(selection))).toEqual([
       'Nuke Town multiplayer arena',
       'Terminal multiplayer arena',
       'RustRig multiplayer arena',
       'Gun Range multiplayer arena',
+      'New World Prime multiplayer arena',
     ]);
   });
 
@@ -80,6 +82,7 @@ describe('opening arena selection', () => {
       'skyline-terminal': true,
       'rustworks-1v1': true,
       'gun-range': true,
+      'newworld-prime': true,
     });
   });
 
@@ -98,6 +101,7 @@ describe('opening arena selection', () => {
       '1 BOT SKIRMISH',
       '1 BOT SKIRMISH',
       'START RANGE',
+      '1 BOT SKIRMISH',
     ]);
   });
 

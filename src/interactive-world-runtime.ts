@@ -119,7 +119,7 @@ export type InteractiveWorldStateEnvelope = Readonly<{
   hash: string;
 }>;
 
-const SHED_ARENA_IDS = Object.freeze(['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'] as const);
+const SHED_ARENA_IDS = Object.freeze(['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'newworld-prime'] as const);
 
 function interactiveWorldEnvelopeHash(value: Omit<InteractiveWorldStateEnvelope, 'hashAlgorithm' | 'hash'>): string {
   return canonicalSha256(value);

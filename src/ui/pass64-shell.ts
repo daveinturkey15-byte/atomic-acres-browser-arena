@@ -37,7 +37,14 @@ export function createPass64ShellViewModel(playerName: string): Pass64ShellViewM
 }
 
 function mapCardsMarkup(): string {
-  return ARENA_SELECTIONS.map((entry, index) => `<button type="button" class="map-card${index === 0 ? ' selected' : ''}" data-arena-id="${entry.id}" data-arena-route="${entry.routeId}" aria-pressed="${index === 0}" disabled>
+  return ARENA_SELECTIONS.map((entry, index) => entry.standbyPreviewOnly
+    ? `<button type="button" class="map-card standby" data-arena-id="${entry.id}" data-arena-route="${entry.routeId}" data-standby="true" aria-pressed="false" aria-disabled="true" disabled>
+    <i class="map-index">0${index + 1}</i>
+    <span>${entry.selectorLabel}</span>
+    <strong>${entry.summary}</strong>
+    <small>STANDBY PREVIEW · NOT YET DEPLOYABLE</small>
+  </button>`
+    : `<button type="button" class="map-card${index === 0 ? ' selected' : ''}" data-arena-id="${entry.id}" data-arena-route="${entry.routeId}" aria-pressed="${index === 0}" disabled>
     <i class="map-index">0${index + 1}</i>
     <span>${entry.selectorLabel}</span>
     <strong>${entry.summary}</strong>
@@ -104,7 +111,7 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
         <div class="showcase-telemetry"><span id="menu-preview-label">PRERECORDED HELO // NUKE TOWN</span><b id="menu-preview-motion">AUTHORED COCKPIT FLYOVER</b></div>
       </aside>
       <section id="map-selector" class="map-selector" aria-label="Choose map">
-        <div class="map-selector-heading"><span>THEATRE INDEX</span><small>Four deployable spaces · choose before launch</small></div>
+        <div class="map-selector-heading"><span>THEATRE INDEX</span><small>Four deployable spaces · one standby preview · choose before launch</small></div>
         <div class="map-card-grid">${mapCardsMarkup()}</div>
       </section>
     </section>
@@ -127,7 +134,7 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
       <section id="private-lobby" hidden aria-labelledby="private-lobby-title">
         <div class="private-lobby-heading"><span><small>PRIVATE MATCH</small><strong id="private-lobby-title">WAITING ROOM</strong></span><b id="lobby-capacity-label">1 / 4</b></div>
         <div class="lobby-settings">
-          <label>MAP<select id="lobby-arena">${ARENA_SELECTIONS.map((entry) => `<option value="${entry.id}">${entry.displayName.toUpperCase()}</option>`).join('')}</select></label>
+          <label>MAP<select id="lobby-arena">${ARENA_SELECTIONS.filter((entry) => !entry.standbyPreviewOnly).map((entry) => `<option value="${entry.id}">${entry.displayName.toUpperCase()}</option>`).join('')}</select></label>
           <label>MODE<select id="lobby-mode"><option value="ffa" selected>FREE FOR ALL</option><option value="tdm">TEAM DEATHMATCH</option></select></label>
           <label>SQUAD NAME<input id="lobby-squad-name" maxlength="20" value="AQUA" autocomplete="off"></label>
           <label>SQUAD COLOUR<input id="lobby-squad-color" type="color" value="#55e6ff" aria-label="Squad colour"></label>

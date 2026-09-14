@@ -150,6 +150,11 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaVisualDefinition['id'], Atmospher
     [[-18, 16, 2.4, 4.2], [18, 16, 2.4, 4.2], [0, -22, 2.2, 3.8]],
     { count: 80, minX: -34, maxX: 34, minZ: -34, maxZ: 34 },
   ),
+  'newworld-prime': atmosphereLayout(
+    [[-24, 12, 14, 4.2], [24, 12, 14, 4.2], [0, -10, 10, 3.2]],
+    [[-20, 16, 2.4, 4.2], [20, 16, 2.4, 4.2], [0, -22, 2.2, 3.8]],
+    { count: 72, minX: -32, maxX: 32, minZ: -32, maxZ: 32 },
+  ),
 });
 const MAX_MIST_LAYERS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
 

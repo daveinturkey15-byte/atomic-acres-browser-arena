@@ -58,6 +58,11 @@ export const PASS65_FLIGHT_NAVIGATION: Readonly<Record<ArenaId, ArenaFlightNavig
     { id: 'boarding-portal', xQ: 0, zQ: 0.08, altitudeM: 4.2 },
     { id: 'terminal-overflight', xQ: 0, zQ: 0, altitudeM: 20 },
   ]),
+  'newworld-prime': definition('newworld-prime', 42, [
+    { id: 'north-yard-air-gap', xQ: 0, zQ: -0.62, altitudeM: 9 },
+    { id: 'south-yard-air-gap', xQ: 0, zQ: 0.62, altitudeM: 9 },
+    { id: 'depot-overflight', xQ: 0, zQ: 0, altitudeM: 20 },
+  ]),
 });
 
 export type SupportFlightStepInput = Readonly<{

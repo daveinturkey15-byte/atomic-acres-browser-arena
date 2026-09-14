@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "releasePass": "PASS 74",
+  "feedbackReceivedAt": "2026-09-14T06:30:00Z",
+  "status": "proposed",
+  "preview": {
+    "kind": "local-candidate",
+    "ref": "contrib/dave-gaming-pc/omp/newworld-prime-20260914 (PR preview pending CI artifact)",
+    "sourceSha": "TBD-at-PR-head",
+    "createdAt": "2026-09-14T07:00:00Z"
+  },
+  "humanAcceptance": {
+    "state": "pending",
+    "approvedBy": "Dave",
+    "approvedAt": null,
+    "evidence": "Owner HITL open: boot ?map=newworld-prime and confirm New World Prime standby card + bar read vs batch-2-layout plates."
+  },
+  "requirements": [
+    {
+      "id": "R1",
+      "summary": "New arena newworld-prime registers alongside the 4 existing arenas without altering them",
+      "expected": "ARENA_SELECTIONS has 5 rows with the 4 old rows byte-identical and first; decoders round-trip new id+route; factories, audio, atmosphere, shadow, nav, spawn, preview, shell and visual registries all carry the new row.",
+      "falsifier": "Any old row reordered/renamed, any registry missing the new key, or tsc failing on the candidate.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "src/map-selection.test.ts",
+          "command": "npx vitest run src/map-selection.test.ts src/ui/pass64-shell.test.ts src/killstreak-flight-navigation.test.ts src/rendering/arena-visual-definition.test.ts",
+          "note": "36/36 green on candidate HEAD after positive pin updates (5 ids, 5 displayNames, 5 routes, 5 clocks/labels/support rows, 5 nav keys)."
+        },
+        {
+          "kind": "unit",
+          "ref": "tsc",
+          "command": "npx tsc --noEmit",
+          "note": "Exit 0 on candidate HEAD; 18 builder-introduced errors (17 structures typings + 1 TSL atmosphere row) fixed by orchestrator."
+        }
+      ]
+    },
+    {
+      "id": "R2",
+      "summary": "Layout, lighting, structures and props generators follow the frozen bar within their own budget fences",
+      "expected": "4 new generator modules emit presentation-only PARTS matching LAYOUT_CONTRACT facts 1-10 and citing batch-2-layout/batch-3 plates; deterministic seeded PRNG throughout; vehicle parts inside coach 10k/truck 6k/saloon 9k fences; world-studio 59,472/60,000 lane untouched.",
+      "falsifier": "Any Math.random( in new code, any ShaderMaterial/GLSL, any collider/spawn/nav edit, or any part total over its fence.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/newworld-prime-arena.ts + src/newworld-prime-lighting.ts + src/newworld-prime-structures.ts + src/newworld-prime-props.ts",
+          "command": "grep -rn Math.random(/ShaderMaterial/onBeforeCompile in new files; npm run build",
+          "note": "Grep clean (comment mentions only); vite build green in ~1s. Structures 80+72 parts vs 96 budgets; props bus 910/truck 1112/rusty 484 vs family fences."
+        }
+      ]
+    },
+    {
+      "id": "R3",
+      "summary": "Candidate serves and ?map=newworld-prime boots to a standby-gated menu without crashing",
+      "expected": "Production build serves; selecting the New World Prime card stays standby-disabled and never crashes the menu camera path (atomic-acres choreography fallback).",
+      "falsifier": "Blank canvas, console exception, or menu crash on the served candidate.",
+      "acceptance": "mixed",
+      "state": "unverified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "http://127.0.0.1:4174/?map=newworld-prime (lane preview, vite preview --outDir dist)",
+          "command": "npx vite preview --host 127.0.0.1 --port 4174 --outDir dist --strictPort",
+          "note": "Build green; live-pixel boot check BLOCKED: OMP browser relay returned no-page-targets twice. Owner can open the URL directly; server aa-prime left running."
+        }
+      ]
+    },
+    {
+      "id": "R4",
+      "summary": "Owner visual acceptance vs the 251-plate bar (deferred to HITL)",
+      "expected": "Day-1 standby read matches batch-2-layout topdown/angle/center-loop massing at representative viewports per LAYOUT_CONTRACT.",
+      "falsifier": "Any representative capture contradicting the 10 layout facts.",
+      "acceptance": "human",
+      "state": "unverified",
+      "evidence": [
+        {
+          "kind": "visual",
+          "ref": "C:/Users/david/Desktop/stuff/atomic-acres-catalog/batch-2-layout/",
+          "note": "Frozen bar cited per generator; viewpoint-regression runner absent at this base (origin/main has no run-arena-viewpoint-regression.mjs) so no diff artifact yet. Deferred to owner HITL."
+        }
+      ]
+    }
+  ]
+}

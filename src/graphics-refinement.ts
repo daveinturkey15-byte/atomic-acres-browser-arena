@@ -29,6 +29,7 @@ const SHADOW_VOLUMES: Readonly<Record<ArenaId, ArenaShadowVolume>> = Object.free
   'rustworks-1v1': Object.freeze({ halfWidth: 41, halfHeight: 48, near: 4, far: 180 }),
   'gun-range': Object.freeze({ halfWidth: 38, halfHeight: 66, near: 4, far: 188 }),
   'skyline-terminal': Object.freeze({ halfWidth: 49, halfHeight: 56, near: 4, far: 182 }),
+  'newworld-prime': Object.freeze({ halfWidth: 52, halfHeight: 58, near: 4, far: 184 }),
 });
 
 // RoomEnvironment is deliberately only a reflection/indirect-light accent.
@@ -39,6 +40,7 @@ const ARENA_ENVIRONMENT_SCALES: Readonly<Record<ArenaId, number>> = Object.freez
   'rustworks-1v1': 0.14,
   'gun-range': 0.1,
   'skyline-terminal': 0.22,
+  'newworld-prime': 0.2,
 });
 
 export function arenaEnvironmentScale(arenaId: ArenaId): number {

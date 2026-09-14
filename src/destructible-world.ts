@@ -27,7 +27,7 @@ export const WORLD_COLLISION_CONSUMERS = Object.freeze([
 ] as const);
 
 export type WorldCollisionConsumer = typeof WORLD_COLLISION_CONSUMERS[number];
-export type ShedArenaId = 'atomic-acres' | 'skyline-terminal' | 'rustworks-1v1' | 'gun-range';
+export type ShedArenaId = 'atomic-acres' | 'skyline-terminal' | 'rustworks-1v1' | 'gun-range' | 'newworld-prime';
 export type DamageableSheetRole = 'wall' | 'roof' | 'door' | 'detached-chunk';
 export type ShedDoorBlockerKind = 'player' | 'major-debris' | 'bullet';
 
@@ -150,7 +150,7 @@ export type DestructibleShedDefinition = Readonly<{
 export type ShedPlacement = Readonly<{
   id: string;
   definitionId: string;
-  arenaId: Exclude<ShedArenaId, 'gun-range'>;
+  arenaId: Exclude<ShedArenaId, 'gun-range' | 'newworld-prime'>;
   zone: 'whole-arena' | 'terminal-apron';
   position: Point3;
   yaw: number;

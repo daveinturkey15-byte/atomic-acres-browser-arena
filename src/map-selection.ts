@@ -2,9 +2,9 @@ import { MATCH_DURATION_MS, type MatchRules } from './gameplay';
 import { MAX_SOLO_BOTS, SOLO_BOT_COUNT, soloBotTargetForDeaths } from './bot-ai';
 import { GUN_RANGE_ROUND_MS } from './gun-range-rules';
 
-export type ArenaId = 'atomic-acres' | 'rustworks-1v1' | 'gun-range' | 'skyline-terminal';
+export type ArenaId = 'atomic-acres' | 'rustworks-1v1' | 'gun-range' | 'skyline-terminal' | 'newworld-prime';
 
-export type ArenaRouteId = 'nuke-town' | 'terminal' | 'rustrig' | 'gun-range';
+export type ArenaRouteId = 'nuke-town' | 'terminal' | 'rustrig' | 'gun-range' | 'new-world-prime';
 
 export type ArenaSelection = Readonly<{
   id: ArenaId;
@@ -22,6 +22,13 @@ export type ArenaSelection = Readonly<{
   multiplayer: boolean;
   fieldSupport: boolean;
   overdrive: boolean;
+  /**
+   * Day-1 standby: the registry, decoders, audio, preview and factory rows
+   * exist, but the menu renders a disabled standby card and the lobby omits
+   * the arena until the gauntlet pass clears it. Removing this flag (one
+   * line on the newworld-prime row) is the entire Day-2 enablement.
+   */
+  standbyPreviewOnly?: boolean;
   matchRules: MatchRules;
 }>;
 
@@ -103,6 +110,25 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     fieldSupport: true,
     overdrive: false,
     matchRules: Object.freeze({ durationMs: GUN_RANGE_ROUND_MS, scoreLimit: null }),
+  }),
+  Object.freeze({
+    id: 'newworld-prime' as const,
+    routeId: 'new-world-prime' as const,
+    legacyAliases: Object.freeze([]),
+    selectorLabel: 'NEW WORLD PRIME',
+    displayName: 'New World Prime',
+    titleLead: 'NEW WORLD',
+    titleAccent: 'PRIME',
+    menuLede: 'Stage through an original bus-yard and garage apron with depot cover, yard-lane sightlines and a standby prerecorded flyover.',
+    summary: 'Original bus-yard team arena · standby preview',
+    rulesLabel: '5 MIN · 1 BOT SKIRMISH · STANDBY',
+    soloBotCount: 1,
+    maximumSoloBots: 1,
+    multiplayer: true,
+    fieldSupport: true,
+    overdrive: false,
+    standbyPreviewOnly: true as const,
+    matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
 ]);
 

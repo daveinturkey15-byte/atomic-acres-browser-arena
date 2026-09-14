@@ -27,6 +27,7 @@ describe('Pass 66 command shell', () => {
       'terminal',
       'rustrig',
       'gun-range',
+      'new-world-prime',
     ]);
   });
 
@@ -36,7 +37,7 @@ describe('Pass 66 command shell', () => {
     expect(markup).toContain('id="host" disabled');
     expect(markup).toContain('id="room-input" placeholder="Paste room code" autocomplete="off" disabled');
     expect(markup).toContain('id="join" disabled');
-    expect(markup.match(/class="map-card[^>]+disabled/g)).toHaveLength(4);
+    expect(markup.match(/class="map-card[^>]+disabled/g)).toHaveLength(5);
   });
 
   it('renders four curated kits, exactly three custom slots with nested EDIT, and one manager', () => {

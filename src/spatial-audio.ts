@@ -254,6 +254,12 @@ export const ARENA_AUDIO_DEFINITIONS: Readonly<Record<ArenaId, ArenaAudioDefinit
     modulationHz: 0.095, modulationDepth: 0.1,
     bedPosition: Object.freeze({ x: -17, y: 5, z: -8 }), airPosition: Object.freeze({ x: 22, y: 4, z: 14 }),
   }),
+  'newworld-prime': Object.freeze({
+    arenaId: 'newworld-prime', identity: 'bus-yard-wind-and-depot-grid-hum', source: 'repository-procedural-original',
+    continuousVoices: 2, bedFrequencyHz: 55, airFrequencyHz: 188, airLowpassHz: 700, airQ: 1.9, airGain: 0.007,
+    modulationHz: 0.09, modulationDepth: 0.1,
+    bedPosition: Object.freeze({ x: -20, y: 5, z: 10 }), airPosition: Object.freeze({ x: 19, y: 6, z: -12 }),
+  }),
 });
 
 export function validateArenaAudioDefinitions(): readonly string[] {

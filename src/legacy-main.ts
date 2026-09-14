@@ -74,6 +74,7 @@ import {
   buildSkylineTerminal,
   updateGunRangePresentation,
 } from './additional-maps';
+import { buildNewworldPrime } from './newworld-prime-arena';
 import { RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES } from './rigged-bot-visual-evidence-contract';
 import {
   GUN_RANGE_TEST_BAY_CONTRACT,
@@ -3097,6 +3098,7 @@ const arenaFactories: Readonly<Record<ArenaId, (target: THREE.Scene) => ArenaMap
   'rustworks-1v1': buildRustworks1v1,
   'gun-range': buildGunRange,
   'skyline-terminal': buildSkylineTerminal,
+  'newworld-prime': buildNewworldPrime,
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const ARENA_CACHE_BOUND = 2;
@@ -24365,7 +24367,8 @@ function syncArenaSelectionUi(): void {
     const selected = button.dataset.arenaId === selectedArena.id;
     button.classList.toggle('selected', selected);
     button.setAttribute('aria-pressed', String(selected));
-    button.disabled = !arenaSelectionReady || gameStarted || matchStartPreparing || lobbyArenaLocked;
+    // Day-1 standby cards are presentation-only: no sync pass may enable them.
+    button.disabled = button.dataset.standby === 'true' || !arenaSelectionReady || gameStarted || matchStartPreparing || lobbyArenaLocked;
   }
   const soloButton = element<HTMLButtonElement>('#solo');
   const hostButton = element<HTMLButtonElement>('#host');
@@ -24880,8 +24883,8 @@ function activateArenaSelection(
 function stageMenuArenaSelection(id: ArenaId): void {
   if (gameStarted || matchStartPreparing || !arenaSelectionReady || network.role !== 'offline' || privateLobbySnapshot) return;
   const nextSelection = arenaSelection(id);
+  if (nextSelection.standbyPreviewOnly) return;
   if (nextSelection.id === selectedArena.id) return;
-  selectedArena = nextSelection;
   clearDebugRiggedEvidenceCaptureTargets();
   lastDebugCapturePresentation = null;
   document.documentElement.dataset.menuArenaId = selectedArena.id;

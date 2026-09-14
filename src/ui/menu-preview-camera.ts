@@ -296,8 +296,12 @@ function adjustedLookAt(position: Vector3Tuple, target: Vector3Tuple, pitchDegre
 }
 
 export function menuPreviewDefinition(arenaId: ArenaId): MenuPreviewDefinition {
+  // Day-1 standby: the choreography masters ship no newworld-prime recipe
+  // until the gauntlet pass clears the arena. Fall back to the atomic-acres
+  // recipe so a standby selection can never crash the menu camera path.
+  const recipe = CHOREOGRAPHY.arenas[arenaId] ?? CHOREOGRAPHY.arenas['atomic-acres'];
   return Object.freeze({
-    ...CHOREOGRAPHY.arenas[arenaId],
+    ...recipe,
     durationMs: DURATION_MS,
     recipeId: CHOREOGRAPHY.recipeId,
     reviewFrames: CHOREOGRAPHY.reviewFrames,

@@ -24,6 +24,7 @@ import {
 import { Team } from './protocol';
 import type { GlassState } from './glass-authority';
 import { bindPass73CollisionVisualOwner } from './pass73-collision-route-authority';
+import type { ArenaId } from './map-selection';
 
 export type PracticeTarget = {
   id: string;
@@ -40,7 +41,7 @@ export type PracticeTarget = {
 };
 export type BreakableWindow = { id: string; mesh: THREE.Mesh; broken: boolean; glassState?: GlassState };
 export type ArenaMap = {
-  id: 'atomic-acres' | 'rustworks-1v1' | 'gun-range' | 'skyline-terminal';
+  id: ArenaId;
   label: string;
   root: THREE.Group;
   colliders: Box2[];

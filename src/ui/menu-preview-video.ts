@@ -79,6 +79,20 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     width: 2560,
     height: 1440,
   }),
+  'newworld-prime': Object.freeze({
+    arenaId: 'newworld-prime',
+    frame: 'helicopter',
+    label: 'PRERECORDED HELO // NEW WORLD PRIME · STANDBY',
+    motionLabel: 'AUTHORED COCKPIT FLYOVER',
+    reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
+    presentationId: 'menu-video-runtime-helo-new-world-prime-standby-v1',
+    webm: `${ROOT}/newworld-prime.webm?v=${CACHE_KEY}`,
+    mp4: `${ROOT}/newworld-prime.mp4?v=${CACHE_KEY}`,
+    poster: `${ROOT}/newworld-prime.webp?v=${CACHE_KEY}`,
+    durationSeconds: 8,
+    width: 2560,
+    height: 1440,
+  }),
 } satisfies Record<ArenaId, MenuPreviewVideoDefinition>);
 
 export function menuPreviewVideoDefinition(arenaId: ArenaId): MenuPreviewVideoDefinition {

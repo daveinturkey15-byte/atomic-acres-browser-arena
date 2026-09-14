@@ -77,6 +77,15 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.f
       [-18, 16, 2.4, 4.2, 1.1], [18, 16, 2.4, 4.2, 3.5], [0, -22, 2.2, 3.8, 2.1],
     ] as SmokeCard[]),
   }),
+  'newworld-prime': Object.freeze({
+    mist: Object.freeze([
+      [-24, 12, 14, 4.2], [24, 12, 14, 4.2], [-16, -20, 12, 3.8],
+      [16, -20, 12, 3.8], [0, 26, 15, 4.5], [0, -8, 10, 3.2],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-20, 18, 2.4, 4.2, 1.1], [20, 18, 2.4, 4.2, 3.5], [0, -24, 2.2, 3.8, 2.1],
+    ] as SmokeCard[]),
+  }),
 });
 
 const MAX_MIST_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
