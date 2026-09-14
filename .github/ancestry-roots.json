@@ -3,6 +3,12 @@
   "purpose": "Executable allowlist of every parentless (root) commit that may appear in this repository history. A root not listed here is refused by scripts/release/pipeline-guard.mjs and by acceptance-gate.mjs --phase reconciliation. Adding an entry is an explicit reviewed decision, never an automatic fix for a red guard.",
   "legitimate": [
     {
+      "sha": "f7efdafc3ea9ff3d49f142ac39f52e1fe619f35a",
+      "date": "2026-07-11",
+      "subject": "Snapshot broken suburban arena before overhaul",
+      "note": "Reviewed 2026-09-14: sole output of rev-list --max-parents=0 origin/main AND of the PASS 96 live-line tip. Genuine root of main's history, not a severing import; without it the guard refuses main itself and every lane. Evidence: PASS 97 reconciliation prep."
+    },
+    {
       "sha": "090f074d9bc075364cf3b0cdc8c122f111570994",
       "date": "2026-07-25",
       "subject": "test: retain stable WebGPU frame pacing"
