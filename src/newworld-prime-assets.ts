@@ -1,7 +1,7 @@
 /**
  * newworld-prime Blender GLB dressing (presentation-only).
  *
- * Attaches five Blender-built GLBs over the Day-1 blockout massing emitted by
+ * Attaches nine Blender-built GLBs over the Day-1 blockout massing emitted by
  * buildNewworldPrime (src/newworld-prime-arena.ts). Authority
  * (colliders, ballistic surfaces, spawns, nav) is untouched — the authority
  * boxes already match these dims by construction, and every dressed mesh is
@@ -34,6 +34,11 @@
  * - house-west-teal (3064 tris): atomic-acres-catalog/assets-batch1/
  *   house-west-teal/manifest.json — LAYOUT_CONTRACT fact 2 (WEST teal
  *   siding, white trim, chimney, porch with railing), 7.2 x 6.0 m.
+ * - bus (3692 tris): atomic-acres-catalog/assets-batch1/bus/out.glb —
+ *   LAYOUT_CONTRACT fact 4 (school-bus center spot, box ~11.2 x 2.5 x 2.6 m).
+ * - fence bay (198 tris, 2.4 m repeat), hedge (200 tris), pad (48 tris):
+ *   atomic-acres-catalog/assets-batch1/fences/ — privacy-fence runs, hedge
+ *   runs, and all 9 concrete-pad placements from newworld-prime-props.
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -44,6 +49,11 @@ import {
   NEWWORLD_PRIME_WEST_TEAL_ORIGIN,
 } from './newworld-prime-arena';
 import {
+  NEWWORLD_PRIME_CONCRETE_PAD_PLACEMENTS,
+  NEWWORLD_PRIME_FENCE_BAY_LENGTH_METRES,
+  NEWWORLD_PRIME_HEDGE_RUNS,
+  NEWWORLD_PRIME_PRIVACY_FENCE_RUNS,
+  NEWWORLD_PRIME_SCHOOL_BUS_PLACEMENT,
   NEWWORLD_PRIME_SHED_PLACEMENTS,
   NEWWORLD_PRIME_STREET_LAMP_PLACEMENTS,
   NEWWORLD_PRIME_WELCOME_SIGN_PLACEMENT,
@@ -65,6 +75,19 @@ export const NEWWORLD_PRIME_LAMP_GLB =
 export const NEWWORLD_PRIME_SIGN_GLB =
   `./assets/newworld-prime/sign.glb?v=${NEWWORLD_PRIME_GLB_VERSION}`;
 
+/** Cache-busting lane for the batch-2 GLB copies. */
+const NEWWORLD_PRIME_GLB_VERSION_BATCH2 = 'batch2-20260914';
+
+/** Public asset URLs for the four batch-2 GLB copies. */
+export const NEWWORLD_PRIME_BUS_GLB =
+  `./assets/newworld-prime/bus.glb?v=${NEWWORLD_PRIME_GLB_VERSION_BATCH2}`;
+export const NEWWORLD_PRIME_FENCE_BAY_GLB =
+  `./assets/newworld-prime/fence_bay.glb?v=${NEWWORLD_PRIME_GLB_VERSION_BATCH2}`;
+export const NEWWORLD_PRIME_HEDGE_GLB =
+  `./assets/newworld-prime/hedge.glb?v=${NEWWORLD_PRIME_GLB_VERSION_BATCH2}`;
+export const NEWWORLD_PRIME_PAD_GLB =
+  `./assets/newworld-prime/pad.glb?v=${NEWWORLD_PRIME_GLB_VERSION_BATCH2}`;
+
 /**
  * Fallback flags for the GLB/blockout swap. Every group defaults ON (new
  * meshes dress the arena); any group set false keeps its blockout massing
@@ -76,6 +99,10 @@ export type NewworldPrimeGlbDressingFlags = Readonly<{
   sheds: boolean;
   lamps: boolean;
   sign: boolean;
+  bus: boolean;
+  fences: boolean;
+  hedges: boolean;
+  pads: boolean;
 }>;
 
 export const NEWWORLD_PRIME_GLB_DRESSING_DEFAULT: NewworldPrimeGlbDressingFlags = Object.freeze({
@@ -83,6 +110,10 @@ export const NEWWORLD_PRIME_GLB_DRESSING_DEFAULT: NewworldPrimeGlbDressingFlags 
   sheds: true,
   lamps: true,
   sign: true,
+  bus: true,
+  fences: true,
+  hedges: true,
+  pads: true,
 });
 
 export type NewworldPrimeGlbAssetId =
@@ -90,7 +121,11 @@ export type NewworldPrimeGlbAssetId =
   | 'house-east-yellow'
   | 'shed'
   | 'lamp'
-  | 'sign';
+  | 'sign'
+  | 'bus'
+  | 'fence-bay'
+  | 'hedge'
+  | 'pad';
 
 /** Per-asset outcome: blockout stays visible whenever error is non-null. */
 export type NewworldPrimeGlbAttachment = Readonly<{
@@ -119,6 +154,54 @@ function placementSpots(placements: readonly NewworldPrimePropPlacement[]): read
     z: placement.z,
     rotationY: placement.rotationY,
   }));
+}
+
+/**
+ * Repeats one dressing instance per fence bay along each privacy-fence run's
+ * local +X, mirroring the blockout emit (emitPropPart over
+ * newworldPrimePrivacyFenceRunParts): world = run origin + yaw-rotated
+ * (bay * bayLength, 0). Deterministic: contract run order, bay index order.
+ */
+function fenceBaySpots(): readonly DressingSpot[] {
+  const spots: DressingSpot[] = [];
+  for (const run of NEWWORLD_PRIME_PRIVACY_FENCE_RUNS) {
+    const c = Math.cos(run.rotationY);
+    const s = Math.sin(run.rotationY);
+    for (let bay = 0; bay < run.bays; bay += 1) {
+      const lx = bay * NEWWORLD_PRIME_FENCE_BAY_LENGTH_METRES;
+      spots.push({
+        x: run.x + lx * c,
+        z: run.z - lx * s,
+        rotationY: run.rotationY,
+      });
+    }
+  }
+  return spots;
+}
+
+/**
+ * One dressing instance per hedge blob along each hedge run's local +X,
+ * mirroring the blockout emit (blobs spaced 1.10 m in newworldPrimeHedgeRowParts).
+ * Per-blob height/yaw jitter is intentionally not mirrored: the GLB dresses
+ * every blob at the run yaw so the plan stays deterministic and countable.
+ */
+const NEWWORLD_PRIME_HEDGE_BLOB_SPACING_METRES = 1.1;
+
+function hedgeSpots(): readonly DressingSpot[] {
+  const spots: DressingSpot[] = [];
+  for (const run of NEWWORLD_PRIME_HEDGE_RUNS) {
+    const c = Math.cos(run.rotationY);
+    const s = Math.sin(run.rotationY);
+    for (let index = 0; index < run.blobs; index += 1) {
+      const lx = index * NEWWORLD_PRIME_HEDGE_BLOB_SPACING_METRES;
+      spots.push({
+        x: run.x + lx * c,
+        z: run.z - lx * s,
+        rotationY: run.rotationY,
+      });
+    }
+  }
+  return spots;
 }
 
 function dressingPlan(flags: NewworldPrimeGlbDressingFlags): readonly DressingPlan[] {
@@ -169,6 +252,40 @@ function dressingPlan(flags: NewworldPrimeGlbDressingFlags): readonly DressingPl
       url: NEWWORLD_PRIME_SIGN_GLB,
       spots: placementSpots([NEWWORLD_PRIME_WELCOME_SIGN_PLACEMENT]),
       coversBlockout: (meshName: string) => meshName.includes(NEWWORLD_PRIME_WELCOME_SIGN_PLACEMENT.id),
+    });
+  }
+  if (flags.bus) {
+    plans.push({
+      asset: 'bus',
+      url: NEWWORLD_PRIME_BUS_GLB,
+      spots: placementSpots([NEWWORLD_PRIME_SCHOOL_BUS_PLACEMENT]),
+      // emitPropPart names bus blockout meshes
+      // `newworld-prime-<placement.id>-<part.id>`.
+      coversBlockout: (meshName: string) => meshName.includes(NEWWORLD_PRIME_SCHOOL_BUS_PLACEMENT.id),
+    });
+  }
+  if (flags.fences) {
+    plans.push({
+      asset: 'fence-bay',
+      url: NEWWORLD_PRIME_FENCE_BAY_GLB,
+      spots: fenceBaySpots(),
+      coversBlockout: (meshName: string) => NEWWORLD_PRIME_PRIVACY_FENCE_RUNS.some((run) => meshName.includes(run.id)),
+    });
+  }
+  if (flags.hedges) {
+    plans.push({
+      asset: 'hedge',
+      url: NEWWORLD_PRIME_HEDGE_GLB,
+      spots: hedgeSpots(),
+      coversBlockout: (meshName: string) => NEWWORLD_PRIME_HEDGE_RUNS.some((run) => meshName.includes(run.id)),
+    });
+  }
+  if (flags.pads) {
+    plans.push({
+      asset: 'pad',
+      url: NEWWORLD_PRIME_PAD_GLB,
+      spots: placementSpots(NEWWORLD_PRIME_CONCRETE_PAD_PLACEMENTS),
+      coversBlockout: (meshName: string) => NEWWORLD_PRIME_CONCRETE_PAD_PLACEMENTS.some((p) => meshName.includes(p.id)),
     });
   }
   return plans;
