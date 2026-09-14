@@ -1,7 +1,7 @@
 /**
  * newworld-prime Blender GLB dressing (presentation-only).
  *
- * Attaches fifteen Blender-built GLBs over the Day-1 blockout massing emitted by
+ * Attaches twenty-one Blender-built GLBs over the Day-1 blockout massing emitted by
  * buildNewworldPrime (src/newworld-prime-arena.ts). Authority
  * (colliders, ballistic surfaces, spawns, nav) is untouched — the authority
  * boxes already match these dims by construction, and every dressed mesh is
@@ -57,6 +57,15 @@
  * - furniture: atomic-acres-catalog/assets-batch1/yard/furniture.glb —
  *   east back-patio spot (x 13.5, z -7.5) over the umbrella/BBQ massing —
  *   non-solid dressing, authority untouched.
+ * - garage (1096 tris): atomic-acres-catalog/assets-batch1/garage/out.glb —
+ *   batch-4 brief (garages flank BOTH houses, attached side volumes), dims
+ *   3.4 x 3.62 x 5.2 m — non-solid dressing, authority untouched (garage
+ *   authority boxes arrive with a later pass if gameplay needs them).
+ * - crates + pallet + wall bay (1752 tris total): atomic-acres-catalog/
+ *   assets-batch1/crates-walls/ (crate_06/09/12.glb 0.6/0.9/1.2 m,
+ *   pallet.glb, wall_bay.glb 2.4 m bay) — batch-4 brief queue items 2+3,
+ *   LAYOUT_CONTRACT facts 4/6/9 (loop cover, south-entry choke, perimeter
+ *   wall ring) — non-solid dressing, authority untouched.
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -138,6 +147,23 @@ export const NEWWORLD_PRIME_SANDBAGS_GLB =
 export const NEWWORLD_PRIME_FURNITURE_GLB =
   `./assets/newworld-prime/furniture.glb?v=${NEWWORLD_PRIME_GLB_VERSION_WAVE6}`;
 
+/** Cache-busting lane for the wave-7 garage + crates + wall GLB copies. */
+const NEWWORLD_PRIME_GLB_VERSION_WAVE7 = 'wave7-20260914';
+
+/** Public asset URLs for the six wave-7 garage/crates/wall GLB copies. */
+export const NEWWORLD_PRIME_GARAGE_GLB =
+  `./assets/newworld-prime/garage.glb?v=${NEWWORLD_PRIME_GLB_VERSION_WAVE7}`;
+export const NEWWORLD_PRIME_CRATE_06_GLB =
+  `./assets/newworld-prime/crate_06.glb?v=${NEWWORLD_PRIME_GLB_VERSION_WAVE7}`;
+export const NEWWORLD_PRIME_CRATE_09_GLB =
+  `./assets/newworld-prime/crate_09.glb?v=${NEWWORLD_PRIME_GLB_VERSION_WAVE7}`;
+export const NEWWORLD_PRIME_CRATE_12_GLB =
+  `./assets/newworld-prime/crate_12.glb?v=${NEWWORLD_PRIME_GLB_VERSION_WAVE7}`;
+export const NEWWORLD_PRIME_PALLET_GLB =
+  `./assets/newworld-prime/pallet.glb?v=${NEWWORLD_PRIME_GLB_VERSION_WAVE7}`;
+export const NEWWORLD_PRIME_WALL_BAY_GLB =
+  `./assets/newworld-prime/wall_bay.glb?v=${NEWWORLD_PRIME_GLB_VERSION_WAVE7}`;
+
 /**
  * Fallback flags for the GLB/blockout swap. Every group defaults ON (new
  * meshes dress the arena); any group set false keeps its blockout massing
@@ -159,6 +185,9 @@ export type NewworldPrimeGlbDressingFlags = Readonly<{
   clothesline: boolean;
   sandbags: boolean;
   furniture: boolean;
+  garage: boolean;
+  crates: boolean;
+  walls: boolean;
 }>;
 
 export const NEWWORLD_PRIME_GLB_DRESSING_DEFAULT: NewworldPrimeGlbDressingFlags = Object.freeze({
@@ -176,6 +205,9 @@ export const NEWWORLD_PRIME_GLB_DRESSING_DEFAULT: NewworldPrimeGlbDressingFlags 
   clothesline: true,
   sandbags: true,
   furniture: true,
+  garage: true,
+  crates: true,
+  walls: true,
 });
 
 export type NewworldPrimeGlbAssetId =
@@ -193,7 +225,13 @@ export type NewworldPrimeGlbAssetId =
   | 'jeep'
   | 'clothesline'
   | 'sandbags'
-  | 'furniture';
+  | 'furniture'
+  | 'garage'
+  | 'crate-06'
+  | 'crate-09'
+  | 'crate-12'
+  | 'pallet'
+  | 'wall-bay';
 
 /** Per-asset outcome: blockout stays visible whenever error is non-null. */
 export type NewworldPrimeGlbAttachment = Readonly<{
@@ -267,6 +305,47 @@ function hedgeSpots(): readonly DressingSpot[] {
         z: run.z - lx * s,
         rotationY: run.rotationY,
       });
+    }
+  }
+  return spots;
+}
+
+/**
+ * Perimeter wall ring (batch-4 brief queue item 3, LAYOUT_CONTRACT fact 9):
+ * 2.4 m concrete bays enclose the playable block as a rectangle
+ * (half-extents X 22 m, Z 28 m — clear of both houses, both attached
+ * garages, both sheds, and all yard massing), with a ~6.4 m gap centred on
+ * x = 0 in the north and south runs for the road entry/exit stubs.
+ * Bays centre on each run so the plan stays deterministic and countable:
+ * 16 + 16 on north/south (18 centred minus 2 skipped in the road gap),
+ * 23 + 23 on east/west — 78 instances total.
+ */
+const NEWWORLD_PRIME_WALL_RING_HALF_X_METRES = 22;
+const NEWWORLD_PRIME_WALL_RING_HALF_Z_METRES = 28;
+const NEWWORLD_PRIME_WALL_BAY_LENGTH_METRES = 2.4;
+const NEWWORLD_PRIME_WALL_RING_ROAD_GAP_HALF_METRES = 3.2;
+
+function wallBaySpots(): readonly DressingSpot[] {
+  const spots: DressingSpot[] = [];
+  const hx = NEWWORLD_PRIME_WALL_RING_HALF_X_METRES;
+  const hz = NEWWORLD_PRIME_WALL_RING_HALF_Z_METRES;
+  const bay = NEWWORLD_PRIME_WALL_BAY_LENGTH_METRES;
+  const gap = NEWWORLD_PRIME_WALL_RING_ROAD_GAP_HALF_METRES;
+  const northCount = Math.floor((hx * 2) / bay);
+  const northOffset = (hx * 2 - northCount * bay) / 2;
+  for (const z of [hz, -hz]) {
+    for (let index = 0; index < northCount; index += 1) {
+      const x = -hx + northOffset + bay / 2 + index * bay;
+      if (Math.abs(x) < gap) continue;
+      spots.push({ x, z, rotationY: 0 });
+    }
+  }
+  const sideCount = Math.floor((hz * 2) / bay);
+  const sideOffset = (hz * 2 - sideCount * bay) / 2;
+  for (const x of [hx, -hx]) {
+    for (let index = 0; index < sideCount; index += 1) {
+      const z = -hz + sideOffset + bay / 2 + index * bay;
+      spots.push({ x, z, rotationY: Math.PI / 2 });
     }
   }
   return spots;
@@ -434,6 +513,94 @@ function dressingPlan(flags: NewworldPrimeGlbDressingFlags): readonly DressingPl
       url: NEWWORLD_PRIME_PAD_GLB,
       spots: placementSpots(NEWWORLD_PRIME_CONCRETE_PAD_PLACEMENTS),
       coversBlockout: (meshName: string) => NEWWORLD_PRIME_CONCRETE_PAD_PLACEMENTS.some((p) => meshName.includes(p.id)),
+    });
+  }
+  if (flags.garage) {
+    plans.push({
+      asset: 'garage',
+      url: NEWWORLD_PRIME_GARAGE_GLB,
+      // Batch-4 brief: attached side volumes flanking BOTH houses. Each
+      // garage mirrors its house origin, offset outward by half the house
+      // width plus half the garage width (west 7.2 m house + 3.4 m garage
+      // -> -18.8; east 7.8 m house + 3.4 m garage -> 19.1), z-kept on the
+      // house centreline and clear of the sedan driveways (z 7 / patio).
+      // As-authored yaw preserved on both sides for a symmetric read.
+      spots: [
+        {
+          x: NEWWORLD_PRIME_WEST_TEAL_ORIGIN.xMetres - (7.2 / 2 + 3.4 / 2),
+          z: NEWWORLD_PRIME_WEST_TEAL_ORIGIN.zMetres,
+          rotationY: 0,
+        },
+        {
+          x: NEWWORLD_PRIME_EAST_YELLOW_ORIGIN.xMetres + (7.8 / 2 + 3.4 / 2),
+          z: NEWWORLD_PRIME_EAST_YELLOW_ORIGIN.zMetres,
+          rotationY: 0,
+        },
+      ],
+      // Pure addition this wave: no garage blockout exists yet, so nothing
+      // hides and any load failure leaves the arena unchanged. Authority
+      // boxes for garages arrive with a later pass if gameplay needs them.
+      coversBlockout: () => false,
+    });
+  }
+  if (flags.crates) {
+    plans.push({
+      asset: 'crate-12',
+      url: NEWWORLD_PRIME_CRATE_12_GLB,
+      // South-entry choke pair (fact 6): flanks the exit-stub road
+      // (4 m asphalt at x 0) at z -18, clear of the loop south cross (z -13).
+      spots: [
+        { x: -2.4, z: -18, rotationY: 0.2 },
+        { x: 2.4, z: -18, rotationY: -0.15 },
+      ],
+      // Pure addition: crate clusters are new cover massing with no
+      // blockout counterpart — load failure leaves the arena unchanged.
+      coversBlockout: () => false,
+    });
+    plans.push({
+      asset: 'crate-09',
+      url: NEWWORLD_PRIME_CRATE_09_GLB,
+      // Choke back-centre behind the crate-12 pair plus the loop-island
+      // pair (fact 4): south-centre inside the loop, clear of the bus/semi
+      // centre pair, the sandbag reservation (0, 8.5), and both lamps.
+      spots: [
+        { x: 0, z: -19.6, rotationY: 0.05 },
+        { x: -3.5, z: -7, rotationY: 0.3 },
+        { x: 3.5, z: -7, rotationY: -0.25 },
+      ],
+      coversBlockout: () => false,
+    });
+    plans.push({
+      asset: 'crate-06',
+      url: NEWWORLD_PRIME_CRATE_06_GLB,
+      // Yard singles: northwest yard off the clothesline run (-15, -11)
+      // and southeast yard off (15, 12) — clear of both sheds and lines.
+      spots: [
+        { x: -16.8, z: -8.8, rotationY: 0.4 },
+        { x: 13.4, z: 9.6, rotationY: -0.35 },
+      ],
+      coversBlockout: () => false,
+    });
+    plans.push({
+      asset: 'pallet',
+      url: NEWWORLD_PRIME_PALLET_GLB,
+      // Choke-flank pair staging pallets beside the south-entry barricade,
+      // clear of the 4 m road and the loop south cross.
+      spots: [
+        { x: -5.2, z: -18.5, rotationY: 0.1 },
+        { x: 5.2, z: -18.5, rotationY: -0.1 },
+      ],
+      coversBlockout: () => false,
+    });
+  }
+  if (flags.walls) {
+    plans.push({
+      asset: 'wall-bay',
+      url: NEWWORLD_PRIME_WALL_BAY_GLB,
+      spots: wallBaySpots(),
+      // Pure addition: the perimeter ring has no blockout counterpart —
+      // load failure leaves the arena unchanged.
+      coversBlockout: () => false,
     });
   }
   return plans;
