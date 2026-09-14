@@ -333,6 +333,14 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaVisualDefinition['id'], Atmospher
     [[-24, 20, 2.3, 3.9], [24, 20, 2.3, 3.9]],
     { count: 52, minX: -36, maxX: 36, minZ: -32, maxZ: 30 },
   ),
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby. Mirrors the
+  // atmosphere-system.ts row card for card; the dust box covers the loop and
+  // both lots (80 x 92 m playfield), which is where a player actually is.
+  'newworld-prime': atmosphereLayout(
+    [[-15, -11, 10, 3.2], [15, 12, 10, 3.2], [0, 38, 11, 3.4], [0, -38, 11, 3.4]],
+    [[-24, 8, 2.2, 3.8], [24, -8, 2.2, 3.8]],
+    { count: 56, minX: -38, maxX: 38, minZ: -44, maxZ: 44 },
+  ),
 });
 const MAX_MIST_LAYERS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
 

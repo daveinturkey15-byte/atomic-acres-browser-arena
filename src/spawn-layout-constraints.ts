@@ -57,6 +57,10 @@ import { buildHighSeas } from './high-seas';
 import { buildTest1, buildTest2 } from './test-maps';
 import { buildMap3 } from './map3-arena';
 import { buildNuketown2 } from './nuketown2-arena';
+// PASS 97 (2026-09-14): New World Prime Day-1 standby blockout assembler.
+// Presentation-only (colliders/spawns standby); registered here because the
+// Record gate is exhaustive - every registry id needs a builder row.
+import { buildNewworldPrime } from './newworld-prime-arena';
 // RAID2 (owner 2026-09-02, HF-408): the Raid layout rethink.
 import { buildRaid2 } from './raid2-arena';
 import { buildWorldStudio } from './world-studio/arena';
@@ -87,6 +91,10 @@ export const ARENA_BUILDERS: Readonly<Record<ArenaId, ArenaBuilder>> = Object.fr
   // same solver as every other arena, from its own colliders.
   nuketown2: buildNuketown2 as ArenaBuilder,
   raid2: buildRaid2 as ArenaBuilder,
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby blockout. Same solver
+  // input shape as every other arena; its colliders/spawns are standby until
+  // the authority pass, so the spawn gates measure placeholders, not a table.
+  'newworld-prime': buildNewworldPrime as ArenaBuilder,
 });
 
 /** `[id, builder]` for every arena the menu offers. */

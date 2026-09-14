@@ -12,6 +12,9 @@ import { menuPreviewVideoDefinition } from '../ui/menu-preview-video';
 const retainedIds = [
   'nuketown2', 'raid2', 'atomic-acres', 'skyline-terminal', 'rustworks-1v1',
   'gun-range', 'farcrysis', 'high-seas', 'test1', 'test2', 'map3',
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby. Retained like every
+  // hidden row: decodes, never offered, menu falls back to the default.
+  'newworld-prime',
 ] as const;
 
 describe('New World selection and retained multiplayer identity', () => {
@@ -75,7 +78,7 @@ describe('New World selection and retained multiplayer identity', () => {
     const preview = menuPreviewVideoDefinition('world-studio');
     expect(preview.mediaAvailable).toBe(false);
     expect([preview.webm, preview.mp4, preview.poster]).toEqual(['', '', '']);
-    expect(ARENA_SELECTIONS).toHaveLength(12);
+    expect(ARENA_SELECTIONS).toHaveLength(13);
   });
 
   it('routes both startup consumers through the menu boundary while keeping lobby activation exact', () => {

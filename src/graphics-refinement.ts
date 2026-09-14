@@ -64,6 +64,13 @@ const SHADOW_VOLUMES: Readonly<Record<ArenaId, ArenaShadowVolume>> = Object.free
   // plus the 4 m margin. The tallest authored mass here is the 5.3 m upper
   // wall, below test2's parapet, so `far` needs no more depth than test2's.
   'raid2': Object.freeze({ halfWidth: 54, halfHeight: 42, near: 4, far: 196 }),
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby. Bounds are 80 x 92 m
+  // (NEWWORLD_PRIME_ARENA_BOUNDS); 44 x 50 half-extents cover 88 x 100, the
+  // bounds plus the same 4 m margin Test2's pin uses. `far` follows the
+  // standing rule - the volume's own diagonal (hypot(88, 100) = 133.2 m) plus
+  // the shared non-Atomic sun standoff (76.9 m) = 210.1 m, rounded up to 212.
+  // Tallest authored mass is the two-storey house roof (~6.5 m).
+  'newworld-prime': Object.freeze({ halfWidth: 44, halfHeight: 50, near: 4, far: 212 }),
 });
 
 // RoomEnvironment is deliberately only a reflection/indirect-light accent.
@@ -108,6 +115,10 @@ const ARENA_ENVIRONMENT_SCALES: Readonly<Record<ArenaId, number>> = Object.freez
   // RAID2 (PREVIEW, HF-408): same volume and same map size as test2, so the
   // texel footprint is the same and the bias that works there works here.
   'raid2': 0.22,
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby. Matte desert sand,
+  // gray shingle and asphalt with painted vehicle panels - between Test1's dry
+  // range (0.16) and Test2's travertine-and-pool (0.22).
+  'newworld-prime': 0.2,
 });
 
 export function arenaEnvironmentScale(arenaId: ArenaId): number {

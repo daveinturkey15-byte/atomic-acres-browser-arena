@@ -23,6 +23,11 @@ export const ARENA_IDS = Object.freeze([
   // id is the network, replay and storage boundary from the first commit:
   // promoting it later must never require moving it.
   'map3',
+  // PASS 97 (2026-09-14): New World Prime registers Day-1 standby. Appended
+  // last; every older row above is byte-identical. The id is the network,
+  // replay and storage boundary from this commit: promoting it later (kind,
+  // selectability, authority) must never require moving it.
+  'newworld-prime',
 ] as const);
 
 export type ArenaId = typeof ARENA_IDS[number];

@@ -187,6 +187,11 @@ describe('collider/visual parity gate (all six arenas)', () => {
       // The audit measured 0 invisible colliders and 0 walk-through meshes on
       // this arena, so a row above 0 would forgive something it does not do.
       raid2: 0,
+      // PASS 97 (2026-09-14): New World Prime Day-1 standby enters at the
+      // same strictest floor. The blockout's presentation-only meshes are
+      // unrated, so the Direction C case above names them until the
+      // authority pass rates them - this pin only forbids raising the bar.
+      'newworld-prime': 0,
       'gun-range': 0,
       farcrysis: 0,
     });

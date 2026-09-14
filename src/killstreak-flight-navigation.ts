@@ -106,6 +106,14 @@ export const PASS65_FLIGHT_NAVIGATION: Readonly<Record<ArenaId, ArenaFlightNavig
   'raid2': definition('raid2', 63, [
     { id: 'raid2-courtyard-overflight', xQ: 0, zQ: 0, altitudeM: 22 },
   ]),
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby. Tallest authored mass
+  // is the ~6.5 m house roof, so the ceiling is set by sightline: the arena's
+  // half-diagonal is hypot(40, 46) = 61 m, rounded up to 63 like test2 and
+  // world-studio. The centre loop is the one portal - the only place open to
+  // the sky with no house, bus or trailer over it.
+  'newworld-prime': definition('newworld-prime', 63, [
+    { id: 'newworld-prime-loop-overflight', xQ: 0, zQ: 0, altitudeM: 22 },
+  ]),
 });
 
 export type SupportFlightStepInput = Readonly<{

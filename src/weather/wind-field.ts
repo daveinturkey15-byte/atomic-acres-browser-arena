@@ -237,6 +237,10 @@ export const WIND_PROFILES: Readonly<Record<ArenaId, WindProfile>> = Object.free
   // gust scale (26 m against 18 m) because what breaks the wind here is a
   // colonnade on 4 m gaps at the end of a 52 m lane, not a hedge line.
   'raid2': profile('raid2', 'hillside-terrace-lane-breeze', -1.18, 2.5, 2.1, 26, 1.05, false),
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby. High-desert air
+  // running the horseshoe loop: a moderate steady breeze on a 22 m gust scale,
+  // the spacing of the bodies that break it up (house, bus, semi, shed).
+  'newworld-prime': profile('newworld-prime', 'high-desert-loop-breeze', 0.0, 3.2, 2.6, 22, 0.85, false),
 });
 
 export function windProfile(arenaId: ArenaId): WindProfile {

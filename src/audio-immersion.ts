@@ -130,6 +130,11 @@ export const ARENA_ACOUSTIC_SPACES: Readonly<Record<ArenaId, AcousticSpace>> = O
   // RAID2 (PREVIEW, HF-408): a walled estate of paved outdoor rooms, the same
   // reverb family as test2 even though the rebuild is the more open of the two.
   'raid2': 'urban-yard',
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby. A walled loop of
+  // paved outdoor rooms between two house lots - the same reverb family as
+  // test2/nuketown2/raid2, not the open field the desert surround alone
+  // would suggest, because the fight happens between the two facades.
+  'newworld-prime': 'urban-yard',
 });
 
 export const DEFAULT_ACOUSTIC_SPACE: AcousticSpace = 'open-field';

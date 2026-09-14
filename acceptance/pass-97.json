@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "releasePass": "PASS 97",
+  "feedbackReceivedAt": null,
+  "feedbackTimestampStatus": "OPEN: no owner feedback binds this standby registration yet. Bind the actual owner feedback timestamp before acceptance; do not infer it from a worker run.",
+  "status": "candidate",
+  "bindingState": "standby-registration-awaiting-authority-pass-and-owner-hitl",
+  "preview": null,
+  "humanAcceptance": null,
+  "requirements": [
+    {
+      "id": "R1",
+      "summary": "New World Prime registers as the 13th arena, Day-1 standby, append-only over the 12-row base",
+      "expected": "ARENA_IDS holds 13 ids with the 12 old rows byte-identical first and newworld-prime last; every exhaustive Record<ArenaId> mirror (selection catalog + new-world-prime route, builders, briefing, preview-standby, ambient, acoustic, both atmosphere layouts, spatial audio, shadow volume, environment scale, flight nav, trap radius, particles, art direction, pinned daylight, weather, wind, visual-stream registry) compiles; standby rows are refused in stage, perform and ?map= boot paths with fallback to the menu default; all 12-pinned contract tests pin 13.",
+      "falsifier": "tsc --noEmit reports any error; any old registry row differs from base 25d14796b; any exhaustive mirror misses the id; a standby id stages, performs or direct-boots instead of falling back; any updated pin still expects 12.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "src/arena-identity.ts",
+          "command": "npx tsc --noEmit",
+          "note": "Exit 0, empty log, at the worktree head. Exhaustive Record<ArenaId> mirrors fail closed at compile time, so a clean typecheck plus the registry diff below is the wiring proof."
+        },
+        {
+          "kind": "unit",
+          "ref": "src/map-selection.test.ts",
+          "command": "npx vitest run src/map-selection.test.ts src/world-studio/routing.test.ts src/rendering/arena-visual-definition.test.ts src/killstreak-flight-navigation.test.ts src/rendering/lighting-conditions.test.ts src/ui/menu-preview-video.test.ts src/collider-visual-parity-gate.test.ts",
+          "note": "Pins updated by Shell but NOT YET RUN AT THIS HEAD (node_modules install owned by orchestrator at edit time). Required receipt, not a claim. Project-wide validation is the main agent's gate."
+        },
+        {
+          "kind": "contract",
+          "ref": "src/legacy-main.ts",
+          "command": "git diff --stat src/legacy-main.ts",
+          "note": "STANDBY_ONLY_ARENAS table + resolveNonStandbyArenaId helper; guards at performArenaSelection head, stageMenuArenaSelection head, and ?map= boot. No arena id literal inside the fenced transition (cold-session precompile reach contract)."
+        }
+      ]
+    },
+    {
+      "id": "R2",
+      "summary": "Generator-owned blockout files land citation-complete and registry-compatible",
+      "expected": "src/newworld-prime-arena.ts (buildNewworldPrime), src/newworld-prime-lighting.ts, src/newworld-prime-structures.ts, src/newworld-prime-props.ts and src/rendering/arenas/newworld-prime.ts are byte-untouched by Shell and satisfy every registry-side contract Shell depends on: builder signature (scene)=>ArenaMap, deterministic seeded PRNG, TSL-registry materials, late-morning lighting variant, four review cameras including a light-occlusion station, coherent practical policies, and cited layout plates.",
+      "falsifier": "Any of the five files differs from the generator handoff; buildNewworldPrime is non-deterministic across runs; a review camera id in the visual module disagrees with scripts/qa/viewpoint-catalog.mjs; the atmosphere preset fails skyBackdropPreset identity; a practical claims shadowed-local without a shadow.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "manual",
+          "ref": "src/newworld-prime-arena.ts",
+          "command": "git status --short src/newworld-prime-*.ts src/rendering/arenas/newworld-prime.ts",
+          "note": "Cited, not re-run: the five files arrived as untracked generator output verified on the stale base (tsc 0, deterministic, in-budget per the handoff brief). Shell never touched them; git status shows them untracked, zero Shell diff. Layout plates batch-2-layout/map__layout-topdown.png + map__layout-angle.png + map__center-loop.png and LAYOUT_CONTRACT.md facts 1-10 are cited from the module header (paths only, images stay out of the repo)."
+        },
+        {
+          "kind": "unit",
+          "ref": "scripts/qa/viewpoint-catalog.mjs",
+          "command": "node --test scripts/qa/arena-viewpoint-regression.test.mjs",
+          "note": "Catalog carries exactly the four authored cameras (overview, yard-geometry, depot-wall-closed, depot-door-open). NOT YET RUN AT THIS HEAD. Required receipt, not a claim."
+        }
+      ]
+    },
+    {
+      "id": "R3",
+      "summary": "Boot and transition behaviour of the standby arena",
+      "expected": "?map=newworld-prime and ?map=new-world-prime boot the menu default (world-studio); staging or performing the standby id falls back to the menu default; no standby boot constructs gameplay authority, starts a match clock, or fields bots.",
+      "falsifier": "A served ?map=newworld-prime boot lands anywhere but the menu default; selectArena/perform on the standby id constructs its builder into gameplay authority; a Solo or hosted launch runs on the standby row.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "src/legacy-main.ts",
+          "command": "Serve the candidate and boot ?map=newworld-prime, ?map=new-world-prime, then drive selectArena('newworld-prime') via __ATOMIC_ACRES_DEBUG__ after bootstrapMenuPreview.",
+          "note": "UNVERIFIED AT THIS HEAD. No build/server run is owned by Shell (orchestrator gates). Required receipt, not a claim."
+        }
+      ]
+    },
+    {
+      "id": "R4",
+      "summary": "Standby card, preview placeholder and late-morning look read as designed",
+      "expected": "The menu shows no New World Prime card (standby); the preview definition is a labelled PREVIEW STANDBY placeholder with no borrowed bytes; the late-morning sky preset, art-direction grade and TSL atmosphere row resolve without fallback when the arena is constructed headless.",
+      "falsifier": "A menu card or host-control entry names the arena; the standby markup embeds another arena's media; skyBackdropPreset downgrades newworld-prime-late-morning to airport-dawn; the art-direction distinctiveness gate names a newworld-prime pair below the floor.",
+      "acceptance": "visual",
+      "state": "pending",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "src/ui/menu-preview-video.ts",
+          "command": "Serve the candidate and inspect the map selector, the lobby arena dropdown, and menuPreviewVideoMarkup('newworld-prime').",
+          "note": "UNVERIFIED AT THIS HEAD. Required receipt plus a representative served capture reviewed by Dave, not a claim."
+        },
+        {
+          "kind": "visual",
+          "ref": "src/rendering/arenas/newworld-prime.ts",
+          "command": "AA_PREVIEW_REVIEW_ONLY=1 AA_PREVIEW_ARENAS=newworld-prime (sanctioned generator) plus a served capture at the four review cameras.",
+          "note": "UNVERIFIED AT THIS HEAD. Capture + grade-search measurement belong to the authority/visual pass, which also re-runs the art-direction distinctiveness gate (Shell-authored grade values are inside safety bounds but the pair floor is unmeasured)."
+        }
+      ]
+    },
+    {
+      "id": "R5",
+      "summary": "Known Day-1 standby gate impacts stay red-by-design and flip only via the authority pass",
+      "expected": "Gates that measure gameplay authority (spawn pair separation, spread floor, HF-402 floor/route/cover/standoff/open-arc, collider/visual Directions B and C, walkable Direction D, ray-traced proxy coverage) name newworld-prime findings instead of skipping it; no gate was weakened to admit the blockout (ceilings 0, empty ledgers, placeholder-matching floors only).",
+      "falsifier": "Any ceiling, floor or ledger was raised, lowered or widened to turn a newworld-prime finding green; any gate silently skips the arena; an ACCEPTED_* row is added without a measured triage reason.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/spawn-layout-quality.test.ts",
+          "command": "npx vitest run src/spawn-layout-quality.test.ts src/collider-visual-parity-gate.test.ts src/walkable-surface-parity-gate.test.ts src/rendering/raytracing/arena-proxy-coverage.test.ts",
+          "note": "NOT YET RUN AT THIS HEAD. Expected reds, each with its flip condition: solved spawn table + real colliders/shot surfaces from the authority pass clear them; the ledger/ceiling rows then hold at zero. Pre-existing gap, not Shell-owned: ACCEPTED_FALL_THROUGH still lacks a world-studio row, so the walkable explicit-ledger case cannot go green on this line regardless."
+        }
+      ]
+    }
+  ]
+}

@@ -216,6 +216,19 @@ export const ARENA_AMBIENT_PROFILES: Readonly<Record<ArenaId, ArenaAmbientProfil
     event('r2.shutter-knock', 'clank', 2, [1_500, 1_180], 0.13, 0.012, 0, 29),
     event('r2.hillside-call', 'call', 2, [540, 415], 0.38, 0.016, 0, 54),
   ]),
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby bed. High-desert loop
+  // between two fenced house lots: wind running the horseshoe road, dry scrub
+  // and timber knocking, a transformer hum off the street lamps - suburb
+  // ambience with the wildlife thinned out, because the lots are props and
+  // the loop is the fight. Six events (contract: at least four).
+  'newworld-prime': profile('newworld-prime', 'high-desert-loop-and-fenced-lots', [8, 17], [
+    event('np.loop-gust', 'whoosh', 6, [330, 150], 1.70, 0.018, 0.8, 16),
+    event('np.scrub-rustle', 'rustle', 4, [2_300, 1_450], 0.55, 0.013, 1.3, 12),
+    event('np.fence-board-knock', 'creak', 4, [220, 140], 0.85, 0.014, 0, 20),
+    event('np.bus-shell-tick', 'clank', 3, [780, 610], 0.20, 0.015, 0, 24),
+    event('np.lamp-hum-swell', 'call', 2, [120, 240], 1.20, 0.012, 0, 34),
+    event('np.desert-bird', 'chirp', 3, [2_600, 3_100], 0.10, 0.019, 0, 46),
+  ]),
 });
 
 /** Total weight of an arena's events; 0 when the arena has none. */

@@ -319,6 +319,16 @@ export const ARENA_AUDIO_DEFINITIONS: Readonly<Record<ArenaId, ArenaAudioDefinit
     modulationHz: 0.079, modulationDepth: 0.1,
     bedPosition: Object.freeze({ x: -24, y: 3, z: -2 }), airPosition: Object.freeze({ x: 18, y: 5, z: 21 }),
   }),
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby. The bed is the low
+  // mains hum at the west house lot, the air layer is wind over the east lot's
+  // fence line - opposite ends of the loop so the pair gives a bearing along
+  // the one axis the map is organised on (the nuketown2 placement rule).
+  'newworld-prime': Object.freeze({
+    arenaId: 'newworld-prime', identity: 'high-desert-loop-hum-and-yard-wind', source: 'repository-procedural-original',
+    continuousVoices: 2, bedFrequencyHz: 52, airFrequencyHz: 186, airLowpassHz: 700, airQ: 1.7, airGain: 0.0063,
+    modulationHz: 0.077, modulationDepth: 0.09,
+    bedPosition: Object.freeze({ x: -15, y: 3, z: -11 }), airPosition: Object.freeze({ x: 15, y: 5, z: 12 }),
+  }),
 });
 
 export function validateArenaAudioDefinitions(): readonly string[] {

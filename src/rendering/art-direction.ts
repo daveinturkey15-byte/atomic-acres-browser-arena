@@ -898,6 +898,43 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
       density: 0.75,
     },
   }),
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby grade. High-desert
+  // late morning - the one blue-led noon in the catalog. map3 is neutral
+  // ([1.1, 1.1, 1.1]) and raid2 is cool but red-dimmed ([0.92, 0.86, 1.0]);
+  // this row leads blue with green held, which is what a clear high-desert
+  // sky does to shade. Every value is inside ART_DIRECTION_SAFETY_BOUNDS by
+  // construction (gain/gamma/lift checked per channel). The pair-wise
+  // distinctiveness floor is NOT measured here - no capture exists yet - so
+  // the authority pass re-runs the grade search before promotion; see
+  // acceptance/pass-97.json R1 residual risk.
+  'newworld-prime': frozen({
+    id: 'newworld-prime',
+    brief: 'High-desert loop under clear late-morning sun - pale dust light, blue shade, teal-and-yellow house paint.',
+    cdl: {
+      gain: [0.94, 1.0, 1.1],
+      lift: [0.004, 0.004, 0.005],
+      gamma: [1.06, 1.0, 0.94],
+    },
+    saturationScale: 1.08,
+    contrastScale: 1.04,
+    crosstalkDelta: -0.04,
+    splitTone: {
+      shadowTint: 0x3a5a6a,
+      highlightTint: 0xffe8c0,
+      strengthScale: 1.3,
+      shadowBalance: 0.5,
+      highlightBalance: 0.46,
+    },
+    midtoneContrastDelta: 0.06,
+    vignette: { base: 0.06, settingScale: 1 },
+    bloom: { intensityScale: 1.08, thresholdScale: 1 },
+    atmosphere: {
+      mistNear: 0xc8d0d4, mistFar: 0xe8ecec,
+      smokeNear: 0x3a4048, smokeFar: 0x94a0aa,
+      dustNear: 0xd8d0b8, dustFar: 0xf2ecdc,
+      density: 0.7,
+    },
+  }),
 });
 
 // Fail closed at module init: an out-of-bounds authored value is a build

@@ -66,8 +66,10 @@ describe('arena daylight catalog', () => {
     // them would be a merge conflict rendered on screen. This list is asserted
     // exactly so that promoting a preview out of PREVIEW cannot silently leave
     // it pinned, and so that adding a pin needs a reason written down.
+    // PASS 97 (2026-09-14): newworld-prime joins as a PINNED Day-1 standby for
+    // the same second reason - the authority pass owns its look.
     const pinned = ARENA_IDS.filter((id) => ARENA_DAYLIGHT_PROFILES[id].pinned);
-    expect([...pinned].sort()).toEqual(['gun-range', 'map3', 'nuketown2', 'raid2', 'world-studio']);
+    expect([...pinned].sort()).toEqual(['gun-range', 'map3', 'newworld-prime', 'nuketown2', 'raid2', 'world-studio']);
   });
 
   it('gives rustworks-1v1 the narrowest outdoor band (its night is the safety datum)', () => {
@@ -426,6 +428,10 @@ describe('band ends are the measured safe interval, not a chosen one', () => {
     map3: null,
     nuketown2: null,
     raid2: null,
+    // PASS 97 (2026-09-14): New World Prime is PINNED, so null like the other
+    // pinned arenas - there is no band to measure until the authority pass
+    // unpins it with a scan.
+    'newworld-prime': null,
   };
 
   it('never plays an hour the scan measured as unsafe', () => {

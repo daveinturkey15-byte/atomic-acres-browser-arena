@@ -82,6 +82,12 @@ const SPAWN_LAYOUT_FLOORS: Readonly<Record<ArenaId, Readonly<{
   'world-studio': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 7 },
   'nuketown2': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 7 },
   'raid2': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 7 },
+  // PASS 97 (2026-09-14): New World Prime Day-1 STANDBY placeholders (six per
+  // team on the north/south aprons, 12 m x 3 m). These floors pin the
+  // placeholder reality - they are not a table to ship. The solved table the
+  // authority pass authors replaces these numbers; the global pair/spread
+  // gates and the HF-402 rules below stay red until then, by design.
+  'newworld-prime': { minPointsPerTeam: 6, minSpreadFraction: 0.13, minMeanNearestNeighbourM: 2.5 },
 });
 
 function distance(a: SpawnPoint, b: SpawnPoint): number {

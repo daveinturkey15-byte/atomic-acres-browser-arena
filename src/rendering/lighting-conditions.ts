@@ -263,6 +263,12 @@ export const ARENA_DAYLIGHT_PROFILES: Readonly<Record<ArenaId, ArenaDaylightProf
   // merge conflict rendered on screen. This row is the TEMPLATE that lane fills
   // in (see docs/DYNAMIC_LIGHTING_2026-09-03.md, "Preset template").
   map3: profile('map3', 'open-scrub-midmorning-preview-pinned', true, 10, [10, 10], [6, 19], [12, 66], 0, 6),
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby. PINNED for the same
+  // reason nuketown2/raid2 are: this Record covers the roster and a standby
+  // arena must not move any lane's sun. Authored hour is the visual module's
+  // own late morning (10.5); the authority pass fills a measured band per
+  // section 4 of docs/DYNAMIC_LIGHTING_2026-09-03.md.
+  'newworld-prime': profile('newworld-prime', 'high-desert-late-morning-preview-pinned', true, 10.5, [10.5, 10.5], [6, 19], [10, 68], 30, 6),
 });
 
 export function arenaDaylightProfile(arenaId: ArenaId): ArenaDaylightProfile {

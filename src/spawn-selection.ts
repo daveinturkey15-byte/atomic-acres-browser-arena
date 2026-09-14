@@ -154,6 +154,9 @@ export const MAP_TRAP_RADIUS: Readonly<Record<ArenaId, number>> = Object.freeze(
   'map3': 8,
   'nuketown2': 7,
   'raid2': 7,
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby. Same street-arena
+  // scale as nuketown2/raid2, same radius.
+  'newworld-prime': 7,
 });
 
 export function stableSpawnTieBreakSeed(id: string): number {

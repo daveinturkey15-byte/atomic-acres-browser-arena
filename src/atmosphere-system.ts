@@ -160,6 +160,19 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.f
       [-20, -21, 2.2, 3.8, 1.1], [20, 21, 2.2, 3.8, 3.6],
     ] as SmokeCard[]),
   }),
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby. Mist sits in the two
+  // fenced back yards and the north/south aprons - the low, still corners -
+  // and never on the horseshoe loop. The loop is the one lane whose full
+  // length has to read end to end, exactly the nuketown2 road rule.
+  'newworld-prime': Object.freeze({
+    mist: Object.freeze([
+      [-15, -11, 10, 3.2], [15, 12, 10, 3.2], [0, 38, 11, 3.4],
+      [0, -38, 11, 3.4], [-30, 20, 9, 3.0], [30, -20, 9, 3.0],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-24, 8, 2.2, 3.8, 1.1], [24, -8, 2.2, 3.8, 3.6],
+    ] as SmokeCard[]),
+  }),
 });
 /**
  * DAY-VISUAL-A (HF-535): Nuke Town golden-hour haze palette. Warm amber

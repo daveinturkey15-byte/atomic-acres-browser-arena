@@ -9,6 +9,8 @@ import {
   hostedArenaDurationMs,
   initialSoloBotCount,
   isArenaId,
+  isMenuMultiplayerArenaId,
+  menuArenaSelection,
   soloLaunchLabel,
   SELECTABLE_ARENAS,
 } from './map-selection';
@@ -35,20 +37,24 @@ describe('opening arena selection', () => {
       'test1',
       'test2',
       'map3',
+      // PASS 97 (2026-09-14): New World Prime registers Day-1 standby, last.
+      'newworld-prime',
     ]);
     // HF-405: Map 3 registered as a PREVIEW arena (2026-09-02); Test1/Test2 carry their owner names.
     // HF-407: Nuke Town Rebuild added. Its display name must NOT collide with
     // 'Nuke Town'; HF-495 now puts the rebuild first while keeping the names
     // unambiguous when both are resolved from the catalog.
     // HF-408: Raid Rebuild added, on the same rule against 'Raid'.
-    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town · New World', 'Nuketown', 'Raid Rebuild', 'Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3']);
+    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town · New World', 'Nuketown', 'Raid Rebuild', 'Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3', 'New World Prime']);
     // HF-495 (owner, 2026-09-04): selectability derives the menu order from
     // this catalog; the retired original Raid is absent without a second list.
     expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toEqual([
       'world-studio',
     ]);
-    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(12);
-    expect(ARENA_SELECTIONS.length).toBe(12);
+    // PASS 97 (2026-09-14): twelve became THIRTEEN with the New World Prime
+    // standby row. Raised, never lowered.
+    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(13);
+    expect(ARENA_SELECTIONS.length).toBe(13);
     for (const entry of ARENA_SELECTIONS) {
       expect(entry.selectorLabel.length).toBeGreaterThan(3);
       expect(entry.summary.length).toBeGreaterThan(12);
@@ -168,6 +174,9 @@ describe('opening arena selection', () => {
       // is the ONE imported arena in the game; its rebuild is code.
       nuketown2: 'code',
       raid2: 'code',
+      // PASS 97 (2026-09-14): New World Prime is entirely procedural, like
+      // every arena but the shipped Nuke Town.
+      'newworld-prime': 'code',
     });
     // Exactly one imported arena today; a second one appearing without this
     // gate being revisited is the drift worth catching.
@@ -201,7 +210,7 @@ describe('opening arena selection', () => {
       // HF-408 (Lane AQ): raid2 is an eleventh entry on MATCH_DURATION_MS, like test2.
       // HF-495: catalog order is Nuke Town Rebuild, Raid Rebuild, then the
       // retained rows; the duration values remain bound to each row.
-      .toEqual([300_000, 300_000, 300_000, 300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000]);
+      .toEqual([300_000, 300_000, 300_000, 300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000, 300_000]);
     expect(ARENA_SELECTIONS.map((selection) => arenaCanvasLabel(selection))).toEqual([
       'Nuke Town · New World multiplayer arena',
       'Nuketown multiplayer arena',
@@ -216,6 +225,8 @@ describe('opening arena selection', () => {
       'Raid multiplayer arena',
       // MAP3: an explore arena is not a multiplayer arena.
       'Map 3 explore arena',
+      // PASS 97 (2026-09-14): New World Prime is a team arena, even standby.
+      'New World Prime multiplayer arena',
     ]);
   });
 
@@ -246,6 +257,10 @@ describe('opening arena selection', () => {
       // registers `multiplayer: true` - so turning support OFF here would be
       // inconsistent with the row it actually ships.
       'raid2': true,
+      // PASS 97 (2026-09-14): New World Prime Day-1 standby. Field support is
+      // ON, matching the team-arena row it ships - the standby gate is the
+      // selectable flag, not a capability stripe.
+      'newworld-prime': true,
     });
   });
 
@@ -274,6 +289,9 @@ describe('opening arena selection', () => {
     expect(activeSoloBotTarget(arenaSelection('test1'), 100)).toBe(2);
     expect(activeSoloBotTarget(arenaSelection('test2'), 100)).toBe(2);
     expect(activeSoloBotTarget(arenaSelection('raid2'), 100)).toBe(2);
+    // PASS 97 (2026-09-14): New World Prime standby declares max === start, so
+    // the ladder holds two like every other 2-bot row.
+    expect(activeSoloBotTarget(arenaSelection('newworld-prime'), 100)).toBe(2);
     // Terminal declares maximumSoloBots 6 like Atomic. Under the old id test it
     // sat at one bot forever regardless of that declaration; it now honours it.
     expect([0, 9, 10, 50, 100].map((deaths) => activeSoloBotTarget(arenaSelection('skyline-terminal'), deaths)))
@@ -348,6 +366,9 @@ describe('opening arena selection', () => {
       // the Gun Range was the only bot-less arena and the wrong words for the
       // second one.
       'START EXPLORING',
+      // PASS 97 (2026-09-14): New World Prime standby opens on its declared
+      // two bots. Last row, catalog order.
+      '2 BOTS SKIRMISH',
       // The remaining rows retain their catalog order and declared bot counts.
     ]);
   });
@@ -462,6 +483,10 @@ describe('opening arena selection', () => {
     // owner 2026-08-30: Test1/Test2 arenas added — route id equals stable id.
     expect(decodeArenaId('test1')).toBe('test1');
     expect(decodeArenaId('test2')).toBe('test2');
+    // PASS 97 (2026-09-14): New World Prime Day-1 standby - descriptive route
+    // like raid-rebuild, no legacy aliases.
+    expect(decodeArenaId('newworld-prime')).toBe('newworld-prime');
+    expect(decodeArenaId('new-world-prime')).toBe('newworld-prime');
   });
 
   it('distinguishes strict current IDs from compatibility routes and aliases', () => {
@@ -479,5 +504,35 @@ describe('opening arena selection', () => {
     // which is now the first selectable card, Nuke Town Rebuild.
     expect(arenaSelection('unknown').id).toBe('nuketown2');
     expect(arenaSelection(null).id).toBe('nuketown2');
+  });
+
+  // PASS 97 (2026-09-14): New World Prime registers Day-1 STANDBY. The id
+  // decodes everywhere (network/replay/storage boundary) but the row is never
+  // offered: no menu card, no host-control entry, no second page, and the
+  // menu boundary falls back to the default. Promotion day flips one field.
+  it('registers New World Prime standby: decoded but never offered', () => {
+    const standby = arenaSelection('newworld-prime');
+    expect(standby.id).toBe('newworld-prime');
+    expect(standby.routeId).toBe('new-world-prime');
+    expect(standby.displayName).toBe('New World Prime');
+    expect(standby.kind).toBe('team');
+    expect(standby.selectable).toBe(false);
+    expect(standby.legacyAliases).toEqual([]);
+    expect(standby.showcasePath).toBeUndefined();
+    expect(standby.selectorLabel).toContain('STANDBY');
+    expect(standby.rulesLabel).toContain('STANDBY');
+    expect(standby.authoring).toBe('code');
+    // Decoded, like every hidden arena - saved matches and shared links keep
+    // resolving.
+    expect(decodeArenaId('newworld-prime')).toBe('newworld-prime');
+    expect(decodeArenaId('new-world-prime')).toBe('newworld-prime');
+    expect(isArenaId('newworld-prime')).toBe(true);
+    expect(ARENA_IDS).toContain('newworld-prime');
+    // Never offered: not selectable, not a menu multiplayer id, and the menu
+    // boundary falls back to the default for it and its route.
+    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).not.toContain('newworld-prime');
+    expect(isMenuMultiplayerArenaId('newworld-prime')).toBe(false);
+    expect(menuArenaSelection('newworld-prime').id).toBe('world-studio');
+    expect(menuArenaSelection('new-world-prime').id).toBe('world-studio');
   });
 });

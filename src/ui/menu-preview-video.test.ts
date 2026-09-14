@@ -78,6 +78,9 @@ const EXPECTED_CACHE_KEYS: Readonly<Record<string, string>> = Object.freeze({
 // should stay empty.
 const MEDIA_PENDING_ARENAS: ReadonlySet<string> = new Set<string>([
   'world-studio', // Owner-authorized fresh arena; capture has not happened.
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby. No flyover captured;
+  // leaves this set only by shipping its own bytes, same mechanism as raid2.
+  'newworld-prime',
   // RAID2 (HF-408) sat here for one pass and has been REMOVED by capturing the
   // flyover, exactly as map3 was before it. That is the mechanism working: a
   // newly registered arena gets an honest place to stand, and it leaves by
@@ -190,6 +193,12 @@ describe('prerecorded map-selection previews', () => {
       expect(menuPreviewVideoDefinition(arenaId).motionLabel).not.toMatch(/PENDING/);
       expect(menuPreviewVideoDefinition(arenaId).reducedMotionLabel).not.toMatch(/PENDING/);
     }
+    // PASS 97 (2026-09-14): New World Prime Day-1 standby keeps the helicopter
+    // frame (the capture, when it lands, is a helo flyover) while honestly
+    // advertising PENDING - the opposite of the farcrysis/high-seas repair.
+    expect(menuPreviewVideoDefinition('newworld-prime').frame).toBe('helicopter');
+    expect(menuPreviewVideoDefinition('newworld-prime').mediaAvailable).toBe(false);
+    expect(menuPreviewVideoDefinition('newworld-prime').motionLabel).toMatch(/PENDING/);
   });
 
   it('serves the HF-372 arenas real media instead of the standby placeholder', async () => {

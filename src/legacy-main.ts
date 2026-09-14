@@ -217,6 +217,8 @@ import {
 import { buildNuketown2 } from './nuketown2-arena';
 // RAID2: the Raid layout rethink (PREVIEW), owner 2026-09-02 via HF-408.
 import { buildRaid2 } from './raid2-arena';
+// PASS 97: New World Prime Day-1 standby blockout assembler (presentation-only).
+import { buildNewworldPrime } from './newworld-prime-arena';
 import { collectPresentationObstructionBoxes } from './presentation-obstruction';
 import {
   DOMINATION_TIME_LIMIT_MS,
@@ -3456,8 +3458,26 @@ let hemisphereLight: THREE.HemisphereLight;
 let ambientLight: THREE.AmbientLight;
 let sunLight: THREE.DirectionalLight;
 let fillLight: THREE.DirectionalLight; let nuketown2ClusteredLightRig: Nuketown2ClusteredLightRig | null = null;
+// PASS 97 (critic round-1): Day-1 standby arenas decode (the id is the
+// network/replay/storage boundary) but must never stage, perform or
+// direct-boot - they have presentation geometry and no gameplay authority.
+// The menu boundary (menuArenaSelection) already falls back to the default
+// for them; this table makes the refusal explicit at each of the three call
+// sites, so a future refactor of one path cannot silently admit a standby
+// arena. Promotion day deletes the row here; nothing else moves.
+const STANDBY_ONLY_ARENAS: Readonly<Partial<Record<ArenaId, true>>> = Object.freeze({
+  'newworld-prime': true,
+});
+function resolveNonStandbyArenaId(id: ArenaId): ArenaId {
+  if (STANDBY_ONLY_ARENAS[id] === true) return menuArenaSelection(null).id;
+  return id;
+}
 buildSky();
 let selectedArena: ArenaSelection = menuArenaSelection(new URLSearchParams(window.location.search).get('map'));
+// PASS 97 (critic round-1): direct-boot (?map=) refuses standby rows with
+// fallback to the menu default. menuArenaSelection already falls back; this
+// makes the refusal explicit at the boot call site.
+if (STANDBY_ONLY_ARENAS[selectedArena.id] === true) selectedArena = menuArenaSelection(null);
 audio.setArena(selectedArena.id);
 /**
  * MAP3 (HF-409): the arena builders, eight EAGER and one LAZY.
@@ -3507,6 +3527,11 @@ const arenaFactories = createArenaFactoryRegistry<ArenaMap, THREE.Scene, ArenaId
   // original is never broken mid-pass. Eager: its builder is synchronous and
   // needs no wasm prepare step. See src/raid2-arena.ts.
   raid2: eagerArena(buildRaid2),
+  // PASS 97: New World Prime Day-1 STANDBY. Eager: synchronous blockout
+  // builder, no wasm prepare step. Registered so the id resolves in every
+  // decoded path; STANDBY_ONLY_ARENAS above keeps it out of stage/perform/boot
+  // until the authority pass promotes it. See src/newworld-prime-arena.ts.
+  'newworld-prime': eagerArena(buildNewworldPrime),
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const ARENA_CACHE_BOUND = 2;
@@ -30081,6 +30106,11 @@ async function performArenaSelection(
   allowWhilePreparing = false,
   admissionToken?: MatchAdmissionToken,
 ): Promise<void> {
+  // PASS 97 (critic round-1): refuse standby rows in the perform path with
+  // fallback to the menu default. No arena id literal here (the cold-session
+  // precompile reach contract forbids per-arena cases in the transition):
+  // membership lives in STANDBY_ONLY_ARENAS, resolved through the helper.
+  id = resolveNonStandbyArenaId(id);
   if (gameStarted
     || matchStartPreparing && !allowWhilePreparing
     || !arenaSelectionReady
@@ -30579,6 +30609,10 @@ async function performArenaSelectionWithColdFenceRetry(
 }
 
 function stageMenuArenaSelection(id: ArenaId): void {
+  // PASS 97 (critic round-1): refuse standby rows in the stage path with
+  // fallback to the menu default (menuArenaSelection would fall back anyway;
+  // this makes the refusal explicit at the call site).
+  id = resolveNonStandbyArenaId(id);
   if (gameStarted || matchStartPreparing || !arenaSelectionReady || network.role !== 'offline' || privateLobbySnapshot) return;
   const nextSelection = menuArenaSelection(id);
   if (nextSelection.id === selectedArena.id) return;

@@ -9,7 +9,12 @@ export type SkyBackdropPreset =
   | 'open-ocean-day'
   | 'range-midmorning'
   | 'estate-golden-hour'
-  | 'nuketown2-golden-hour';
+  | 'nuketown2-golden-hour'
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby sky, authored by the
+  // generator lane as `atmosphere.preset: 'newworld-prime-late-morning'` in
+  // src/rendering/arenas/newworld-prime.ts. Registered here so the preset
+  // resolves to itself instead of falling back to Terminal's airport-dawn.
+  | 'newworld-prime-late-morning';
 
 export const SKY_BACKDROP_TEXTURE_SIZE = Object.freeze({ width: 2_048, height: 1_024 });
 export const ATOMIC_ACRES_GENERATED_SKY_ASSET_URL = './assets/original/skies/atomic-acres-sunset.webp';
@@ -311,6 +316,27 @@ export const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly
     [0.72, '#c2a87f'],
     [1, '#8a7657'],
   ] as const),
+  // PASS 97 (2026-09-14): New World Prime late morning over high desert. Same
+  // horizon-at-0.5 and paired-stop ground-half discipline as range-midmorning
+  // above; the ground half is sunlit sand rather than range dust, so the warm
+  // bounce under eaves and bus panels comes from the environment. The sky half
+  // holds the cool bank the flyover reads against the teal/yellow paint.
+  'newworld-prime-late-morning': Object.freeze([
+    [0, '#2f5f9e'],
+    [0.16, '#3b73b0'],
+    [0.32, '#4e8ac2'],
+    [0.42, '#66a0d0'],
+    [0.474, '#8fbcdc'],
+    [0.492, '#b7c8cf'],
+    [0.4985, '#e7d9ba'],
+    [0.505, '#d3d9dd'],
+    [0.520, '#a9b4bd'],
+    [0.548, '#9aa5ad'],
+    [0.578, '#b3a893'],
+    [0.608, '#cbb98e'],
+    [0.72, '#bd9f6e'],
+    [1, '#7d6c4e'],
+  ] as const),
 });
 
 /**
@@ -445,6 +471,13 @@ export const SKY_BACKDROP_CLOUDS: Readonly<Record<SkyBackdropPreset, Readonly<{
     rgb: [250, 232, 206] as [number, number, number], shadowRgb: [88, 84, 134] as [number, number, number],
     alpha: 0.36, scale: 0.5,
   }),
+  // PASS 97 (2026-09-14): New World Prime late morning. Same deck geometry as
+  // range-midmorning - a high-desert late morning carries the same thin deck.
+  'newworld-prime-late-morning': Object.freeze({
+    count: 26, bandTop: 0.22, bandBottom: 0.505,
+    rgb: [253, 250, 244] as [number, number, number], shadowRgb: [116, 136, 168] as [number, number, number],
+    alpha: 0.42, scale: 0.42,
+  }),
 });
 
 function skyRandom(seed: number): () => number {
@@ -553,6 +586,15 @@ export const SKY_BACKDROP_SUN: Readonly<Record<SkyBackdropPreset, Readonly<{
     // dust 0.08: less aerosol, so a dimmer halo, but fine haze scatters over a
     // broader lobe (lower g) and the low warm key makes it read amber.
     aureole: Object.freeze({ reachDegrees: 22, coreDegrees: 5.2, strength: 0.52, anisotropy: 0.7 }),
+  }),
+  // PASS 97 (2026-09-14): New World Prime late morning. Same disc placement as
+  // range-midmorning - the light is in the same place - with the dusty-range
+  // halo the high-desert loop air actually carries.
+  'newworld-prime-late-morning': Object.freeze({
+    x: 0.913, y: 0.398,
+    coreRgb: [255, 252, 240] as [number, number, number], glowRgb: [252, 234, 196] as [number, number, number],
+    coreRadius: 12, glowRadius: 20,
+    aureole: Object.freeze({ reachDegrees: 20, coreDegrees: 4, strength: 0.66, anisotropy: 0.8 }),
   }),
 });
 
@@ -793,6 +835,10 @@ export function skyBackdropPreset(preset: string): SkyBackdropPreset {
     // Owner 2026-08-30: Test1/Test2 daylight presets, both authored procedural.
     || preset === 'range-midmorning' || preset === 'estate-golden-hour'
     || preset === 'nuketown2-golden-hour'
+    // PASS 97 (2026-09-14): New World Prime standby sky. Procedural like the
+    // other daylight presets (asset lookup below returns null for it, the
+    // High Seas precedent) until a generated panorama lands.
+    || preset === 'newworld-prime-late-morning'
     ? preset
     : 'airport-dawn';
 }

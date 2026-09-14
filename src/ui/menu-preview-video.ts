@@ -269,6 +269,26 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     width: 2560,
     height: 1440,
   }),
+  // PASS 97 (2026-09-14): New World Prime Day-1 STANDBY. No flyover has been
+  // captured; standby never borrows older map bytes, so all three media
+  // paths are empty and the card renders the labelled PREVIEW STANDBY
+  // placeholder. Joins MEDIA_PENDING_ARENAS in menu-preview-video.test.ts
+  // until its own capture lands through the sanctioned generator.
+  'newworld-prime': Object.freeze({
+    arenaId: 'newworld-prime',
+    frame: 'helicopter',
+    label: 'PREVIEW STANDBY // NEW WORLD PRIME',
+    motionLabel: 'HIGH-DESERT LOOP PREVIEW PENDING',
+    reducedMotionLabel: 'PREVIEW STANDBY',
+    presentationId: 'menu-video-runtime-helo-newworld-prime-v1',
+    mediaAvailable: false,
+    webm: '',
+    mp4: '',
+    poster: '',
+    durationSeconds: 8,
+    width: 2560,
+    height: 1440,
+  }),
 } satisfies Record<ArenaId, MenuPreviewVideoDefinition>);
 
 export function menuPreviewVideoDefinition(arenaId: ArenaId): MenuPreviewVideoDefinition {

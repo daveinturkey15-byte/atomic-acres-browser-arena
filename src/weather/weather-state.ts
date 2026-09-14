@@ -265,6 +265,12 @@ export const ARENA_WEATHER_PROFILES: Readonly<Record<ArenaId, ArenaWeatherProfil
   // lit for a bleached high sun, exactly as the shipped Raid is graded for
   // golden hour, and an overcast state was never authored or looked at.
   'raid2': arenaProfile('raid2', 'hillside-terrace-late-morning', false, ['clear']),
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby. CLEAR ONLY: the arena
+  // is graded and lit for a bleached high sun, and no overcast state was ever
+  // authored or looked at. A multi-rung ladder is also a sequencer risk until
+  // measured (see the nuketown2/raid2 notes above); pinning clear is the
+  // honest authoring call regardless.
+  'newworld-prime': arenaProfile('newworld-prime', 'high-desert-late-morning-clear', false, ['clear']),
 });
 
 export function arenaWeatherProfile(arenaId: ArenaId): ArenaWeatherProfile {

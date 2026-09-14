@@ -8,7 +8,10 @@ export { ARENA_IDS, isArenaId, type ArenaId } from './arena-identity';
 export type ArenaRouteId = 'world-studio' | 'nuke-town' | 'terminal' | 'rustrig' | 'gun-range' | 'farcrysis' | 'high-seas' | 'test1' | 'test2' | 'map3' | 'nuke-town-rebuild'
   // RAID2 (HF-408): a descriptive route, not `raid2`, so a shared link says
   // what it opens. `test2` keeps `test2`; nothing about the shipped Raid moves.
-  | 'raid-rebuild';
+  | 'raid-rebuild'
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby route. Descriptive,
+  // like raid-rebuild, so a shared link says what it opens.
+  | 'new-world-prime';
 
 export type ArenaSelection = Readonly<{
   id: ArenaId;
@@ -535,6 +538,35 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     //     real roster), and `docs/eye-clearance/ledger.json` carries a MEASURED
     //     map3 ceiling from the headless sweep, not the unmeasured sentinel.
     // HF-405: Map 3 is entirely procedural (no imported mesh, image, font or LUT).
+    authoring: 'code' as const,
+    authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
+    matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
+  }),
+  // PASS 97 (2026-09-14): New World Prime Day-1 STANDBY. `selectable: false`
+  // keeps it out of the menu, host controls and MP sweeps (all derive from
+  // SELECTABLE_ARENAS / isMenuMultiplayerArenaId); the stable id still decodes
+  // for network/replay/storage. Team kind with a 2-bot solo budget inside the
+  // sized population; no showcasePath (no second page ships). Menu copy is
+  // written from the layout contract, not a template: high-desert loop road,
+  // west teal + east yellow two-storey houses, school bus + semi cover.
+  Object.freeze({
+    id: 'newworld-prime' as const,
+    selectable: false,
+    routeId: 'new-world-prime' as const,
+    kind: 'team' as const,
+    legacyAliases: Object.freeze([]),
+    selectorLabel: 'NEW WORLD PRIME · STANDBY',
+    displayName: 'New World Prime',
+    titleLead: 'NEW WORLD',
+    titleAccent: 'PRIME',
+    menuLede: 'Fight the high-desert loop: teal and yellow two-storey houses face each other over a horseshoe road, with a school bus and a semi-trailer holding the centre. Standby preview.',
+    summary: 'High-desert loop · two-storey houses · standby preview',
+    rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO · STANDBY',
+    soloBotCount: 2,
+    maximumSoloBots: 2,
+    multiplayer: true,
+    fieldSupport: true,
+    overdrive: false,
     authoring: 'code' as const,
     authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),

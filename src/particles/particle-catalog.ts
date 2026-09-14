@@ -326,6 +326,16 @@ export const ARENA_PARTICLE_PROFILES: Readonly<Record<ArenaId, ArenaParticleProf
     { density: 0.5, kind: 'seed', colorWarm: 0xf2e8c0, colorCool: 0xc0c4a8, radiusM: 0.044, fallMps: 0.25, windPull: 0.75, flutterMps: 0.56, spinRadiansPerSecond: 1.45, opacity: 0.11 },
     0.7, 24, 14, 4,
   ),
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby. High-desert dust off
+  // the loop road and dry scrub seed out of the two fenced lots - the same
+  // family as the nuketown2 road-grit air, because this lane is a layout
+  // blockout and familiar air lets the layout read on its own.
+  'newworld-prime': arena(
+    'newworld-prime', 'high-desert-road-dust-and-scrub-seed',
+    { density: 0.72, colorWarm: 0xe6d8b8, colorCool: 0xc0bfb4, radiusM: 0.026, riseMps: 0.055, swirlMps: 0.22, windPull: 0.72, opacity: 0.11 },
+    { density: 0.42, kind: 'seed', colorWarm: 0xdfd2a4, colorCool: 0xaeae94, radiusM: 0.055, fallMps: 0.29, windPull: 0.82, flutterMps: 0.56, spinRadiansPerSecond: 1.45, opacity: 0.15 },
+    0.55, 21, 12, 4,
+  ),
 });
 
 export function arenaParticleProfile(arenaId: ArenaId): ArenaParticleProfile {

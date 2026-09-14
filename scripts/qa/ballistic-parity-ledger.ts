@@ -110,6 +110,12 @@ export const ACCEPTED_SHOOT_THROUGH: Readonly<Record<string, readonly AcceptedSh
   // RAID2 (owner 2026-09-02, HF-408): same rule. The audit measured 0 ghost
   // shot surfaces on this arena, so an empty ledger is the measurement.
   raid2: [],
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby enters with an EMPTY
+  // accepted ledger, like every new arena. Anything the audit finds is a bug
+  // for the authority pass to rate, not a row to add here to turn the gate
+  // green (see the header rule). The gate below measures the blockout's
+  // presentation-only meshes against ceiling 0 until that pass lands.
+  'newworld-prime': [],
   'gun-range': [
     // Merged static presentation batch spanning the tall test-bay shell. Every
     // source wall is individually registered with an authored material
@@ -149,6 +155,9 @@ export const BALLISTIC_UNRATED_CEILINGS: Readonly<Record<string, number>> = Obje
   raid2: 0,
   'gun-range': 0,
   farcrysis: 0,
+  // PASS 97 (2026-09-14): New World Prime enters at the strictest ceiling, not
+  // at whatever it happens to measure - same rule as map3/nuketown2/raid2.
+  'newworld-prime': 0,
 });
 
 export type LedgerMatchResult = {

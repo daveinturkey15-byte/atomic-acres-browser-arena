@@ -25,6 +25,10 @@ export const ARENA_VISUAL_REGISTRY: ArenaVisualRegistry = Object.freeze({
   'nuketown2': () => import('./arenas/nuketown2'),
   // RAID2 (PREVIEW), owner 2026-09-02 via HF-408.
   'raid2': () => import('./arenas/raid2'),
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby visual definition.
+  // Eager static import like every arena but Map 3; the module is small
+  // presentation metadata over the blockout builder, not corridor TSL.
+  'newworld-prime': () => import('./arenas/newworld-prime'),
 });
 
 /**

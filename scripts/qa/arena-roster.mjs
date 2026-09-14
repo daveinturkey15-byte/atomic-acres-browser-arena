@@ -55,7 +55,7 @@ const LIGHTING_CONDITIONS = resolve(HERE, '../../src/rendering/lighting-conditio
  * registry grows; see the block comment above for why a floor and not a
  * non-empty check.
  */
-export const MINIMUM_ARENA_IDS = 11;
+export const MINIMUM_ARENA_IDS = 13;
 
 /** Every arena the arena picker offers after the three parked registry rows. */
 // HF-495 (owner, 2026-09-04): the original Raid is parked, so the derived

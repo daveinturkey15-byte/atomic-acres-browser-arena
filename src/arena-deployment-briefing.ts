@@ -108,6 +108,16 @@ const BRIEFINGS: Readonly<Record<ArenaId, ArenaDeploymentBriefing>> = Object.fre
     briefing: 'Three stacked decks and open bow-to-stern lanes — height wins the fight, and below deck is where it ends.',
     approach: 'HELO INBOUND · STARBOARD PASS, STERN TO BOW',
   }),
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby copy, written from its
+  // own terrain (high-desert loop, teal/yellow houses, bus + semi centre).
+  // Unique kicker/briefing/approach (the inventory test requires all three
+  // distinct across the roster); uppercase eyebrow + orientation lines.
+  'newworld-prime': Object.freeze({
+    arenaId: 'newworld-prime',
+    kicker: 'HIGH-DESERT LOOP STANDBY',
+    briefing: 'Teal and yellow two-storey houses face each other over a horseshoe road, and a school bus plus a semi-trailer hold the centre loop.',
+    approach: 'STANDBY PREVIEW · NORTH GATE TO SOUTH EXIT',
+  }),
 });
 
 /** Total, by construction: every selectable arena has authored deployment copy. */

@@ -121,6 +121,12 @@ const ACCEPTED_FALL_THROUGH: Record<string, LedgerRow[]> = {
     { name: 'high-seas-stern-upper-chart-table-top', centre: [6.6, 6.98, 18], reason: 'chart table top 0.8 m proud of the table collider; High Seas lane' },
     { name: 'high-seas-cabana-table', centre: [6.55, 4.03, 0], reason: 'cabana table top 0.85 m proud of the table collider; High Seas lane' },
   ],
+  // PASS 97 (2026-09-14): New World Prime Day-1 standby enters at zero, like
+  // every new arena. The blockout's roofs/decks have no movement authority
+  // yet, so the audit names them as fall-through until the authority pass
+  // rates them; the ledger may only ever shrink, and this row is the pin
+  // that forces that pass to fix rather than excuse.
+  'newworld-prime': [],
 };
 
 let auditPromise: Promise<WalkableArenaResult[]> | null = null;
