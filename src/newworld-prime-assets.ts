@@ -1,7 +1,7 @@
 /**
  * newworld-prime Blender GLB dressing (presentation-only).
  *
- * Attaches eleven Blender-built GLBs over the Day-1 blockout massing emitted by
+ * Attaches twelve Blender-built GLBs over the Day-1 blockout massing emitted by
  * buildNewworldPrime (src/newworld-prime-arena.ts). Authority
  * (colliders, ballistic surfaces, spawns, nav) is untouched — the authority
  * boxes already match these dims by construction, and every dressed mesh is
@@ -45,6 +45,9 @@
  * - rusty car (1232 tris): atomic-acres-catalog/assets-batch1/rusty-car/out.glb —
  *   LAYOUT_CONTRACT fact 9 (rusty-car showcase spot at the north entrance,
  *   box ~4.4 x 1.8 x 1.45 m — presentation-only, untouched).
+ * - jeep (2180 tris): atomic-acres-catalog/assets-batch1/jeep/out.glb —
+ *   south-exit reservation spot (x 13.5, z -21.0, yaw -0.5) — non-solid
+ *   dressing, reservation footprint, authority untouched.
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -59,6 +62,7 @@ import {
   NEWWORLD_PRIME_FENCE_BAY_LENGTH_METRES,
   NEWWORLD_PRIME_HEDGE_RUNS,
   NEWWORLD_PRIME_PRIVACY_FENCE_RUNS,
+  NEWWORLD_PRIME_JEEP_RESERVATION,
   NEWWORLD_PRIME_RUSTY_CAR_PLACEMENT,
   NEWWORLD_PRIME_SCHOOL_BUS_PLACEMENT,
   NEWWORLD_PRIME_SEMI_TRUCK_PLACEMENT,
@@ -107,6 +111,12 @@ const NEWWORLD_PRIME_GLB_VERSION_BATCH4 = 'batch4-20260914';
 /** Public asset URL for the wave-4 rusty-car GLB copy. */
 export const NEWWORLD_PRIME_RUSTY_CAR_GLB =
   `./assets/newworld-prime/rusty-car.glb?v=${NEWWORLD_PRIME_GLB_VERSION_BATCH4}`;
+/** Cache-busting lane for the wave-5 jeep GLB copy. */
+const NEWWORLD_PRIME_GLB_VERSION_WAVE5 = 'wave5-20260914';
+
+/** Public asset URL for the wave-5 jeep GLB copy. */
+export const NEWWORLD_PRIME_JEEP_GLB =
+  `./assets/newworld-prime/jeep.glb?v=${NEWWORLD_PRIME_GLB_VERSION_WAVE5}`;
 
 /**
  * Fallback flags for the GLB/blockout swap. Every group defaults ON (new
@@ -125,6 +135,7 @@ export type NewworldPrimeGlbDressingFlags = Readonly<{
   pads: boolean;
   semi: boolean;
   rustyCar: boolean;
+  jeep: boolean;
 }>;
 
 export const NEWWORLD_PRIME_GLB_DRESSING_DEFAULT: NewworldPrimeGlbDressingFlags = Object.freeze({
@@ -138,6 +149,7 @@ export const NEWWORLD_PRIME_GLB_DRESSING_DEFAULT: NewworldPrimeGlbDressingFlags 
   pads: true,
   semi: true,
   rustyCar: true,
+  jeep: true,
 });
 
 export type NewworldPrimeGlbAssetId =
@@ -151,7 +163,8 @@ export type NewworldPrimeGlbAssetId =
   | 'hedge'
   | 'pad'
   | 'semi'
-  | 'rusty-car';
+  | 'rusty-car'
+  | 'jeep';
 
 /** Per-asset outcome: blockout stays visible whenever error is non-null. */
 export type NewworldPrimeGlbAttachment = Readonly<{
@@ -308,6 +321,21 @@ function dressingPlan(flags: NewworldPrimeGlbDressingFlags): readonly DressingPl
       // emitPropSet names rusty-car blockout meshes
       // `newworld-prime-<placement.id>-<part.id>`.
       coversBlockout: (meshName: string) => meshName.includes(NEWWORLD_PRIME_RUSTY_CAR_PLACEMENT.id),
+    });
+  }
+  if (flags.jeep) {
+    plans.push({
+      asset: 'jeep',
+      url: NEWWORLD_PRIME_JEEP_GLB,
+      spots: [{
+        x: NEWWORLD_PRIME_JEEP_RESERVATION.x,
+        z: NEWWORLD_PRIME_JEEP_RESERVATION.z,
+        rotationY: NEWWORLD_PRIME_JEEP_RESERVATION.rotationY,
+      }],
+      // South-exit reservation: no blockout meshes carry the reservation id
+      // yet, so nothing hides until the reservation is built — the GLB is
+      // pure addition and any load failure leaves the arena unchanged.
+      coversBlockout: (meshName: string) => meshName.includes(NEWWORLD_PRIME_JEEP_RESERVATION.id),
     });
   }
   if (flags.fences) {
