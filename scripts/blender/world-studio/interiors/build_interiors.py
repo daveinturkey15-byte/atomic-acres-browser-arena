@@ -2,11 +2,15 @@
 
 Lane: interiors-night-20260912 (contrib/dave-gaming-pc/claude/interiors-night-20260912).
 
-Run (never interactively, never with the GPU):
+Run (never interactively, never with the GPU) - one line, from the repo root, no `--` payload:
 
-    "C:/Program Files/Blender Foundation/Blender 5.1/blender.exe" --background --threads 4 \
-        --python scripts/blender/world-studio/interiors/build_interiors.py -- \
-        --repo <repo-root> [--render] [--samples 24]
+    "C:/Program Files/Blender Foundation/Blender 5.1/blender.exe" --background --factory-startup \
+        --threads 2 --python scripts/blender/world-studio/interiors/build_interiors.py
+
+That line exports all ten assets: `--repo` defaults to this file's own repo root and the per-prop
+GLBs are on by default. Optional `-- --render [--samples 24]` adds the Cycles CPU thumbnail, and
+`-- --hero-only` skips the props. Without `--render` the catalog publishes `thumbnailUrl: null`
+rather than pointing at a still from an earlier, different export - see `write_catalog`.
 
 What it produces
 ----------------
@@ -413,8 +417,17 @@ def build_sofa(coll: bpy.types.Collection, lx: float, lz: float, yaw: float) -> 
     Footprint 2.24 x 0.92 m from the `sofa` anchor, seat height 0.42 m."""
     tag = "sofa"
     base_y = 0.20
+    # DEFECT FIX (wave 5, ADAPTER M1). A line setting the frame's own Z rotation to the anchor yaw
+    # used to sit here, and has been deleted.
+    # `_rotate_group` at the end of this function adds `yaw` to every part's Z rotation,
+    # so the frame received it twice and the exported `sofa-frame` node sits at 180 deg while its
+    # fifteen siblings sit at -90: a 2.20 x 0.88 m walnut plinth lying crosswise under a sofa whose
+    # body runs along Z, 0.65 m outside the anchor footprint at each end. The frame needs no yaw of
+    # its own - `_rotate_group` rotates both its position about the anchor and its own Z.
+    # The shipped GLBs still contain the defect (this lane may not run Blender); the runtime
+    # repairs it on load - `src/world-studio/interior-assets/fit.ts` SOFA_PLINTH_REPAIR - and that
+    # repair is conditional, so it goes quiet once this export is refreshed.
     frame = box(f"{tag}-frame", (2.20, 0.88, 0.16), _p(lx, base_y + 0.08, lz), "IntWalnut", coll, bevel=0.02)
-    frame.rotation_euler.z = yaw
     parts = [frame]
     for index, offset in enumerate((-0.70, 0.0, 0.70)):
         cushion = box(
@@ -483,11 +496,19 @@ def build_coffee_table(coll: bpy.types.Collection, lx: float, lz: float, yaw: fl
     tag = "coffee-table"
     top_y = 0.40
     parts = []
-    top = box(f"{tag}-top", (1.34, 0.58, 0.036), _p(lx, top_y, lz), "IntWalnut", coll, bevel=0.017, segments=4)
+    # FIT FIX (wave 5). The top was authored 1.34 m long inside the 1.20 x 0.60 m `coffee-table`
+    # anchor, so it stood 0.07 m proud at each end - the anchor footprint binds, and a coffee table
+    # is not a dinette chair with a reason to stand outside it. 1.34 -> 1.20 with the pinch
+    # half-length following it (0.67 -> 0.60), which keeps the surfboard profile identical in
+    # normalised terms rather than re-tuning the curve. Legs at +/-0.54 and the 1.02 m apron are
+    # unchanged and stay inside. The shipped GLB still measures 1.34: this takes effect on the
+    # next Blender run, and no runtime transform can shrink geometry, so the overrun is recorded
+    # as accepted in `fit.ts` until then.
+    top = box(f"{tag}-top", (1.20, 0.58, 0.036), _p(lx, top_y, lz), "IntWalnut", coll, bevel=0.017, segments=4)
     # Shape the rectangle into a soft surfboard: pull the end vertices in.
     mesh = top.data
     for vert in mesh.vertices:
-        pinch = 1.0 - 0.42 * (abs(vert.co.x) / 0.67) ** 2.4
+        pinch = 1.0 - 0.42 * (abs(vert.co.x) / 0.60) ** 2.4
         vert.co.y *= pinch
     parts.append(top)
     parts.append(
@@ -576,13 +597,25 @@ def build_credenza(coll: bpy.types.Collection, lx: float, lz: float, yaw: float)
     parts = []
     body_y = 0.34
     height = 0.56
-    parts.append(box(f"{tag}-carcass", (1.56, 0.44, height), _p(lx, body_y + height / 2, lz), "IntWalnut", coll, bevel=0.014))
+    # FIT FIX (wave 6). The credenza is not oversized - it is off-centre. The carcass is 0.44 m
+    # deep inside a 0.500 m `tv-unit` footprint, but the hardware only stands proud at the front:
+    # the brass pulls reach +0.262 (0.25 standoff + 0.012 radius) while the deepest thing behind
+    # the centre line is the carcass at -0.220. Occupied depth 0.482 m, centred at +0.021, so the
+    # front face sat 0.012 m outside the footprint while 0.030 m of slack went unused at the back.
+    # Author the whole assembly about that occupied centre instead of about the carcass centre:
+    # +/-0.241 inside +/-0.250, 9 mm clear on both faces. The rotation pivot below stays on the
+    # true anchor centre `lz`, so the piece still rotates about its anchor, not about the bias.
+    # Wave 5's load-time nudge measured the same 0.012 m and translated 12 mm; it is derived from
+    # measured bounds, so it computes zero and goes quiet once this export reaches the bytes.
+    CREDENZA_FRONT_BIAS = 0.021
+    cz = lz - CREDENZA_FRONT_BIAS
+    parts.append(box(f"{tag}-carcass", (1.56, 0.44, height), _p(lx, body_y + height / 2, cz), "IntWalnut", coll, bevel=0.014))
     for index, ox in enumerate((-0.38, 0.38)):
         parts.append(
             box(
                 f"{tag}-door-{index}",
                 (0.72, 0.024, height - 0.07),
-                _p(lx + ox, body_y + height / 2, lz + 0.232),
+                _p(lx + ox, body_y + height / 2, cz + 0.232),
                 "IntTeakLight",
                 coll,
                 bevel=0.007,
@@ -593,7 +626,7 @@ def build_credenza(coll: bpy.types.Collection, lx: float, lz: float, yaw: float)
                 f"{tag}-pull-{index}",
                 0.012,
                 0.16,
-                _p(lx + ox + (0.28 if index == 0 else -0.28), body_y + height / 2, lz + 0.25),
+                _p(lx + ox + (0.28 if index == 0 else -0.28), body_y + height / 2, cz + 0.25),
                 "IntBrass",
                 coll,
                 segments=10,
@@ -603,20 +636,20 @@ def build_credenza(coll: bpy.types.Collection, lx: float, lz: float, yaw: float)
     for index, (ox, oz) in enumerate(((-0.64, 0.16), (0.64, 0.16), (-0.64, -0.16), (0.64, -0.16))):
         parts.append(
             tapered_leg(
-                f"{tag}-leg-{index}", _p(lx + ox, body_y, lz + oz), body_y, 0.022, "IntWalnut", coll,
+                f"{tag}-leg-{index}", _p(lx + ox, body_y, cz + oz), body_y, 0.022, "IntWalnut", coll,
                 splay=(0.02 * (1 if ox > 0 else -1), 0.02 * (1 if oz > 0 else -1)),
             )
         )
     # Period portable television.
     tv_y = body_y + height
-    parts.append(box(f"{tag}-tv-body", (0.52, 0.40, 0.40), _p(lx - 0.36, tv_y + 0.20, lz), "IntWalnut", coll, bevel=0.02, segments=3))
-    parts.append(box(f"{tag}-tv-bezel", (0.42, 0.02, 0.31), _p(lx - 0.36, tv_y + 0.22, lz + 0.20), "IntDarkCast", coll, bevel=0.02, segments=4))
-    parts.append(box(f"{tag}-tv-screen", (0.37, 0.012, 0.27), _p(lx - 0.36, tv_y + 0.22, lz + 0.213), "IntScreenGlass", coll, bevel=0.02, segments=4))
+    parts.append(box(f"{tag}-tv-body", (0.52, 0.40, 0.40), _p(lx - 0.36, tv_y + 0.20, cz), "IntWalnut", coll, bevel=0.02, segments=3))
+    parts.append(box(f"{tag}-tv-bezel", (0.42, 0.02, 0.31), _p(lx - 0.36, tv_y + 0.22, cz + 0.20), "IntDarkCast", coll, bevel=0.02, segments=4))
+    parts.append(box(f"{tag}-tv-screen", (0.37, 0.012, 0.27), _p(lx - 0.36, tv_y + 0.22, cz + 0.213), "IntScreenGlass", coll, bevel=0.02, segments=4))
     for index, oz in enumerate((0.06, -0.02)):
         parts.append(
             cylinder(
                 f"{tag}-tv-knob-{index}", 0.022, 0.02,
-                _p(lx - 0.10, tv_y + 0.26 + index * -0.08, lz + 0.205), "IntBrass", coll,
+                _p(lx - 0.10, tv_y + 0.26 + index * -0.08, cz + 0.205), "IntBrass", coll,
                 segments=12, rotation=(math.radians(90.0), 0.0, 0.0),
             )
         )
@@ -670,42 +703,64 @@ def build_kitchen_run(coll: bpy.types.Collection, lx: float, lz: float, yaw: flo
     tag = "kitchen"
     parts = []
     counter_y = 0.90
-    depth = 0.62
+    # FIT FIX (wave 6), two causes, both measured in `fit-report.json` (X span 0.664 in a 0.650 m
+    # footprint, Z span 4.440 in a 4.400 m one). Wave 5 declined to re-author either; wave 6 does,
+    # because the `kitchen-run` anchor footprint is the wall line and a run that crosses it is not
+    # "what the object is".
+    #
+    # Depth 0.62 -> 0.60. 600 mm is the standard base-cabinet depth and 650 mm the worktop over it,
+    # which is exactly what the anchor publishes; 620 was arbitrary and spent the slack the chrome
+    # pulls need. At 0.60 the front-most thing is a base pull at +0.329 (0.300 carcass + 0.020
+    # standoff + 0.009 radius) and the rear-most is the splash lip and backsplash at -0.315.
+    # Occupied depth 0.644 m in 0.650, centred at +0.007 - so bias the assembly back by that and
+    # both faces land at +/-0.322, 3 mm clear. The pulls keep their full standoff: a handle that
+    # protrudes is still a handle, it just no longer protrudes through a wall.
+    #
+    # Length `+ 0.04` -> `length` on the worktop, splash lip and backsplash. That 40 mm was a
+    # bullnose overhang applied to the wrong axis: the worktop still overhangs the *front* by
+    # `depth + 0.03`, which is the feature, but the ends of a run butt into the room and 0.020 m
+    # of laminate stood outside the footprint at each end.
+    #
+    # The shipped GLBs still measure 0.664 x 4.440. Nothing at runtime can shrink geometry, so both
+    # stay recorded as accepted overruns in `fit.ts` until this export is refreshed.
+    depth = 0.60
     length = 4.40
-    parts.append(box(f"{tag}-toe-kick", (length - 0.06, depth - 0.09, 0.11), _p(lx, 0.055, lz - 0.04), "IntDarkCast", coll, bevel=0.006))
-    parts.append(box(f"{tag}-carcass", (length, depth, counter_y - 0.15), _p(lx, 0.11 + (counter_y - 0.15) / 2, lz), "IntCabinetOchre", coll, bevel=0.008))
+    KITCHEN_FRONT_BIAS = 0.007
+    kz = lz - KITCHEN_FRONT_BIAS
+    parts.append(box(f"{tag}-toe-kick", (length - 0.06, depth - 0.09, 0.11), _p(lx, 0.055, kz - 0.04), "IntDarkCast", coll, bevel=0.006))
+    parts.append(box(f"{tag}-carcass", (length, depth, counter_y - 0.15), _p(lx, 0.11 + (counter_y - 0.15) / 2, kz), "IntCabinetOchre", coll, bevel=0.008))
     door_h = counter_y - 0.24
     for index in range(5):
         ox = -length / 2 + 0.46 + index * 0.87
         parts.append(
-            box(f"{tag}-door-{index}", (0.82, 0.026, door_h), _p(lx + ox, 0.11 + door_h / 2 + 0.03, lz + depth / 2 - 0.004), "IntCabinetOchre", coll, bevel=0.008, segments=3)
+            box(f"{tag}-door-{index}", (0.82, 0.026, door_h), _p(lx + ox, 0.11 + door_h / 2 + 0.03, kz + depth / 2 - 0.004), "IntCabinetOchre", coll, bevel=0.008, segments=3)
         )
         parts.append(
-            cylinder(f"{tag}-pull-{index}", 0.009, 0.13, _p(lx + ox + 0.33, 0.11 + door_h - 0.08, lz + depth / 2 + 0.02), "IntChrome", coll, segments=10, rotation=(0.0, math.radians(90.0), 0.0))
+            cylinder(f"{tag}-pull-{index}", 0.009, 0.13, _p(lx + ox + 0.33, 0.11 + door_h - 0.08, kz + depth / 2 + 0.02), "IntChrome", coll, segments=10, rotation=(0.0, math.radians(90.0), 0.0))
         )
     # Worktop with a bullnose front edge and a shallow recessed sink.
-    parts.append(box(f"{tag}-worktop", (length + 0.04, depth + 0.03, 0.04), _p(lx, counter_y - 0.02, lz + 0.01), "IntLaminateCounter", coll, bevel=0.018, segments=4))
-    parts.append(box(f"{tag}-splash-lip", (length + 0.04, 0.03, 0.09), _p(lx, counter_y + 0.045, lz - depth / 2), "IntLaminateCounter", coll, bevel=0.008))
+    parts.append(box(f"{tag}-worktop", (length, depth + 0.03, 0.04), _p(lx, counter_y - 0.02, kz + 0.01), "IntLaminateCounter", coll, bevel=0.018, segments=4))
+    parts.append(box(f"{tag}-splash-lip", (length, 0.03, 0.09), _p(lx, counter_y + 0.045, kz - depth / 2), "IntLaminateCounter", coll, bevel=0.008))
     sink_x = lx + 0.62
-    parts.append(box(f"{tag}-sink-basin", (0.62, 0.42, 0.14), _p(sink_x, counter_y - 0.10, lz + 0.01), "IntChrome", coll, bevel=0.02, segments=3))
-    parts.append(box(f"{tag}-sink-rim", (0.66, 0.46, 0.012), _p(sink_x, counter_y + 0.004, lz + 0.01), "IntChrome", coll, bevel=0.006))
-    parts.append(cylinder(f"{tag}-tap-body", 0.017, 0.24, _p(sink_x, counter_y + 0.12, lz - 0.20), "IntChrome", coll, segments=14))
-    parts.append(cylinder(f"{tag}-tap-spout", 0.014, 0.22, _p(sink_x, counter_y + 0.22, lz - 0.10), "IntChrome", coll, segments=12, rotation=(math.radians(90.0), 0.0, 0.0)))
+    parts.append(box(f"{tag}-sink-basin", (0.62, 0.42, 0.14), _p(sink_x, counter_y - 0.10, kz + 0.01), "IntChrome", coll, bevel=0.02, segments=3))
+    parts.append(box(f"{tag}-sink-rim", (0.66, 0.46, 0.012), _p(sink_x, counter_y + 0.004, kz + 0.01), "IntChrome", coll, bevel=0.006))
+    parts.append(cylinder(f"{tag}-tap-body", 0.017, 0.24, _p(sink_x, counter_y + 0.12, kz - 0.20), "IntChrome", coll, segments=14))
+    parts.append(cylinder(f"{tag}-tap-spout", 0.014, 0.22, _p(sink_x, counter_y + 0.22, kz - 0.10), "IntChrome", coll, segments=12, rotation=(math.radians(90.0), 0.0, 0.0)))
     # Four-burner hob.
     hob_x = lx - 1.28
-    parts.append(box(f"{tag}-hob-plate", (0.62, 0.52, 0.014), _p(hob_x, counter_y + 0.005, lz + 0.01), "IntDarkCast", coll, bevel=0.006))
+    parts.append(box(f"{tag}-hob-plate", (0.62, 0.52, 0.014), _p(hob_x, counter_y + 0.005, kz + 0.01), "IntDarkCast", coll, bevel=0.006))
     for index, (ox, oz) in enumerate(((-0.15, 0.12), (0.15, 0.12), (-0.15, -0.12), (0.15, -0.12))):
-        parts.append(cylinder(f"{tag}-burner-{index}", 0.075, 0.012, _p(hob_x + ox, counter_y + 0.014, lz + oz), "IntChrome", coll, segments=18))
-        parts.append(cylinder(f"{tag}-burner-cap-{index}", 0.028, 0.016, _p(hob_x + ox, counter_y + 0.02, lz + oz), "IntDarkCast", coll, segments=12))
+        parts.append(cylinder(f"{tag}-burner-{index}", 0.075, 0.012, _p(hob_x + ox, counter_y + 0.014, kz + oz), "IntChrome", coll, segments=18))
+        parts.append(cylinder(f"{tag}-burner-cap-{index}", 0.028, 0.016, _p(hob_x + ox, counter_y + 0.02, kz + oz), "IntDarkCast", coll, segments=12))
     # Wall cabinets and the tiled field behind the run.
     wall_y = 1.52
     wall_h = 0.72
-    parts.append(box(f"{tag}-wall-carcass", (2.60, 0.34, wall_h), _p(lx - 0.70, wall_y + wall_h / 2, lz - 0.14), "IntCabinetOchre", coll, bevel=0.008))
+    parts.append(box(f"{tag}-wall-carcass", (2.60, 0.34, wall_h), _p(lx - 0.70, wall_y + wall_h / 2, kz - 0.14), "IntCabinetOchre", coll, bevel=0.008))
     for index in range(3):
         ox = -0.70 - 1.30 + 0.44 + index * 0.86
-        parts.append(box(f"{tag}-wall-door-{index}", (0.81, 0.024, wall_h - 0.04), _p(lx + ox, wall_y + wall_h / 2, lz - 0.14 + 0.18), "IntCabinetOchre", coll, bevel=0.008, segments=3))
-        parts.append(cylinder(f"{tag}-wall-pull-{index}", 0.008, 0.11, _p(lx + ox + 0.32, wall_y + 0.10, lz - 0.14 + 0.20), "IntChrome", coll, segments=10, rotation=(0.0, math.radians(90.0), 0.0)))
-    parts.append(box(f"{tag}-backsplash", (length + 0.04, 0.02, 0.56), _p(lx, counter_y + 0.30, lz - depth / 2 - 0.005), "IntBacksplashTile", coll, bevel=0.004))
+        parts.append(box(f"{tag}-wall-door-{index}", (0.81, 0.024, wall_h - 0.04), _p(lx + ox, wall_y + wall_h / 2, kz - 0.14 + 0.18), "IntCabinetOchre", coll, bevel=0.008, segments=3))
+        parts.append(cylinder(f"{tag}-wall-pull-{index}", 0.008, 0.11, _p(lx + ox + 0.32, wall_y + 0.10, kz - 0.14 + 0.20), "IntChrome", coll, segments=10, rotation=(0.0, math.radians(90.0), 0.0)))
+    parts.append(box(f"{tag}-backsplash", (length, 0.02, 0.56), _p(lx, counter_y + 0.30, kz - depth / 2 - 0.005), "IntBacksplashTile", coll, bevel=0.004))
     _rotate_group(parts, _p(lx, 0, lz), yaw)
 
 
@@ -1170,13 +1225,28 @@ def write_catalog(report: dict, out_dir: str) -> str:
 # --------------------------------------------------------------------------------------
 
 
+def _repo_root() -> str:
+    """Repo root inferred from this file: `<repo>/scripts/blender/world-studio/interiors/`."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    return os.path.abspath(os.path.join(here, "..", "..", "..", "..")).replace("\\", "/")
+
+
 def main() -> None:
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     parser = argparse.ArgumentParser()
-    parser.add_argument("--repo", required=True)
+    # The canonical run is the single pinned line in the module docstring, with no `--` payload at
+    # all, so every argument has to have a correct default. `--repo` used to be required, which
+    # made that line exit 2 before a single object was built; it now derives the repo root from
+    # this file's own location (repo/scripts/blender/world-studio/interiors/build_interiors.py),
+    # which is the only root at which the export paths below are meaningful. Still overridable.
+    parser.add_argument("--repo", default=_repo_root())
     parser.add_argument("--render", action="store_true")
     parser.add_argument("--samples", type=int, default=24)
-    parser.add_argument("--props", action="store_true", help="also export the per-prop GLBs")
+    # The catalog publishes ten assets, so the default run has to export ten. `--props` stays
+    # accepted so older invocations keep working; `--hero-only` is the opt-out that used to be
+    # the accidental default.
+    parser.add_argument("--props", action="store_true", default=True, help="export the per-prop GLBs")
+    parser.add_argument("--hero-only", dest="props", action="store_false", help="export only the hero composition")
     args = parser.parse_args(argv)
 
     repo = args.repo.replace("\\", "/").rstrip("/")
