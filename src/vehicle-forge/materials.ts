@@ -72,6 +72,14 @@ const FORGE_TREAD_GROOVE_M = -0.003;
 const FORGE_TYRE_GRAIN_M = 0.0001;
 /** 0.06 mm cabin-lining tooth, metres: slope ~0.4 on 1.0 mm. */
 const FORGE_LINING_TOOTH_M = 0.00006;
+/** Warm golden-hour horizon sRGB for the analytic glass sky-sheen. */
+export const FORGE_GLASS_SKY_HORIZON_SRGB = 0xffd2a0;
+/** Cool golden-hour zenith sRGB for the analytic glass sky-sheen. */
+export const FORGE_GLASS_SKY_ZENITH_SRGB = 0x9ec4e8;
+/** Dielectric F0 (~0.04) plus the clearcoat lobe (~0.04): base sky reflectance. */
+export const FORGE_GLASS_BASE_REFLECTANCE = 0.08;
+/** Analytic sky-sheen strength: grazing peak (<= 1.0 linear) stays below the ~1.02 bloom threshold. */
+export const FORGE_GLASS_SKY_SHEEN = 1.0;
 
 function forgePaintSpec(name: string, baseSrgb: number, roughness: number): Nuketown2MaterialSpec {
   return assertSpec({
@@ -419,6 +427,14 @@ export function createForgePaintMaterial(options: PaintOptions): MeshPhysicalNod
  * near-black colour tints the REFLECTION black, so the screens mirror a black
  * sky while the chrome beside them catches white and the car reads as a toy.
  * The tint lives in `color`; the reflection is Fresnel plus clearcoat.
+ *
+ * CAUSAL 2026-09-10: `scene.environment` measures NULL on the WebGPU quality
+ * route (2026-08-30, recorded in `src/rendering/arenas/test1.ts`), so the
+ * Fresnel/clearcoat lobes have no IBL source and the tinted glass over a
+ * shadowed lining renders as a dark hole. Opacity is not illumination: prior
+ * a0 bumps only blended dark-over-dark. The emissive term below supplies the
+ * missing sky reflection analytically (world-up gradient × dielectric
+ * reflectance `F0 + (1 - F0) * F`), with no sampler, pass, or instance change.
  */
 export function createForgeGlassMaterial(name: string, tintHex = 0x243036): MeshPhysicalNodeMaterial {
   const tint = linearOf(tintHex);
@@ -442,13 +458,30 @@ export function createForgeGlassMaterial(name: string, tintHex = 0x243036): Mesh
   const fresnel = pow(float(1).sub(cosine), float(5));
   const a0 = float(0.12);
   material.colorNode = vec3(tint.r, tint.g, tint.b);
-  // Bounded coach-only tonal breakup, not a new reflection or emissive fill.
+  // Bounded coach-only tonal breakup of the opacity graph, not an albedo wash.
   // Every other vehicle carries an explicit zero through the shared merge.
   const coachFlag = attribute('forgeCoachShade', 'float');
   const coachSheen = valueNoise2(vec2(positionWorld.z.mul(1.7), positionWorld.y.mul(2.3))).mul(coachFlag);
   const coachVariation = coachSheen.sub(float(0.5).mul(coachFlag)).mul(float(0.08));
   material.opacityNode = saturate(a0.add(float(1).sub(a0).mul(fresnel)).add(float(0.22)).add(coachVariation));
   material.roughnessNode = float(0.06).add(coachSheen.mul(float(0.05)));
+  // Analytic sky-sheen: the IBL the NULL-environment route never delivers.
+  // World-up gradient (warm horizon -> cool zenith) times the dielectric
+  // reflectance, so vertical glazing returns horizon warmth, grazing angles
+  // catch the sky, and normal-incidence glass keeps a legible F0 lift instead
+  // of transmitting only the shadowed lining. Emissive, not albedo: the tint,
+  // opacity, roughness and clearcoat graphs above are untouched.
+  const skyHorizon = linearOf(FORGE_GLASS_SKY_HORIZON_SRGB);
+  const skyZenith = linearOf(FORGE_GLASS_SKY_ZENITH_SRGB);
+  const upFacing = clamp(normalWorld.y.mul(float(0.5)).add(float(0.5)), float(0), float(1));
+  const skyGradient = mix(
+    vec3(skyHorizon.r, skyHorizon.g, skyHorizon.b),
+    vec3(skyZenith.r, skyZenith.g, skyZenith.b),
+    upFacing,
+  );
+  const skyReflect = float(FORGE_GLASS_BASE_REFLECTANCE)
+    .add(float(1 - FORGE_GLASS_BASE_REFLECTANCE).mul(fresnel));
+  material.emissiveNode = skyGradient.mul(skyReflect).mul(float(FORGE_GLASS_SKY_SHEEN));
   return material;
 }
 
