@@ -47,6 +47,10 @@ const ACCEPTED_UNBACKED_SHOT_SURFACES: Readonly<Record<string, number>> = Object
   test2: 0,
   raid2: 0,
   map3: 205,
+  // world-studio restored (row exists in registries; pin predates it).
+  'world-studio': 0,
+  // PASS 97: every newworld-prime surface ships a proxy mesh (census-backed).
+  'newworld-prime': 0,
 });
 
 /**
@@ -85,6 +89,11 @@ const ACCEPTED_BALLISTIC_FALLBACK: Readonly<Record<string, number>> = Object.fre
   test2: 135,
   map3: 21,
   raid2: 105,
+  // world-studio restored (measured 0 fallback 2026-09-14; unbacked/orphan
+  // debt below stays open and owned by the live line, not pinned here).
+  'world-studio': 0,
+  // PASS 97: measured 0 fallback on candidate HEAD (probe).
+  'newworld-prime': 0,
 });
 
 const origin = { x: 0, y: 1.5, z: 0 };

@@ -3458,15 +3458,14 @@ let hemisphereLight: THREE.HemisphereLight;
 let ambientLight: THREE.AmbientLight;
 let sunLight: THREE.DirectionalLight;
 let fillLight: THREE.DirectionalLight; let nuketown2ClusteredLightRig: Nuketown2ClusteredLightRig | null = null;
-// PASS 97 (critic round-1): Day-1 standby arenas decode (the id is the
-// network/replay/storage boundary) but must never stage, perform or
-// direct-boot - they have presentation geometry and no gameplay authority.
-// The menu boundary (menuArenaSelection) already falls back to the default
-// for them; this table makes the refusal explicit at each of the three call
-// sites, so a future refactor of one path cannot silently admit a standby
-// arena. Promotion day deletes the row here; nothing else moves.
+// Day-2 (2026-09-14): New World Prime gameplay authority landed, so its
+// standby row is removed and menu/stage/perform/direct-boot admit it. The
+// table + helper + three call sites stay as the mechanism: a future
+// standby-preview-only arena rejoins by adding one row here, nothing else
+// moves. The menu boundary (menuArenaSelection) already falls back to the
+// default for any such row; this table keeps the refusal explicit at each
+// call site, so a future refactor of one path cannot silently admit it.
 const STANDBY_ONLY_ARENAS: Readonly<Partial<Record<ArenaId, true>>> = Object.freeze({
-  'newworld-prime': true,
 });
 function resolveNonStandbyArenaId(id: ArenaId): ArenaId {
   if (STANDBY_ONLY_ARENAS[id] === true) return menuArenaSelection(null).id;
@@ -3527,10 +3526,11 @@ const arenaFactories = createArenaFactoryRegistry<ArenaMap, THREE.Scene, ArenaId
   // original is never broken mid-pass. Eager: its builder is synchronous and
   // needs no wasm prepare step. See src/raid2-arena.ts.
   raid2: eagerArena(buildRaid2),
-  // PASS 97: New World Prime Day-1 STANDBY. Eager: synchronous blockout
-  // builder, no wasm prepare step. Registered so the id resolves in every
-  // decoded path; STANDBY_ONLY_ARENAS above keeps it out of stage/perform/boot
-  // until the authority pass promotes it. See src/newworld-prime-arena.ts.
+  // Day-2 (2026-09-14): New World Prime gameplay authority landed. Eager:
+  // synchronous builder, no wasm prepare step. Registered so the id resolves
+  // in every decoded path and stage/perform/boot now admit it; the
+  // STANDBY_ONLY_ARENAS mechanism above stays for future standby rows.
+  // See src/newworld-prime-arena.ts.
   'newworld-prime': eagerArena(buildNewworldPrime),
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();

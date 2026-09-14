@@ -48,7 +48,13 @@
           "kind": "manual",
           "ref": "src/newworld-prime-arena.ts",
           "command": "git status --short src/newworld-prime-*.ts src/rendering/arenas/newworld-prime.ts",
-          "note": "Cited, not re-run: the five files arrived as untracked generator output verified on the stale base (tsc 0, deterministic, in-budget per the handoff brief). Shell never touched them; git status shows them untracked, zero Shell diff. Layout plates batch-2-layout/map__layout-topdown.png + map__layout-angle.png + map__center-loop.png and LAYOUT_CONTRACT.md facts 1-10 are cited from the module header (paths only, images stay out of the repo)."
+          "note": "Day-2 update: orchestrator wired newworldPrimeAuthority into buildNewworldPrime (authority arrays + live spawns replace standby empties) and added proxyMeshes return to the authority module. All other generator content byte-identical to the verified handoff. Layout plates + LAYOUT_CONTRACT facts 1-10 cited from module headers (paths only)."
+        },
+        {
+          "kind": "unit",
+          "ref": "src/ballistics.test.ts",
+          "command": "npx vitest run src/ballistics.test.ts",
+          "note": "Measured on candidate HEAD via throwaway probe (since removed): newworld-prime fallback=0 unbacked=0 orphans=0 — clean census, pinned at 0 floors. world-studio on the same run: fallback=0, unbacked=786, orphans=61 (pre-existing live-line debt, fails the dynamic-target assert; not pinned, owned by the live line)."
         },
         {
           "kind": "unit",

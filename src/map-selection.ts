@@ -542,26 +542,27 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
-  // PASS 97 (2026-09-14): New World Prime Day-1 STANDBY. `selectable: false`
-  // keeps it out of the menu, host controls and MP sweeps (all derive from
-  // SELECTABLE_ARENAS / isMenuMultiplayerArenaId); the stable id still decodes
-  // for network/replay/storage. Team kind with a 2-bot solo budget inside the
+  // Day-2 (2026-09-14): gameplay authority landed, so New World Prime is
+  // selectable. Menu, host controls, lobby filter and MP sweeps all derive
+  // from SELECTABLE_ARENAS / isMenuMultiplayerArenaId, so this one flip
+  // admits the row everywhere; the stable id still decodes for
+  // network/replay/storage. Team kind with a 2-bot solo budget inside the
   // sized population; no showcasePath (no second page ships). Menu copy is
   // written from the layout contract, not a template: high-desert loop road,
   // west teal + east yellow two-storey houses, school bus + semi cover.
   Object.freeze({
     id: 'newworld-prime' as const,
-    selectable: false,
+    selectable: true,
     routeId: 'new-world-prime' as const,
     kind: 'team' as const,
     legacyAliases: Object.freeze([]),
-    selectorLabel: 'NEW WORLD PRIME · STANDBY',
+    selectorLabel: 'NEW WORLD PRIME',
     displayName: 'New World Prime',
     titleLead: 'NEW WORLD',
     titleAccent: 'PRIME',
-    menuLede: 'Fight the high-desert loop: teal and yellow two-storey houses face each other over a horseshoe road, with a school bus and a semi-trailer holding the centre. Standby preview.',
-    summary: 'High-desert loop · two-storey houses · standby preview',
-    rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO · STANDBY',
+    menuLede: 'Fight the high-desert loop: teal and yellow two-storey houses face each other over a horseshoe road, with a school bus and a semi-trailer holding the centre.',
+    summary: 'High-desert loop · two-storey houses · bus + semi cover',
+    rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
     soloBotCount: 2,
     maximumSoloBots: 2,
     multiplayer: true,

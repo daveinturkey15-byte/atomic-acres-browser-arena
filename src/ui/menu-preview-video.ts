@@ -269,11 +269,12 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     width: 2560,
     height: 1440,
   }),
-  // PASS 97 (2026-09-14): New World Prime Day-1 STANDBY. No flyover has been
+  // Day-2 (2026-09-14): New World Prime is playable, but no flyover has been
   // captured; standby never borrows older map bytes, so all three media
-  // paths are empty and the card renders the labelled PREVIEW STANDBY
-  // placeholder. Joins MEDIA_PENDING_ARENAS in menu-preview-video.test.ts
-  // until its own capture lands through the sanctioned generator.
+  // paths stay empty and the card renders the labelled PREVIEW STANDBY
+  // placeholder via the menuPreviewVideoMarkup fallback below. Real capture
+  // is an owner HITL follow-up through the sanctioned generator; the row
+  // leaves standby only by shipping its own bytes, same mechanism as raid2.
   'newworld-prime': Object.freeze({
     arenaId: 'newworld-prime',
     frame: 'helicopter',

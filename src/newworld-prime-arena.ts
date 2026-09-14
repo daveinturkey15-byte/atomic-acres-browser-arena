@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import type { ArenaMap } from './map';
 import type { Box2 } from './collision';
-import type { Team } from './protocol';
 import { DeterministicRng } from './deterministic-rng';
 import {
   NEWWORLD_PRIME_PRACTICAL_ROLE_IDS,
@@ -43,6 +42,7 @@ import {
   type NewworldPrimePropPart,
   type NewworldPrimePropPlacement,
 } from './newworld-prime-props';
+import { newworldPrimeAuthority } from './newworld-prime-authority';
 
 /**
  * newworld-prime Day-1 layout blockout assembler (presentation-only).
@@ -609,23 +609,15 @@ function buildClotheslines(ctx: BlockoutContext): void {
   }
 }
 
-function standbySpawns(): Record<Team, THREE.Vector3[]> {
-  const north: Array<[number, number]> = [[-6, 38], [-3.5, 39], [0, 38.5], [3.5, 39], [6, 38], [0, 41]];
-  const south: Array<[number, number]> = [[-6, -38], [-3.5, -39], [0, -38.5], [3.5, -39], [6, -38], [0, -41]];
-  return {
-    0: north.map(([x, z]) => new THREE.Vector3(x, 1.7, z)),
-    1: south.map(([x, z]) => new THREE.Vector3(x, 1.7, z)),
-  };
-}
+// Day-2: live spawns come from newworld-prime-authority (standby set retired).
 
 // ---------------------------------------------------------------------------
 // Arena entry (Shell imports this by name for arenaFactories + visual-stream).
 // ---------------------------------------------------------------------------
 
 /**
- * Day-1 standby-preview blockout of New World Prime. Presentation-only:
- * colliders, shot surfaces, cover and nav authority stay empty; spawns are
- * standby placeholders Shell replaces when the arena goes selectable.
+ * Day-2 playable New World Prime. Presentation blockout plus gameplay
+ * authority from newworld-prime-authority (movement + shot + live spawns).
  *
  * Bar: batch-2-layout/map__layout-topdown.png +
  * batch-2-layout/map__layout-angle.png + batch-2-layout/map__center-loop.png.
@@ -694,33 +686,31 @@ export function buildNewworldPrime(scene: THREE.Scene): ArenaMap {
       jeep: NEWWORLD_PRIME_JEEP_RESERVATION,
       sandbag: NEWWORLD_PRIME_SANDBAG_RESERVATION,
     }),
-    spawnsStandby: true,
+    spawnsStandby: false,
     blockoutParts: Object.freeze([...ctx.parts]),
   });
 
-  // Presentation never derives collision/authority: every array below stays
-  // empty by construction (pair/centred/emit paths never push here).
-  const colliders: Box2[] = [];
-  const physicsColliders: Box2[] = [];
-  const raycastMeshes: THREE.Object3D[] = [];
+  // Day-2: gameplay authority from the authority module (same boxes the
+  // presentation reads, emitted once through map.ts conventions).
+  const authority = newworldPrimeAuthority(scene);
 
   return {
     // Shell widens the ArenaMap id union to admit 'newworld-prime'.
     id: NEWWORLD_PRIME_ARENA_ID as unknown as ArenaMap['id'],
     label: NEWWORLD_PRIME_ARENA_DISPLAY_NAME,
     root,
-    colliders,
-    physicsColliders,
-    raycastMeshes,
-    shotSurfaces: [],
-    spawns: standbySpawns(),
+    colliders: authority.colliders,
+    physicsColliders: authority.physicsColliders,
+    raycastMeshes: authority.proxyMeshes,
+    shotSurfaces: authority.shotSurfaces,
+    spawns: authority.spawns,
     patrolPoints: [
       [0, 20], [-7.5, 8], [7.5, 8], [0, 0], [-7.5, -8], [7.5, -8], [0, -20],
     ].map(([x, z]) => new THREE.Vector3(x, 0, z)),
     targets: [],
     houses: [],
     breakableWindows: [],
-    physicalCover: [],
+    physicalCover: authority.physicalCover,
     bounds: { ...NEWWORLD_PRIME_ARENA_BOUNDS },
     houseTelemetry: {
       houses: 0, groundRooms: 0, upperRooms: 0, doors: 0, windows: 0, ramps: 0,
