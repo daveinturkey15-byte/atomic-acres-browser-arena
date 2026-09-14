@@ -1,7 +1,7 @@
 /**
  * newworld-prime Blender GLB dressing (presentation-only).
  *
- * Attaches nine Blender-built GLBs over the Day-1 blockout massing emitted by
+ * Attaches ten Blender-built GLBs over the Day-1 blockout massing emitted by
  * buildNewworldPrime (src/newworld-prime-arena.ts). Authority
  * (colliders, ballistic surfaces, spawns, nav) is untouched — the authority
  * boxes already match these dims by construction, and every dressed mesh is
@@ -36,6 +36,9 @@
  *   siding, white trim, chimney, porch with railing), 7.2 x 6.0 m.
  * - bus (3692 tris): atomic-acres-catalog/assets-batch1/bus/out.glb —
  *   LAYOUT_CONTRACT fact 4 (school-bus center spot, box ~11.2 x 2.5 x 2.6 m).
+ * - semi (3740 tris): atomic-acres-catalog/assets-batch1/semi/out.glb —
+ *   LAYOUT_CONTRACT fact 4 (semi-truck center spot, nose north, authority
+ *   box ~13 m already matches — presentation-only, untouched).
  * - fence bay (198 tris, 2.4 m repeat), hedge (200 tris), pad (48 tris):
  *   atomic-acres-catalog/assets-batch1/fences/ — privacy-fence runs, hedge
  *   runs, and all 9 concrete-pad placements from newworld-prime-props.
@@ -54,6 +57,7 @@ import {
   NEWWORLD_PRIME_HEDGE_RUNS,
   NEWWORLD_PRIME_PRIVACY_FENCE_RUNS,
   NEWWORLD_PRIME_SCHOOL_BUS_PLACEMENT,
+  NEWWORLD_PRIME_SEMI_TRUCK_PLACEMENT,
   NEWWORLD_PRIME_SHED_PLACEMENTS,
   NEWWORLD_PRIME_STREET_LAMP_PLACEMENTS,
   NEWWORLD_PRIME_WELCOME_SIGN_PLACEMENT,
@@ -87,6 +91,12 @@ export const NEWWORLD_PRIME_HEDGE_GLB =
   `./assets/newworld-prime/hedge.glb?v=${NEWWORLD_PRIME_GLB_VERSION_BATCH2}`;
 export const NEWWORLD_PRIME_PAD_GLB =
   `./assets/newworld-prime/pad.glb?v=${NEWWORLD_PRIME_GLB_VERSION_BATCH2}`;
+/** Cache-busting lane for the wave-3 semi GLB copy. */
+const NEWWORLD_PRIME_GLB_VERSION_BATCH3 = 'batch3-20260914';
+
+/** Public asset URL for the wave-3 semi GLB copy. */
+export const NEWWORLD_PRIME_SEMI_GLB =
+  `./assets/newworld-prime/semi.glb?v=${NEWWORLD_PRIME_GLB_VERSION_BATCH3}`;
 
 /**
  * Fallback flags for the GLB/blockout swap. Every group defaults ON (new
@@ -103,6 +113,7 @@ export type NewworldPrimeGlbDressingFlags = Readonly<{
   fences: boolean;
   hedges: boolean;
   pads: boolean;
+  semi: boolean;
 }>;
 
 export const NEWWORLD_PRIME_GLB_DRESSING_DEFAULT: NewworldPrimeGlbDressingFlags = Object.freeze({
@@ -114,6 +125,7 @@ export const NEWWORLD_PRIME_GLB_DRESSING_DEFAULT: NewworldPrimeGlbDressingFlags 
   fences: true,
   hedges: true,
   pads: true,
+  semi: true,
 });
 
 export type NewworldPrimeGlbAssetId =
@@ -125,7 +137,8 @@ export type NewworldPrimeGlbAssetId =
   | 'bus'
   | 'fence-bay'
   | 'hedge'
-  | 'pad';
+  | 'pad'
+  | 'semi';
 
 /** Per-asset outcome: blockout stays visible whenever error is non-null. */
 export type NewworldPrimeGlbAttachment = Readonly<{
@@ -262,6 +275,16 @@ function dressingPlan(flags: NewworldPrimeGlbDressingFlags): readonly DressingPl
       // emitPropPart names bus blockout meshes
       // `newworld-prime-<placement.id>-<part.id>`.
       coversBlockout: (meshName: string) => meshName.includes(NEWWORLD_PRIME_SCHOOL_BUS_PLACEMENT.id),
+    });
+  }
+  if (flags.semi) {
+    plans.push({
+      asset: 'semi',
+      url: NEWWORLD_PRIME_SEMI_GLB,
+      spots: placementSpots([NEWWORLD_PRIME_SEMI_TRUCK_PLACEMENT]),
+      // emitPropPart names semi blockout meshes
+      // `newworld-prime-<placement.id>-<part.id>`.
+      coversBlockout: (meshName: string) => meshName.includes(NEWWORLD_PRIME_SEMI_TRUCK_PLACEMENT.id),
     });
   }
   if (flags.fences) {
