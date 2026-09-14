@@ -128,7 +128,9 @@ export type NewworldPrimeStructurePartRole =
   | 'ridge-cap'
   | 'fascia'
   | 'soffit'
-  | 'patio-slab';
+  | 'patio-slab'
+  | 'interior-partition'
+  | 'interior-floor-slab';
 
 /** TSL registry material keys — resolved to materials by Shell, never here. */
 export type NewworldPrimeStructureMaterial =

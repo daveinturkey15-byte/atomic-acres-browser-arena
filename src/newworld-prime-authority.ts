@@ -29,6 +29,7 @@ import {
   NEWWORLD_PRIME_WEST_TEAL_D_M,
   NEWWORLD_PRIME_WEST_TEAL_W_M,
 } from './newworld-prime-structures';
+import { newworldPrimeInteriorWallSolids } from './newworld-prime-interiors';
 
 /**
  * newworld-prime Day-2 gameplay authority (movement + shot).
@@ -46,6 +47,10 @@ import {
  * - LAYOUT_CONTRACT fact 4: school bus + semi cab + semi trailer (center pair)
  * - LAYOUT_CONTRACT fact 5: 2 field sheds (northwest + southeast)
  * - LAYOUT_CONTRACT fact 6: 3 lot-division privacy fence runs
+ * - INTERIORS PILOT: ground-floor partitions inside both houses (6 walls each,
+ *   appended from newworld-prime-interiors; the full-footprint house boxes
+ *   above stay solid — physical ingress through the siding is a later pass,
+ *   so these walls validate layout + shot cover, not entry)
  *
  * Deliberately non-solid (dressing / flat / reserved — no authority):
  * - LAYOUT_CONTRACT fact 7: concrete pads (150 mm slabs, walkable),
@@ -204,6 +209,19 @@ function solidSpecs(): SolidSpec[] {
       minY: 0, maxY: FENCE_MAX_Y_M,
       yaw: run.rotationY,
       ballisticMaterial: 'fence',
+    });
+  }
+
+  // INTERIORS PILOT: ground-floor partition walls, both houses (data-owned by
+  // newworld-prime-interiors, emitted here in this module's pattern: one
+  // bounds object shared by colliders, physicsColliders and the ballistic
+  // surface plus an invisible proxy mesh).
+  for (const wall of newworldPrimeInteriorWallSolids()) {
+    specs.push({
+      id: wall.id,
+      x: wall.x, z: wall.z, sizeX: wall.sizeX, sizeZ: wall.sizeZ,
+      minY: wall.minY, maxY: wall.maxY,
+      ballisticMaterial: 'interior-wall',
     });
   }
 

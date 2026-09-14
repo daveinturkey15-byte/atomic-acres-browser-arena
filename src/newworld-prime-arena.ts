@@ -6,6 +6,7 @@ import {
   NEWWORLD_PRIME_PRACTICAL_ROLE_IDS,
   NEWWORLD_PRIME_TSL_PIPELINE_ROLES,
   newworldPrimeLightingFor,
+  type NewworldPrimeLightingVariant,
 } from './newworld-prime-lighting';
 import {
   NEWWORLD_PRIME_EAST_YELLOW_PART_BUDGET,
@@ -42,6 +43,17 @@ import {
   type NewworldPrimePropPart,
   type NewworldPrimePropPlacement,
 } from './newworld-prime-props';
+import {
+  NEWWORLD_PRIME_SCALE_READ_DEFAULT,
+  NEWWORLD_PRIME_SCALE_READ_DOORWAYS,
+  NEWWORLD_PRIME_SCALE_READ_EDGING,
+  NEWWORLD_PRIME_SCALE_READ_FENCE_CLOSURES,
+  NEWWORLD_PRIME_SCALE_READ_GROUND_RING,
+  NEWWORLD_PRIME_SCALE_READ_WINDOW_GLOW,
+  newworldPrimeScaleReadGlowIntensity,
+  type NewworldPrimeScaleReadBox,
+  type NewworldPrimeScaleReadFlags,
+} from './newworld-prime-scale-read';
 import { newworldPrimeAuthority } from './newworld-prime-authority';
 
 /**
@@ -609,6 +621,42 @@ function buildClotheslines(ctx: BlockoutContext): void {
   }
 }
 
+/**
+ * Scale-read dressing (2026-09-14 owner wave): closed lot perimeters, doorway
+ * depth cues, lawn edging + sand ring, dusk window glow. Presentation-only —
+ * same forced flags as every other emitter here — and fully reversible
+ * through the flags (mirrors the NEWWORLD_PRIME_GLB_DRESSING_DEFAULT pattern).
+ * Authority/colliders/spawns/nav untouched.
+ */
+function buildScaleReadDressing(
+  ctx: BlockoutContext,
+  flags: NewworldPrimeScaleReadFlags,
+  variant: NewworldPrimeLightingVariant,
+): void {
+  if (flags.lotFences) {
+    for (const run of NEWWORLD_PRIME_SCALE_READ_FENCE_CLOSURES) {
+      const parts = newworldPrimePrivacyFenceRunParts(run.bays, NEWWORLD_PRIME_BLOCKOUT_SEED);
+      for (const part of parts) emitPropPart(ctx, part, run);
+    }
+  }
+  const boxes: NewworldPrimeScaleReadBox[] = [];
+  if (flags.doorways) boxes.push(...NEWWORLD_PRIME_SCALE_READ_DOORWAYS);
+  if (flags.groundVariation) boxes.push(...NEWWORLD_PRIME_SCALE_READ_EDGING, ...NEWWORLD_PRIME_SCALE_READ_GROUND_RING);
+  if (flags.windowGlow) boxes.push(...NEWWORLD_PRIME_SCALE_READ_WINDOW_GLOW);
+  for (const item of boxes) {
+    emitLocal(ctx, item.id, item.role, item.offset, item.size, item.materialId, item.rotationY ?? 0);
+  }
+  if (flags.windowGlow) {
+    // One shared lamp-lens role: cards + street-lamp lenses lift together at
+    // dusk and sit dark at noon (late-morning/overcast read intensity 0).
+    const lens = ctx.materials.get('newworld-prime-lamp-lens-v1') as THREE.MeshStandardMaterial | undefined;
+    if (lens && lens.emissive) {
+      lens.emissive.setHex(0xffc37a);
+      lens.emissiveIntensity = newworldPrimeScaleReadGlowIntensity(variant);
+    }
+  }
+}
+
 // Day-2: live spawns come from newworld-prime-authority (standby set retired).
 
 // ---------------------------------------------------------------------------
@@ -622,7 +670,13 @@ function buildClotheslines(ctx: BlockoutContext): void {
  * Bar: batch-2-layout/map__layout-topdown.png +
  * batch-2-layout/map__layout-angle.png + batch-2-layout/map__center-loop.png.
  */
-export function buildNewworldPrime(scene: THREE.Scene): ArenaMap {
+export function buildNewworldPrime(
+  scene: THREE.Scene,
+  opts?: {
+    readonly scaleRead?: Partial<NewworldPrimeScaleReadFlags>;
+    readonly lightingVariant?: NewworldPrimeLightingVariant;
+  },
+): ArenaMap {
   const root = new THREE.Group();
   root.name = 'New World Prime arena (blockout)';
   scene.add(root);
@@ -631,6 +685,10 @@ export function buildNewworldPrime(scene: THREE.Scene): ArenaMap {
     root, materials: new Map(), parts: [], meshes: 0, triangles: 0,
   };
   const rng = new DeterministicRng(NEWWORLD_PRIME_BLOCKOUT_SEED);
+  const scaleRead: NewworldPrimeScaleReadFlags = Object.freeze({
+    ...NEWWORLD_PRIME_SCALE_READ_DEFAULT,
+    ...opts?.scaleRead,
+  });
 
   // LAYOUT_CONTRACT facts 1..10, in order (fact 6 reservations stay data-only).
   buildDesertSurround(ctx, rng); // fact 1
@@ -641,9 +699,10 @@ export function buildNewworldPrime(scene: THREE.Scene): ArenaMap {
   buildNorthEntrance(ctx); // fact 5
   buildYardsAndStreet(ctx); // facts 7/8/9 (props PARTS)
   buildClotheslines(ctx); // fact 8 (local massing)
+  const lighting = newworldPrimeLightingFor(opts?.lightingVariant ?? 'late-morning');
+  buildScaleReadDressing(ctx, scaleRead, lighting.variant); // scale-read wave
 
 
-  const lighting = newworldPrimeLightingFor('late-morning');
   const propBudgetErrors = validateNewworldPrimePropBudgets();
   const propTriangles = newworldPrimePropTriangleTotal([
     ...orEmpty(NEWWORLD_PRIME_SCHOOL_BUS_PARTS),
@@ -686,6 +745,7 @@ export function buildNewworldPrime(scene: THREE.Scene): ArenaMap {
       jeep: NEWWORLD_PRIME_JEEP_RESERVATION,
       sandbag: NEWWORLD_PRIME_SANDBAG_RESERVATION,
     }),
+    scaleRead: scaleRead,
     spawnsStandby: false,
     blockoutParts: Object.freeze([...ctx.parts]),
   });
