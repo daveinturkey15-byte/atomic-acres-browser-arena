@@ -1,0 +1,61 @@
+--- scripts/qa/verify-pass65-first-person-arms-visual.mjs	2026-09-02 20:21:57.683820900 +0100
++++ zz-arms-probe.mjs	2026-09-02 20:48:47.597588800 +0100
+@@ -4,7 +4,7 @@
+ import { chromium } from '@playwright/test';
+ import { createServer } from 'vite';
+ 
+-const artifactRoot = 'artifacts/pass65/first-person-arms-visual-gate';
++const artifactRoot = 'artifacts/pass65/first-person-arms-visual-probe';
+ const port = Number(process.env.PASS65_ARMS_VISUAL_PORT ?? '44205');
+ const allowDirty = process.env.PASS65_ARMS_VISUAL_ALLOW_DIRTY === '1';
+ const executablePath = [
+@@ -38,6 +38,7 @@
+ }
+ 
+ const finiteArray = (values) => Array.isArray(values) && values.every(Number.isFinite);
++const probeObservations = [];
+ 
+ function presentationViolations(label, state) {
+   const violations = [];
+@@ -476,17 +477,26 @@
+     api.equipWeapon('m4a1');
+     api.teleportPlayer(-19.65, 1.7, -14.5, Math.PI / 2, 0);
+   });
+-  await page.waitForFunction(() => (
+-    window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.surfaceRetreat > 0.15
+-  ), undefined, { timeout: 10_000 });
++  // PROBE ONLY (HF-410 integration prep): the committed gate WAITS here. Under
++  // the Lane W body fit the rig no longer leaves the capsule, so the wall
++  // pullback never engages and this wait can never satisfy. Record what it
++  // measured instead of aborting, so the run still yields a violation count.
++  await page.waitForTimeout(1200);
++  probeObservations.push({ where: 'contact/m4a1/wall-hip precondition', expected: 'surfaceRetreat > 0.15',
++    observed: await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.surfaceRetreat ?? null) });
+   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setStance('prone'));
++  // PROBE ONLY: same reason. Wait for the STANCE (which is real) and record the
++  // retreat/lift the gate wanted rather than timing out on the removed lift.
+   await page.waitForFunction(() => {
+     const current = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+-    return current?.player?.stance === 'prone'
+-      && current?.weaponPresentation?.weapon === 'm4a1'
+-      && current?.weaponPresentation?.surfaceRetreat > 0.25
+-      && current?.weaponPresentation?.surfaceLift >= 0.13;
++    return current?.player?.stance === 'prone' && current?.weaponPresentation?.weapon === 'm4a1';
+   }, undefined, { timeout: 15_000 });
++  probeObservations.push({ where: 'contact/m4a1/prone-wall-floor-hip precondition',
++    expected: 'surfaceRetreat > 0.25 && surfaceLift >= 0.13',
++    observed: await page.evaluate(() => {
++      const p = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation;
++      return { surfaceRetreat: p?.surfaceRetreat ?? null, surfaceLift: p?.surfaceLift ?? null };
++    }) });
+   await page.waitForTimeout(400);
+   state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+   violations.push(...presentationViolations('contact/m4a1/prone-wall-floor-hip', state));
+@@ -523,6 +533,7 @@
+     sourceRevision, route, browser: browser.version(),
+     renderer: { requested: 'webgpu', actual: state.render.runtime.actualBackend, softwareAdapter: state.render.runtime.softwareAdapter, profile: state.render.profile },
+     representatives, evidence, browserErrors: fatalBrowserErrors(errors), violations,
++    probeObservations, violationCount: violations.length,
+   };
+   await writeFile(`${artifactRoot}/receipt.json`, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
+   if (violations.length > 0) throw new Error(`Pass 65 first-person arms visual gate failed:\n- ${violations.join('\n- ')}`);

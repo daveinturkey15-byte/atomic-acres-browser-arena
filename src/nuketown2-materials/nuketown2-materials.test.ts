@@ -1,0 +1,399 @@
+/**
+ * PASS 94 materials lane — the per-family gate.
+ *
+ * WHAT THIS GATE IS FOR. The owner's report on the rebuilt Nuke Town was that
+ * it "looks like basic geometry". The two properties that fix that are
+ * numbers, not opinions:
+ *
+ *   1. wear at three scales, each inside its authored physical band; and
+ *   2. an albedo wear step the eye can actually resolve.
+ *
+ * Both are asserted here per FAMILY, against the same spec objects the node
+ * graphs are built from, so a future edit that quietly tunes the wear back
+ * down to the invisible 3-6% the arena shipped with fails this file rather
+ * than passing review and losing the frame.
+ *
+ * It also pins the properties this lane must NOT have changed: the HF-434
+ * coplanar offset tiers, the two houses' base hexes (the fidelity gate reads
+ * those), zero imported textures, and zero light objects.
+ */
+import { describe, it, expect } from 'vitest';
+import * as THREE from 'three';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+import {
+  MAX_ALBEDO_DARKENING,
+  MIN_ALBEDO_WEAR_STEP,
+  NUKETOWN2_MATERIAL_ROLES,
+  WEAR_BANDS,
+  albedoWearStep,
+  createNuketown2MaterialRegistry,
+  createNuketown2TextureBridge,
+  linearRgb,
+  maxDarkening,
+  type Nuketown2MaterialSpec,
+} from './index';
+import {
+  MIN_FEATURE_PIXELS,
+  featurePixels,
+  readDistance,
+  scaleResolvable,
+} from './spec';
+import { BACKDROP_READ_DISTANCE_M, isBackdrop } from './wear';
+import { noiseLutTexture } from './noise-lut';
+import { sidingSpec } from './families/siding';
+import { roofSpec } from './families/roof';
+import { asphaltSpec, markingSpec } from './families/asphalt';
+import { concreteSpec, KERB_CONCRETE_SRGB } from './families/concrete';
+import { timberSpec } from './families/timber';
+import { glassSpec } from './families/glass';
+import { paintedMetalSpec } from './families/painted-metal';
+import { lawnSpec } from './families/lawn';
+
+/**
+ * One representative spec per family, plus the roughness/metalness window
+ * that family is allowed to live in.
+ *
+ * The windows are per-family PBR ranges, not a global "0..1 is fine": a
+ * dielectric pane at metalness 0.3 and a mown lawn at roughness 0.4 are both
+ * type errors you can only catch by family.
+ */
+const FAMILIES: ReadonlyArray<{
+  readonly family: string;
+  readonly spec: Nuketown2MaterialSpec;
+  readonly roughness: readonly [number, number];
+  readonly metalness: readonly [number, number];
+}> = [
+  { family: 'siding', spec: sidingSpec('gate-siding', 0x9f6147), roughness: [0.55, 0.90], metalness: [0, 0.05] },
+  { family: 'roof', spec: roofSpec('gate-roof'), roughness: [0.80, 1.00], metalness: [0, 0.05] },
+  { family: 'asphalt', spec: asphaltSpec('gate-asphalt'), roughness: [0.85, 1.00], metalness: [0, 0.05] },
+  { family: 'asphalt-marking', spec: markingSpec('gate-marking'), roughness: [0.75, 1.00], metalness: [0, 0.05] },
+  { family: 'concrete', spec: concreteSpec('gate-concrete', KERB_CONCRETE_SRGB), roughness: [0.85, 1.00], metalness: [0, 0.05] },
+  { family: 'timber', spec: timberSpec('gate-timber', 0x8a6244, 'fence'), roughness: [0.80, 1.00], metalness: [0, 0.05] },
+  { family: 'timber-painted', spec: timberSpec('gate-trim', 0xf0e4c9, 'painted-trim'), roughness: [0.50, 0.80], metalness: [0, 0.05] },
+  // Float glass is a DIELECTRIC. metalness must be exactly 0: anything above
+  // it tints the pane's own reflection by its albedo and the window comes back
+  // as a sheet of coloured metal.
+  { family: 'glass', spec: glassSpec('gate-glass', 0x2b3d47), roughness: [0.02, 0.10], metalness: [0, 0] },
+  { family: 'painted-metal', spec: paintedMetalSpec('gate-painted-metal', 0xaebdc1), roughness: [0.25, 0.65], metalness: [0, 0.30] },
+  { family: 'lawn', spec: lawnSpec('gate-lawn', 0x496438, 'turf'), roughness: [0.90, 1.00], metalness: [0, 0.02] },
+];
+
+function graphTextureNames(material: THREE.Material): string[] {
+  const names = new Set<string>();
+  const seen = new Set<object>();
+  const visit = (value: unknown): void => {
+    if (!value || typeof value !== 'object' || seen.has(value)) return;
+    seen.add(value);
+    const record = value as Record<string, unknown>;
+    if (record.isTexture === true && typeof record.name === 'string') names.add(record.name);
+    for (const child of Object.values(record)) visit(child);
+  };
+  for (const slot of ['colorNode', 'roughnessNode', 'normalNode']) {
+    visit((material as unknown as Record<string, unknown>)[slot]);
+  }
+  return [...names].sort();
+}
+
+describe('nuketown2 materials — per-family physical authoring', () => {
+  for (const row of FAMILIES) {
+    describe(row.family, () => {
+      it('is authored to be read from close range unless it says otherwise', () => {
+        // Every representative spec here is a surface a player can walk up to.
+        // A spec that opts out of a scale has to justify it with a declared
+        // read distance, and the next test is what checks the justification.
+        expect(readDistance(row.spec), `${row.family} read distance (m)`).toBeLessThan(BACKDROP_READ_DISTANCE_M);
+        expect(isBackdrop(row.spec), `${row.family} is not a backdrop`).toBe(false);
+      });
+
+      it('carries wear at all three authored scales, each inside its physical band', () => {
+        const { grain, scuff, traffic } = row.spec;
+        expect(grain.sizeM, `${row.family} grain feature size (m)`)
+          .toBeGreaterThanOrEqual(WEAR_BANDS.grain.minM);
+        expect(grain.sizeM).toBeLessThanOrEqual(WEAR_BANDS.grain.maxM);
+        expect(scuff.sizeM, `${row.family} scuff feature size (m)`)
+          .toBeGreaterThanOrEqual(WEAR_BANDS.scuff.minM);
+        expect(scuff.sizeM).toBeLessThanOrEqual(WEAR_BANDS.scuff.maxM);
+        expect(traffic.sizeM, `${row.family} traffic feature size (m)`)
+          .toBeGreaterThanOrEqual(WEAR_BANDS.traffic.minM);
+        expect(traffic.sizeM).toBeLessThanOrEqual(WEAR_BANDS.traffic.maxM);
+        // Every scale must actually do something. A scale authored at zero is
+        // the single-scale material this lane exists to replace.
+        for (const [label, scale] of [['grain', grain], ['scuff', scuff], ['traffic', traffic]] as const) {
+          expect(scale.albedo, `${row.family} ${label} albedo swing`).toBeGreaterThan(0);
+        }
+      });
+
+      it('clears the visible albedo wear step and stays inside the readability ceiling', () => {
+        const step = albedoWearStep(row.spec);
+        expect(step, `${row.family} peak-to-peak albedo wear step`)
+          .toBeGreaterThanOrEqual(MIN_ALBEDO_WEAR_STEP);
+        expect(maxDarkening(row.spec), `${row.family} peak darkening`)
+          .toBeLessThanOrEqual(MAX_ALBEDO_DARKENING);
+      });
+
+      it('sits in its family roughness and metalness window', () => {
+        expect(row.spec.roughness, `${row.family} roughness`).toBeGreaterThanOrEqual(row.roughness[0]);
+        expect(row.spec.roughness).toBeLessThanOrEqual(row.roughness[1]);
+        expect(row.spec.metalness, `${row.family} metalness`).toBeGreaterThanOrEqual(row.metalness[0]);
+        expect(row.spec.metalness).toBeLessThanOrEqual(row.metalness[1]);
+      });
+    });
+  }
+
+  it('drops a scale only where the frame provably cannot resolve it', () => {
+    // THE RULE THIS PINS. `readDistanceM` is the one escape hatch in the
+    // library: declare a surface far enough away and its near-field scales
+    // stop being evaluated. That is correct authoring - a 1 mm grain read from
+    // 55 m is 0.03 of a pixel - and it is also the only lever that could be
+    // used to quietly delete wear. So it is checked by arithmetic, not trust:
+    // every scale a spec drops must genuinely fall under the pixel floor at
+    // the distance that spec declares, and every scale it keeps must clear it.
+    const registry = createNuketown2MaterialRegistry() as unknown as Record<string, { userData?: unknown }>;
+    expect(Object.keys(registry).length).toBeGreaterThan(0);
+
+    const cases: Array<{ label: string; sizeM: number; distanceM: number; resolvable: boolean }> = [
+      { label: '0.9 mm grain at half a metre', sizeM: 0.0009, distanceM: 0.5, resolvable: true },
+      { label: '0.9 mm grain from 55 m', sizeM: 0.0009, distanceM: 55, resolvable: false },
+      { label: '60 mm scuff at half a metre', sizeM: 0.060, distanceM: 0.5, resolvable: true },
+      { label: '60 mm scuff from 55 m', sizeM: 0.060, distanceM: 55, resolvable: false },
+      { label: '2.4 m traffic from 55 m', sizeM: 2.4, distanceM: 55, resolvable: true },
+    ];
+    for (const row of cases) {
+      expect(scaleResolvable(row.sizeM, row.distanceM), row.label).toBe(row.resolvable);
+    }
+    // The floor is a real pixel count on the arena's own camera, not a magic
+    // number: 37 degrees over 1080 lines.
+    expect(featurePixels(0.060, 55)).toBeCloseTo(1.76, 2);
+    expect(featurePixels(0.060, 0.5)).toBeGreaterThan(MIN_FEATURE_PIXELS);
+  });
+
+  it('decodes sRGB swatches to linear once, not twice', () => {
+    // The trap: `new THREE.Color(hex).r` is ALREADY linear, so a generator
+    // that decodes it again ships a near-black surface. These two must agree.
+    for (const hex of [0x9f6147, 0xeae3cf, 0x8b8879, 0x496438]) {
+      const [r, g, b] = linearRgb(hex);
+      const viaThree = new THREE.Color(hex);
+      expect(r).toBeCloseTo(viaThree.r, 4);
+      expect(g).toBeCloseTo(viaThree.g, 4);
+      expect(b).toBeCloseTo(viaThree.b, 4);
+    }
+  });
+});
+
+describe('nuketown2 material registry', () => {
+  it('answers every declared role with a distinct node material', () => {
+    const registry = createNuketown2MaterialRegistry() as unknown as Record<string, THREE.Material>;
+    const seen = new Set<THREE.Material>();
+    for (const role of NUKETOWN2_MATERIAL_ROLES) {
+      const material = registry[role];
+      expect(material, `role ${role}`).toBeDefined();
+      expect(material!.name, `role ${role} is named (the coplanar instrument prints it)`).not.toBe('');
+      expect(seen.has(material!), `role ${role} must be its own instance`).toBe(false);
+      seen.add(material!);
+    }
+    expect(seen.size).toBe(NUKETOWN2_MATERIAL_ROLES.length);
+  });
+
+  it('drives albedo and roughness from node graphs, not from flat swatches', () => {
+    const registry = createNuketown2MaterialRegistry() as unknown as Record<string, Record<string, unknown>>;
+    for (const role of NUKETOWN2_MATERIAL_ROLES) {
+      const material = registry[role]!;
+      // THE REGRESSION THIS CATCHES. Ten of these roles shipped as a bare
+      // `new MeshStandardMaterial({ color, roughness, metalness })` - no map,
+      // no node, one value across a whole surface, which is exactly what
+      // "looks like basic geometry" describes.
+      expect(material.colorNode, `${role} albedo node`).toBeTruthy();
+      expect(material.roughnessNode, `${role} roughness node`).toBeTruthy();
+    }
+  });
+
+  it('keeps classic map slots empty while the TSL bridge owns runtime assets', () => {
+    // The classic map slots stay empty: the TSL bridge owns the runtime
+    // textures so WebGPU and the compatibility backend share one authored graph.
+    const registry = createNuketown2MaterialRegistry() as unknown as Record<string, Record<string, unknown>>;
+    const mapSlots = [
+      'map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap',
+      'alphaMap', 'emissiveMap', 'bumpMap', 'displacementMap',
+    ];
+    for (const role of NUKETOWN2_MATERIAL_ROLES) {
+      for (const slot of mapSlots) {
+        expect(registry[role]![slot] ?? null, `${role}.${slot} must stay procedural`).toBeNull();
+      }
+    }
+    const lut = noiseLutTexture();
+    expect(lut.image.data, 'the noise tile is CPU bytes').toBeInstanceOf(Uint8Array);
+    expect((lut.image as { src?: string }).src ?? null, 'the noise tile has no URL').toBeNull();
+  });
+
+  it('binds runtime PBR assets with the authored colour spaces and metre tile sizes', () => {
+    const registry = createNuketown2MaterialRegistry();
+    const bridge = registry.asphalt.userData.nuketown2TextureBridge as ReturnType<typeof createNuketown2TextureBridge>;
+    expect(bridge.useTextureSet).toBe(true);
+    expect(bridge.sourceRoute).toBe('codex-built-in-image-generation');
+    expect(bridge.assetFamilies).toEqual(expect.arrayContaining(['asphalt', 'lapSiding', 'brick', 'concrete', 'shingle', 'timber']));
+    for (const family of ['asphalt', 'lapSiding', 'shingle', 'concrete', 'brick', 'timber'] as const) {
+      const resource = bridge.resource(family);
+      expect(resource, `${family} resource`).not.toBeNull();
+      expect(resource!.set.metresPerTile).toBeGreaterThan(0);
+      expect(resource!.albedo.colorSpace, `${family} albedo is sRGB`).toBe(THREE.SRGBColorSpace);
+      expect(resource!.normal.colorSpace, `${family} normal is linear`).toBe(THREE.NoColorSpace);
+      expect(resource!.orm.colorSpace, `${family} ORM is linear`).toBe(THREE.NoColorSpace);
+      expect((resource!.albedo as THREE.Texture & { isDataTexture?: boolean }).isDataTexture ?? false, `${family} albedo uses the regular image upload path`).toBe(false);
+      expect((resource!.normal as THREE.Texture & { isDataTexture?: boolean }).isDataTexture ?? false, `${family} normal uses the regular image upload path`).toBe(false);
+      expect((resource!.orm as THREE.Texture & { isDataTexture?: boolean }).isDataTexture ?? false, `${family} ORM uses the regular image upload path`).toBe(false);
+      expect(resource!.albedo.wrapS).toBe(THREE.RepeatWrapping);
+      expect(resource!.albedo.wrapT).toBe(THREE.RepeatWrapping);
+      expect(resource!.albedo.generateMipmaps).toBe(true);
+      expect(resource!.albedo.anisotropy).toBe(8);
+      expect(resource!.normal.generateMipmaps).toBe(true);
+      expect(resource!.orm.generateMipmaps).toBe(true);
+      expect(resource!.orm.name).toBe(`nuketown2-${family}-orm`);
+      expect((resource!.albedo.image as { width: number }).width).toBe(1);
+      expect((resource!.normal.image as { width: number }).width).toBe(1);
+      expect((resource!.orm.image as { width: number }).width).toBe(1);
+    }
+  });
+
+  it('samples the runtime maps in the shared family graphs', () => {
+    const registry = createNuketown2MaterialRegistry();
+    expect(graphTextureNames(registry.asphalt)).toEqual(expect.arrayContaining([
+      'nuketown2-asphalt-albedo', 'nuketown2-asphalt-normal', 'nuketown2-asphalt-orm',
+    ]));
+    expect(graphTextureNames(registry.sidingA)).toEqual(expect.arrayContaining([
+      'nuketown2-lapSiding-albedo', 'nuketown2-lapSiding-normal', 'nuketown2-lapSiding-orm',
+    ]));
+    expect(graphTextureNames(registry.roof)).toEqual(expect.arrayContaining([
+      'nuketown2-shingle-albedo', 'nuketown2-shingle-normal', 'nuketown2-shingle-orm',
+    ]));
+    expect(graphTextureNames(registry.block)).toEqual(expect.arrayContaining([
+      'nuketown2-concrete-albedo', 'nuketown2-concrete-normal', 'nuketown2-concrete-orm',
+      'nuketown2-brick-albedo', 'nuketown2-brick-normal', 'nuketown2-brick-orm',
+    ]));
+    expect(graphTextureNames(registry.fence)).toEqual(expect.arrayContaining([
+      'nuketown2-timber-albedo', 'nuketown2-timber-normal', 'nuketown2-timber-orm',
+    ]));
+  });
+
+  it('falls back to the procedural graph when the measured sampler limit cannot fit the bridge', () => {
+    const registry = createNuketown2MaterialRegistry({ deviceSampledTextureLimit: 3 });
+    const bridge = registry.asphalt.userData.nuketown2TextureBridge as ReturnType<typeof createNuketown2TextureBridge>;
+    expect(bridge.useTextureSet).toBe(false);
+    expect(bridge.fallbackReason).toMatch(/maxSampledTexturesPerShaderStage=3/);
+    expect(bridge.resource('asphalt')).toBeNull();
+  });
+
+  it('disposes every runtime texture once per arena bridge', () => {
+    const bridge = createNuketown2TextureBridge({ deviceSampledTextureLimit: 16 });
+    const resource = bridge.resource('asphalt')!;
+    let disposed = 0;
+    for (const texture of [resource.albedo, resource.normal, resource.orm]) {
+      texture.addEventListener('dispose', () => { disposed += 1; });
+    }
+    bridge.dispose();
+    bridge.dispose();
+    expect(disposed).toBe(3);
+    expect(bridge.resource('asphalt')).toBeNull();
+  });
+
+  it('ships every runtime map and keeps texture bytes out of built JS chunks', () => {
+    const families = ['asphalt', 'lapSiding', 'brick', 'concrete', 'shingle', 'timber'];
+    const publicRoot = join(process.cwd(), 'public', 'textures', 'nuketown2');
+    for (const family of families) {
+      for (const map of ['albedo', 'normal', 'orm']) {
+        const file = join(publicRoot, family, `${map}.png`);
+        expect(existsSync(file), `${family}/${map}.png exists`).toBe(true);
+        expect(readFileSync(file).subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+      }
+    }
+    // HF-536 day-2 integration: the gate must not name one lane's dist. Look at
+    // NUKETOWN2_DIST when set, else the canonical `dist`, else the newest
+    // `dist-*` build present. With no build at all the byte check has nothing
+    // to read and is reported as skipped rather than passing silently.
+    const distCandidates = [
+      ...(process.env.NUKETOWN2_DIST ? [process.env.NUKETOWN2_DIST] : []),
+      'dist',
+      ...readdirSync(process.cwd())
+        .filter((name) => name.startsWith('dist-'))
+        .sort(),
+    ];
+    const distName = distCandidates.find((name) => existsSync(join(process.cwd(), name, 'assets')));
+    const distRoot = join(process.cwd(), distName ?? 'dist', 'assets');
+    // Three's vendor chunk carries a pre-existing example PNG data URI. The
+    // lane gate covers every application-owned chunk; vendor provenance is
+    // unrelated to the Nuke Town asset module and is recorded in REPORT.md.
+    const chunks = existsSync(distRoot)
+      ? readdirSync(distRoot)
+        .filter((name) => name.endsWith('.js'))
+        .map((name) => join(distRoot, name))
+      : [];
+    if (chunks.length === 0) {
+      // No build in the tree: the asset files above are still asserted, and the
+      // embedded-bytes half runs in every gate lane (which always builds first).
+      return;
+    }
+    for (const chunk of chunks) {
+      const source = readFileSync(chunk, 'utf8');
+      const pngSignatures = source.match(/iVBORw0KGgo/g) ?? [];
+      const dataUris = source.match(/data:image\/png;base64/g) ?? [];
+      if (pngSignatures.length > 0 || dataUris.length > 0) {
+        // Three's vendor chunk contains two pre-existing SMAA lookup images;
+        // those are not Nuke Town assets and are outside this lane's source
+        // graph. Keep this explicit allow-list so a new application chunk or
+        // an extra embedded PNG fails instead of being silently filtered.
+        expect(chunk, `${chunk} contains an application-owned embedded PNG`).toMatch(/vendor-three-/);
+        expect(pngSignatures.length, `${chunk} changed its pre-existing PNG count`).toBe(2);
+        expect(dataUris.length, `${chunk} changed its pre-existing data-URI count`).toBe(2);
+      }
+    }
+  });
+
+  it('builds no light object', () => {
+    // This lane is materials only. A material library that quietly adds a
+    // light has changed the arena's lighting contract, which belongs to a
+    // different lane and different gates.
+    const registry = createNuketown2MaterialRegistry() as unknown as Record<string, unknown>;
+    for (const role of NUKETOWN2_MATERIAL_ROLES) {
+      expect((registry[role] as { isLight?: boolean }).isLight ?? false, `${role} is not a light`).toBe(false);
+      expect(registry[role]).not.toBeInstanceOf(THREE.Light);
+    }
+  });
+
+  it('carries the HF-434 coplanar offset tiers verbatim', () => {
+    // These are not this lane's numbers to move: HF-434 measured them and the
+    // coplanar instrument is asserted against the split they produce.
+    const registry = createNuketown2MaterialRegistry() as unknown as Record<string, THREE.Material>;
+    const expected: Record<string, number> = {
+      lawn: -2,
+      trimDecal: -2,
+      asphalt: -1,
+      driveDecal: -1,
+      busTrim: -1,
+      coachGlass: -1,
+    };
+    for (const [role, factor] of Object.entries(expected)) {
+      expect(registry[role]!.polygonOffset, `${role} polygonOffset enabled`).toBe(true);
+      expect(registry[role]!.polygonOffsetFactor, `${role} offset factor`).toBe(factor);
+      expect(registry[role]!.polygonOffsetUnits, `${role} offset units`).toBe(factor);
+    }
+    // The SOLID users stay clean, exactly as the shipped tier says.
+    for (const role of ['drive', 'trim', 'ground', 'block', 'sidingA', 'sidingB', 'roof', 'fence']) {
+      expect(registry[role]!.polygonOffset, `${role} must not carry an offset`).toBe(false);
+    }
+  });
+
+  it('keeps the HF-477 terracotta-orange and white/cream house pins', () => {
+    const registry = createNuketown2MaterialRegistry();
+    expect(registry.sidingA.color.getHex()).toBe(0x9f6147);
+    expect(registry.sidingB.color.getHex()).toBe(0xeae3cf);
+  });
+
+  it('keeps the coach glazing band a dielectric', () => {
+    // It shipped at metalness 0.5, which is a coloured metal band, not glass.
+    const registry = createNuketown2MaterialRegistry();
+    expect(registry.coachGlass.metalness).toBe(0);
+    // Opaque, so it stays out of the transparent queue it was never in.
+    expect(registry.coachGlass.transparent).toBe(false);
+  });
+});

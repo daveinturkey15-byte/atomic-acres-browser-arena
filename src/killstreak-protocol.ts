@@ -1,5 +1,6 @@
 import { PASS65_KILLSTREAK_CATALOG, validateKillstreakLoadout, type KillstreakLoadoutV1, type Pass65KillstreakId } from './killstreak-catalog';
 import type { CombatTiming } from './network-fairness';
+import { PILOTED_DRONE_TASER_CHARGES } from './killstreak-tuning';
 import type {
   CareCaptureAdmissionReason,
   DroneSensorContact,
@@ -33,6 +34,9 @@ import {
   CARPET_GROUND_FIRE_STATE_MAX_CHUNKS,
 } from './carpet-ground-fire-multiplayer';
 import type { CarpetGroundFirePresentationSnapshot } from './flamethrower-stream-system';
+import type { KillstreakAnnounceMessage } from './killstreak-awareness';
+
+export type { KillstreakAnnounceMessage } from './killstreak-awareness';
 
 export type KillstreakLoadoutIntentMessage = Readonly<{
   type: 'killstreak-loadout-intent';
@@ -128,7 +132,8 @@ export type KillstreakProtocolMessage = KillstreakLoadoutIntentMessage
   | KillstreakCareCaptureResultMessage
   | KillstreakStateMessage
   | KillstreakDamageResultMessage
-  | KillstreakCarpetFireStateMessage;
+  | KillstreakCarpetFireStateMessage
+  | KillstreakAnnounceMessage;
 
 export type KillstreakStateAdmission = Readonly<{
   accepted: boolean;
@@ -278,7 +283,7 @@ function isActorSnapshot(value: unknown): boolean {
   const charges = value.availableCharges as unknown[];
   if (!charges.every((charge) => object(charge)
     && exactKeys(charge, ['id', 'count'])
-    && loadout.slots.includes(charge.id as Pass65KillstreakId)
+    && (loadout.slots as readonly string[]).includes(String(charge.id))
     && safeCounter(charge.count, MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD)
     && Number(charge.count) > 0)) return false;
   const chargedIds = charges.map((charge) => (charge as { id: Pass65KillstreakId }).id);
@@ -302,7 +307,7 @@ function isEntitySnapshot(value: unknown): boolean {
   if (!object(value) || !exactKeys(value, [
     'id', 'activationId', 'ownerId', 'team', 'kind', 'mode', 'phase', 'position', 'velocity', 'attitude', 'health', 'expiresInMs',
     'magazine', 'reserveClips', 'gunProfileId', 'gunController', 'missileAmmo', 'missileCooldownMs',
-    'captureActorId', 'captureProgress', 'revealedReward', 'revision',
+    'taserCharges', 'captureActorId', 'captureProgress', 'revealedReward', 'revision',
   ]) || !hostEntityId(value.id) || !activationId(value.activationId) || !actorId(value.ownerId)
     || (value.team !== 0 && value.team !== 1)
     || (value.kind !== 'aircraft' && value.kind !== 'chopper' && value.kind !== 'drone' && value.kind !== 'care-crate')
@@ -315,7 +320,12 @@ function isEntitySnapshot(value: unknown): boolean {
     if (!safeCounter(value.magazine, 20)
       || (value.mode === 'piloted' ? !safeCounter(value.reserveClips, 3) : value.reserveClips !== null)
       || value.gunProfileId !== DRONE_SUPPORT_DEFINITIONS[value.mode].gunProfileId) return false;
-  } else if (value.mode !== null || value.magazine !== null || value.reserveClips !== null || value.gunProfileId !== null) return false;
+    // HF-458: only the Piloted Drone carries taser charges.
+    if (value.mode === 'piloted'
+      ? !safeCounter(value.taserCharges, PILOTED_DRONE_TASER_CHARGES)
+      : value.taserCharges !== null) return false;
+  } else if (value.mode !== null || value.magazine !== null || value.reserveClips !== null
+    || value.gunProfileId !== null || value.taserCharges !== null) return false;
   const phaseValid = value.kind === 'aircraft' ? value.phase === 'inbound' || value.phase === 'active' || value.phase === 'outbound'
     : value.kind === 'chopper' ? value.phase === 'inbound' || value.phase === 'orbiting' || value.phase === 'outbound'
     : value.kind === 'drone' ? value.phase === 'active' || value.phase === 'reloading'
@@ -455,15 +465,19 @@ function isSupportShotEvent(value: unknown): value is KillstreakSupportShotEvent
   return supportShotEntityMatchesSource(value as KillstreakSupportShotEvent);
 }
 
-function isImpactEvent(value: unknown): value is KillstreakImpactEvent {
+export function isImpactEvent(value: unknown): value is KillstreakImpactEvent {
   if (!object(value)) return false;
-  if (!exactKeys(value, ['activationId', 'source', 'ordinal', 'phase', 'position', 'impactAtMs', 'atMs'])
+  // HF-335: launchPosition is an OPTIONAL fail-open presentation field. Older
+  // peers legitimately omit it; present peers must carry a finite vec3 when it
+  // is present. Existing required-key validation bounds are unchanged.
+  if (!exactKeys(value, ['activationId', 'source', 'ordinal', 'phase', 'position', 'impactAtMs', 'atMs'], ['launchPosition'])
     || !activationId(value.activationId)
     || (value.source !== 'carpet-bomber' && value.source !== 'chopper')
     || typeof value.ordinal !== 'number' || !Number.isSafeInteger(value.ordinal) || value.ordinal < 0
     || value.ordinal >= (value.source === 'chopper' ? CHOPPER_MISSILE_CAPACITY : CARPET_BOMBER_IMPACT_COUNT)
     || (value.phase !== 'drop' && value.phase !== 'impact')
     || !vec3(value.position)
+    || (value.launchPosition !== undefined && !vec3(value.launchPosition))
     || !finite(value.impactAtMs, 0, Number.MAX_SAFE_INTEGER)
     || !finite(value.atMs, 0, Number.MAX_SAFE_INTEGER)) return false;
   if (value.source === 'chopper') return value.phase === 'drop'
@@ -502,7 +516,7 @@ export function isKillstreakProtocolMessage(value: unknown): value is Killstreak
   }
   if (value.type === 'killstreak-control-intent') {
     return exactKeys(value, ['type', 'by', 'matchEpoch', 'lifeId', 'sequence', 'entityId', 'action', 'nonce'], [
-      'yawQ', 'pitchQ', 'thrustQ', 'strafeQ', 'verticalQ', 'fire', 'missileFire', 'timing',
+      'yawQ', 'pitchQ', 'thrustQ', 'strafeQ', 'verticalQ', 'fire', 'missileFire', 'taserFire', 'timing',
     ]) && baseIntent(value) && hostEntityId(value.entityId)
       && (value.action === 'toggle-chopper-gunner' || value.action === 'toggle-piloted-drone' || value.action === 'pilot-control' || value.action === 'exit-piloted-drone')
       && (value.yawQ === undefined || finite(value.yawQ, -Math.PI, Math.PI))
@@ -512,6 +526,8 @@ export function isKillstreakProtocolMessage(value: unknown): value is Killstreak
       && (value.verticalQ === undefined || finite(value.verticalQ, -1, 1))
       && (value.fire === undefined || typeof value.fire === 'boolean')
       && (value.missileFire === undefined || (value.action === 'pilot-control' && typeof value.missileFire === 'boolean'))
+      // HF-458: right-click taser, admitted on the same pilot-control action.
+      && (value.taserFire === undefined || (value.action === 'pilot-control' && typeof value.taserFire === 'boolean'))
       && timing(value.timing);
   }
   if (value.type === 'killstreak-care-capture-intent') {
@@ -563,6 +579,16 @@ export function isKillstreakProtocolMessage(value: unknown): value is Killstreak
       })).size !== value.fires.length) return false;
     return finite(value.nonce, 0, Number.MAX_SAFE_INTEGER);
   }
+  if (value.type === 'killstreak-announce') {
+    // HF-509: host-only, once per admitted activation, public to every peer.
+    return exactKeys(value, ['type', 'by', 'matchEpoch', 'activationId', 'ownerId', 'ownerTeam', 'source', 'position', 'nonce'])
+      && actorId(value.by) && safeCounter(value.matchEpoch)
+      && activationId(value.activationId)
+      && String(value.activationId).startsWith(`ks-activation-${Number(value.matchEpoch)}-`)
+      && actorId(value.ownerId) && (value.ownerTeam === 0 || value.ownerTeam === 1)
+      && ids.has(String(value.source)) && vec3(value.position)
+      && finite(value.nonce, 0, Number.MAX_SAFE_INTEGER);
+  }
   if (value.type === 'killstreak-damage-result') {
     return exactKeys(value, ['type', 'by', 'matchEpoch', 'revision', 'events', 'shots', 'impacts', 'nonce'])
       && actorId(value.by) && safeCounter(value.matchEpoch) && safeCounter(value.revision)
@@ -593,6 +619,8 @@ export function killstreakMessageBelongsToPlayer(message: KillstreakProtocolMess
   if (message.type === 'killstreak-care-capture-result') return message.by === playerId || message.forPlayerId === playerId;
   if (message.type === 'killstreak-state') return message.by === playerId || message.forPlayerId === playerId;
   if (message.type === 'killstreak-carpet-fire-state') return message.by === playerId || message.forPlayerId === playerId;
+  // HF-509: the whole lobby is the audience of an activation announcement.
+  if (message.type === 'killstreak-announce') return true;
   if (message.type === 'killstreak-damage-result') return message.shots.length > 0
     || message.impacts.length > 0
     || message.by === playerId
@@ -604,7 +632,8 @@ export function isKillstreakHostAuthorityMessage(message: KillstreakProtocolMess
   return message.type === 'killstreak-care-capture-result'
     || message.type === 'killstreak-state'
     || message.type === 'killstreak-carpet-fire-state'
-    || message.type === 'killstreak-damage-result';
+    || message.type === 'killstreak-damage-result'
+    || message.type === 'killstreak-announce';
 }
 
 export function isPass65KillstreakId(value: unknown): value is Pass65KillstreakId {

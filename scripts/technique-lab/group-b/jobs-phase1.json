@@ -1,0 +1,60 @@
+[
+  {"sourceId": 18, "role": "original-url", "url": "https://github.com/CK42BB/procedural-grass-threejs"},
+  {"sourceId": 18, "role": "pinned-tree", "url": "https://api.github.com/repos/CK42BB/procedural-grass-threejs/git/trees/26f072308df12caac68a474cb40300ef576793e1?recursive=1"},
+  {"sourceId": 18, "role": "licence", "url": "https://raw.githubusercontent.com/CK42BB/procedural-grass-threejs/26f072308df12caac68a474cb40300ef576793e1/LICENSE"},
+  {"sourceId": 18, "role": "method-body", "url": "https://raw.githubusercontent.com/CK42BB/procedural-grass-threejs/26f072308df12caac68a474cb40300ef576793e1/SKILL.md"},
+
+  {"sourceId": 19, "role": "original-url", "url": "https://github.com/erichlof/THREE.js-RayTracing-Renderer"},
+  {"sourceId": 19, "role": "pinned-tree", "url": "https://api.github.com/repos/erichlof/THREE.js-RayTracing-Renderer/git/trees/490ca0817ce31781df2cd36af2edcc2f36d9dfcc?recursive=1"},
+  {"sourceId": 19, "role": "licence", "url": "https://raw.githubusercontent.com/erichlof/THREE.js-RayTracing-Renderer/490ca0817ce31781df2cd36af2edcc2f36d9dfcc/LICENSE"},
+
+  {"sourceId": 20, "role": "original-url", "url": "https://cot.kevinliu.studio/"},
+  {"sourceId": 20, "role": "original-url", "url": "https://github.com/Kevin-Liu-01/Claude-of-Tanks"},
+  {"sourceId": 20, "role": "pinned-tree", "url": "https://api.github.com/repos/Kevin-Liu-01/Claude-of-Tanks/git/trees/9004ce65a9be52793a3f4130bde034ec4a857f32?recursive=1"},
+  {"sourceId": 20, "role": "licence", "url": "https://raw.githubusercontent.com/Kevin-Liu-01/Claude-of-Tanks/9004ce65a9be52793a3f4130bde034ec4a857f32/LICENSE"},
+  {"sourceId": 20, "role": "licence-carveout", "url": "https://raw.githubusercontent.com/Kevin-Liu-01/Claude-of-Tanks/9004ce65a9be52793a3f4130bde034ec4a857f32/NOTICE.md"},
+
+  {"sourceId": 22, "role": "original-url", "url": "https://revo-realms.aleksandargjoreski.dev/"},
+  {"sourceId": 22, "role": "original-url", "url": "https://winchxyz.github.io/moon-rover/"},
+  {"sourceId": 22, "role": "original-url", "url": "https://yugiriworks.itch.io/sky-fang"},
+
+  {"sourceId": 23, "role": "original-url", "url": "https://battle-of-the-hoth-simulator.vercel.app/"},
+  {"sourceId": 23, "role": "original-url", "url": "https://github.com/csanz/battle-of-the-hoth-simulator"},
+  {"sourceId": 23, "role": "pinned-tree", "url": "https://api.github.com/repos/csanz/battle-of-the-hoth-simulator/git/trees/bc057e2ce52254bc2e3c2bd6feaaaf4625dddee8?recursive=1"},
+  {"sourceId": 23, "role": "licence-probe", "url": "https://raw.githubusercontent.com/csanz/battle-of-the-hoth-simulator/bc057e2ce52254bc2e3c2bd6feaaaf4625dddee8/LICENSE"},
+
+  {"sourceId": 24, "role": "original-url", "url": "https://www.taken-game.com/play"},
+
+  {"sourceId": 25, "role": "original-url", "url": "https://x.com/voidmode/status/2079334222217588842"},
+
+  {"sourceId": 26, "role": "original-url", "url": "https://amix-design.com/tl/web-g-games/"},
+  {"sourceId": 26, "role": "method-body", "url": "https://amix-design.com/tl/web-g-games/js/main.js"},
+  {"sourceId": 26, "role": "licence", "url": "https://amix-design.com/tl/web-g-games/license.html"},
+
+  {"sourceId": 27, "role": "original-url", "url": "https://github.com/majidmanzarpour/threejs-game-skills"},
+  {"sourceId": 27, "role": "pinned-tree", "url": "https://api.github.com/repos/majidmanzarpour/threejs-game-skills/git/trees/7221c1f4a6d2ae189a4d85d058d24f3228499d46?recursive=1"},
+  {"sourceId": 27, "role": "licence", "url": "https://raw.githubusercontent.com/majidmanzarpour/threejs-game-skills/7221c1f4a6d2ae189a4d85d058d24f3228499d46/LICENSE"},
+
+  {"sourceId": 28, "role": "original-url", "url": "https://github.com/dgreenheck/webgpu-claude-skill"},
+  {"sourceId": 28, "role": "pinned-tree", "url": "https://api.github.com/repos/dgreenheck/webgpu-claude-skill/git/trees/af2319bd01bb7cc881267a9ef42cafdaf5e9029d?recursive=1"},
+  {"sourceId": 28, "role": "licence-probe", "url": "https://raw.githubusercontent.com/dgreenheck/webgpu-claude-skill/af2319bd01bb7cc881267a9ef42cafdaf5e9029d/LICENSE"},
+
+  {"sourceId": 29, "role": "original-url", "url": "https://github.com/CloudAI-X/threejs-skills"},
+  {"sourceId": 29, "role": "pinned-tree", "url": "https://api.github.com/repos/CloudAI-X/threejs-skills/git/trees/b1c623076c661fc9b03dac19292e825a5d106823?recursive=1"},
+  {"sourceId": 29, "role": "licence-probe", "url": "https://raw.githubusercontent.com/CloudAI-X/threejs-skills/b1c623076c661fc9b03dac19292e825a5d106823/LICENSE"},
+
+  {"sourceId": 31, "role": "original-url", "url": "https://opengameart.org/content/fps-arms-rigged-only"},
+
+  {"sourceId": 32, "role": "original-url", "url": "https://docs.comfy.org/tutorials/video/wan/wan2_2"},
+
+  {"sourceId": 33, "role": "original-url", "url": "https://x.com/alightinastorm/status/2091649089272156592"},
+  {"sourceId": 33, "role": "original-url", "url": "https://vibe-stack.github.io/super-terrain"},
+  {"sourceId": 33, "role": "original-url", "url": "https://github.com/vibe-stack/super-terrain"},
+  {"sourceId": 33, "role": "pinned-tree", "url": "https://api.github.com/repos/vibe-stack/super-terrain/git/trees/e417c048c29fc0193005df4f3e39dff44cef5d31?recursive=1"},
+  {"sourceId": 33, "role": "licence-probe", "url": "https://raw.githubusercontent.com/vibe-stack/super-terrain/e417c048c29fc0193005df4f3e39dff44cef5d31/LICENSE"},
+
+  {"sourceId": 34, "role": "original-url", "url": "https://x.com/mattshumer_/status/2081054356405731740"},
+  {"sourceId": 34, "role": "original-url", "url": "https://github.com/mshumer/Claude-of-Duty"},
+  {"sourceId": 34, "role": "pinned-tree", "url": "https://api.github.com/repos/mshumer/Claude-of-Duty/git/trees/d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853?recursive=1"},
+  {"sourceId": 34, "role": "licence", "url": "https://raw.githubusercontent.com/mshumer/Claude-of-Duty/d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853/LICENSE"}
+]

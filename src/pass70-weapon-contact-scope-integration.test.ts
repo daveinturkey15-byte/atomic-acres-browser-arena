@@ -14,10 +14,19 @@ describe('Pass 70 contact and Railgun scope integration contracts', () => {
     expect(presentation).toContain('* this.contactResponse.scale');
     expect(runtime).toContain('const baseDirection = camera.getWorldDirection(new THREE.Vector3());');
     expect(runtime).toContain('cameraDirection: baseDirection.toArray()');
-    expect(runtime).toContain('const profile = VIEWMODEL_CONTACT_PROFILES[player.weapon];');
-    expect(runtime).toContain('const probePaddingMeters = viewmodelContactProbePaddingMeters(profile);');
-    expect(runtime).toContain('for (const offset of VIEWMODEL_CONTACT_PROBE_OFFSETS)');
-    expect(runtime).toContain('viewmodelObstructionPose(nearestForward, player.stance === \'prone\', floorClearance, player.weapon)');
+    // Re-pinned 2026-08-30: the contact lattice moved out of legacy-main into
+    // src/systems/viewmodel-contact-probe.ts, because inside the 33k-line module
+    // it had silently drifted into TWO copies (the live pose and the HF-343 fire
+    // admission diagnostic) that measured different worlds. The invariant is
+    // unchanged - only its home moved - so the pins follow it, and gain a
+    // negative assertion that stops a second copy growing back where the first did.
+    const probe = read('./systems/viewmodel-contact-probe.ts');
+    expect(probe).toContain('const profile = VIEWMODEL_CONTACT_PROFILES[input.weapon];');
+    expect(probe).toContain('const probePaddingMeters = viewmodelContactProbePaddingMeters(profile);');
+    expect(probe).toContain('for (const offset of VIEWMODEL_CONTACT_PROBE_OFFSETS)');
+    expect(probe).toContain('viewmodelObstructionPose(nearestForward, input.prone, floorClearance, input.weapon)');
+    expect(runtime).toContain('resolveViewmodelObstructionPose(currentViewmodelObstructionInput())');
+    expect(runtime).not.toContain('VIEWMODEL_CONTACT_PROBE_OFFSETS');
     expect(runtime).not.toMatch(/contactResponse[^\n]*(camera|baseDirection|projectile)/u);
   });
 
@@ -27,7 +36,13 @@ describe('Pass 70 contact and Railgun scope integration contracts', () => {
     const dmr = read('./dmr-thermal-presentation.ts');
     const railgun = read('./railgun-presentation.ts');
     expect(runtime).toContain("const chopperThermal = localKillstreakActorSnapshot()?.possession?.kind === 'chopper-gunner';");
-    expect(runtime).toContain('if (!dmrThermalActive && !railgunRevealActive && !chopperThermal)');
+    // Re-pinned 2026-08-30: the three-optic gate moved into
+    // src/systems/thermal-reveal-selection.ts. Same routing, one home - which is
+    // the point, since "reveal works on the drone but not the chopper gunner or
+    // railgun" was the owner regression that motivated the extraction.
+    const reveal = read('./systems/thermal-reveal-selection.ts');
+    expect(reveal).toContain('activation.dmrThermalActive || activation.railgunRevealActive || activation.chopperThermal');
+    expect(runtime).toContain('if (!thermalRevealActive(activation))');
     expect(runtime).toContain('railgunPresentation.syncExactOperatorReveal(railgunRevealActive, thermalGhostPresentation.telemetry())');
     expect(ghost).toContain("'exact-animated-operator-plus-orange-halo-v1'");
     expect(ghost).toContain('model.skeleton === layer.source.skeleton');

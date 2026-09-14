@@ -1,0 +1,66 @@
+{
+  "task": "HF-536 DAY-2 image-generated PBR textures",
+  "generatedUtc": "2026-09-07T08:00:00Z",
+  "route": "codex-built-in-image-generation",
+  "licence": "owner-authorised AI texture 2026-09-07",
+  "allowedUse": "shipped",
+  "shipped": true,
+  "candidatePolicy": "one measured 1024 source candidate per family; lower-res or fewer candidates accepted by the lane brief when the measured runtime budget is better",
+  "resolutionPolicy": "512 is the shipped set; 1024 is retained for comparison and only promoted when the detail instrument and frame budget justify it",
+  "families": {
+    "asphalt": {
+      "source": "asphalt/candidate-01-source.png",
+      "sourceOrigin": "docs/forge/references/asphalt.png was produced by the authorized Codex image-generation reference stage; the 1024 source is its preserved generation output",
+      "prompt": "1024x1024 seamless tileable texture reference of weathered dense-graded asphalt road surface, 10mm exposed aggregate stone visible in a dark bitumen matrix, one dark tar seam, faint tyre polish, photographic, neutral overcast lighting, top-down",
+      "metresPerTile": 4.0,
+      "resolution": 512,
+      "maps": ["candidate-01/512/albedo.png", "candidate-01/512/normal.png", "candidate-01/512/roughness.png", "candidate-01/512/ao.png"],
+      "deriveReport": "asphalt/candidate-01/derive-report.json"
+    },
+    "lapSiding": {
+      "source": "lapSiding/candidate-01-source.png",
+      "sourceOrigin": "docs/forge/references/siding.png was produced by the authorized Codex image-generation reference stage; the 1024 source is its preserved generation output",
+      "prompt": "1024x1024 seamless tileable texture reference of painted cream-white horizontal lap weatherboard siding, 185mm board exposure, hard drip shadow line under every course, chalked and slightly peeling paint at the board butts, visible brush tooth, photographic, neutral overcast lighting, flat-on",
+      "metresPerTile": 1.76,
+      "resolution": 512,
+      "maps": ["candidate-01/512/albedo.png", "candidate-01/512/normal.png", "candidate-01/512/roughness.png", "candidate-01/512/ao.png"],
+      "deriveReport": "lapSiding/candidate-01/derive-report.json"
+    },
+    "brick": {
+      "source": "brick/candidate-01-source.png",
+      "sourceOrigin": "docs/forge/references/block-wall.png was produced by the authorized Codex image-generation reference stage; the 1024 source is its preserved generation output",
+      "prompt": "1024x1024 seamless tileable texture reference of grey concrete masonry block wall, 390x190mm units in half bond, recessed 10mm mortar joints, per-block tone variation, dark damp weathering band along the bottom two courses, photographic, neutral overcast lighting, flat-on",
+      "metresPerTile": 1.8,
+      "resolution": 512,
+      "maps": ["candidate-01/512/albedo.png", "candidate-01/512/normal.png", "candidate-01/512/roughness.png", "candidate-01/512/ao.png"],
+      "deriveReport": "brick/candidate-01/derive-report.json"
+    },
+    "concrete": {
+      "source": "concrete/candidate-01-source.png",
+      "sourceOrigin": "docs/forge/references/concrete.png was produced by the authorized Codex image-generation reference stage; the 1024 source is its preserved generation output",
+      "prompt": "1024x1024 seamless tileable texture reference of poured concrete driveway apron, broom finish with fine parallel ridges, sawn control joint, oil staining, chipped edge, damp band, photographic, neutral overcast lighting, top-down",
+      "metresPerTile": 3.0,
+      "resolution": 512,
+      "maps": ["candidate-01/512/albedo.png", "candidate-01/512/normal.png", "candidate-01/512/roughness.png", "candidate-01/512/ao.png"],
+      "deriveReport": "concrete/candidate-01/derive-report.json"
+    },
+    "shingle": {
+      "source": "shingle/candidate-01-source.png",
+      "sourceOrigin": "docs/forge/references/roof.png was produced by the authorized Codex image-generation reference stage; the 1024 source is its preserved generation output",
+      "prompt": "1024x1024 seamless tileable texture reference of grey asphalt three-tab shingle roof, horizontal courses at 143mm exposure with soft shadow under each butt, 3mm keyway slots staggered per course, mineral granule texture, faint algae streaking, photographic, neutral overcast lighting, flat-on",
+      "metresPerTile": 3.0,
+      "resolution": 512,
+      "maps": ["candidate-01/512/albedo.png", "candidate-01/512/normal.png", "candidate-01/512/roughness.png", "candidate-01/512/ao.png"],
+      "deriveReport": "shingle/candidate-01/derive-report.json"
+    },
+    "timber": {
+      "source": "timber/candidate-01-source.png",
+      "sourceOrigin": "docs/forge/references/timber.png was produced by the authorized Codex image-generation reference stage; the 1024 source is its preserved generation output",
+      "prompt": "1024x1024 seamless tileable texture reference of weathered softwood fence pickets, silvered UV-bleached grain with darker latewood bands, knots, 3mm gaps between boards, dark damp foot, photographic, neutral overcast lighting, flat-on",
+      "metresPerTile": 1.8,
+      "resolution": 512,
+      "maps": ["candidate-01/512/albedo.png", "candidate-01/512/normal.png", "candidate-01/512/roughness.png", "candidate-01/512/ao.png"],
+      "deriveReport": "timber/candidate-01/derive-report.json"
+    }
+  }
+}

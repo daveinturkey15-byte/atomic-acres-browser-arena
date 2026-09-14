@@ -1,0 +1,866 @@
+{
+  "cases": [
+    {
+      "camera": "street-grazing",
+      "census": {
+        "concrete": 8380,
+        "door": 3599,
+        "glass": 4693,
+        "metal": 2999,
+        "shingle": 618,
+        "siding": 95334,
+        "trim": 39338
+      },
+      "frame": "source-assets/world-studio/houses/teal/review/cpu-street-grazing-wave3.png",
+      "lightSliverPixels": 622,
+      "sidingFieldPixels": 95334,
+      "sliverShareOfField": 0.00652,
+      "state": "wave3",
+      "variant": "teal",
+      "worstSurfaces": [
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 179,
+          "planeOffset": 8.78
+        },
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "pixels": 160,
+          "planeOffset": 3.788
+        },
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "pixels": 47,
+          "planeOffset": 6.768
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 28,
+          "planeOffset": 7.6
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 25,
+          "planeOffset": -6.0
+        }
+      ]
+    },
+    {
+      "camera": "street-grazing",
+      "census": {
+        "concrete": 8380,
+        "door": 3599,
+        "glass": 4693,
+        "metal": 2999,
+        "shingle": 618,
+        "siding": 95684,
+        "trim": 38988
+      },
+      "frame": "source-assets/world-studio/houses/teal/review/cpu-street-grazing-wave4.png",
+      "lightSliverPixels": 327,
+      "sidingFieldPixels": 95684,
+      "sliverShareOfField": 0.00342,
+      "state": "wave4",
+      "variant": "teal",
+      "worstSurfaces": [
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "pixels": 160,
+          "planeOffset": 3.788
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 24,
+          "planeOffset": -6.0
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 24,
+          "planeOffset": -7.6
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 24,
+          "planeOffset": 9.0
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 18,
+          "planeOffset": -7.7
+        }
+      ]
+    },
+    {
+      "camera": "belt-grazing",
+      "census": {
+        "concrete": 4135,
+        "door": 8429,
+        "glass": 9460,
+        "metal": 3979,
+        "shingle": 394,
+        "siding": 96286,
+        "trim": 71167
+      },
+      "frame": "source-assets/world-studio/houses/teal/review/cpu-belt-grazing-wave3.png",
+      "lightSliverPixels": 457,
+      "sidingFieldPixels": 96286,
+      "sliverShareOfField": 0.00475,
+      "state": "wave3",
+      "variant": "teal",
+      "worstSurfaces": [
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "pixels": 201,
+          "planeOffset": 6.768
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 36,
+          "planeOffset": -7.7
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 27,
+          "planeOffset": -7.6
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 25,
+          "planeOffset": 5.6
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 21,
+          "planeOffset": -6.59
+        }
+      ]
+    },
+    {
+      "camera": "belt-grazing",
+      "census": {
+        "concrete": 4135,
+        "door": 8429,
+        "glass": 9460,
+        "metal": 3979,
+        "shingle": 394,
+        "siding": 96579,
+        "trim": 70874
+      },
+      "frame": "source-assets/world-studio/houses/teal/review/cpu-belt-grazing-wave4.png",
+      "lightSliverPixels": 166,
+      "sidingFieldPixels": 96579,
+      "sliverShareOfField": 0.00172,
+      "state": "wave4",
+      "variant": "teal",
+      "worstSurfaces": [
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 36,
+          "planeOffset": -7.7
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 24,
+          "planeOffset": -7.6
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 21,
+          "planeOffset": -6.59
+        },
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "pixels": 19,
+          "planeOffset": 6.925
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 18,
+          "planeOffset": 8.925
+        }
+      ]
+    },
+    {
+      "camera": "watertable-close",
+      "census": {
+        "concrete": 141,
+        "door": 27832,
+        "glass": 26731,
+        "metal": 275,
+        "siding": 85531,
+        "trim": 36336
+      },
+      "frame": "source-assets/world-studio/houses/teal/review/cpu-watertable-close-wave3.png",
+      "lightSliverPixels": 308,
+      "sidingFieldPixels": 85531,
+      "sliverShareOfField": 0.0036,
+      "state": "wave3",
+      "variant": "teal",
+      "worstSurfaces": [
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "pixels": 206,
+          "planeOffset": 6.768
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 65,
+          "planeOffset": 2.4
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 18,
+          "planeOffset": 1.0
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 8,
+          "planeOffset": 3.6
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 5,
+          "planeOffset": -2.1
+        }
+      ]
+    },
+    {
+      "camera": "watertable-close",
+      "census": {
+        "concrete": 141,
+        "door": 27832,
+        "glass": 26731,
+        "metal": 275,
+        "siding": 85948,
+        "trim": 35919
+      },
+      "frame": "source-assets/world-studio/houses/teal/review/cpu-watertable-close-wave4.png",
+      "lightSliverPixels": 2,
+      "sidingFieldPixels": 85948,
+      "sliverShareOfField": 2e-05,
+      "state": "wave4",
+      "variant": "teal",
+      "worstSurfaces": [
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            -1.0,
+            0.0
+          ],
+          "pixels": 1,
+          "planeOffset": -3.3
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 1,
+          "planeOffset": -8.78
+        }
+      ]
+    },
+    {
+      "camera": "street-grazing",
+      "census": {
+        "concrete": 9464,
+        "door": 283,
+        "glass": 9445,
+        "metal": 3150,
+        "shingle": 618,
+        "siding": 85016,
+        "trim": 49663
+      },
+      "frame": "source-assets/world-studio/houses/yellow/review/cpu-street-grazing-wave3.png",
+      "lightSliverPixels": 376,
+      "sidingFieldPixels": 85016,
+      "sliverShareOfField": 0.00442,
+      "state": "wave3",
+      "variant": "yellow",
+      "worstSurfaces": [
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            0.0,
+            -0.0
+          ],
+          "pixels": 161,
+          "planeOffset": 3.8
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 90,
+          "planeOffset": 8.78
+        },
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            0.0,
+            -0.0
+          ],
+          "pixels": 21,
+          "planeOffset": 6.78
+        },
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            0.0,
+            -0.0
+          ],
+          "pixels": 20,
+          "planeOffset": 5.4
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 16,
+          "planeOffset": 9.0
+        }
+      ]
+    },
+    {
+      "camera": "street-grazing",
+      "census": {
+        "concrete": 9464,
+        "door": 283,
+        "glass": 9445,
+        "metal": 3150,
+        "shingle": 618,
+        "siding": 85313,
+        "trim": 49366
+      },
+      "frame": "source-assets/world-studio/houses/yellow/review/cpu-street-grazing-wave4.png",
+      "lightSliverPixels": 245,
+      "sidingFieldPixels": 85313,
+      "sliverShareOfField": 0.00287,
+      "state": "wave4",
+      "variant": "yellow",
+      "worstSurfaces": [
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            0.0,
+            -0.0
+          ],
+          "pixels": 161,
+          "planeOffset": 3.8
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 16,
+          "planeOffset": 8.74
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 16,
+          "planeOffset": 9.0
+        },
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            -0.0,
+            0.0
+          ],
+          "pixels": 13,
+          "planeOffset": 6.74
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            -1.0,
+            -0.0
+          ],
+          "pixels": 8,
+          "planeOffset": -3.5
+        }
+      ]
+    },
+    {
+      "camera": "belt-grazing",
+      "census": {
+        "concrete": 8165,
+        "door": 28,
+        "glass": 5279,
+        "metal": 4607,
+        "shingle": 394,
+        "siding": 78022,
+        "trim": 99488
+      },
+      "frame": "source-assets/world-studio/houses/yellow/review/cpu-belt-grazing-wave3.png",
+      "lightSliverPixels": 213,
+      "sidingFieldPixels": 78022,
+      "sliverShareOfField": 0.00273,
+      "state": "wave3",
+      "variant": "yellow",
+      "worstSurfaces": [
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            0.0,
+            -0.0
+          ],
+          "pixels": 115,
+          "planeOffset": 6.78
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 34,
+          "planeOffset": 7.8
+        },
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            0.0,
+            -0.0
+          ],
+          "pixels": 19,
+          "planeOffset": 6.925
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 18,
+          "planeOffset": 8.925
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 6,
+          "planeOffset": 8.83
+        }
+      ]
+    },
+    {
+      "camera": "belt-grazing",
+      "census": {
+        "concrete": 8165,
+        "door": 28,
+        "glass": 5279,
+        "metal": 4607,
+        "shingle": 394,
+        "siding": 78203,
+        "trim": 99307
+      },
+      "frame": "source-assets/world-studio/houses/yellow/review/cpu-belt-grazing-wave4.png",
+      "lightSliverPixels": 54,
+      "sidingFieldPixels": 78203,
+      "sliverShareOfField": 0.00069,
+      "state": "wave4",
+      "variant": "yellow",
+      "worstSurfaces": [
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            0.0,
+            -0.0
+          ],
+          "pixels": 19,
+          "planeOffset": 6.925
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 18,
+          "planeOffset": 8.925
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 6,
+          "planeOffset": 8.83
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 4,
+          "planeOffset": 8.74
+        },
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            -0.0,
+            0.0
+          ],
+          "pixels": 3,
+          "planeOffset": 7.018
+        }
+      ]
+    },
+    {
+      "camera": "watertable-close",
+      "census": {
+        "concrete": 57930,
+        "door": 57,
+        "glass": 7457,
+        "metal": 781,
+        "siding": 40099,
+        "trim": 94904
+      },
+      "frame": "source-assets/world-studio/houses/yellow/review/cpu-watertable-close-wave3.png",
+      "lightSliverPixels": 119,
+      "sidingFieldPixels": 40099,
+      "sliverShareOfField": 0.00297,
+      "state": "wave3",
+      "variant": "yellow",
+      "worstSurfaces": [
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            -0.0,
+            0.0
+          ],
+          "pixels": 98,
+          "planeOffset": 6.78
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            -1.0,
+            -0.0
+          ],
+          "pixels": 4,
+          "planeOffset": -3.3
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 4,
+          "planeOffset": -2.6
+        },
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            -0.0,
+            0.0
+          ],
+          "pixels": 4,
+          "planeOffset": 7.018
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 2,
+          "planeOffset": -3.4
+        }
+      ]
+    },
+    {
+      "camera": "watertable-close",
+      "census": {
+        "concrete": 57930,
+        "door": 57,
+        "glass": 7457,
+        "metal": 781,
+        "siding": 40433,
+        "trim": 94570
+      },
+      "frame": "source-assets/world-studio/houses/yellow/review/cpu-watertable-close-wave4.png",
+      "lightSliverPixels": 13,
+      "sidingFieldPixels": 40433,
+      "sliverShareOfField": 0.00032,
+      "state": "wave4",
+      "variant": "yellow",
+      "worstSurfaces": [
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            -1.0,
+            -0.0
+          ],
+          "pixels": 4,
+          "planeOffset": -3.3
+        },
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            -0.0,
+            0.0
+          ],
+          "pixels": 4,
+          "planeOffset": 7.018
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "pixels": 2,
+          "planeOffset": -8.78
+        },
+        {
+          "material": "trim",
+          "normal": [
+            0.0,
+            1.0,
+            -0.0
+          ],
+          "pixels": 1,
+          "planeOffset": 0.52
+        },
+        {
+          "material": "trim",
+          "normal": [
+            -1.0,
+            -0.0,
+            0.0
+          ],
+          "pixels": 1,
+          "planeOffset": 6.98
+        }
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "after": 166,
+      "before": 457,
+      "camera": "belt-grazing",
+      "reductionPercent": 63.7,
+      "variant": "teal"
+    },
+    {
+      "after": 327,
+      "before": 622,
+      "camera": "street-grazing",
+      "reductionPercent": 47.4,
+      "variant": "teal"
+    },
+    {
+      "after": 2,
+      "before": 308,
+      "camera": "watertable-close",
+      "reductionPercent": 99.4,
+      "variant": "teal"
+    },
+    {
+      "after": 54,
+      "before": 213,
+      "camera": "belt-grazing",
+      "reductionPercent": 74.6,
+      "variant": "yellow"
+    },
+    {
+      "after": 245,
+      "before": 376,
+      "camera": "street-grazing",
+      "reductionPercent": 34.8,
+      "variant": "yellow"
+    },
+    {
+      "after": 13,
+      "before": 119,
+      "camera": "watertable-close",
+      "reductionPercent": 89.1,
+      "variant": "yellow"
+    }
+  ],
+  "depthBits": 24,
+  "far": 2000.0,
+  "instrument": "facade_preview (CPU raster, quantised depth buffer)",
+  "near": 0.1,
+  "runtimeSidedness": "FrontSide on opaque, DoubleSide on glass (src/world-studio/houses/index.ts:211)",
+  "size": [
+    800,
+    450
+  ],
+  "totalAfter": 807,
+  "totalBefore": 2095,
+  "totalReductionPercent": 61.5
+}

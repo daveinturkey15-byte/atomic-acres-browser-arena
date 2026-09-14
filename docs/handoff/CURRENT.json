@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "projectId": "atomic-acres-browser-arena",
+  "checkpoint": "build19",
+  "state": "stopped-for-owner-handoff",
+  "observedAt": "2026-09-13T16:30:00+01:00",
+  "build": {
+    "number": 19,
+    "timestamp": "2026-09-13T15:41:00+01:00",
+    "sourceSha": "82677da2c8e910f4bcdebcc804c434e874439c9e",
+    "url": "http://127.0.0.1:41996/updates/slice19/",
+    "artifactPath": "dist-world-studio-slice4/updates/slice19",
+    "acceptance": "local checkpoint; visual, performance and production acceptance OPEN"
+  },
+  "source": {
+    "branch": "contrib/dave-gaming-pc/codex/world-studio-20260912",
+    "buildSourceSha": "82677da2c8e910f4bcdebcc804c434e874439c9e",
+    "documentationHead": "Read git rev-parse HEAD; later documentation commits are not new game builds."
+  },
+  "machineObservation": {
+    "machine": "dave-gaming-pc",
+    "worktree": "C:/Users/david/Desktop/stuff/atomic-acres",
+    "lane": "world-studio-20260912",
+    "ownerAtCheckpoint": "codex",
+    "leaseExpiresAt": "2026-09-13T17:00:00+01:00",
+    "registry": "C:/Users/david/AppData/Local/atomic-acres-browser-arena/project-routing.json",
+    "gitCommonDir": "C:/Users/david/Documents/Codex/2026-09-09/atomic-acres-weekly-audit/work/integration-full/.git",
+    "takeover": "Require explicit native harness ownership transfer and bounded lease before writing. Re-read registry; this snapshot grants no authority."
+  },
+  "documents": {
+    "handoff": "checkpoints/build19/HANDOFF.md",
+    "requests": "checkpoints/build19/OWNER_REQUESTS.md",
+    "workers": "checkpoints/build19/AGENTS_AND_USAGE.md",
+    "contract": "CONTRACT.md"
+  },
+  "localEvidence": {
+    "root": "../../.handoff-evidence/work",
+    "overview": "../../.handoff-evidence/work/continued-world-20260913/handoff/index.html",
+    "manifest": "../../.handoff-evidence/migration/copied-artifacts.json",
+    "copiedFiles": 64,
+    "conceptImages": 18,
+    "gitIncluded": false
+  },
+  "nextAction": "Owner inspection and next orchestrator takeover. No game generation or autonomous continuation authorized by this checkpoint."
+}

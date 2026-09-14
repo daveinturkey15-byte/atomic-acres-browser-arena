@@ -25,7 +25,17 @@ describe('Pass 70 multiplayer regression wiring', () => {
     const implementation = main.slice(start, end);
 
     expect(start).toBeGreaterThan(0);
-    expect(implementation).toContain('durationMs: hostedArenaDurationMs(arenaSelection(arenaId))');
+    // Pass 70 invariant in its HF-377 form: changing the MAP canonicalizes the
+    // round clock to THAT arena's own duration by resetting the mirrored limit
+    // selects before the contract is applied - a stale gun-range clock can no
+    // longer leak into the next arena.
+    expect(implementation).toContain('if (arenaId !== privateMatchConfig.arenaId) {');
+    expect(implementation).toContain('timeLimitSelect.value = String(hostedArenaDurationMs(arenaSelection(arenaId)));');
+    expect(implementation).toContain('killLimitSelect.value = \'\';');
+    // Outside a map change the host's explicit choice joins the replicated
+    // contract; gun-range stays its fixed untimed practice round.
+    expect(implementation).toContain('durationMs: rangeLobby ? hostedArenaDurationMs(arenaSelection(arenaId)) : Number(timeLimitSelect.value)');
+    expect(implementation).toContain('scoreLimit: rangeLobby ? null : parsedLobbyKillLimit(killLimitSelect.value)');
   });
 
   it('keeps supported long-soak fixtures on current gameplay entry points', () => {

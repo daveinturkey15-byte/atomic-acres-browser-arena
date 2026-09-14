@@ -1,0 +1,1542 @@
+/**
+ * vehicle-forge/build.ts - assemble one forged vehicle into a merged group.
+ *
+ * PRESENTATION ONLY. The returned group carries `userData.presentationOnly`
+ * on every mesh, registers nothing with any builder, and is meant to be added
+ * to an arena root ALONGSIDE the authored boxes that own that vehicle's
+ * colliders and shot surfaces - never in place of their authority.
+ *
+ * BUDGET. Every part is merged into one mesh per material bucket, so a whole
+ * vehicle - body, shut lines, glass, lining, chrome, tyres, wheel faces and
+ * two lamp colours - costs at most nine draw calls no matter how many parts
+ * it is made of. Merging is per VEHICLE, deliberately, not across vehicles:
+ * one merged mesh spanning the whole street would have an axis-aligned bounds
+ * that no single collider explains, and the collider/visual parity audit would
+ * correctly report it as a walk-through prop.
+ *
+ * No per-frame allocation happens here at all; this runs once, at arena
+ * construction, and returns static geometry.
+ */
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import {
+  type VehicleSpec,
+  chamferedBar,
+  crownSurfaceY,
+  flankHalfWidth,
+  loftBody,
+  roofRail,
+  surfaceBandAtHeights,
+  stripAtHeight,
+  stationRing,
+} from './geometry';
+import { type WheelStyle, hubcapDome, lampParts, wheelParts } from './wheels';
+import { TRAILER_FRAME_DEPTH_M, TRAILER_FRAME_RAIL_M } from './trailer-frame';
+import {
+  createForgeChromeMaterial,
+  createForgeGlassMaterial,
+  createForgeGrooveMaterial,
+  createForgeLampMaterial,
+  createForgeLiningMaterial,
+  createForgePaintMaterial,
+  createForgeTyreMaterial,
+  quantizeVehicleAnchor,
+} from './materials';
+
+export interface ForgedVehicleMaterials {
+  readonly paint: THREE.Material;
+  readonly glass: THREE.Material;
+  readonly lining: THREE.Material;
+  readonly groove: THREE.Material;
+  readonly chrome: THREE.Material;
+  /** A second body colour for a waist stripe or a contrast panel. */
+  readonly accent: THREE.Material;
+  readonly tyre: THREE.Material;
+  readonly headLamp: THREE.Material;
+  readonly tailLamp: THREE.Material;
+}
+
+/**
+ * Materials are shared across every vehicle that wants the same finish, so a
+ * street of forged bodies compiles one paint program per colour rather than
+ * one per body.
+ */
+/** The buckets every vehicle shares: no colour of its own, so one material serves the whole street. */
+export type ForgeSharedBucket = 'glass' | 'lining' | 'groove' | 'chrome' | 'tyre' | 'headLamp' | 'tailLamp';
+export type ForgeSharedMaterials = Readonly<Pick<ForgedVehicleMaterials, ForgeSharedBucket>>;
+
+/**
+ * PERF (HITL 5, HF-491). One instance of each colourless bucket material. A
+ * material set used to build all nine per vehicle, so three sets on the street
+ * carried three tyre, three chrome, three glass ... materials with identical
+ * graphs - each a separate draw per vehicle and a separate pipeline to
+ * compile inside the fenced first submission. Sharing them is what lets
+ * `mergeForgedPlacements` fold every vehicle's tyres into ONE draw.
+ */
+export function createForgeSharedMaterials(): ForgeSharedMaterials {
+  return {
+    glass: createForgeGlassMaterial('vehicle-forge-glass'),
+    lining: createForgeLiningMaterial(),
+    groove: createForgeGrooveMaterial(),
+    chrome: createForgeChromeMaterial(),
+    tyre: createForgeTyreMaterial(),
+    headLamp: createForgeLampMaterial('head'),
+    tailLamp: createForgeLampMaterial('tail'),
+  };
+}
+
+export function createForgeMaterialSet(
+  paintHex: number,
+  paintName: string,
+  accentHex = paintHex,
+  /** See `PaintOptions.roughness`: 0.20 keeps a body SSR-eligible. */
+  baseRoughness = 0.2,
+  shared: ForgeSharedMaterials = createForgeSharedMaterials(),
+): ForgedVehicleMaterials {
+  return {
+    paint: createForgePaintMaterial({ color: paintHex, name: paintName, roughness: baseRoughness }),
+    accent: createForgePaintMaterial({ color: accentHex, name: `${paintName}-accent`, roughness: baseRoughness }),
+    ...shared,
+  };
+}
+
+export interface ForgedPlacement {
+  readonly built: ForgedVehicle;
+  /** World position of the vehicle group. */
+  readonly x: number;
+  readonly z: number;
+  /** World yaw of the vehicle group, radians about +y. */
+  readonly yaw: number;
+}
+
+export interface ForgedSkinPlacement {
+  /** The source group's name, e.g. `vehicle-forge nuketown2-coach`. */
+  readonly name: string;
+  /** Plan centre of the vehicle's BAKED world-space geometry (all of its parts). */
+  readonly centre: Readonly<{ x: number; z: number }>;
+}
+
+export interface MergedForgedPlacements {
+  /** One presentation-only mesh per distinct material, world-space geometry. */
+  readonly meshes: readonly THREE.Mesh[];
+  readonly drawCalls: number;
+  readonly triangles: number;
+  /**
+   * Where each vehicle actually landed, measured from the transformed
+   * geometry - the fidelity mirror gate (HF-473) reads these instead of the
+   * per-vehicle groups the merge no longer adds to the scene.
+   */
+  readonly skins: readonly ForgedSkinPlacement[];
+}
+
+/**
+ * Stamp the non-geometric placement anchor used by the shared weathering
+ * graph. Positions, indices and triangle counts are untouched; the attribute
+ * simply survives the per-material static merge so one vehicle cannot inherit
+ * its neighbour's enamel hash.
+ */
+function stampVehicleAnchor(geometry: THREE.BufferGeometry, x = 0, z = 0): THREE.BufferGeometry {
+  const position = geometry.getAttribute('position');
+  if (!position) return geometry;
+  const [qx, qz] = quantizeVehicleAnchor(x, z);
+  const anchor = new Float32Array(position.count * 2);
+  for (let index = 0; index < position.count; index += 1) {
+    anchor[index * 2] = qx;
+    anchor[index * 2 + 1] = qz;
+  }
+  geometry.setAttribute('forgeVehicleAnchor', new THREE.Float32BufferAttribute(anchor, 2));
+  return geometry;
+}
+
+/** Explicit on every glazing mesh so the shared static merge stays valid. */
+function stampCoachShade(geometry: THREE.BufferGeometry, value: number): THREE.BufferGeometry {
+  const count = geometry.getAttribute('position').count;
+  geometry.setAttribute('forgeCoachShade', new THREE.Float32BufferAttribute(new Float32Array(count).fill(value), 1));
+  return geometry;
+}
+
+/**
+ * PERF (HITL 5, HF-491). Fold every placed vehicle into ONE mesh per material.
+ *
+ * The street vehicles are static scenery. Built one group per vehicle they
+ * cost a draw per bucket per vehicle - six placements on Nuke Town Rebuild
+ * were ~40 draws, most of the +42 draws/frame the HITL 4 candidate carried
+ * over PASS 93. With the colourless buckets shared (`createForgeSharedMaterials`)
+ * the same street is one draw per material: three paints, up to three
+ * accents, and seven shared buckets.
+ *
+ * Each vehicle's world transform (position + yaw, exactly what the caller
+ * would have set on the group) is baked into its geometry, geometries are
+ * merged per material, and the per-vehicle groups are never added to the
+ * scene. Shadow flags, `renderOrder` and `presentationOnly` come from the
+ * source meshes, so a merged mesh casts and sorts exactly as its parts did.
+ * Source geometries are disposed here - they are copied, not referenced.
+ */
+export function mergeForgedPlacements(
+  placements: readonly ForgedPlacement[],
+  namePrefix = 'vehicle-forge merged',
+): MergedForgedPlacements {
+  const byMaterial = new Map<THREE.Material, { geometries: THREE.BufferGeometry[]; source: THREE.Mesh; label: string }>();
+  const transform = new THREE.Matrix4();
+  const groupMatrix = new THREE.Matrix4();
+  const skins: ForgedSkinPlacement[] = [];
+  const bounds = new THREE.Box3();
+  const skinBounds = new THREE.Box3();
+  for (const { built, x, z, yaw } of placements) {
+    built.group.position.set(x, 0, z);
+    built.group.rotation.set(0, yaw, 0);
+    built.group.updateMatrix();
+    groupMatrix.copy(built.group.matrix);
+    bounds.makeEmpty();
+    skinBounds.makeEmpty();
+    let hasPaintBody = false;
+    for (const child of built.group.children) {
+      if (!(child instanceof THREE.Mesh)) continue;
+      child.updateMatrix();
+      transform.multiplyMatrices(groupMatrix, child.matrix);
+      const geometry = child.geometry.clone();
+      geometry.applyMatrix4(transform);
+      stampVehicleAnchor(geometry, x, z);
+      geometry.computeBoundingBox();
+      if (geometry.boundingBox) bounds.union(geometry.boundingBox);
+      const material = child.material as THREE.Material;
+      const bucketLabel = child.userData.forgeBucket as string | undefined;
+      if (bucketLabel === undefined) throw new Error(`Forged mesh is missing its material bucket: ${child.name}`);
+      if (bucketLabel === 'paint' && geometry.boundingBox) {
+        skinBounds.union(geometry.boundingBox);
+        hasPaintBody = true;
+      }
+      const entry = byMaterial.get(material);
+      if (entry) entry.geometries.push(geometry);
+      else byMaterial.set(material, { geometries: [geometry], source: child, label: bucketLabel });
+      child.geometry.dispose();
+    }
+    skins.push({
+      name: built.group.name,
+      // Panel seams can continue from a cab into the authored cargo box. The
+      // fidelity mirror is about the forged body it dresses, not those detail
+      // bars, so anchor it to the paint body when present.
+      centre: {
+        x: ((hasPaintBody ? skinBounds : bounds).min.x + (hasPaintBody ? skinBounds : bounds).max.x) / 2,
+        z: ((hasPaintBody ? skinBounds : bounds).min.z + (hasPaintBody ? skinBounds : bounds).max.z) / 2,
+      },
+    });
+  }
+  const meshes: THREE.Mesh[] = [];
+  let triangles = 0;
+  for (const [material, { geometries, source, label }] of byMaterial) {
+    const merged = geometries.length === 1 ? geometries[0]! : mergeGeometries(geometries, false);
+    if (geometries.length > 1) for (const geometry of geometries) geometry.dispose();
+    if (!merged) continue;
+    const mesh = new THREE.Mesh(merged, material);
+    mesh.name = `${namePrefix} ${label}`;
+    mesh.castShadow = source.castShadow;
+    mesh.receiveShadow = source.receiveShadow;
+    mesh.renderOrder = source.renderOrder;
+    mesh.userData.presentationOnly = true;
+    // Static scenery: nothing moves it after this, so three need not recompose
+    // its matrix every frame (r185 recomposes every auto-updating node).
+    mesh.matrixAutoUpdate = false;
+    mesh.updateMatrix();
+    meshes.push(mesh);
+    triangles += (merged.getAttribute('position')?.count ?? 0) / 3;
+  }
+  return { meshes, drawCalls: meshes.length, triangles, skins };
+}
+
+/** The per-vertex attribute `stampVehicleAnchor` writes: quantised (x, z) of the owning vehicle. */
+export const FORGE_VEHICLE_ANCHOR_ATTRIBUTE = 'forgeVehicleAnchor';
+
+/** One vehicle's share of a merged forge mesh. */
+export interface MergedVehicleComponent {
+  /** `${x},${z}` of the stamped anchor, the same key `mergedVehicleBounds` uses. */
+  readonly key: string;
+  readonly anchor: readonly [number, number];
+  /** Bounds of this vehicle's vertices only, in the space `matrixWorld` maps to. */
+  readonly box: THREE.Box3;
+  readonly vertices: number;
+}
+
+/**
+ * How a geometry partitions by vehicle. `unanchored` is an ordinary mesh with
+ * no anchor attribute; `malformed` carries an anchor attribute that cannot be
+ * trusted (wrong item size, count mismatch, non-finite values). Both leave the
+ * caller to measure the whole mesh, so no vertex ever drops out of a census.
+ */
+export type MergedVehiclePartition =
+  | { readonly kind: 'partitioned'; readonly components: readonly MergedVehicleComponent[]; readonly vertices: number }
+  | { readonly kind: 'unanchored'; readonly vertices: number }
+  | { readonly kind: 'malformed'; readonly reason: string; readonly vertices: number };
+
+/**
+ * Partition a merged forge mesh into per-VEHICLE bounds by the quantised
+ * anchor `stampVehicleAnchor` wrote on every vertex.
+ *
+ * The per-material merge folds every vehicle that shares a paint into one
+ * mesh, so the mesh's own AABB spans the road between two saloons and no
+ * single collider explains it - the exact false "walk-through" the header
+ * warns about. The anchor attribute is the only record of which vehicle each
+ * triangle belongs to, and it survives the merge untouched, so any audit that
+ * reads a merged mesh must partition by it before comparing against
+ * colliders: the whole-mesh AABB is the wrong unit of measurement.
+ *
+ * Every vertex lands in exactly one component (component vertex counts sum
+ * to the position count), so a census over the parts is a census over the
+ * mesh. `matrixWorld`, when given, is applied per vertex, so a rotated
+ * placement yields the tight world box, not a transformed local AABB.
+ * Presentation-only diagnostics: builds nothing, registers nothing.
+ */
+export function partitionMergedVehicles(
+  geometry: THREE.BufferGeometry,
+  matrixWorld?: THREE.Matrix4,
+): MergedVehiclePartition {
+  const position = geometry.getAttribute('position');
+  if (!position) return { kind: 'unanchored', vertices: 0 };
+  const vertices = position.count;
+  const anchor = geometry.getAttribute(FORGE_VEHICLE_ANCHOR_ATTRIBUTE);
+  if (!anchor) return { kind: 'unanchored', vertices };
+  // The forge emits non-indexed triangles. Other topologies must be audited
+  // whole until their ownership can be proved, never guessed from vertex order.
+  if (geometry.index || position.itemSize !== 3 || vertices % 3 !== 0) {
+    return { kind: 'malformed', reason: 'expected non-indexed xyz triangles', vertices };
+  }
+  if (matrixWorld && !matrixWorld.elements.every(Number.isFinite)) {
+    return { kind: 'malformed', reason: 'non-finite world transform', vertices };
+  }
+  if (anchor.itemSize !== 2) return { kind: 'malformed', reason: `anchor itemSize ${anchor.itemSize}, expected 2`, vertices };
+  if (anchor.count !== vertices) return { kind: 'malformed', reason: `anchor count ${anchor.count} != position count ${vertices}`, vertices };
+  const byKey = new Map<string, { anchor: [number, number]; box: THREE.Box3; vertices: number }>();
+  const point = new THREE.Vector3();
+  for (let index = 0; index < vertices; index += 1) {
+    const ax = anchor.getX(index);
+    const az = anchor.getY(index);
+    if (!Number.isFinite(ax) || !Number.isFinite(az)) {
+      return { kind: 'malformed', reason: `non-finite anchor at vertex ${index}`, vertices };
+    }
+    const key = `${ax},${az}`;
+    const triangleStart = index - index % 3;
+    if (ax !== anchor.getX(triangleStart) || az !== anchor.getY(triangleStart)) {
+      return { kind: 'malformed', reason: `ownership changes within triangle ${triangleStart / 3}`, vertices };
+    }
+    let entry = byKey.get(key);
+    if (!entry) {
+      entry = { anchor: [ax, az], box: new THREE.Box3(), vertices: 0 };
+      byKey.set(key, entry);
+    }
+    point.fromBufferAttribute(position as THREE.BufferAttribute, index);
+    if (matrixWorld) point.applyMatrix4(matrixWorld);
+    if (![point.x, point.y, point.z].every(Number.isFinite)) {
+      return { kind: 'malformed', reason: `non-finite position at vertex ${index}`, vertices };
+    }
+    entry.box.expandByPoint(point);
+    entry.vertices += 1;
+  }
+  const components = [...byKey.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, entry]) => ({ key, ...entry }));
+  return { kind: 'partitioned', components, vertices };
+}
+
+/**
+ * Per-VEHICLE local bounds of a merged forge mesh keyed by anchor. Empty when
+ * the geometry carries no trustworthy anchor: callers that need to tell
+ * "no anchor" from "bad anchor" read `partitionMergedVehicles` directly.
+ */
+export function mergedVehicleBounds(geometry: THREE.BufferGeometry): ReadonlyMap<string, THREE.Box3> {
+  const partition = partitionMergedVehicles(geometry);
+  const bounds = new Map<string, THREE.Box3>();
+  if (partition.kind !== 'partitioned') return bounds;
+  for (const component of partition.components) bounds.set(component.key, component.box);
+  return bounds;
+}
+
+export interface LampPlacement {
+  /** Distance of each lamp pair from the centre plane. */
+  readonly x: number;
+  readonly y: number;
+  readonly radius: number;
+}
+
+export interface WaistStripe {
+  /** World height the stripe rides. A waistline is level, not a ring index. */
+  readonly y: number;
+  /** `accent` for a painted waistline, `chrome` for a bright moulding. */
+  readonly bucket: 'accent' | 'chrome';
+  readonly z0: number;
+  readonly z1: number;
+  readonly height: number;
+  readonly proud: number;
+}
+
+export interface SurfaceBand {
+  /** Lower and upper heights of a body-colour panel. */
+  readonly y0: number;
+  readonly y1: number;
+  readonly bucket: 'accent' | 'chrome';
+  readonly z0: number;
+  readonly z1: number;
+  readonly proud: number;
+}
+
+export interface GrilleDetail {
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly depth: number;
+  readonly barCount?: number;
+}
+
+export interface MirrorDetail {
+  readonly y: number;
+  readonly z: number;
+  readonly x: number;
+}
+
+export interface RoofRails {
+  /** Plan offsets of the rail pair from the centre plane, metres. */
+  readonly x: readonly number[];
+  /** Roof run the rails follow, in vehicle-frame z. */
+  readonly z0: number;
+  readonly z1: number;
+  /** Bar half-width across x. Defaults to 0.03. */
+  readonly halfWidth?: number;
+  /** Bar height above its bedded base. Defaults to 0.045. */
+  readonly height?: number;
+  /** Which existing bucket the rails merge into - paint or chrome. */
+  readonly bucket: 'paint' | 'chrome';
+}
+
+export interface PanelSeam {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly height: number;
+  readonly width?: number;
+  readonly depth?: number;
+}
+
+/** One door-handle row: small chrome pulls at the given height and door z list. */
+export interface DoorHandleRow {
+  readonly y: number;
+  readonly z: readonly number[];
+}
+
+/** Window-run pillars dividing a continuous side-glass band (groove bucket). */
+export interface PillarDressing {
+  readonly z: readonly number[];
+  readonly y0: number;
+  readonly y1: number;
+}
+
+/** Roof vents riding the crowned roof at plan offset ±x (chrome bucket). */
+export interface VentDressing {
+  readonly x: number;
+  readonly z: readonly number[];
+}
+
+/** A single centred exhaust stack behind the cab (chrome bucket). */
+export interface StackDressing {
+  readonly z: number;
+  readonly y0: number;
+  readonly y1: number;
+}
+
+/** Roof-gutter bars along both roof side edges (chrome bucket). */
+export interface GutterDressing {
+  readonly x: number;
+  readonly y: number;
+  readonly z0: number;
+  readonly z1: number;
+}
+
+/** A horizontal boot-lid shut line across the deck (groove bucket). */
+export interface BootSeam {
+  readonly y: number;
+  readonly z: number;
+  readonly halfWidth: number;
+}
+
+/** Front indicator pair (headLamp bucket) plus tail-cluster pair (tailLamp). */
+export interface IndicatorDressing {
+  readonly y: number;
+  readonly x: number;
+}
+
+/** Number plates: 2-triangle quads, nose and tail, centred (accent bucket). */
+export interface PlateDressing {
+  readonly y: number;
+  readonly width?: number;
+  readonly height?: number;
+}
+
+export interface CoachVehicleDetail {
+  /** Front windscreen surround, measured in the coach nose face. */
+  readonly windscreen: Readonly<{ y0: number; y1: number; halfWidth: number }>;
+  readonly destinationBoard: Readonly<{ y: number; width: number; height: number }>;
+  readonly fogLamps: Readonly<{ x: number; y: number; width: number; height: number }>;
+  readonly rearLouvers: Readonly<{ y0: number; y1: number; count: number; halfWidth: number }>;
+  readonly skirt: Readonly<{ y: number; height: number; z0: number; z1: number }>;
+  readonly luggageDoor: Readonly<{ y0: number; y1: number; z: number; width: number }>;
+  readonly rearPlate: Readonly<{ y: number; width: number; height: number }>;
+}
+
+export interface TrailerVehicleDetail {
+  /** Cargo sides are presentation only; the authored box remains authority. */
+  readonly side: Readonly<{ z0: number; z1: number; step: number; y0: number; y1: number }>;
+  readonly rubRail: Readonly<{ y: number; height: number }>;
+  readonly rearDoor: Readonly<{ y0: number; y1: number; halfWidth: number }>;
+  readonly rearLocks: Readonly<{ y0: number; y1: number; x: number[] }>;
+  readonly hinges: Readonly<{ y: number[]; x: number[] }>;
+  readonly mudFlaps: Readonly<{ z: number; y0: number; y1: number }>;
+  readonly sideMarkers: Readonly<{ z: number[]; y: number }>;
+  readonly rearZ: number;
+}
+
+export interface SaloonVehicleDetail {
+  readonly doorShutLines: Readonly<{ z: number[]; y0: number; y1: number }>;
+  readonly sill: Readonly<{ y: number; z0: number; z1: number }>;
+}
+
+export interface VehicleDetailDressing {
+  readonly coach?: CoachVehicleDetail;
+  readonly trailer?: TrailerVehicleDetail;
+  readonly saloon?: SaloonVehicleDetail;
+}
+
+export interface VehicleDressing {
+  readonly wheelStyle: WheelStyle;
+  /**
+   * Extra axles that belong to this vehicle's presentation but not to its
+   * loft - the moving truck's rear bogie lives under an authored cargo box
+   * that keeps its own boxy shape, so its wheels are dressed without an arch.
+   */
+  readonly extraWheelZ?: readonly number[];
+  readonly headLamps?: LampPlacement;
+  readonly tailLamps?: LampPlacement;
+  /** Front and rear bumper bars, at the given height and depth from each end. */
+  readonly bumperY?: number;
+  readonly stripe?: WaistStripe;
+  readonly surfaceBands?: readonly SurfaceBand[];
+  readonly grille?: GrilleDetail;
+  readonly mirrors?: readonly MirrorDetail[];
+  readonly panelSeams?: readonly PanelSeam[];
+  /** Longitudinal roof rails riding the crowned roof surface (see roofRail). */
+  readonly roofRails?: RoofRails;
+  /** Chrome door pulls on both flanks (HF-536 detail pass, Muse). */
+  readonly doorHandles?: DoorHandleRow;
+  /** 12-gon hubcap domes on dished steel faces; covers already have one. */
+  readonly hubcaps?: boolean;
+  /** Saloon hub-nut hint: small hex centres on full-cover faces. */
+  readonly wheelNuts?: boolean;
+  /** Nose and tail number-plate quads (accent bucket). */
+  readonly plates?: PlateDressing;
+  /** Front indicators (headLamp) and tail-cluster extras (tailLamp). */
+  readonly indicators?: IndicatorDressing;
+  /** Window-run pillars across the side-glass band (groove bucket). */
+  readonly pillars?: PillarDressing;
+  /** Roof vents riding the crown (chrome bucket). */
+  readonly vents?: VentDressing;
+  /** Centred exhaust stack (chrome bucket). */
+  readonly stack?: StackDressing;
+  /** Roof-gutter bars on both roof edges (chrome bucket). */
+  readonly gutters?: GutterDressing;
+  /** Horizontal boot-lid shut line (groove bucket). */
+  readonly bootSeam?: BootSeam;
+  /** HF-536 reallocated face detail; all parts remain in existing buckets. */
+  readonly detail?: VehicleDetailDressing;
+  /**
+   * HF-536 (R14). The dark mass BETWEEN the wheels. Without it a lofted body
+   * on four wheels reads as a shell hovering over the road: the sun reaches
+   * straight under the sill, the far kerb shows through the gap, and the
+   * silhouette has a bright stripe where a chassis should be.
+   */
+  readonly underbody?: UnderbodyBlock;
+  /**
+   * HF-536 (R14). Contact darkening under the vehicle - the ambient-occlusion
+   * pool every grounded object owes the ground. Kept INSIDE the vehicle's own
+   * plan footprint so it never reads as a painted shadow from above.
+   */
+  readonly contactShadow?: boolean;
+}
+
+/**
+ * The dark block slung between the axles: `y0` to `y1` in the vehicle frame,
+ * `insetM` in from the sill half-width on each side so it can never escape the
+ * body it hides under (and so it stays inside the collider envelope the arena
+ * owns - `specs.ts:7-21`).
+ */
+export interface UnderbodyBlock {
+  readonly y0: number;
+  readonly y1: number;
+  readonly insetM: number;
+}
+
+/** Plan fraction of (track, wheelbase) the contact pool covers. */
+export const CONTACT_SHADOW_PLAN_FRACTION = 0.55;
+/**
+ * 12 mm proud of the carriageway. The road decals this sits over are tiered
+ * below 0.02, so the pool sorts above them without a `renderOrder` of its own;
+ * raise it to 0.02 only if a station shows z-fighting (recorded in the report).
+ */
+export const CONTACT_SHADOW_Y = 0.012;
+/** Sides of the contact pool's 8-gon: 8 triangles, enough for a soft pool. */
+const CONTACT_SHADOW_SEGMENTS = 8;
+
+/** Options for the axle-only wheel sets (the truck's bogie under its cargo box). */
+export interface WheelSetDressing {
+  readonly underbody?: UnderbodyBlock;
+  readonly contactShadow?: boolean;
+  /**
+   * Explicit vehicle-frame z range for the contact pool. The truck is ONE
+   * vehicle built as two placements (a lofted cab plus this bogie), and two
+   * coplanar pools at the same height would hatch where they overlap - so the
+   * bogie draws the truck's whole pool and the cab draws none.
+   */
+  readonly contactSpan?: Readonly<{ z0: number; z1: number }>;
+}
+
+/**
+ * The z run a grounded dressing spans: between the wheel arches, or - when a
+ * vehicle has a single axle (the cab-over truck) - from that arch to the tail.
+ */
+function groundedSpan(
+  axles: readonly number[],
+  wheelRadius: number,
+  archGap: number,
+  length: number,
+): { z0: number; z1: number } {
+  const archHalfSpan = wheelRadius + archGap;
+  const z0 = Math.min(...axles) + archHalfSpan;
+  const z1 = Math.max(...axles) - archHalfSpan;
+  if (z1 - z0 >= 0.4) return { z0, z1 };
+  return { z0, z1: length - wheelRadius };
+}
+
+/**
+ * EVERY GEOMETRY IN A BUCKET MUST AGREE ABOUT ITS INDEX BUFFER.
+ * `mergeGeometries` refuses a mix and returns null - which does not throw, does
+ * not fail a build, and simply DELETES the bucket: the first cut of this pass
+ * dropped every tyre on the street and only the R24 wheel gate noticed. The
+ * lofted wheels are non-indexed, so these primitives are converted to match.
+ */
+function nonIndexed(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
+  return geometry.index ? geometry.toNonIndexed() : geometry;
+}
+
+/** Remove the downward face from a hidden underbody box. */
+function openBottom(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
+  const position = geometry.getAttribute('position') as THREE.BufferAttribute;
+  const normal = geometry.getAttribute('normal') as THREE.BufferAttribute;
+  const uv = geometry.getAttribute('uv') as THREE.BufferAttribute;
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  for (let vertex = 0; vertex < position.count; vertex += 3) {
+    const normalY = (normal.getY(vertex) + normal.getY(vertex + 1) + normal.getY(vertex + 2)) / 3;
+    if (normalY < -0.5) continue;
+    for (let offset = 0; offset < 3; offset += 1) {
+      const index = vertex + offset;
+      positions.push(position.getX(index), position.getY(index), position.getZ(index));
+      normals.push(normal.getX(index), normal.getY(index), normal.getZ(index));
+      uvs.push(uv.getX(index), uv.getY(index));
+    }
+  }
+  const trimmed = new THREE.BufferGeometry();
+  trimmed.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  trimmed.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  trimmed.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.dispose();
+  return trimmed;
+}
+
+/** One box, 12 triangles, in the LINING bucket (matte dark grey, no new material): the tyre albedo
+ * renders exact black on the camera-facing underbody face in the vehicle's own shadow (HF-536 forge-2
+ * measurement), and an exact-black block reads as a hole, not as an underbody. */
+function underbodyBox(
+  halfWidth: number,
+  block: UnderbodyBlock,
+  span: { z0: number; z1: number },
+): THREE.BufferGeometry {
+  return markPart(translated(
+    openBottom(nonIndexed(new THREE.BoxGeometry(halfWidth * 2, Math.max(0.02, block.y1 - block.y0), span.z1 - span.z0))),
+    0,
+    (block.y0 + block.y1) / 2,
+    (span.z0 + span.z1) / 2,
+  ), 'grounding.underbody');
+}
+
+/** One 12-gon, 12 triangles, in the tyre bucket. */
+function contactPool(semiX: number, semiZ: number, centreZ: number): THREE.BufferGeometry {
+  const disc = nonIndexed(new THREE.CircleGeometry(1, CONTACT_SHADOW_SEGMENTS));
+  disc.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
+  disc.applyMatrix4(new THREE.Matrix4().makeScale(semiX, 1, semiZ));
+  return translated(disc, 0, CONTACT_SHADOW_Y, centreZ);
+}
+
+export interface ForgedPartBound {
+  readonly bucket: string;
+  readonly part: string;
+  readonly triangles: number;
+  readonly relief?: number;
+  readonly min: readonly [number, number, number];
+  readonly max: readonly [number, number, number];
+}
+
+export interface ForgedVehicle {
+  readonly group: THREE.Group;
+  /** One per merged material bucket - this vehicle's draw-call cost. */
+  readonly drawCalls: number;
+  readonly triangles: number;
+  readonly stations: number;
+  /** Pre-merge part counts per bucket - the detail-pass audit trail. */
+  readonly partCounts: Readonly<Record<string, number>>;
+  /** Pre-merge triangle allocations keyed by authored part family. */
+  readonly partTriangles: Readonly<Record<string, number>>;
+  /** Pre-merge AABB of every part, vehicle frame - the envelope audit trail. */
+  readonly partBounds: readonly ForgedPartBound[];
+}
+
+type Bucket = 'paint' | 'accent' | 'glass' | 'lining' | 'groove' | 'chrome' | 'tyre' | 'headLamp' | 'tailLamp';
+
+const BUCKET_ORDER: readonly Bucket[] = [
+  'paint', 'accent', 'groove', 'chrome', 'tyre', 'lining', 'glass', 'headLamp', 'tailLamp',
+];
+
+function translated(geometry: THREE.BufferGeometry, x: number, y: number, z: number): THREE.BufferGeometry {
+  geometry.applyMatrix4(new THREE.Matrix4().makeTranslation(x, y, z));
+  return geometry;
+}
+
+function markPart(geometry: THREE.BufferGeometry, part: string, relief?: number): THREE.BufferGeometry {
+  geometry.userData.forgePart = part;
+  if (relief !== undefined) geometry.userData.forgeRelief = relief;
+  return geometry;
+}
+
+/** A non-indexed 12-triangle box, used only for proud presentation detail. */
+function reliefBox(
+  parts: Record<Bucket, THREE.BufferGeometry[]>,
+  bucket: Bucket,
+  part: string,
+  size: readonly [number, number, number],
+  centre: readonly [number, number, number],
+  relief: number,
+): void {
+  const geometry = nonIndexed(new THREE.BoxGeometry(size[0], size[1], size[2]));
+  translated(geometry, centre[0], centre[1], centre[2]);
+  parts[bucket].push(markPart(geometry, part, relief));
+}
+
+/** A mirrored pair of boxes standing off a side face. */
+function reliefSidePair(
+  parts: Record<Bucket, THREE.BufferGeometry[]>,
+  bucket: Bucket,
+  part: string,
+  hostX: number,
+  y: number,
+  z: number,
+  height: number,
+  length: number,
+  relief = 0.012,
+): void {
+  for (const side of [1, -1] as const) {
+    const geometry = nonIndexed(new THREE.BoxGeometry(relief, height, length));
+    if (side === -1) mirroredToLeft(geometry);
+    translated(geometry, side * (hostX + relief / 2), y, z);
+    parts[bucket].push(markPart(geometry, part, relief));
+  }
+}
+
+/** A mirrored pair of boxes standing proud of the front face. */
+function reliefFrontPair(
+  parts: Record<Bucket, THREE.BufferGeometry[]>,
+  bucket: Bucket,
+  part: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  relief = 0.012,
+): void {
+  for (const side of [1, -1] as const) {
+    const geometry = nonIndexed(new THREE.BoxGeometry(width, height, relief));
+    if (side === -1) mirroredToLeft(geometry);
+    translated(geometry, side * x, y, -relief / 2);
+    parts[bucket].push(markPart(geometry, part, relief));
+  }
+}
+
+function reliefFrontBox(
+  parts: Record<Bucket, THREE.BufferGeometry[]>,
+  bucket: Bucket,
+  part: string,
+  width: number,
+  y: number,
+  height: number,
+  relief = 0.012,
+): void {
+  reliefBox(parts, bucket, part, [width, height, relief], [0, y, -relief / 2], relief);
+}
+
+function reliefRearPair(
+  parts: Record<Bucket, THREE.BufferGeometry[]>,
+  bucket: Bucket,
+  part: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  z: number,
+  relief = 0.012,
+): void {
+  for (const side of [1, -1] as const) {
+    const geometry = nonIndexed(new THREE.BoxGeometry(width, height, relief));
+    if (side === -1) mirroredToLeft(geometry);
+    translated(geometry, side * x, y, z + relief / 2);
+    parts[bucket].push(markPart(geometry, part, relief));
+  }
+}
+
+function reliefRearBox(
+  parts: Record<Bucket, THREE.BufferGeometry[]>,
+  bucket: Bucket,
+  part: string,
+  width: number,
+  y: number,
+  height: number,
+  z: number,
+  relief = 0.012,
+): void {
+  reliefBox(parts, bucket, part, [width, height, relief], [0, y, z + relief / 2], relief);
+}
+
+/**
+ * Mirror a part to the vehicle's left by ROTATING it half a turn about y, not
+ * by scaling x by -1. A negative scale reverses triangle winding, and every
+ * mirrored part then culls to black on the side of the car a player walks past.
+ */
+/** Reflect an already positioned asymmetric trim part, preserving outward winding. */
+function reflectedAcrossCentre(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
+  geometry.scale(-1, 1, 1);
+  // chamferedBar is non-indexed. Swap complete vertex records so normals/UVs
+  // stay attached, and the negative determinant never turns trim inside out.
+  for (const attribute of Object.values(geometry.attributes)) {
+    for (let triangle = 0; triangle < attribute.count; triangle += 3) {
+      for (let axis = 0; axis < attribute.itemSize; axis += 1) {
+        const a = (triangle + 1) * attribute.itemSize + axis;
+        const b = (triangle + 2) * attribute.itemSize + axis;
+        const value = attribute.array[a]!;
+        attribute.array[a] = attribute.array[b]!;
+        attribute.array[b] = value;
+      }
+    }
+  }
+  return geometry;
+}
+
+function mirroredToLeft(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
+  geometry.applyMatrix4(new THREE.Matrix4().makeRotationY(Math.PI));
+  return geometry;
+}
+
+/**
+ * HF-536 detail pass (Muse): the pre-merge audit trail. Counts and AABBs are
+ * read off the placed, vehicle-frame geometries before they merge, so the
+ * gates can assert per-bucket part counts and per-part envelope containment
+ * without unmerging anything. Build-time only; no per-frame cost.
+ */
+function summarizeParts(parts: Readonly<Record<string, THREE.BufferGeometry[]>>): {
+  partCounts: Record<string, number>;
+  partTriangles: Record<string, number>;
+  partBounds: ForgedPartBound[];
+} {
+  const partCounts: Record<string, number> = {};
+  const partTriangles: Record<string, number> = {};
+  const partBounds: ForgedPartBound[] = [];
+  for (const [bucket, geometries] of Object.entries(parts)) {
+    partCounts[bucket] = geometries.length;
+    for (const [index, geometry] of geometries.entries()) {
+      geometry.computeBoundingBox();
+      const box = geometry.boundingBox;
+      if (!box) continue;
+      const part = String(geometry.userData.forgePart ?? `${bucket}[${index}]`);
+      const triangles = (geometry.getAttribute('position')?.count ?? 0) / 3;
+      partTriangles[part] = (partTriangles[part] ?? 0) + triangles;
+      partBounds.push({
+        bucket,
+        part,
+        triangles,
+        relief: typeof geometry.userData.forgeRelief === 'number' ? geometry.userData.forgeRelief : undefined,
+        min: [box.min.x, box.min.y, box.min.z],
+        max: [box.max.x, box.max.y, box.max.z],
+      });
+    }
+  }
+  return { partCounts, partTriangles, partBounds };
+}
+
+/**
+ * W1 (HF-536/R006). A wheel centre in the BODY frame: the vehicle frame the
+ * spec is authored in (nose at z = 0, ground at y = 0, +x the vehicle's
+ * right facing +z). The ONLY place a wheel position is authored; geometry and
+ * queries below both derive from it, so neither can drift from the other.
+ */
+export interface ForgedWheelCentre {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+type WheelSide = 1 | -1;
+const WHEEL_SIDES: readonly WheelSide[] = [1, -1];
+
+/**
+ * Every wheel centre of a lofted vehicle in its body frame: one per side per
+ * axle of `[...spec.wheelZ, ...extraWheelZ]` - the SAME axle list
+ * `buildForgedVehicle` emits geometry from. A placement may move the body;
+ * it must never move a wheel relative to the body.
+ */
+export function forgedVehicleWheelCentres(
+  spec: VehicleSpec,
+  extraWheelZ: readonly number[] = [],
+): readonly ForgedWheelCentre[] {
+  const centres: ForgedWheelCentre[] = [];
+  for (const z of [...spec.wheelZ, ...extraWheelZ]) {
+    for (const side of WHEEL_SIDES) centres.push(Object.freeze({ x: side * spec.trackHalfWidth, y: spec.wheelRadius, z }));
+  }
+  return Object.freeze(centres);
+}
+
+/**
+ * Every wheel centre of an axle-only set (the truck bogie) in the body frame
+ * of the vehicle it dresses. `axleZ` MUST be body-frame z (for the truck:
+ * `truckNoseX - worldAxleX`); world-x arithmetic here is the HF-536 defect
+ * that parked a wheel pair 1.5 m ahead of the cab nose.
+ */
+export function forgedWheelSetCentres(
+  radius: number,
+  trackHalfWidth: number,
+  axleZ: readonly number[],
+): readonly ForgedWheelCentre[] {
+  const centres: ForgedWheelCentre[] = [];
+  for (const z of axleZ) {
+    for (const side of WHEEL_SIDES) centres.push(Object.freeze({ x: side * trackHalfWidth, y: radius, z }));
+  }
+  return Object.freeze(centres);
+}
+/**
+ * Body frame -> world for a placement at `(x, z)` with `yaw`: exactly the
+ * transform `mergeForgedPlacements` bakes into geometry
+ * (`makeRotationY(yaw)` then `setPosition(x, 0, z)`).
+ */
+export function applyForgedPlacement(
+  centre: ForgedWheelCentre,
+  x: number,
+  z: number,
+  yaw: number,
+): ForgedWheelCentre {
+  const s = Math.sin(yaw);
+  const c = Math.cos(yaw);
+  return { x: x + centre.x * c + centre.z * s, y: centre.y, z: z - centre.x * s + centre.z * c };
+}
+
+/**
+ * World -> body frame: the inverse of `applyForgedPlacement`. A wheel rigidly
+ * attached to its body recovers its exact body-local centre at any placement.
+ */
+export function stripForgedPlacement(
+  point: ForgedWheelCentre,
+  x: number,
+  z: number,
+  yaw: number,
+): ForgedWheelCentre {
+  const dx = point.x - x;
+  const dz = point.z - z;
+  const s = Math.sin(yaw);
+  const c = Math.cos(yaw);
+  return { x: dx * c - dz * s, y: point.y, z: dx * s + dz * c };
+}
+
+/**
+ * Wheels with no body: the axles that belong to a vehicle's presentation but
+ * not to any loft.
+ *
+ * The moving truck is the case this exists for. Its cargo box is authored
+ * geometry with three walk-through mouths that gameplay depends on, so it
+ * keeps its boxy shape and only the CAB is lofted - but its rear axles still
+ * have to stop being full-width slabs. Keeping them in their own group also
+ * keeps them SHORT: folded into the cab's buckets they would stretch one
+ * merged mesh over ten metres of street, and a bounds that long stops being
+ * explainable by the collider it belongs to.
+ */
+export function buildForgedWheelSet(
+  id: string,
+  radius: number,
+  tyreHalfWidth: number,
+  trackHalfWidth: number,
+  axleZ: readonly number[],
+  style: WheelStyle,
+  materials: ForgedVehicleMaterials,
+  dressing: WheelSetDressing = {},
+): ForgedVehicle {
+  const parts = { tyre: [] as THREE.BufferGeometry[], chrome: [] as THREE.BufferGeometry[], lining: [] as THREE.BufferGeometry[] };
+  // W1 (HF-536/R006): same single-source binding as the lofted builder above.
+  const wheelSetAxles = [...new Set(forgedWheelSetCentres(radius, trackHalfWidth, axleZ).map((centre) => centre.z))];
+  for (const z of wheelSetAxles) {
+    for (const side of [1, -1] as const) {
+      const wheel = wheelParts(radius, tyreHalfWidth, style, id === 'nuketown2-truck-bogie');
+      const place = (geometry: THREE.BufferGeometry): THREE.BufferGeometry => translated(
+        side === 1 ? geometry : mirroredToLeft(geometry), side * trackHalfWidth, radius, z,
+      );
+      parts.tyre.push(place(wheel.tyre));
+      parts.chrome.push(place(wheel.face));
+      if (wheel.whitewall) parts.chrome.push(place(wheel.whitewall));
+      parts.tyre.push(place(wheel.dark));
+    }
+  }
+  // HF-536 (R14): the same grounded dressing a lofted body gets. The bogie
+  // carries the truck's, because the truck is one vehicle in two placements.
+  const wheelSetSpan = { z0: Math.min(...axleZ), z1: Math.max(...axleZ) };
+  if (dressing.underbody) {
+    parts.lining.push(underbodyBox(
+      Math.max(0.05, trackHalfWidth - dressing.underbody.insetM),
+      dressing.underbody,
+      { z0: wheelSetSpan.z0 + radius, z1: wheelSetSpan.z1 - radius },
+    ));
+  }
+  if (dressing.contactShadow) {
+    const span = dressing.contactSpan ?? wheelSetSpan;
+    parts.tyre.push(contactPool(
+      CONTACT_SHADOW_PLAN_FRACTION * trackHalfWidth * 2,
+      Math.max(0.2, (span.z1 - span.z0) / 2),
+      (span.z0 + span.z1) / 2,
+    ));
+  }
+  const group = new THREE.Group();
+  group.name = `vehicle-forge ${id}`;
+  group.userData.presentationOnly = true;
+  let drawCalls = 0;
+  let triangles = 0;
+  for (const bucket of ['tyre', 'chrome', 'lining'] as const) {
+    if (parts[bucket].length === 0) continue;
+    const merged = mergeGeometries(parts[bucket].map((geometry) => stampVehicleAnchor(geometry)), false);
+    if (!merged) continue;
+    const mesh = new THREE.Mesh(merged, materials[bucket]);
+    mesh.name = `vehicle-forge ${id} ${bucket}`;
+    mesh.castShadow = bucket === 'tyre';
+    mesh.receiveShadow = true;
+    mesh.userData.presentationOnly = true;
+    mesh.userData.forgeBucket = bucket;
+    group.add(mesh);
+    drawCalls += 1;
+    triangles += (merged.getAttribute('position')?.count ?? 0) / 3;
+  }
+  return { group, drawCalls, triangles, stations: 0, ...summarizeParts(parts) };
+}
+
+export function buildForgedVehicle(
+  spec: VehicleSpec,
+  dressing: VehicleDressing,
+  materials: ForgedVehicleMaterials,
+): ForgedVehicle {
+  const loft = loftBody(spec);
+  const nonCoachAllocation = spec.id === 'nuketown2-truck-cab' || spec.id === 'nuketown2-sedan';
+  const parts: Record<Bucket, THREE.BufferGeometry[]> = {
+    paint: [loft.body], accent: [], glass: [], lining: [], groove: [], chrome: [], tyre: [], headLamp: [], tailLamp: [],
+  };
+  if (loft.glass) parts.glass.push(stampCoachShade(loft.glass, spec.id === 'nuketown2-coach' ? 1 : 0));
+  if (loft.lining) parts.lining.push(loft.lining);
+  if (loft.groove) parts.groove.push(loft.groove);
+
+  // W1 (HF-536/R006). The axle list the geometry loop iterates comes from the
+  // same query the attachment test reads, so wheels and centres cannot drift
+  // apart without this line moving with them.
+  const axles = [...new Set(forgedVehicleWheelCentres(spec, dressing.extraWheelZ).map((centre) => centre.z))];
+  for (const z of axles) {
+    for (const side of [1, -1] as const) {
+      const wheel = wheelParts(spec.wheelRadius, spec.tyreHalfWidth, dressing.wheelStyle, nonCoachAllocation);
+      const place = (geometry: THREE.BufferGeometry): THREE.BufferGeometry => translated(
+        side === 1 ? geometry : mirroredToLeft(geometry),
+        side * spec.trackHalfWidth,
+        spec.wheelRadius,
+        z,
+      );
+      parts.tyre.push(place(wheel.tyre));
+      parts.chrome.push(place(wheel.face));
+      if (wheel.whitewall) parts.chrome.push(place(wheel.whitewall));
+      // The inboard disc and the bead gap go in the TYRE bucket, not the
+      // lining's. They are matte dark either way, but the lining is a cabin
+      // backdrop that lives at greenhouse height, and folding four knee-high
+      // discs into it drags its bounds down past the sill - which defeats the
+      // ballistic audit's combat-height coverage test and reports the car's
+      // own interior as unrated ghost cover over its own shot surface.
+      parts.tyre.push(place(wheel.dark));
+    }
+  }
+
+  if (dressing.headLamps) {
+    const { x, y, radius } = dressing.headLamps;
+    for (const side of [1, -1] as const) {
+      const lamp = lampParts(radius, 0.06, spec.id === 'nuketown2-coach' ? 12 : 18, nonCoachAllocation);
+      const nose = (geometry: THREE.BufferGeometry): THREE.BufferGeometry => translated(
+        mirroredToLeft(geometry), side * -x, y, -0.006,
+      );
+      parts.chrome.push(nose(lamp.bezel));
+      parts.headLamp.push(nose(lamp.lens));
+    }
+  }
+  if (dressing.tailLamps) {
+    const { x, y, radius } = dressing.tailLamps;
+    for (const side of [1, -1] as const) {
+      const lamp = lampParts(radius, 0.06, spec.id === 'nuketown2-coach' ? 12 : 18, nonCoachAllocation);
+      const tail = (geometry: THREE.BufferGeometry): THREE.BufferGeometry => translated(
+        geometry, side * x, y, spec.length + 0.006,
+      );
+      parts.chrome.push(tail(lamp.bezel));
+      parts.tailLamp.push(tail(lamp.lens));
+    }
+  }
+
+  // HF-536 (R14). GROUNDED DRESSING, before any trim, so it merges into the
+  // tyre bucket with the wheels and costs no extra draw.
+  if (dressing.underbody) {
+    parts.lining.push(underbodyBox(
+      Math.max(0.05, spec.sillHalfWidth - dressing.underbody.insetM),
+      dressing.underbody,
+      groundedSpan(axles, spec.wheelRadius, spec.archGap, spec.length),
+    ));
+  }
+  if (dressing.contactShadow) {
+    const wheelbase = Math.max(...axles) - Math.min(...axles);
+    const poolZ = wheelbase >= 0.5
+      ? { length: wheelbase, centre: (Math.min(...axles) + Math.max(...axles)) / 2 }
+      : { length: spec.length - spec.wheelRadius * 2, centre: spec.length / 2 };
+    parts.tyre.push(contactPool(
+      CONTACT_SHADOW_PLAN_FRACTION * spec.trackHalfWidth * 2,
+      CONTACT_SHADOW_PLAN_FRACTION * poolZ.length,
+      poolZ.centre,
+    ));
+  }
+
+  if (dressing.bumperY !== undefined) {
+    // 20 mm PROUD of each end, not flush with it. Flush puts the bar's back
+    // face exactly on the end cap's plane, the two race for the same depth
+    // samples, and the nose grows a hatched grey band that reads as damage.
+    // 20 mm also keeps the whole bar inside the collider's own footprint
+    // tolerance, so no visible mass escapes the authority that owns it.
+    const halfLength = spec.halfWidth * 0.96;
+    const halfDepth = 0.075;
+    const proud = 0.02;
+    for (const z of [halfDepth - proud, spec.length - halfDepth + proud]) {
+      parts.chrome.push(translated(chamferedBar(halfLength, 0.11, halfDepth, 0.02), 0, dressing.bumperY, z));
+    }
+  }
+
+  if (dressing.grille) {
+    const { y, width, height, depth, barCount = 5 } = dressing.grille;
+    const grilleDepth = depth / 2;
+    // Every forged nose is capped at z=0. A positive front depth buries the
+    // grille behind opaque paint; keep its backing and bars just outside it.
+    const coachGrille = spec.id === 'nuketown2-coach';
+    const grilleFront = -0.012;
+    const grilleMouth = translated(
+      chamferedBar(width / 2, height / 2, grilleDepth, Math.min(0.03, height * 0.18, grilleDepth * 0.45)),
+      0, y, grilleDepth + grilleFront,
+    );
+    // Preserve the already-exposed chrome bars; their dark backing prevents
+    // the entire lower front becoming one specular white rectangle.
+    parts.lining.push(markPart(grilleMouth, coachGrille ? 'detail.coach.grille-mouth' : 'detail.grille-mouth', 0.012));
+    const count = Math.max(1, Math.floor(barCount));
+    for (let index = 0; index < count; index += 1) {
+      const x = count === 1 ? 0 : -width * 0.38 + (width * 0.76 * index) / (count - 1);
+      const bar = chamferedBar(height / 2, 0.018, grilleDepth * 0.92, 0.006);
+      bar.applyMatrix4(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
+      parts.chrome.push(translated(bar, x, y, grilleFront - 0.010 + grilleDepth * 0.92));
+    }
+  }
+
+  if (dressing.mirrors) {
+    for (const mirror of dressing.mirrors) {
+      for (const side of [1, -1] as const) {
+        const stem = chamferedBar(0.018, 0.14, 0.018, 0.006);
+        stem.applyMatrix4(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
+        parts.chrome.push(translated(stem, side * mirror.x, mirror.y - 0.14, mirror.z));
+        parts.chrome.push(translated(
+          chamferedBar(0.12, 0.075, 0.035, 0.012),
+          side * (mirror.x + 0.06), mirror.y, mirror.z,
+        ));
+      }
+    }
+  }
+
+  if (dressing.panelSeams) {
+    for (const seam of dressing.panelSeams) {
+      const seamGeometry = chamferedBar(
+        seam.height / 2,
+        (seam.width ?? 0.018) / 2,
+        (seam.depth ?? 0.014) / 2,
+        0.004,
+      );
+      seamGeometry.applyMatrix4(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
+      parts.groove.push(translated(seamGeometry, seam.x, seam.y, seam.z));
+    }
+  }
+
+  if (dressing.doorHandles) {
+    const { y, z } = dressing.doorHandles;
+    const flankX = flankHalfWidth(spec, y);
+    for (const handleZ of z) {
+      for (const side of [1, -1] as const) {
+        // The pull lies ALONG the door (z), standing 20 mm proud of the flank:
+        // extruded along x it would be a 14 cm spike out of the panel.
+        const pull = chamferedBar(0.07, 0.012, 0.012, 0.004);
+        pull.applyMatrix4(new THREE.Matrix4().makeRotationY(Math.PI / 2));
+        parts.chrome.push(translated(pull, side * (flankX + 0.008), y, handleZ));
+      }
+    }
+  }
+  // Full-cover and whitewall faces already carry a domed centre in their lathe
+  // profile; a dome on a dome is triangle moss, so hubcaps dress steel only.
+  if (dressing.hubcaps && dressing.wheelStyle === 'steel') {
+    const rim = spec.wheelRadius * 0.62;
+    const faceX = spec.tyreHalfWidth * 0.72 - 0.018;
+    for (const z of axles) {
+      for (const side of [1, -1] as const) {
+        const dome = hubcapDome(rim, faceX);
+        parts.chrome.push(translated(
+          side === 1 ? dome : mirroredToLeft(dome),
+          side * spec.trackHalfWidth,
+          spec.wheelRadius,
+          z,
+        ));
+      }
+    }
+  }
+  // The hub-nut hint for covered faces: a small hex centre on the dome they
+  // already carry. Steel faces read their hub from the cap and dome instead.
+  if (dressing.wheelNuts && dressing.wheelStyle !== 'steel') {
+    const faceX = spec.tyreHalfWidth * 0.72 + 0.012;
+    for (const z of axles) {
+      for (const side of [1, -1] as const) {
+        const nut = nonIndexed(new THREE.CylinderGeometry(0.02, 0.02, 0.014, 6));
+        nut.applyMatrix4(new THREE.Matrix4().makeRotationZ(-Math.PI / 2));
+        parts.chrome.push(translated(
+          side === 1 ? nut : mirroredToLeft(nut),
+          side * (spec.trackHalfWidth + faceX + 0.004),
+          spec.wheelRadius,
+          z,
+        ));
+      }
+    }
+  }
+  if (dressing.indicators) {
+    const { y, x } = dressing.indicators;
+    for (const side of [1, -1] as const) {
+      parts.headLamp.push(translated(chamferedBar(0.035, 0.03, 0.02, 0.006), side * x, y, 0.005));
+      parts.tailLamp.push(translated(chamferedBar(0.035, 0.03, 0.02, 0.006), side * x, y, spec.length - 0.005));
+    }
+  }
+  if (dressing.plates) {
+    const plateW = dressing.plates.width ?? 0.32;
+    const plateH = dressing.plates.height ?? 0.09;
+    // Existing plate cards are retained for audit parity. New lane detail uses
+    // explicit relief boxes below; this legacy surface is not reclassified.
+    const rear = nonIndexed(new THREE.PlaneGeometry(plateW, plateH));
+    parts.accent.push(translated(rear, 0, dressing.plates.y, spec.length + 0.004));
+    const front = nonIndexed(new THREE.PlaneGeometry(plateW, plateH));
+    front.applyMatrix4(new THREE.Matrix4().makeRotationY(Math.PI));
+    parts.accent.push(translated(front, 0, dressing.plates.y, -0.004));
+  }
+  if (dressing.pillars) {
+    const { z, y0, y1 } = dressing.pillars;
+    const midY = (y0 + y1) / 2;
+    const isCoachCabin = Boolean(dressing.detail?.coach);
+    const glassX = flankHalfWidth(spec, midY) + (isCoachCabin ? 0.008 : -0.005);
+    for (const pillarZ of z) {
+      for (const side of [1, -1] as const) {
+        if (isCoachCabin) {
+          // Coach-only: planar mullion keyed4mm into the flank,20mm proud,
+          // instead of half-buried behind the continuous transparent band.
+          const geometry = nonIndexed(new THREE.BoxGeometry(0.024, y1 - y0, 0.028));
+          if (side === -1) mirroredToLeft(geometry);
+          parts.groove.push(translated(geometry, side * glassX, midY, pillarZ));
+        } else {
+          parts.groove.push(translated(chamferedBar(0.012, (y1 - y0) / 2, 0.014, 0.004), side * glassX, midY, pillarZ));
+        }
+      }
+    }
+  }
+  if (dressing.vents) {
+    for (const z of dressing.vents.z) {
+      for (const side of [1, -1] as const) {
+        const ventY = crownSurfaceY(spec, z, dressing.vents.x) + 0.005;
+        parts.chrome.push(translated(chamferedBar(0.09, 0.025, 0.06, 0.008), side * dressing.vents.x, ventY, z));
+      }
+    }
+  }
+  if (dressing.stack) {
+    const { z, y0, y1 } = dressing.stack;
+    parts.chrome.push(translated(chamferedBar(0.035, (y1 - y0) / 2, 0.035, 0.008), 0, (y0 + y1) / 2, z));
+    parts.chrome.push(translated(chamferedBar(0.045, 0.03, 0.045, 0.008), 0, y1 + 0.02, z));
+  }
+  if (dressing.gutters) {
+    const { x, y } = dressing.gutters;
+    // The sedan's rolled greenhouse is narrower than the legacy fixed bars.
+    // Keep the two existing bars per side on the roof plateau and take their
+    // endpoints from the actual arc, preserving geometry/draw allocation.
+    const sedanRoof = spec.id === 'nuketown2-sedan';
+    const plateau = spec.top.filter(point => point.yTop >= 1.79);
+    const z0 = sedanRoof ? Math.max(dressing.gutters.z0, plateau[0]!.z) : dressing.gutters.z0;
+    const z1 = sedanRoof ? Math.min(dressing.gutters.z1, plateau.at(-1)!.z) : dressing.gutters.z1;
+    const midZ = (z0 + z1) / 2;
+    const half = (z1 - z0) / 4;
+    for (const side of [1, -1] as const) {
+      for (const gutterZ of [midZ - half, midZ + half]) {
+        if (sedanRoof) {
+          const endpoint = (z: number): THREE.Vector3 => {
+            const arc = stationRing(spec, z).points[10]!;
+            return new THREE.Vector3(arc[0] + 0.009, arc[1] + 0.009, z);
+          };
+          const a = endpoint(gutterZ - half + 0.01);
+          const b = endpoint(gutterZ + half - 0.01);
+          const direction = b.clone().sub(a);
+          const gutterHalfDepth = 0.012;
+          const bar = chamferedBar(direction.length() / 2, gutterHalfDepth, gutterHalfDepth, 0.004);
+          bar.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), direction.normalize()));
+          const centre = a.add(b).multiplyScalar(0.5);
+          const placed = translated(bar, centre.x, centre.y, centre.z);
+          // Record the actual24mm nominal cross-section depth for the detail
+          // audit; this metadata is distinct from distance off the curved roof.
+          parts.chrome.push(markPart(side === 1 ? placed : reflectedAcrossCentre(placed), 'detail.saloon.roof-gutter', gutterHalfDepth * 2));
+        } else {
+          const bar = chamferedBar(half - 0.01, 0.012, 0.012, 0.004);
+          bar.applyMatrix4(new THREE.Matrix4().makeRotationY(Math.PI / 2));
+          parts.chrome.push(translated(bar, side * x, y, gutterZ));
+        }
+      }
+    }
+  }
+  if (dressing.bootSeam) {
+    const { y, z, halfWidth } = dressing.bootSeam;
+    parts.groove.push(translated(chamferedBar(halfWidth, 0.009, 0.009, 0.003), 0, y, z));
+  }
+
+  const detail = dressing.detail;
+  if (detail?.coach) {
+    const coach = detail.coach;
+    const cap = loft.rings[0]!;
+    const paneEdges = spec.noseGlass ? cap.points.slice(1,12).filter(point => point[1]>=spec.noseGlass!.yMin && point[1]<=spec.noseGlass!.yMax) : [];
+    if (paneEdges.length>=2) {
+      // Frame follows the actual glazed cap taper; old fixed halfWidth0.62
+      // placed a small disconnected rectangle inside a much wider pane.
+      const lower=paneEdges[0]!,upper=paneEdges[paneEdges.length-1]!;
+      const dx=upper[0]-lower[0],dy=upper[1]-lower[1];
+      for(const side of [1,-1] as const) {
+        const bar=nonIndexed(new THREE.BoxGeometry(.055,Math.hypot(dx,dy),.012));
+        bar.rotateZ(-side*Math.atan2(dx,dy));
+        translated(bar,side*(lower[0]+upper[0])/2,(lower[1]+upper[1])/2,-.006);
+        parts.chrome.push(markPart(bar,'detail.coach.windscreen-surround',.012));
+      }
+      for(const edge of [lower,upper])reliefFrontBox(parts,'chrome','detail.coach.windscreen-surround',edge[0]*2+.055,edge[1],.055,.012);
+      const browHeight=cap.yTop-upper[1];
+      const boardHeight=Math.min(coach.destinationBoard.height,Math.max(.02,browHeight-.04));
+      reliefFrontBox(parts,'accent','detail.coach.destination-board',coach.destinationBoard.width,upper[1]+browHeight/2,boardHeight,.012);
+    } else {
+      const screenY = (coach.windscreen.y0 + coach.windscreen.y1) / 2;
+      const screenHeight = coach.windscreen.y1 - coach.windscreen.y0;
+      reliefFrontPair(parts, 'chrome', 'detail.coach.windscreen-surround', coach.windscreen.halfWidth, screenY, 0.055, screenHeight, 0.012);
+      reliefFrontBox(parts, 'chrome', 'detail.coach.windscreen-surround', coach.windscreen.halfWidth * 2 + 0.11, coach.windscreen.y1, 0.055, 0.012);
+      reliefFrontBox(parts, 'accent', 'detail.coach.destination-board', coach.destinationBoard.width, coach.destinationBoard.y, coach.destinationBoard.height, 0.012);
+    }
+    reliefFrontPair(parts, 'headLamp', 'detail.coach.fog-lamp', coach.fogLamps.x, coach.fogLamps.y, coach.fogLamps.width, coach.fogLamps.height, 0.012);
+    for (let index = 0; index < Math.max(1, Math.floor(coach.rearLouvers.count)); index += 1) {
+      const t = (index + 0.5) / Math.max(1, Math.floor(coach.rearLouvers.count));
+      reliefRearBox(
+        parts,
+        'chrome',
+        'detail.coach.engine-louvre',
+        coach.rearLouvers.halfWidth * 2,
+        coach.rearLouvers.y0 + (coach.rearLouvers.y1 - coach.rearLouvers.y0) * t,
+        0.045,
+        spec.length,
+        0.012,
+      );
+    }
+    // Retain the same two skirt pieces but stop before the two wheel arches.
+    // The old continuous spear crossed the tyre discs in front of the wheels.
+    const skirtArchClearance = spec.wheelRadius + spec.archGap + 0.13;
+    const skirtZ0 = Math.max(coach.skirt.z0, Math.min(...axles) + skirtArchClearance);
+    const skirtZ1 = Math.min(coach.skirt.z1, Math.max(...axles) - skirtArchClearance);
+    if (skirtZ1 <= skirtZ0) throw new Error('Coach skirt has no clear span between wheel arches');
+    const skirtZ = (skirtZ0 + skirtZ1) / 2;
+    reliefSidePair(
+      parts,
+      'accent',
+      'detail.coach.skirt-line',
+      flankHalfWidth(spec, coach.skirt.y),
+      coach.skirt.y,
+      skirtZ,
+      coach.skirt.height,
+      skirtZ1 - skirtZ0,
+      0.012,
+    );
+    const luggageY = (coach.luggageDoor.y0 + coach.luggageDoor.y1) / 2;
+    const luggageX = flankHalfWidth(spec, luggageY);
+    const luggageHeight = coach.luggageDoor.y1 - coach.luggageDoor.y0;
+    const luggageHalfWidth = coach.luggageDoor.width / 2;
+    for (const offset of [-luggageHalfWidth, luggageHalfWidth] as const) {
+      reliefSidePair(parts, 'groove', 'detail.coach.luggage-door-frame', luggageX, luggageY, coach.luggageDoor.z + offset, luggageHeight, 0.045, 0.012);
+    }
+    for (const y of [coach.luggageDoor.y0, coach.luggageDoor.y1] as const) {
+      reliefSidePair(parts, 'groove', 'detail.coach.luggage-door-frame', luggageX, y, coach.luggageDoor.z, 0.045, coach.luggageDoor.width, 0.012);
+    }
+    reliefRearBox(parts, 'accent', 'detail.coach.rear-number-plate-box', coach.rearPlate.width, coach.rearPlate.y, coach.rearPlate.height, spec.length, 0.008);
+    // Coach cabin occupancy: 3 mirrored rows seen through tinted side glass
+    // against the retained inward-only lining backdrop. Maroon accent reads
+    // behind tint; clear central aisle |x|<0.4; outer edge 0.9 stays inside
+    // sillHalfWidth 1.16 / dressed collider. Backs abut cushions, no plates.
+    const cabinRows = [2.6, 4.1, 5.9] as const;
+    for (const rowZ of cabinRows) {
+      for (const side of [1, -1] as const) {
+        const back = nonIndexed(new THREE.BoxGeometry(0.5, 0.78, 0.12));
+        if (side === -1) mirroredToLeft(back);
+        // Seat-back base overlaps the cushion top by 10 mm; no floating gap.
+        translated(back, side * 0.65, 1.56, rowZ + 0.3);
+        parts.accent.push(markPart(back, 'cabin.coach.seat-back'));
+        const cushion = nonIndexed(new THREE.BoxGeometry(0.5, 0.12, 0.48));
+        if (side === -1) mirroredToLeft(cushion);
+        translated(cushion, side * 0.65, 1.12, rowZ);
+        parts.accent.push(markPart(cushion, 'cabin.coach.seat-cushion'));
+      }
+    }
+  }
+
+  if (detail?.trailer) {
+    const trailer = detail.trailer;
+    const sideY = (trailer.side.y0 + trailer.side.y1) / 2;
+    const sideHeight = trailer.side.y1 - trailer.side.y0;
+    const step = Math.max(0.45, Math.min(0.6, trailer.side.step));
+    let battenIndex = 0;
+    for (let z = trailer.side.z0; z <= trailer.side.z1 + 1e-6; z += step) {
+      reliefSidePair(parts, 'accent', 'detail.trailer.corrugation-batten', spec.halfWidth, sideY, z, sideHeight, 0.028, 0.02);
+      battenIndex += 1;
+    }
+    // Keep the loop's count visible to the allocation audit without relying on
+    // a text-only assertion about a floating-point range.
+    if (battenIndex < 2) throw new Error('Trailer detail needs at least two corrugation battens');
+    reliefSidePair(parts, 'chrome', 'detail.trailer.lower-rub-rail', spec.halfWidth, trailer.rubRail.y, (trailer.side.z0 + trailer.side.z1) / 2, trailer.rubRail.height, trailer.side.z1 - trailer.side.z0, 0.012);
+
+    const rearDoor = trailer.rearDoor;
+    const doorHeight = rearDoor.y1 - rearDoor.y0;
+    const doorY = (rearDoor.y0 + rearDoor.y1) / 2;
+    // Horizontal bars own the corners. The old upright ends were fully
+    // buried inside those bars; shorten only that duplicate interior volume.
+    reliefRearPair(parts, 'chrome', 'detail.trailer.rear-door-frame', rearDoor.halfWidth - TRAILER_FRAME_RAIL_M / 2,
+      doorY, TRAILER_FRAME_RAIL_M, doorHeight - TRAILER_FRAME_RAIL_M, trailer.rearZ, TRAILER_FRAME_DEPTH_M);
+    for (const y of [rearDoor.y0, rearDoor.y1] as const) {
+      reliefRearBox(parts, 'chrome', 'detail.trailer.rear-door-frame', rearDoor.halfWidth * 2, y,
+        TRAILER_FRAME_RAIL_M, trailer.rearZ, TRAILER_FRAME_DEPTH_M);
+    }
+    for (const x of trailer.rearLocks.x) {
+      reliefRearPair(parts, 'chrome', 'detail.trailer.rear-lock-bar', Math.abs(x), doorY, 0.045, doorHeight * 0.86, trailer.rearZ + 0.004, 0.012);
+    }
+    for (const y of trailer.hinges.y) {
+      reliefRearPair(parts, 'chrome', 'detail.trailer.hinge-block', trailer.hinges.x[0] ?? 0.55, y, 0.11, 0.12, trailer.rearZ + 0.006, 0.012);
+    }
+    reliefSidePair(parts, 'lining', 'detail.trailer.mud-flap', spec.halfWidth - 0.08, (trailer.mudFlaps.y0 + trailer.mudFlaps.y1) / 2, trailer.mudFlaps.z, trailer.mudFlaps.y1 - trailer.mudFlaps.y0, 0.08, 0.008);
+    for (const z of trailer.sideMarkers.z) {
+      reliefSidePair(parts, 'headLamp', 'detail.trailer.amber-side-marker', spec.halfWidth, trailer.sideMarkers.y, z, 0.10, 0.12, 0.008);
+    }
+    reliefRearBox(parts, 'accent', 'detail.trailer.number-plate-box', 0.36, trailer.rearDoor.y0 + 0.08, 0.10, trailer.rearZ, 0.008);
+  }
+
+  if (detail?.saloon) {
+    const saloon = detail.saloon;
+    const doorY = (saloon.doorShutLines.y0 + saloon.doorShutLines.y1) / 2;
+    for (const z of saloon.doorShutLines.z) {
+      reliefSidePair(parts, 'groove', 'detail.saloon.door-shut-line', flankHalfWidth(spec, doorY), doorY, z, saloon.doorShutLines.y1 - saloon.doorShutLines.y0, 0.008, 0.004);
+    }
+    reliefSidePair(parts, 'chrome', 'detail.saloon.sill-strip', flankHalfWidth(spec, saloon.sill.y), saloon.sill.y, (saloon.sill.z0 + saloon.sill.z1) / 2, 0.06, saloon.sill.z1 - saloon.sill.z0, 0.008);
+  }
+
+  if (detail?.coach) {
+    // Existing shared buckets, coach-only hierarchy. Low sweep stays between
+    // the enlarged wheel arches; the narrow rub rail sits above both crowns.
+    const bands = [
+      { part: 'detail.coach.lower-sweep', y0: 0.60, y1: 0.74, bucket: 'accent' as const, z0: 2.35, z1: 6.75, proud: 0.01 },
+      { part: 'detail.coach.rub-rail', y0: 1.395, y1: 1.445, bucket: 'chrome' as const, z0: 1.0, z1: 8.1, proud: 0.014 },
+    ];
+    for (const band of bands) {
+      const surface = band.bucket === 'chrome'
+        ? stripAtHeight(loft.rings, (band.y0 + band.y1) / 2, band.z0, band.z1, band.y1 - band.y0, band.proud, true)
+        : surfaceBandAtHeights(spec, loft.rings, band.y0, band.y1, band.z0, band.z1, band.proud);
+      if (surface) parts[band.bucket].push(markPart(surface, band.part, band.proud));
+    }
+  }
+
+  if (dressing.surfaceBands) {
+    for (const band of dressing.surfaceBands) {
+      const surface = surfaceBandAtHeights(
+        spec, loft.rings, band.y0, band.y1, band.z0, band.z1, band.proud,
+      );
+      if (surface) parts[band.bucket].push(surface);
+    }
+  }
+
+  if (dressing.stripe) {
+    const strip = stripAtHeight(
+      loft.rings,
+      dressing.stripe.y,
+      dressing.stripe.z0,
+      dressing.stripe.z1,
+      dressing.stripe.height,
+      dressing.stripe.proud,
+      spec.id === 'nuketown2-coach' || nonCoachAllocation,
+    );
+    if (strip) parts[dressing.stripe.bucket].push(strip);
+  }
+  if (dressing.roofRails) {
+    const rails = dressing.roofRails;
+    for (const x of rails.x) {
+      const rail = roofRail(
+        spec,
+        loft.rings,
+        x,
+        rails.z0,
+        rails.z1,
+        rails.halfWidth ?? 0.03,
+        rails.height ?? 0.045,
+        spec.id === 'nuketown2-coach' || nonCoachAllocation,
+      );
+      if (rail) parts[rails.bucket].push(rail);
+    }
+  }
+
+  const group = new THREE.Group();
+  group.name = `vehicle-forge ${spec.id}`;
+  group.userData.presentationOnly = true;
+  let drawCalls = 0;
+  let triangles = 0;
+  for (const bucket of BUCKET_ORDER) {
+    const geometries = parts[bucket];
+    if (geometries.length === 0) continue;
+    const anchored = geometries.map((geometry) => stampVehicleAnchor(geometry));
+    const merged = anchored.length === 1 ? anchored[0]! : mergeGeometries(anchored, false);
+    if (!merged) continue;
+    const mesh = new THREE.Mesh(merged, materials[bucket]);
+    mesh.name = `vehicle-forge ${spec.id} ${bucket}`;
+    // ONLY THE BODY AND THE TYRES CAST. Every caster is one depth draw per
+    // shadow map per frame, and trim, lamps, wheel faces, shut-line floors,
+    // lining and glass all sit inside or on a silhouette the body already
+    // casts - so their depth passes buy a shadow nobody can distinguish.
+    mesh.castShadow = bucket === 'paint' || bucket === 'tyre';
+    mesh.receiveShadow = bucket !== 'groove';
+    mesh.userData.presentationOnly = true;
+    mesh.userData.forgeBucket = bucket;
+    if (bucket === 'glass') mesh.renderOrder = 3;
+    group.add(mesh);
+    drawCalls += 1;
+    triangles += (merged.getAttribute('position')?.count ?? 0) / 3;
+  }
+
+  return { group, drawCalls, triangles, stations: loft.rings.length, ...summarizeParts(parts) };
+}

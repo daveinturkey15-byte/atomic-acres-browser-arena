@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "generator": "generate-loading-poster",
+  "arenaId": "map3",
+  "camera": "map3-hub-vista",
+  "cameraCurated": true,
+  "sourceSha": "f848cb320c6a6218385f40a6ab722c66e2d12db2",
+  "capture": {
+    "label": "loading-poster-map3",
+    "viewport": "2560x1440",
+    "samples": 1,
+    "frameSha256": "c8ec146f8ca93d01de9fb7f67239dbfd6b2aa1f93253e49d0afb7947f7ecd105"
+  },
+  "output": {
+    "path": "public/assets/original/menu-previews/map3.webp",
+    "sha256": "b9f0a58f35743c47d716e29b3bb142ea8a8859ae47fdb23786858a69b957595d",
+    "bytes": 55918,
+    "width": 2560,
+    "height": 1440,
+    "quality": 88
+  },
+  "generatorScript": {
+    "path": "scripts/generate-loading-poster.mjs",
+    "sha256": "6b4d720e047767e8e52ffc984dcb7273941e5f84b23eeae76abfcadbb75f07f9"
+  },
+  "generatedAt": "2026-09-08T12:03:39.238Z"
+}

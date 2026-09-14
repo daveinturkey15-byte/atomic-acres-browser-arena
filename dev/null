@@ -1,0 +1,134 @@
+"use strict";
+export const ARENA_BOUNDS = Object.freeze({ minX: -32.55, maxX: 32.55, minZ: -31.5, maxZ: 31.5 });
+export const STREET_HALF_WIDTH = 5.25;
+export const CENTRAL_BUS = Object.freeze({
+  x: 0,
+  z: 0,
+  size: Object.freeze([13.23, 3.8, 5.88]),
+  /** Length of the authored bus body the collider wraps. */
+  assetLength: 13.02
+});
+export const PARKED_VAN_LAYOUT = Object.freeze([
+  Object.freeze({ id: "east-parked-van", x: 6.3, z: -4.1 }),
+  Object.freeze({ id: "west-parked-van", x: -6.3, z: 4.1 })
+]);
+export const FRONT_HEDGE_LAYOUT = Object.freeze([
+  // North-west long run: stops short of the aqua house's west corner.
+  Object.freeze({ x: -16.275, z: -9.77, length: 22.05 }),
+  // North-east short run: starts at the aqua house's east corner.
+  Object.freeze({ x: 19.95, z: -9.77, length: 14.7 }),
+  // South-west short run (180-degree twin of north-east).
+  Object.freeze({ x: -19.95, z: 9.77, length: 14.7 }),
+  // South-east long run (180-degree twin of north-west).
+  Object.freeze({ x: 16.275, z: 9.77, length: 22.05 })
+]);
+export const FRONT_HEDGE_SIZE = Object.freeze({ height: 2.05, depth: 1.47 });
+export const FRONT_HEDGE_FIN_LAYOUT = Object.freeze([
+  Object.freeze({ x: 11.55, z: -5.71 }),
+  Object.freeze({ x: -11.55, z: 5.71 })
+]);
+export const FRONT_HEDGE_FIN_SIZE = Object.freeze([1.47, 2.05, 8.12]);
+export const REAR_HEDGE_LAYOUT = Object.freeze([
+  Object.freeze({ x: -3.15, z: -30.65 }),
+  Object.freeze({ x: 3.15, z: 30.65 })
+]);
+export const REAR_HEDGE_SIZE = Object.freeze([48.3, 2.05, 1.68]);
+export const CORNER_HEDGE_LAYOUT = Object.freeze([
+  Object.freeze({ x: -22.575, z: -26.985 }),
+  Object.freeze({ x: 22.575, z: -26.985 }),
+  Object.freeze({ x: 22.575, z: 26.985 }),
+  Object.freeze({ x: -22.575, z: 26.985 })
+]);
+export const CORNER_HEDGE_SIZE = Object.freeze([5.25, 2.05, 5.46]);
+export const SIDE_HEDGE_LAYOUT = Object.freeze([
+  Object.freeze({ x: -29.925, z: -17.85 }),
+  Object.freeze({ x: -29.925, z: 17.85 }),
+  Object.freeze({ x: 29.925, z: 17.85 }),
+  Object.freeze({ x: 29.925, z: -17.85 })
+]);
+export const SIDE_HEDGE_SIZE = Object.freeze([5.88, 2.05, 1.68]);
+export const NEIGHBOURHOOD_BENCH_LAYOUT = Object.freeze([
+  [-17.85, -7.875, 0],
+  [17.85, 7.875, Math.PI],
+  [6.825, -7.875, 0],
+  [-6.825, 7.875, Math.PI]
+]);
+export const HOUSE_LAYOUT = Object.freeze([
+  // Aqua house on the north kerb, facing the street across the road.
+  Object.freeze({ team: 0, x: 4.2, z: -18.27, facing: 1 }),
+  // Coral house on the south kerb, mirrored across the road.
+  Object.freeze({ team: 1, x: -4.2, z: 18.27, facing: -1 })
+]);
+export const HOUSE_FRONT_Z = Math.abs(HOUSE_LAYOUT[0].z) - 8.2;
+export const GARAGE_LAYOUT = Object.freeze([
+  Object.freeze({ x: 17.9, z: -13.37 }),
+  Object.freeze({ x: -17.9, z: 13.37 })
+]);
+export const GARAGE_SIZE = Object.freeze([7.2, 3.3, 6.6]);
+export const YARD_FENCE_LAYOUT = Object.freeze([
+  [23.1, -18.9, 0.25, 14.7],
+  [-23.1, 18.9, 0.25, 14.7],
+  [-11.55, -21, 0.25, 12.6],
+  [11.55, 21, 0.25, 12.6]
+]);
+export const YARD_FENCE_HEIGHT = 1.05;
+export const COVER_LAYOUT = Object.freeze([
+  [-12.6, -6.825, 3.78, 2.1],
+  [12.6, 6.825, 3.78, 2.1],
+  [-21, -2.1, 2.52, 3.78],
+  [21, 2.1, 2.52, 3.78],
+  [-8.4, -23.1, 3.15, 2.31],
+  [8.4, 23.1, 3.15, 2.31],
+  [25.2, -13.65, 2.94, 4.62],
+  [-25.2, 13.65, 2.94, 4.62]
+]);
+export const SPAWN_LAYOUT = Object.freeze({
+  0: Object.freeze([
+    [-2.1, -28.35],
+    [3.15, -28.35],
+    [8.4, -28.35],
+    [13.65, -28.35],
+    [-12.6, -27.3],
+    [-17.85, -25.2],
+    [-22.05, -21],
+    [-25.2, -16.8],
+    [18.9, -26.25],
+    [26.25, -26.25],
+    [29.4, -13.65],
+    [28.35, -10.5]
+  ]),
+  1: Object.freeze([
+    [2.1, 28.35],
+    [-3.15, 28.35],
+    [-8.4, 28.35],
+    [-13.65, 28.35],
+    [12.6, 27.3],
+    [17.85, 25.2],
+    [22.05, 21],
+    [25.2, 16.8],
+    [-18.9, 26.25],
+    [-26.25, 26.25],
+    [-29.4, 13.65],
+    [-28.35, 10.5]
+  ])
+});
+export const PATROL_LAYOUT = Object.freeze([
+  [-15.75, -12.6],
+  [15.75, 12.6],
+  [-6.3, -6.3],
+  [6.3, 6.3],
+  [-19.95, -7.35],
+  [19.95, 7.35],
+  [-25.2, -21],
+  [25.2, 21]
+]);
+export const NEIGHBOURHOOD_BIN_POSITIONS = Object.freeze([
+  [-21, -8.82],
+  [21, 8.82],
+  [13.65, -6.825],
+  [-13.65, 6.825],
+  [-30.45, -22.05],
+  [30.45, 22.05]
+]);
+export const NEIGHBOURHOOD_BENCH_COLLIDER_SIZE = Object.freeze([2.5, 1.34, 0.72]);
+export const NEIGHBOURHOOD_BIN_COLLIDER_SIZE = Object.freeze([0.78, 1.08, 0.72]);

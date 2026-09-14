@@ -1,0 +1,2556 @@
+{
+ "version": 1,
+ "candidate": "C:\\Users\\david\\Desktop\\stuff\\aa-day-2026-09-06\\root-captures\\final-3",
+ "base": "C:\\Users\\david\\Desktop\\stuff\\aa-day-2026-09-06\\root-captures\\final-3",
+ "stations": {
+  "nuketown2-appliance-bank-north-close": {
+   "file": "nuketown2-appliance-bank-north-close.png",
+   "boxes": {
+    "topControl": {
+     "rect": [
+      0,
+      0,
+      1280,
+      70
+     ],
+     "kind": "control",
+     "protected": true,
+     "n": 89600,
+     "luma": {
+      "p10": 73,
+      "p50": 153.2,
+      "p90": 212.8
+     },
+     "meanRGB": [
+      178.8,
+      132,
+      111.4
+     ],
+     "hueDeg": 18.3,
+     "stddev": 63.7
+    },
+    "applianceRow": {
+     "rect": [
+      330,
+      220,
+      620,
+      220
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 136400,
+     "luma": {
+      "p10": 31.3,
+      "p50": 143.8,
+      "p90": 185.5
+     },
+     "meanRGB": [
+      142.9,
+      126.2,
+      92.7
+     ],
+     "hueDeg": 40,
+     "stddev": 60
+    },
+    "foreGround": {
+     "rect": [
+      150,
+      540,
+      980,
+      160
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 156800,
+     "luma": {
+      "p10": 0,
+      "p50": 90.6,
+      "p90": 126.6
+     },
+     "meanRGB": [
+      76.8,
+      74.5,
+      20.7
+     ],
+     "hueDeg": 57.6,
+     "stddev": 49.3
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-appliance-bank-south-close": {
+   "file": "nuketown2-appliance-bank-south-close.png",
+   "boxes": {
+    "topControl": {
+     "rect": [
+      0,
+      0,
+      1280,
+      70
+     ],
+     "kind": "control",
+     "protected": true,
+     "n": 89600,
+     "luma": {
+      "p10": 137,
+      "p50": 203,
+      "p90": 222
+     },
+     "meanRGB": [
+      195.7,
+      190.3,
+      181.4
+     ],
+     "hueDeg": 37.2,
+     "stddev": 38.5
+    },
+    "applianceRow": {
+     "rect": [
+      300,
+      230,
+      640,
+      220
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 140800,
+     "luma": {
+      "p10": 41.5,
+      "p50": 133.4,
+      "p90": 221
+     },
+     "meanRGB": [
+      138.1,
+      135.3,
+      95.2
+     ],
+     "hueDeg": 56.1,
+     "stddev": 60.3
+    },
+    "foreGround": {
+     "rect": [
+      150,
+      540,
+      980,
+      160
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 156800,
+     "luma": {
+      "p10": 39,
+      "p50": 89.4,
+      "p90": 167.2
+     },
+     "meanRGB": [
+      78.7,
+      84.5,
+      33.9
+     ],
+     "hueDeg": 67,
+     "stddev": 44.7
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-border-path-close": {
+   "file": "nuketown2-border-path-close.png",
+   "boxes": {
+    "topControl": {
+     "rect": [
+      0,
+      0,
+      1280,
+      70
+     ],
+     "kind": "control",
+     "protected": true,
+     "n": 89600,
+     "luma": {
+      "p10": 60.3,
+      "p50": 172.7,
+      "p90": 217.9
+     },
+     "meanRGB": [
+      168.4,
+      164,
+      135
+     ],
+     "hueDeg": 52.1,
+     "stddev": 59
+    },
+    "pathMid": {
+     "rect": [
+      420,
+      240,
+      440,
+      300
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 132000,
+     "luma": {
+      "p10": 132.4,
+      "p50": 153.5,
+      "p90": 177.5
+     },
+     "meanRGB": [
+      173.8,
+      151.2,
+      109.2
+     ],
+     "hueDeg": 39,
+     "stddev": 23.2
+    },
+    "vergeGround": {
+     "rect": [
+      150,
+      540,
+      980,
+      160
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 156800,
+     "luma": {
+      "p10": 138.8,
+      "p50": 147.7,
+      "p90": 170.6
+     },
+     "meanRGB": [
+      169.9,
+      148.4,
+      105.9
+     ],
+     "hueDeg": 39.8,
+     "stddev": 13.2
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-coach-elevation": {
+   "file": "nuketown2-coach-elevation.png",
+   "boxes": {
+    "skyTop": {
+     "rect": [
+      0,
+      0,
+      1280,
+      80
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 102400,
+     "luma": {
+      "p10": 198.7,
+      "p50": 207.2,
+      "p90": 218.9
+     },
+     "meanRGB": [
+      211.5,
+      206.6,
+      211.6
+     ],
+     "hueDeg": 298.1,
+     "stddev": 7.5
+    },
+    "wheels": {
+     "rect": [
+      150,
+      380,
+      750,
+      140
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 105000,
+     "luma": {
+      "p10": 0.4,
+      "p50": 68.2,
+      "p90": 217.3
+     },
+     "meanRGB": [
+      112.7,
+      101.8,
+      95.7
+     ],
+     "hueDeg": 21.5,
+     "stddev": 94.3
+    },
+    "roadLower": {
+     "rect": [
+      150,
+      530,
+      750,
+      170
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 127500,
+     "luma": {
+      "p10": 0,
+      "p50": 0,
+      "p90": 0.4
+     },
+     "meanRGB": [
+      11,
+      8.8,
+      7.6
+     ],
+     "hueDeg": 21,
+     "stddev": 31.5
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-driveway-apron-close": {
+   "file": "nuketown2-driveway-apron-close.png",
+   "boxes": {
+    "skyTop": {
+     "rect": [
+      0,
+      0,
+      1280,
+      70
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 89600,
+     "luma": {
+      "p10": 109.4,
+      "p50": 165,
+      "p90": 217
+     },
+     "meanRGB": [
+      184.4,
+      156.6,
+      127.2
+     ],
+     "hueDeg": 30.8,
+     "stddev": 49.4
+    },
+    "apronMid": {
+     "rect": [
+      300,
+      280,
+      680,
+      220
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 149600,
+     "luma": {
+      "p10": 43.6,
+      "p50": 72.9,
+      "p90": 154.7
+     },
+     "meanRGB": [
+      163,
+      70.3,
+      49.4
+     ],
+     "hueDeg": 11,
+     "stddev": 49.5
+    },
+    "foreApron": {
+     "rect": [
+      150,
+      540,
+      980,
+      160
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 156800,
+     "luma": {
+      "p10": 84.5,
+      "p50": 163.1,
+      "p90": 174.6
+     },
+     "meanRGB": [
+      170,
+      143.9,
+      99.9
+     ],
+     "hueDeg": 37.6,
+     "stddev": 34.1
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-front-porch": {
+   "file": "nuketown2-front-porch.png",
+   "boxes": {
+    "skyTop": {
+     "rect": [
+      900,
+      5,
+      360,
+      60
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 21600,
+     "luma": {
+      "p10": 0,
+      "p50": 135.7,
+      "p90": 203.4
+     },
+     "meanRGB": [
+      173.6,
+      127.2,
+      97.1
+     ],
+     "hueDeg": 23.6,
+     "stddev": 71.8
+    },
+    "porchSubject": {
+     "rect": [
+      400,
+      180,
+      480,
+      260
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 124800,
+     "luma": {
+      "p10": 120.1,
+      "p50": 168,
+      "p90": 221.2
+     },
+     "meanRGB": [
+      193.7,
+      161.7,
+      126.4
+     ],
+     "hueDeg": 31.5,
+     "stddev": 58
+    },
+    "stepGround": {
+     "rect": [
+      200,
+      540,
+      880,
+      160
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 140800,
+     "luma": {
+      "p10": 40.4,
+      "p50": 114.1,
+      "p90": 177.6
+     },
+     "meanRGB": [
+      123.7,
+      117.2,
+      68.4
+     ],
+     "hueDeg": 53,
+     "stddev": 57
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-garage": {
+   "file": "nuketown2-garage.png",
+   "boxes": {
+    "ceilingControl": {
+     "rect": [
+      0,
+      40,
+      1280,
+      60
+     ],
+     "kind": "control",
+     "protected": true,
+     "n": 76800,
+     "luma": {
+      "p10": 0,
+      "p50": 170.8,
+      "p90": 179.3
+     },
+     "meanRGB": [
+      148.5,
+      131,
+      107.3
+     ],
+     "hueDeg": 34.5,
+     "stddev": 71.1
+    },
+    "bayMid": {
+     "rect": [
+      340,
+      200,
+      600,
+      240
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 144000,
+     "luma": {
+      "p10": 52.6,
+      "p50": 145.4,
+      "p90": 185.9
+     },
+     "meanRGB": [
+      122.5,
+      124,
+      121.9
+     ],
+     "hueDeg": 103.6,
+     "stddev": 58.2
+    },
+    "floorBox": {
+     "rect": [
+      200,
+      540,
+      880,
+      160
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 140800,
+     "luma": {
+      "p10": 23.9,
+      "p50": 29.2,
+      "p90": 58.9
+     },
+     "meanRGB": [
+      6.9,
+      41.1,
+      46.3
+     ],
+     "hueDeg": 188,
+     "stddev": 17.2
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-garden-pod-north-close": {
+   "file": "nuketown2-garden-pod-north-close.png",
+   "boxes": {
+    "topControl": {
+     "rect": [
+      0,
+      0,
+      1280,
+      70
+     ],
+     "kind": "control",
+     "protected": true,
+     "n": 89600,
+     "luma": {
+      "p10": 122.9,
+      "p50": 211.1,
+      "p90": 218
+     },
+     "meanRGB": [
+      198.2,
+      199.8,
+      188
+     ],
+     "hueDeg": 67.9,
+     "stddev": 35
+    },
+    "podMid": {
+     "rect": [
+      360,
+      200,
+      560,
+      240
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 134400,
+     "luma": {
+      "p10": 53.5,
+      "p50": 61.6,
+      "p90": 136.3
+     },
+     "meanRGB": [
+      122,
+      78.1,
+      12.8
+     ],
+     "hueDeg": 35.9,
+     "stddev": 37.8
+    },
+    "bedGround": {
+     "rect": [
+      200,
+      540,
+      880,
+      160
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 140800,
+     "luma": {
+      "p10": 91.4,
+      "p50": 97.8,
+      "p90": 111.5
+     },
+     "meanRGB": [
+      69.3,
+      121.8,
+      4.4
+     ],
+     "hueDeg": 86.8,
+     "stddev": 19.7
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-glasshouse-north-close": {
+   "file": "nuketown2-glasshouse-north-close.png",
+   "boxes": {
+    "topControl": {
+     "rect": [
+      0,
+      0,
+      1280,
+      70
+     ],
+     "kind": "control",
+     "protected": true,
+     "n": 89600,
+     "luma": {
+      "p10": 197.4,
+      "p50": 205.6,
+      "p90": 210.9
+     },
+     "meanRGB": [
+      199.6,
+      198.2,
+      198.1
+     ],
+     "hueDeg": 1.6,
+     "stddev": 28.7
+    },
+    "glassMid": {
+     "rect": [
+      340,
+      180,
+      600,
+      260
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 156000,
+     "luma": {
+      "p10": 49.3,
+      "p50": 62.9,
+      "p90": 122
+     },
+     "meanRGB": [
+      109.8,
+      73.5,
+      16.4
+     ],
+     "hueDeg": 36.7,
+     "stddev": 42.3
+    },
+    "glassPane": {
+     "rect": [
+      500,
+      220,
+      200,
+      120
+     ],
+     "kind": "glazing",
+     "protected": true,
+     "n": 24000,
+     "luma": {
+      "p10": 54,
+      "p50": 63.4,
+      "p90": 124.2
+     },
+     "meanRGB": [
+      106.7,
+      67.9,
+      5.6
+     ],
+     "hueDeg": 37,
+     "stddev": 32.6
+    },
+    "baseBed": {
+     "rect": [
+      200,
+      540,
+      880,
+      160
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 140800,
+     "luma": {
+      "p10": 42.3,
+      "p50": 95.6,
+      "p90": 104.3
+     },
+     "meanRGB": [
+      67,
+      108.8,
+      12.8
+     ],
+     "hueDeg": 86.1,
+     "stddev": 37.2
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-into-sun-street": {
+   "file": "nuketown2-into-sun-street.png",
+   "boxes": {
+    "sky": {
+     "rect": [
+      0,
+      0,
+      1280,
+      180
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 230400,
+     "luma": {
+      "p10": 68.3,
+      "p50": 216.4,
+      "p90": 226.7
+     },
+     "meanRGB": [
+      199.7,
+      175,
+      165.5
+     ],
+     "hueDeg": 16.7,
+     "stddev": 69.1
+    },
+    "road": {
+     "rect": [
+      300,
+      300,
+      600,
+      420
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 252000,
+     "luma": {
+      "p10": 0.2,
+      "p50": 94,
+      "p90": 181.3
+     },
+     "meanRGB": [
+      107.7,
+      90.5,
+      76.5
+     ],
+     "hueDeg": 26.9,
+     "stddev": 73.3
+    },
+    "vergeLeft": {
+     "rect": [
+      0,
+      400,
+      280,
+      300
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 84000,
+     "luma": {
+      "p10": 0.4,
+      "p50": 66.1,
+      "p90": 188.1
+     },
+     "meanRGB": [
+      96.2,
+      84.9,
+      76.1
+     ],
+     "hueDeg": 26.1,
+     "stddev": 74.4
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-north-balcony": {
+   "file": "nuketown2-north-balcony.png",
+   "boxes": {
+    "skyTop": {
+     "rect": [
+      700,
+      5,
+      560,
+      60
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 33600,
+     "luma": {
+      "p10": 196.3,
+      "p50": 214.9,
+      "p90": 219.9
+     },
+     "meanRGB": [
+      213.8,
+      209.4,
+      211.8
+     ],
+     "hueDeg": 327.3,
+     "stddev": 9.3
+    },
+    "midStreet": {
+     "rect": [
+      340,
+      220,
+      600,
+      220
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 132000,
+     "luma": {
+      "p10": 0,
+      "p50": 128.1,
+      "p90": 225
+     },
+     "meanRGB": [
+      158.2,
+      121.5,
+      96.3
+     ],
+     "hueDeg": 24.5,
+     "stddev": 78.5
+    },
+    "foreGround": {
+     "rect": [
+      100,
+      540,
+      1080,
+      160
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 172800,
+     "luma": {
+      "p10": 42.2,
+      "p50": 120.4,
+      "p90": 152.4
+     },
+     "meanRGB": [
+      108.8,
+      110.1,
+      64
+     ],
+     "hueDeg": 61.8,
+     "stddev": 40
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-north-interior": {
+   "file": "nuketown2-north-interior.png",
+   "boxes": {
+    "ceilingControl": {
+     "rect": [
+      0,
+      0,
+      1280,
+      80
+     ],
+     "kind": "control",
+     "protected": true,
+     "n": 102400,
+     "luma": {
+      "p10": 148.9,
+      "p50": 156.8,
+      "p90": 160
+     },
+     "meanRGB": [
+      178.3,
+      154.7,
+      97.2
+     ],
+     "hueDeg": 42.5,
+     "stddev": 4.2
+    },
+    "interiorWall": {
+     "rect": [
+      400,
+      200,
+      480,
+      200
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 96000,
+     "luma": {
+      "p10": 172.7,
+      "p50": 173.7,
+      "p90": 183.4
+     },
+     "meanRGB": [
+      194.4,
+      172.7,
+      141.6
+     ],
+     "hueDeg": 35.3,
+     "stddev": 9.5
+    },
+    "floorBox": {
+     "rect": [
+      200,
+      520,
+      880,
+      180
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 158400,
+     "luma": {
+      "p10": 65.8,
+      "p50": 111.1,
+      "p90": 173.7
+     },
+     "meanRGB": [
+      161.7,
+      114,
+      72.9
+     ],
+     "hueDeg": 27.8,
+     "stddev": 52.4
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-north-upper-window": {
+   "file": "nuketown2-north-upper-window.png",
+   "boxes": {
+    "skyLeft": {
+     "rect": [
+      0,
+      0,
+      640,
+      100
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 64000,
+     "luma": {
+      "p10": 163,
+      "p50": 183.9,
+      "p90": 204.4
+     },
+     "meanRGB": [
+      182.2,
+      176.3,
+      177.6
+     ],
+     "hueDeg": 346.7,
+     "stddev": 32.9
+    },
+    "treeline": {
+     "rect": [
+      820,
+      120,
+      460,
+      70
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 32200,
+     "luma": {
+      "p10": 61.6,
+      "p50": 68.5,
+      "p90": 70.8
+     },
+     "meanRGB": [
+      169.3,
+      53.7,
+      11
+     ],
+     "hueDeg": 16.2,
+     "stddev": 30.5
+    },
+    "ridge": {
+     "rect": [
+      820,
+      110,
+      460,
+      100
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 46000,
+     "luma": {
+      "p10": 60.1,
+      "p50": 68.5,
+      "p90": 71.1
+     },
+     "meanRGB": [
+      169.1,
+      53.5,
+      10.9
+     ],
+     "hueDeg": 16.2,
+     "stddev": 30.6
+    },
+    "groundBottom": {
+     "rect": [
+      100,
+      560,
+      1080,
+      140
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 151200,
+     "luma": {
+      "p10": 160.4,
+      "p50": 165.7,
+      "p90": 168.8
+     },
+     "meanRGB": [
+      185.1,
+      161.9,
+      140.9
+     ],
+     "hueDeg": 28.5,
+     "stddev": 3.6
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-north-yard": {
+   "file": "nuketown2-north-yard.png",
+   "boxes": {
+    "roofTopSlab": {
+     "rect": [
+      480,
+      34,
+      200,
+      46
+     ],
+     "kind": "roof",
+     "protected": false,
+     "n": 9200,
+     "luma": {
+      "p10": 0,
+      "p50": 0,
+      "p90": 0
+     },
+     "meanRGB": [
+      0,
+      0,
+      0
+     ],
+     "hueDeg": 0,
+     "stddev": 0
+    },
+    "roofSoffit": {
+     "rect": [
+      300,
+      150,
+      80,
+      24
+     ],
+     "kind": "roof",
+     "protected": false,
+     "n": 1920,
+     "luma": {
+      "p10": 0,
+      "p50": 0,
+      "p90": 224.9
+     },
+     "meanRGB": [
+      109.1,
+      105.1,
+      103.9
+     ],
+     "hueDeg": 13.1,
+     "stddev": 110.8
+    },
+    "roofLeftMass": {
+     "rect": [
+      20,
+      200,
+      60,
+      300
+     ],
+     "kind": "roof",
+     "protected": false,
+     "n": 18000,
+     "luma": {
+      "p10": 0,
+      "p50": 0,
+      "p90": 0
+     },
+     "meanRGB": [
+      0.2,
+      0.2,
+      0.4
+     ],
+     "hueDeg": 256.3,
+     "stddev": 2.7
+    },
+    "sidingControl": {
+     "rect": [
+      342,
+      192,
+      158,
+      58
+     ],
+     "kind": "siding",
+     "protected": true,
+     "n": 9164,
+     "luma": {
+      "p10": 61.7,
+      "p50": 70.4,
+      "p90": 71.3
+     },
+     "meanRGB": [
+      169.8,
+      45.7,
+      0.1
+     ],
+     "hueDeg": 16.1,
+     "stddev": 6
+    },
+    "creamControl": {
+     "rect": [
+      362,
+      326,
+      118,
+      44
+     ],
+     "kind": "cream",
+     "protected": true,
+     "n": 5192,
+     "luma": {
+      "p10": 126.4,
+      "p50": 182.9,
+      "p90": 184.2
+     },
+     "meanRGB": [
+      181.1,
+      159.6,
+      136.2
+     ],
+     "hueDeg": 31.3,
+     "stddev": 35.5
+    },
+    "farRoofBand": {
+     "rect": [
+      922,
+      310,
+      236,
+      22
+     ],
+     "kind": "roof",
+     "protected": false,
+     "n": 5192,
+     "luma": {
+      "p10": 0,
+      "p50": 0,
+      "p90": 153.8
+     },
+     "meanRGB": [
+      44.6,
+      52.7,
+      24.9
+     ],
+     "hueDeg": 77.4,
+     "stddev": 63.3
+    },
+    "skyTopRight": {
+     "rect": [
+      980,
+      10,
+      280,
+      90
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 25200,
+     "luma": {
+      "p10": 206.6,
+      "p50": 213.6,
+      "p90": 220.7
+     },
+     "meanRGB": [
+      216.5,
+      212.8,
+      211.8
+     ],
+     "hueDeg": 13.1,
+     "stddev": 5.1
+    },
+    "grassNear": {
+     "rect": [
+      420,
+      430,
+      220,
+      110
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 24200,
+     "luma": {
+      "p10": 36.7,
+      "p50": 41.1,
+      "p90": 180.2
+     },
+     "meanRGB": [
+      75,
+      91.5,
+      50.9
+     ],
+     "hueDeg": 84.4,
+     "stddev": 61.7
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-nuke-north-balcony": {
+   "file": "nuketown2-nuke-north-balcony.png",
+   "boxes": {
+    "skyTop": {
+     "rect": [
+      0,
+      0,
+      1280,
+      90
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 115200,
+     "luma": {
+      "p10": 60.6,
+      "p50": 206.6,
+      "p90": 214.3
+     },
+     "meanRGB": [
+      185.1,
+      150.7,
+      139.4
+     ],
+     "hueDeg": 14.8,
+     "stddev": 74.7
+    },
+    "viewMid": {
+     "rect": [
+      340,
+      200,
+      600,
+      220
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 132000,
+     "luma": {
+      "p10": 65.6,
+      "p50": 173.8,
+      "p90": 222.9
+     },
+     "meanRGB": [
+      176.5,
+      144.1,
+      127.4
+     ],
+     "hueDeg": 20.4,
+     "stddev": 71.2
+    },
+    "railFore": {
+     "rect": [
+      100,
+      540,
+      1080,
+      160
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 172800,
+     "luma": {
+      "p10": 0,
+      "p50": 80.9,
+      "p90": 127.3
+     },
+     "meanRGB": [
+      81.5,
+      64.6,
+      43.9
+     ],
+     "hueDeg": 33.1,
+     "stddev": 52.8
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-nuke-south-balcony": {
+   "file": "nuketown2-nuke-south-balcony.png",
+   "boxes": {
+    "skyTop": {
+     "rect": [
+      0,
+      0,
+      1280,
+      90
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 115200,
+     "luma": {
+      "p10": 202.5,
+      "p50": 208.7,
+      "p90": 214.9
+     },
+     "meanRGB": [
+      211.6,
+      207.3,
+      209.2
+     ],
+     "hueDeg": 332.8,
+     "stddev": 5.1
+    },
+    "viewMid": {
+     "rect": [
+      340,
+      200,
+      600,
+      220
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 132000,
+     "luma": {
+      "p10": 23.6,
+      "p50": 84.4,
+      "p90": 219.6
+     },
+     "meanRGB": [
+      107.8,
+      121.8,
+      84.6
+     ],
+     "hueDeg": 82.6,
+     "stddev": 77.8
+    },
+    "railFore": {
+     "rect": [
+      100,
+      540,
+      1080,
+      160
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 172800,
+     "luma": {
+      "p10": 19.6,
+      "p50": 90.8,
+      "p90": 164.4
+     },
+     "meanRGB": [
+      72.4,
+      94.3,
+      28
+     ],
+     "hueDeg": 79.8,
+     "stddev": 50.4
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-nuke-street": {
+   "file": "nuketown2-nuke-street.png",
+   "boxes": {
+    "skyTop": {
+     "rect": [
+      0,
+      0,
+      1280,
+      90
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 115200,
+     "luma": {
+      "p10": 202.7,
+      "p50": 208.8,
+      "p90": 215.1
+     },
+     "meanRGB": [
+      211.8,
+      207.6,
+      209.4
+     ],
+     "hueDeg": 333.4,
+     "stddev": 5.1
+    },
+    "midGround": {
+     "rect": [
+      520,
+      180,
+      240,
+      180
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 43200,
+     "luma": {
+      "p10": 160.6,
+      "p50": 192.7,
+      "p90": 224.6
+     },
+     "meanRGB": [
+      200.7,
+      196.5,
+      191.3
+     ],
+     "hueDeg": 32.9,
+     "stddev": 23.1
+    },
+    "streetRoad": {
+     "rect": [
+      200,
+      480,
+      880,
+      220
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 193600,
+     "luma": {
+      "p10": 3.6,
+      "p50": 57,
+      "p90": 184
+     },
+     "meanRGB": [
+      92.4,
+      82.5,
+      63
+     ],
+     "hueDeg": 39.7,
+     "stddev": 66
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-overhead": {
+   "file": "nuketown2-overhead.png",
+   "boxes": {
+    "mountains": {
+     "rect": [
+      0,
+      0,
+      400,
+      150
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 60000,
+     "luma": {
+      "p10": 79.5,
+      "p50": 86.5,
+      "p90": 95.2
+     },
+     "meanRGB": [
+      79.7,
+      89.3,
+      115.7
+     ],
+     "hueDeg": 224.1,
+     "stddev": 17.1
+    },
+    "lawnBox": {
+     "rect": [
+      420,
+      360,
+      180,
+      60
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 10800,
+     "luma": {
+      "p10": 48.9,
+      "p50": 187.2,
+      "p90": 217.8
+     },
+     "meanRGB": [
+      163.1,
+      151.8,
+      125.6
+     ],
+     "hueDeg": 42,
+     "stddev": 67
+    },
+    "roadBox": {
+     "rect": [
+      400,
+      170,
+      70,
+      130
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 9100,
+     "luma": {
+      "p10": 136.1,
+      "p50": 157.1,
+      "p90": 215
+     },
+     "meanRGB": [
+      173.9,
+      171.5,
+      139.1
+     ],
+     "hueDeg": 55.9,
+     "stddev": 37.8
+    },
+    "northHouseRoof": {
+     "rect": [
+      536,
+      296,
+      46,
+      26
+     ],
+     "kind": "roof",
+     "protected": false,
+     "n": 1196,
+     "luma": {
+      "p10": 22.3,
+      "p50": 75.6,
+      "p90": 191.6
+     },
+     "meanRGB": [
+      99.4,
+      95.2,
+      91.7
+     ],
+     "hueDeg": 27.4,
+     "stddev": 75.2
+    },
+    "garageRoofLeft": {
+     "rect": [
+      400,
+      442,
+      52,
+      52
+     ],
+     "kind": "roof",
+     "protected": false,
+     "n": 2704,
+     "luma": {
+      "p10": 5.1,
+      "p50": 6.4,
+      "p90": 7.4
+     },
+     "meanRGB": [
+      5.7,
+      5.8,
+      10.6
+     ],
+     "hueDeg": 238.3,
+     "stddev": 0.9
+    },
+    "southHouseRoof": {
+     "rect": [
+      700,
+      500,
+      100,
+      80
+     ],
+     "kind": "roof",
+     "protected": false,
+     "n": 8000,
+     "luma": {
+      "p10": 17.1,
+      "p50": 20.3,
+      "p90": 24.1
+     },
+     "meanRGB": [
+      25.7,
+      19.7,
+      18
+     ],
+     "hueDeg": 13,
+     "stddev": 3.5
+    },
+    "glazingRoofPale": {
+     "rect": [
+      596,
+      246,
+      78,
+      34
+     ],
+     "kind": "glazing",
+     "protected": true,
+     "n": 2652,
+     "luma": {
+      "p10": 18.6,
+      "p50": 164.4,
+      "p90": 204.2
+     },
+     "meanRGB": [
+      138.8,
+      139.6,
+      135.2
+     ],
+     "hueDeg": 70.6,
+     "stddev": 73.3
+    },
+    "groundControl": {
+     "rect": [
+      300,
+      300,
+      60,
+      40
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 2400,
+     "luma": {
+      "p10": 168.3,
+      "p50": 213.7,
+      "p90": 213.9
+     },
+     "meanRGB": [
+      212.1,
+      203.2,
+      160.5
+     ],
+     "hueDeg": 49.6,
+     "stddev": 22.9
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-perimeter-wall-end-close": {
+   "file": "nuketown2-perimeter-wall-end-close.png",
+   "boxes": {
+    "topControl": {
+     "rect": [
+      970,
+      10,
+      290,
+      110
+     ],
+     "kind": "control",
+     "protected": true,
+     "n": 31900,
+     "luma": {
+      "p10": 0,
+      "p50": 1.5,
+      "p90": 215.5
+     },
+     "meanRGB": [
+      93.5,
+      90.8,
+      90.8
+     ],
+     "hueDeg": 1.2,
+     "stddev": 102.2
+    },
+    "wallEnd": {
+     "rect": [
+      960,
+      180,
+      300,
+      300
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 90000,
+     "luma": {
+      "p10": 0,
+      "p50": 0,
+      "p90": 97.1
+     },
+     "meanRGB": [
+      23,
+      27.4,
+      12.1
+     ],
+     "hueDeg": 77.2,
+     "stddev": 41.5
+    },
+    "baseGround": {
+     "rect": [
+      640,
+      500,
+      400,
+      200
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 80000,
+     "luma": {
+      "p10": 33.6,
+      "p50": 38.6,
+      "p90": 98.1
+     },
+     "meanRGB": [
+      18.4,
+      69.1,
+      0
+     ],
+     "hueDeg": 104,
+     "stddev": 29.4
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-perimeter-wall-long-close": {
+   "file": "nuketown2-perimeter-wall-long-close.png",
+   "boxes": {
+    "topControl": {
+     "rect": [
+      0,
+      0,
+      1280,
+      70
+     ],
+     "kind": "control",
+     "protected": true,
+     "n": 89600,
+     "luma": {
+      "p10": 57.6,
+      "p50": 199.2,
+      "p90": 220.6
+     },
+     "meanRGB": [
+      185.3,
+      133.3,
+      112.8
+     ],
+     "hueDeg": 17,
+     "stddev": 75.8
+    },
+    "wallMid": {
+     "rect": [
+      140,
+      200,
+      1000,
+      220
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 220000,
+     "luma": {
+      "p10": 17.9,
+      "p50": 72.1,
+      "p90": 159.1
+     },
+     "meanRGB": [
+      134.4,
+      67.4,
+      23.9
+     ],
+     "hueDeg": 23.6,
+     "stddev": 46.4
+    },
+    "baseGround": {
+     "rect": [
+      140,
+      540,
+      1000,
+      160
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 160000,
+     "luma": {
+      "p10": 57.7,
+      "p50": 152.1,
+      "p90": 159.2
+     },
+     "meanRGB": [
+      164.1,
+      114.9,
+      70.9
+     ],
+     "hueDeg": 28.3,
+     "stddev": 42.7
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-sand-pit-north-close": {
+   "file": "nuketown2-sand-pit-north-close.png",
+   "boxes": {
+    "skyTop": {
+     "rect": [
+      0,
+      0,
+      1280,
+      80
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 102400,
+     "luma": {
+      "p10": 65.3,
+      "p50": 207.4,
+      "p90": 213.5
+     },
+     "meanRGB": [
+      175,
+      177.9,
+      165.8
+     ],
+     "hueDeg": 74.6,
+     "stddev": 63.9
+    },
+    "pitMid": {
+     "rect": [
+      380,
+      280,
+      520,
+      200
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 104000,
+     "luma": {
+      "p10": 92.5,
+      "p50": 101.9,
+      "p90": 220.5
+     },
+     "meanRGB": [
+      99.5,
+      137.1,
+      36.9
+     ],
+     "hueDeg": 82.5,
+     "stddev": 44.2
+    },
+    "surroundGround": {
+     "rect": [
+      150,
+      520,
+      980,
+      180
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 176400,
+     "luma": {
+      "p10": 76.4,
+      "p50": 94,
+      "p90": 100.9
+     },
+     "meanRGB": [
+      74.9,
+      106.4,
+      4.4
+     ],
+     "hueDeg": 78.5,
+     "stddev": 12.4
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-south-interior": {
+   "file": "nuketown2-south-interior.png",
+   "boxes": {
+    "ceilingControl": {
+     "rect": [
+      0,
+      0,
+      1280,
+      80
+     ],
+     "kind": "control",
+     "protected": true,
+     "n": 102400,
+     "luma": {
+      "p10": 148.9,
+      "p50": 156.8,
+      "p90": 160.1
+     },
+     "meanRGB": [
+      178.3,
+      154.7,
+      97.2
+     ],
+     "hueDeg": 42.5,
+     "stddev": 4.2
+    },
+    "roomMid": {
+     "rect": [
+      360,
+      200,
+      560,
+      220
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 123200,
+     "luma": {
+      "p10": 163,
+      "p50": 164.1,
+      "p90": 177.5
+     },
+     "meanRGB": [
+      186.8,
+      163.3,
+      129
+     ],
+     "hueDeg": 35.6,
+     "stddev": 12.4
+    },
+    "floorBox": {
+     "rect": [
+      200,
+      520,
+      880,
+      180
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 158400,
+     "luma": {
+      "p10": 66,
+      "p50": 107.6,
+      "p90": 164.9
+     },
+     "meanRGB": [
+      159.3,
+      110.9,
+      68.9
+     ],
+     "hueDeg": 27.8,
+     "stddev": 48.5
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-south-upper-window": {
+   "file": "nuketown2-south-upper-window.png",
+   "boxes": {
+    "skyRight": {
+     "rect": [
+      640,
+      0,
+      640,
+      100
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 64000,
+     "luma": {
+      "p10": 155.9,
+      "p50": 172.2,
+      "p90": 195.1
+     },
+     "meanRGB": [
+      186.6,
+      171.6,
+      153.4
+     ],
+     "hueDeg": 32.9,
+     "stddev": 15.7
+    },
+    "treeline": {
+     "rect": [
+      0,
+      120,
+      460,
+      70
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 32200,
+     "luma": {
+      "p10": 169.2,
+      "p50": 187.2,
+      "p90": 193.1
+     },
+     "meanRGB": [
+      192.5,
+      181,
+      176.3
+     ],
+     "hueDeg": 17.2,
+     "stddev": 10.2
+    },
+    "ridge": {
+     "rect": [
+      0,
+      110,
+      460,
+      100
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 46000,
+     "luma": {
+      "p10": 169.2,
+      "p50": 184.6,
+      "p90": 192.9
+     },
+     "meanRGB": [
+      191.9,
+      179.7,
+      175.5
+     ],
+     "hueDeg": 15.5,
+     "stddev": 10.2
+    },
+    "groundBottom": {
+     "rect": [
+      100,
+      560,
+      1080,
+      140
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 151200,
+     "luma": {
+      "p10": 158.4,
+      "p50": 164.6,
+      "p90": 167.5
+     },
+     "meanRGB": [
+      183.8,
+      160.3,
+      139
+     ],
+     "hueDeg": 28.5,
+     "stddev": 3.6
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-south-yard": {
+   "file": "nuketown2-south-yard.png",
+   "boxes": {
+    "skyTop": {
+     "rect": [
+      900,
+      10,
+      300,
+      100
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 30000,
+     "luma": {
+      "p10": 205.3,
+      "p50": 212.4,
+      "p90": 218.9
+     },
+     "meanRGB": [
+      215.5,
+      211,
+      213.5
+     ],
+     "hueDeg": 326.7,
+     "stddev": 5
+    },
+    "houseMid": {
+     "rect": [
+      440,
+      180,
+      400,
+      240
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 96000,
+     "luma": {
+      "p10": 112.6,
+      "p50": 209.9,
+      "p90": 221
+     },
+     "meanRGB": [
+      197.6,
+      182.8,
+      154.3
+     ],
+     "hueDeg": 39.5,
+     "stddev": 53
+    },
+    "lawnSouth": {
+     "rect": [
+      380,
+      430,
+      240,
+      110
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 26400,
+     "luma": {
+      "p10": 62.7,
+      "p50": 103.1,
+      "p90": 220.5
+     },
+     "meanRGB": [
+      127.3,
+      132.5,
+      57.6
+     ],
+     "hueDeg": 64.2,
+     "stddev": 56.4
+    },
+    "wallControl": {
+     "rect": [
+      500,
+      260,
+      160,
+      60
+     ],
+     "kind": "control",
+     "protected": false,
+     "n": 9600,
+     "luma": {
+      "p10": 0,
+      "p50": 156.2,
+      "p90": 217.2
+     },
+     "meanRGB": [
+      163.6,
+      122.8,
+      86.6
+     ],
+     "hueDeg": 28.2,
+     "stddev": 78.5
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-street-centre": {
+   "file": "nuketown2-street-centre.png",
+   "boxes": {
+    "skyRight": {
+     "rect": [
+      700,
+      5,
+      300,
+      45
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 13500,
+     "luma": {
+      "p10": 214.9,
+      "p50": 219.9,
+      "p90": 223.5
+     },
+     "meanRGB": [
+      222.2,
+      218.8,
+      218.5
+     ],
+     "hueDeg": 4.5,
+     "stddev": 3.2
+    },
+    "lampHead": {
+     "rect": [
+      440,
+      35,
+      55,
+      60
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 3300,
+     "luma": {
+      "p10": 221.8,
+      "p50": 222.8,
+      "p90": 223.1
+     },
+     "meanRGB": [
+      225.8,
+      221.6,
+      221.3
+     ],
+     "hueDeg": 4.4,
+     "stddev": 0.6
+    },
+    "roadCentre": {
+     "rect": [
+      0,
+      380,
+      780,
+      340
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 265200,
+     "luma": {
+      "p10": 0.2,
+      "p50": 73.2,
+      "p90": 187.3
+     },
+     "meanRGB": [
+      96.2,
+      84.1,
+      73.1
+     ],
+     "hueDeg": 28.6,
+     "stddev": 82.2
+    },
+    "hedgeKerb": {
+     "rect": [
+      520,
+      380,
+      160,
+      340
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 54400,
+     "luma": {
+      "p10": 0,
+      "p50": 0.6,
+      "p90": 182
+     },
+     "meanRGB": [
+      77.9,
+      67.3,
+      57.8
+     ],
+     "hueDeg": 28.4,
+     "stddev": 82.5
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-truck-cab-near": {
+   "file": "nuketown2-truck-cab-near.png",
+   "boxes": {
+    "skyTop": {
+     "rect": [
+      0,
+      0,
+      1280,
+      80
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 102400,
+     "luma": {
+      "p10": 194.9,
+      "p50": 215,
+      "p90": 224.7
+     },
+     "meanRGB": [
+      212.1,
+      209.7,
+      211.5
+     ],
+     "hueDeg": 313.7,
+     "stddev": 20.9
+    },
+    "cabMid": {
+     "rect": [
+      360,
+      220,
+      560,
+      220
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 123200,
+     "luma": {
+      "p10": 13.1,
+      "p50": 143.9,
+      "p90": 206.9
+     },
+     "meanRGB": [
+      132.1,
+      128.7,
+      118.2
+     ],
+     "hueDeg": 45.4,
+     "stddev": 70.3
+    },
+    "roadCab": {
+     "rect": [
+      100,
+      530,
+      1080,
+      170
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 183600,
+     "luma": {
+      "p10": 0.2,
+      "p50": 25.9,
+      "p90": 51.2
+     },
+     "meanRGB": [
+      38.4,
+      29.6,
+      24.6
+     ],
+     "hueDeg": 21.8,
+     "stddev": 37.3
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-vehicle-far": {
+   "file": "nuketown2-vehicle-far.png",
+   "boxes": {
+    "skyTop": {
+     "rect": [
+      300,
+      5,
+      500,
+      55
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 27500,
+     "luma": {
+      "p10": 218.5,
+      "p50": 222.5,
+      "p90": 226.4
+     },
+     "meanRGB": [
+      225.1,
+      221.8,
+      220.5
+     ],
+     "hueDeg": 17.4,
+     "stddev": 2.9
+    },
+    "roadFar": {
+     "rect": [
+      400,
+      300,
+      480,
+      200
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 96000,
+     "luma": {
+      "p10": 0.6,
+      "p50": 130.1,
+      "p90": 182.3
+     },
+     "meanRGB": [
+      119.3,
+      101.6,
+      83.2
+     ],
+     "hueDeg": 30.5,
+     "stddev": 69.6
+    },
+    "foreRoad": {
+     "rect": [
+      100,
+      540,
+      1080,
+      160
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 172800,
+     "luma": {
+      "p10": 0,
+      "p50": 45.9,
+      "p90": 136.4
+     },
+     "meanRGB": [
+      58,
+      48.6,
+      35.4
+     ],
+     "hueDeg": 35,
+     "stddev": 50.3
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-vehicle-mid": {
+   "file": "nuketown2-vehicle-mid.png",
+   "boxes": {
+    "skyTop": {
+     "rect": [
+      0,
+      0,
+      1280,
+      80
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 102400,
+     "luma": {
+      "p10": 193.9,
+      "p50": 212.5,
+      "p90": 224.7
+     },
+     "meanRGB": [
+      212,
+      210,
+      212.2
+     ],
+     "hueDeg": 294.8,
+     "stddev": 12.7
+    },
+    "carMid": {
+     "rect": [
+      400,
+      260,
+      480,
+      180
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 86400,
+     "luma": {
+      "p10": 0.1,
+      "p50": 179.2,
+      "p90": 190
+     },
+     "meanRGB": [
+      141.7,
+      122.9,
+      106.8
+     ],
+     "hueDeg": 27.8,
+     "stddev": 77.5
+    },
+    "roadMid": {
+     "rect": [
+      100,
+      520,
+      1080,
+      180
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 194400,
+     "luma": {
+      "p10": 27,
+      "p50": 145,
+      "p90": 212.4
+     },
+     "meanRGB": [
+      150.4,
+      131.4,
+      94.3
+     ],
+     "hueDeg": 39.7,
+     "stddev": 77.9
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  },
+  "nuketown2-vehicle-near": {
+   "file": "nuketown2-vehicle-near.png",
+   "boxes": {
+    "skyTop": {
+     "rect": [
+      0,
+      0,
+      1280,
+      80
+     ],
+     "kind": "sky",
+     "protected": true,
+     "n": 102400,
+     "luma": {
+      "p10": 195.3,
+      "p50": 211.6,
+      "p90": 221.9
+     },
+     "meanRGB": [
+      211,
+      206.9,
+      207.3
+     ],
+     "hueDeg": 355,
+     "stddev": 22.7
+    },
+    "carBody": {
+     "rect": [
+      380,
+      280,
+      520,
+      180
+     ],
+     "kind": "subject",
+     "protected": false,
+     "n": 93600,
+     "luma": {
+      "p10": 2.6,
+      "p50": 37.5,
+      "p90": 173.7
+     },
+     "meanRGB": [
+      62.7,
+      61.7,
+      73.4
+     ],
+     "hueDeg": 244.9,
+     "stddev": 67.5
+    },
+    "roadNear": {
+     "rect": [
+      100,
+      520,
+      1080,
+      180
+     ],
+     "kind": "ground",
+     "protected": false,
+     "n": 194400,
+     "luma": {
+      "p10": 17.6,
+      "p50": 27.1,
+      "p90": 48
+     },
+     "meanRGB": [
+      40.4,
+      29.9,
+      23
+     ],
+     "hueDeg": 23.9,
+     "stddev": 26.4
+    }
+   },
+   "newlyBlack": 0,
+   "healed": 0
+  }
+ }
+}

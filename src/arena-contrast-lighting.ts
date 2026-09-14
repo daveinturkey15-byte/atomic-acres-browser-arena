@@ -241,7 +241,7 @@ export class ArenaContrastLighting {
       activeLights,
       shadowCastingLights,
       authoredLights: this.authoredLights,
-      occlusion: root ? auditLocalLightOcclusion(root) : { activeLocalLights: 0, shadowedLocalLights: 0, emissiveOnlySources: 0, violations: [] },
+      occlusion: root ? auditLocalLightOcclusion(root) : { activeLocalLights: 0, shadowedLocalLights: 0, clusteredLocalLights: 0, emissiveOnlySources: 0, violations: [] },
     };
   }
 

@@ -1,0 +1,20 @@
+diff --git a/scripts/release/stage-release-topology.mjs b/scripts/release/stage-release-topology.mjs
+index 0c9abc0c..1b0e7110 100644
+--- a/scripts/release/stage-release-topology.mjs
++++ b/scripts/release/stage-release-topology.mjs
+@@ -116,6 +116,15 @@ const experimentalRoot = channelRoot(config.experimental.path);
+ mkdirSync(experimentalRoot, { recursive: true });
+ renameSync(join(distRoot, 'index.html'), join(experimentalRoot, 'index.html'));
+ renameSync(join(distRoot, 'assets'), join(experimentalRoot, 'assets'));
++// MAP3 (HF-409): the Map 3 showcase page is a second build input, so vite emits
++// it beside index.html at the dist root with `./assets/...` links. Those links
++// only resolve inside the candidate channel, which is where index.html and the
++// assets directory just went - without this move /map3.html is served with a
++// 200 and every one of its chunks 404s, and the page never leaves its
++// "Starting Map 3..." banner. Measured: 9 x 404, banner still up after 180 s.
++if (existsSync(join(distRoot, 'map3.html'))) {
++  renameSync(join(distRoot, 'map3.html'), join(experimentalRoot, 'map3.html'));
++}
+ const experimentalJs = walkFiles(join(experimentalRoot, 'assets')).filter((path) => path.endsWith('.js'));
+ if (!experimentalJs.some((path) => readFileSync(path).includes(Buffer.from(config.experimental.pass)))) {
+   throw new Error(`Experimental candidate does not contain ${config.experimental.pass}`);

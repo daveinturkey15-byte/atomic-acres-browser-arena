@@ -1,0 +1,1001 @@
+[
+ {
+  "station": "nuketown2-appliance-bank-north-close",
+  "box": "topControl",
+  "kind": "control",
+  "protected": true,
+  "detailA": 16.752,
+  "detailB": 16.806,
+  "ratio": 1.003
+ },
+ {
+  "station": "nuketown2-appliance-bank-north-close",
+  "box": "applianceRow",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 24.026,
+  "detailB": 24.09,
+  "ratio": 1.003
+ },
+ {
+  "station": "nuketown2-appliance-bank-north-close",
+  "box": "foreGround",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 4.81,
+  "detailB": 4.809,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-appliance-bank-south-close",
+  "box": "topControl",
+  "kind": "control",
+  "protected": true,
+  "detailA": 20.213,
+  "detailB": 20.233,
+  "ratio": 1.001
+ },
+ {
+  "station": "nuketown2-appliance-bank-south-close",
+  "box": "applianceRow",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 18.55,
+  "detailB": 18.607,
+  "ratio": 1.003
+ },
+ {
+  "station": "nuketown2-appliance-bank-south-close",
+  "box": "foreGround",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 9.836,
+  "detailB": 9.882,
+  "ratio": 1.005
+ },
+ {
+  "station": "nuketown2-border-path-close",
+  "box": "topControl",
+  "kind": "control",
+  "protected": true,
+  "detailA": 27.039,
+  "detailB": 27.035,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-border-path-close",
+  "box": "pathMid",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 12.988,
+  "detailB": 12.988,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-border-path-close",
+  "box": "vergeGround",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 10.963,
+  "detailB": 10.962,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-border-path-close",
+  "box": "leftWall",
+  "kind": "wall",
+  "protected": false,
+  "detailA": 18.133,
+  "detailB": 17.743,
+  "ratio": 0.978
+ },
+ {
+  "station": "nuketown2-border-path-close",
+  "box": "rightWall",
+  "kind": "wall",
+  "protected": false,
+  "detailA": 16.775,
+  "detailB": 16.774,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-coach-elevation",
+  "box": "skyTop",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 7.091,
+  "detailB": 7.865,
+  "ratio": 1.109
+ },
+ {
+  "station": "nuketown2-coach-elevation",
+  "box": "wheels",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 12.55,
+  "detailB": 12.54,
+  "ratio": 0.999
+ },
+ {
+  "station": "nuketown2-coach-elevation",
+  "box": "roadLower",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 5.826,
+  "detailB": 5.837,
+  "ratio": 1.002
+ },
+ {
+  "station": "nuketown2-coach-elevation",
+  "box": "trailerFlank",
+  "kind": "wall",
+  "protected": false,
+  "detailA": 22.588,
+  "detailB": 22.576,
+  "ratio": 0.999
+ },
+ {
+  "station": "nuketown2-driveway-apron-close",
+  "box": "skyTop",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 20.329,
+  "detailB": 20.332,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-driveway-apron-close",
+  "box": "apronMid",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 11.077,
+  "detailB": 10.919,
+  "ratio": 0.986
+ },
+ {
+  "station": "nuketown2-driveway-apron-close",
+  "box": "foreApron",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 8.757,
+  "detailB": 8.757,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-front-porch",
+  "box": "skyTop",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 15.35,
+  "detailB": 15.347,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-front-porch",
+  "box": "porchSubject",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 25.282,
+  "detailB": 25.217,
+  "ratio": 0.997
+ },
+ {
+  "station": "nuketown2-front-porch",
+  "box": "stepGround",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 15.063,
+  "detailB": 15.411,
+  "ratio": 1.023
+ },
+ {
+  "station": "nuketown2-front-porch",
+  "box": "garageFlank",
+  "kind": "wall",
+  "protected": false,
+  "detailA": 21.48,
+  "detailB": 21.468,
+  "ratio": 0.999
+ },
+ {
+  "station": "nuketown2-garage",
+  "box": "ceilingControl",
+  "kind": "control",
+  "protected": true,
+  "detailA": 21.045,
+  "detailB": 21.045,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-garage",
+  "box": "bayMid",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 16.483,
+  "detailB": 16.214,
+  "ratio": 0.984
+ },
+ {
+  "station": "nuketown2-garage",
+  "box": "floorBox",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 0.991,
+  "detailB": 0.517,
+  "ratio": 0.522
+ },
+ {
+  "station": "nuketown2-garden-pod-north-close",
+  "box": "topControl",
+  "kind": "control",
+  "protected": true,
+  "detailA": 14.717,
+  "detailB": 14.717,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-garden-pod-north-close",
+  "box": "podMid",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 19.01,
+  "detailB": 19.015,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-garden-pod-north-close",
+  "box": "bedGround",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 9.674,
+  "detailB": 9.691,
+  "ratio": 1.002
+ },
+ {
+  "station": "nuketown2-glasshouse-north-close",
+  "box": "topControl",
+  "kind": "control",
+  "protected": true,
+  "detailA": 13.326,
+  "detailB": 13.327,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-glasshouse-north-close",
+  "box": "glassMid",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 25.564,
+  "detailB": 25.558,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-glasshouse-north-close",
+  "box": "glassPane",
+  "kind": "glazing",
+  "protected": true,
+  "detailA": 26.197,
+  "detailB": 26.197,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-glasshouse-north-close",
+  "box": "baseBed",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 11.048,
+  "detailB": 11.136,
+  "ratio": 1.008
+ },
+ {
+  "station": "nuketown2-glasshouse-north-close",
+  "box": "fenceBack",
+  "kind": "wall",
+  "protected": false,
+  "detailA": 8.24,
+  "detailB": 8.253,
+  "ratio": 1.002
+ },
+ {
+  "station": "nuketown2-into-sun-street",
+  "box": "sky",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 13.806,
+  "detailB": 13.831,
+  "ratio": 1.002
+ },
+ {
+  "station": "nuketown2-into-sun-street",
+  "box": "road",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 16.965,
+  "detailB": 16.988,
+  "ratio": 1.001
+ },
+ {
+  "station": "nuketown2-into-sun-street",
+  "box": "vergeLeft",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 17.739,
+  "detailB": 17.742,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-north-balcony",
+  "box": "skyTop",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 1.438,
+  "detailB": 1.438,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-north-balcony",
+  "box": "midStreet",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 19.924,
+  "detailB": 19.956,
+  "ratio": 1.002
+ },
+ {
+  "station": "nuketown2-north-balcony",
+  "box": "foreGround",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 15.645,
+  "detailB": 15.66,
+  "ratio": 1.001
+ },
+ {
+  "station": "nuketown2-north-interior",
+  "box": "ceilingControl",
+  "kind": "control",
+  "protected": true,
+  "detailA": 0.194,
+  "detailB": 0.521,
+  "ratio": 2.692
+ },
+ {
+  "station": "nuketown2-north-interior",
+  "box": "interiorWall",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 11.231,
+  "detailB": 11.246,
+  "ratio": 1.001
+ },
+ {
+  "station": "nuketown2-north-interior",
+  "box": "floorBox",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 11,
+  "detailB": 11.078,
+  "ratio": 1.007
+ },
+ {
+  "station": "nuketown2-north-upper-window",
+  "box": "skyLeft",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 14.61,
+  "detailB": 14.301,
+  "ratio": 0.979
+ },
+ {
+  "station": "nuketown2-north-upper-window",
+  "box": "treeline",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 8.295,
+  "detailB": 8.294,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-north-upper-window",
+  "box": "ridge",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 9.716,
+  "detailB": 9.714,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-north-upper-window",
+  "box": "groundBottom",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 1.814,
+  "detailB": 1.886,
+  "ratio": 1.04
+ },
+ {
+  "station": "nuketown2-north-yard",
+  "box": "roofTopSlab",
+  "kind": "roof",
+  "protected": false,
+  "detailA": 6.982,
+  "detailB": 6.982,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-north-yard",
+  "box": "roofSoffit",
+  "kind": "roof",
+  "protected": false,
+  "detailA": 29.792,
+  "detailB": 29.814,
+  "ratio": 1.001
+ },
+ {
+  "station": "nuketown2-north-yard",
+  "box": "roofLeftMass",
+  "kind": "roof",
+  "protected": false,
+  "detailA": 0.798,
+  "detailB": 0.799,
+  "ratio": 1.001
+ },
+ {
+  "station": "nuketown2-north-yard",
+  "box": "sidingControl",
+  "kind": "siding",
+  "protected": true,
+  "detailA": 6.851,
+  "detailB": 6.853,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-north-yard",
+  "box": "creamControl",
+  "kind": "cream",
+  "protected": true,
+  "detailA": 33.469,
+  "detailB": 33.474,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-north-yard",
+  "box": "farRoofBand",
+  "kind": "roof",
+  "protected": false,
+  "detailA": 14.664,
+  "detailB": 14.629,
+  "ratio": 0.998
+ },
+ {
+  "station": "nuketown2-north-yard",
+  "box": "skyTopRight",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 0.39,
+  "detailB": 0.388,
+  "ratio": 0.996
+ },
+ {
+  "station": "nuketown2-north-yard",
+  "box": "grassNear",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 16.209,
+  "detailB": 16.166,
+  "ratio": 0.997
+ },
+ {
+  "station": "nuketown2-north-yard",
+  "box": "houseFlank",
+  "kind": "wall",
+  "protected": false,
+  "detailA": 9.989,
+  "detailB": 9.983,
+  "ratio": 0.999
+ },
+ {
+  "station": "nuketown2-nuke-north-balcony",
+  "box": "skyTop",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 8.394,
+  "detailB": 8.394,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-nuke-north-balcony",
+  "box": "viewMid",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 16.675,
+  "detailB": 16.698,
+  "ratio": 1.001
+ },
+ {
+  "station": "nuketown2-nuke-north-balcony",
+  "box": "railFore",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 5.832,
+  "detailB": 5.829,
+  "ratio": 0.999
+ },
+ {
+  "station": "nuketown2-nuke-south-balcony",
+  "box": "skyTop",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 2.565,
+  "detailB": 2.562,
+  "ratio": 0.999
+ },
+ {
+  "station": "nuketown2-nuke-south-balcony",
+  "box": "viewMid",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 29.902,
+  "detailB": 29.901,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-nuke-south-balcony",
+  "box": "railFore",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 16.241,
+  "detailB": 16.218,
+  "ratio": 0.999
+ },
+ {
+  "station": "nuketown2-nuke-street",
+  "box": "skyTop",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 0.496,
+  "detailB": 0.497,
+  "ratio": 1.003
+ },
+ {
+  "station": "nuketown2-nuke-street",
+  "box": "midGround",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 29.985,
+  "detailB": 29.978,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-nuke-street",
+  "box": "streetRoad",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 18.873,
+  "detailB": 18.86,
+  "ratio": 0.999
+ },
+ {
+  "station": "nuketown2-overhead",
+  "box": "mountains",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 4.704,
+  "detailB": 4.705,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-overhead",
+  "box": "lawnBox",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 18.657,
+  "detailB": 18.676,
+  "ratio": 1.001
+ },
+ {
+  "station": "nuketown2-overhead",
+  "box": "roadBox",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 9.562,
+  "detailB": 9.548,
+  "ratio": 0.999
+ },
+ {
+  "station": "nuketown2-overhead",
+  "box": "northHouseRoof",
+  "kind": "roof",
+  "protected": false,
+  "detailA": 26.8,
+  "detailB": 26.746,
+  "ratio": 0.998
+ },
+ {
+  "station": "nuketown2-overhead",
+  "box": "garageRoofLeft",
+  "kind": "roof",
+  "protected": false,
+  "detailA": 23.452,
+  "detailB": 23.451,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-overhead",
+  "box": "southHouseRoof",
+  "kind": "roof",
+  "protected": false,
+  "detailA": 20.019,
+  "detailB": 20.016,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-overhead",
+  "box": "glazingRoofPale",
+  "kind": "glazing",
+  "protected": true,
+  "detailA": 20.123,
+  "detailB": 20.13,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-overhead",
+  "box": "groundControl",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 11.728,
+  "detailB": 11.517,
+  "ratio": 0.982
+ },
+ {
+  "station": "nuketown2-perimeter-wall-end-close",
+  "box": "topControl",
+  "kind": "control",
+  "protected": true,
+  "detailA": 0.372,
+  "detailB": 0.374,
+  "ratio": 1.005
+ },
+ {
+  "station": "nuketown2-perimeter-wall-end-close",
+  "box": "wallEnd",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 1.69,
+  "detailB": 1.69,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-perimeter-wall-end-close",
+  "box": "blockWall",
+  "kind": "wall",
+  "protected": false,
+  "detailA": 5.179,
+  "detailB": 5.183,
+  "ratio": 1.001
+ },
+ {
+  "station": "nuketown2-perimeter-wall-end-close",
+  "box": "baseGround",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 16.445,
+  "detailB": 16.434,
+  "ratio": 0.999
+ },
+ {
+  "station": "nuketown2-perimeter-wall-long-close",
+  "box": "topControl",
+  "kind": "control",
+  "protected": true,
+  "detailA": 5.712,
+  "detailB": 5.712,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-perimeter-wall-long-close",
+  "box": "wallMid",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 15.6,
+  "detailB": 15.653,
+  "ratio": 1.003
+ },
+ {
+  "station": "nuketown2-perimeter-wall-long-close",
+  "box": "baseGround",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 11.913,
+  "detailB": 11.914,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-sand-pit-north-close",
+  "box": "skyTop",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 23.226,
+  "detailB": 23.227,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-sand-pit-north-close",
+  "box": "pitMid",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 12.599,
+  "detailB": 12.62,
+  "ratio": 1.002
+ },
+ {
+  "station": "nuketown2-sand-pit-north-close",
+  "box": "surroundGround",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 5.951,
+  "detailB": 5.946,
+  "ratio": 0.999
+ },
+ {
+  "station": "nuketown2-south-interior",
+  "box": "ceilingControl",
+  "kind": "control",
+  "protected": true,
+  "detailA": 0.204,
+  "detailB": 0.516,
+  "ratio": 2.521
+ },
+ {
+  "station": "nuketown2-south-interior",
+  "box": "roomMid",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 12.248,
+  "detailB": 12.278,
+  "ratio": 1.002
+ },
+ {
+  "station": "nuketown2-south-interior",
+  "box": "floorBox",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 9.009,
+  "detailB": 9.084,
+  "ratio": 1.008
+ },
+ {
+  "station": "nuketown2-south-upper-window",
+  "box": "skyRight",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 15.695,
+  "detailB": 15.691,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-south-upper-window",
+  "box": "treeline",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 23.792,
+  "detailB": 23.826,
+  "ratio": 1.001
+ },
+ {
+  "station": "nuketown2-south-upper-window",
+  "box": "ridge",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 22.115,
+  "detailB": 22.146,
+  "ratio": 1.001
+ },
+ {
+  "station": "nuketown2-south-upper-window",
+  "box": "groundBottom",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 0.961,
+  "detailB": 1.232,
+  "ratio": 1.281
+ },
+ {
+  "station": "nuketown2-south-upper-window",
+  "box": "alleyWall",
+  "kind": "wall",
+  "protected": false,
+  "detailA": 34.268,
+  "detailB": 34.257,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-south-yard",
+  "box": "skyTop",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 2.386,
+  "detailB": 2.384,
+  "ratio": 0.999
+ },
+ {
+  "station": "nuketown2-south-yard",
+  "box": "houseMid",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 24.796,
+  "detailB": 24.828,
+  "ratio": 1.001
+ },
+ {
+  "station": "nuketown2-south-yard",
+  "box": "lawnSouth",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 12.86,
+  "detailB": 12.916,
+  "ratio": 1.004
+ },
+ {
+  "station": "nuketown2-south-yard",
+  "box": "wallControl",
+  "kind": "control",
+  "protected": false,
+  "detailA": 29.127,
+  "detailB": 29.217,
+  "ratio": 1.003
+ },
+ {
+  "station": "nuketown2-street-centre",
+  "box": "skyRight",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 16.703,
+  "detailB": 16.719,
+  "ratio": 1.001
+ },
+ {
+  "station": "nuketown2-street-centre",
+  "box": "lampHead",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 0.441,
+  "detailB": 0.444,
+  "ratio": 1.007
+ },
+ {
+  "station": "nuketown2-street-centre",
+  "box": "roadCentre",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 15.464,
+  "detailB": 15.483,
+  "ratio": 1.001
+ },
+ {
+  "station": "nuketown2-street-centre",
+  "box": "hedgeKerb",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 10.857,
+  "detailB": 10.929,
+  "ratio": 1.007
+ },
+ {
+  "station": "nuketown2-street-centre",
+  "box": "garageFlank",
+  "kind": "wall",
+  "protected": false,
+  "detailA": 24.054,
+  "detailB": 24.001,
+  "ratio": 0.998
+ },
+ {
+  "station": "nuketown2-truck-cab-near",
+  "box": "skyTop",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 12.814,
+  "detailB": 12.803,
+  "ratio": 0.999
+ },
+ {
+  "station": "nuketown2-truck-cab-near",
+  "box": "cabMid",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 24.461,
+  "detailB": 24.301,
+  "ratio": 0.993
+ },
+ {
+  "station": "nuketown2-truck-cab-near",
+  "box": "roadCab",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 12.015,
+  "detailB": 12.015,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-vehicle-far",
+  "box": "skyTop",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 0.442,
+  "detailB": 0.442,
+  "ratio": 1
+ },
+ {
+  "station": "nuketown2-vehicle-far",
+  "box": "roadFar",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 19.631,
+  "detailB": 19.679,
+  "ratio": 1.002
+ },
+ {
+  "station": "nuketown2-vehicle-far",
+  "box": "foreRoad",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 9.473,
+  "detailB": 9.498,
+  "ratio": 1.003
+ },
+ {
+  "station": "nuketown2-vehicle-mid",
+  "box": "skyTop",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 11.708,
+  "detailB": 11.742,
+  "ratio": 1.003
+ },
+ {
+  "station": "nuketown2-vehicle-mid",
+  "box": "carMid",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 11.721,
+  "detailB": 11.748,
+  "ratio": 1.002
+ },
+ {
+  "station": "nuketown2-vehicle-mid",
+  "box": "roadMid",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 10.785,
+  "detailB": 10.777,
+  "ratio": 0.999
+ },
+ {
+  "station": "nuketown2-vehicle-near",
+  "box": "skyTop",
+  "kind": "sky",
+  "protected": true,
+  "detailA": 17.087,
+  "detailB": 17.104,
+  "ratio": 1.001
+ },
+ {
+  "station": "nuketown2-vehicle-near",
+  "box": "carBody",
+  "kind": "subject",
+  "protected": false,
+  "detailA": 16,
+  "detailB": 16.034,
+  "ratio": 1.002
+ },
+ {
+  "station": "nuketown2-vehicle-near",
+  "box": "roadNear",
+  "kind": "ground",
+  "protected": false,
+  "detailA": 12.106,
+  "detailB": 12.107,
+  "ratio": 1
+ }
+]

@@ -14,7 +14,8 @@ const packageJson = JSON.parse(readFileSync(new URL('../../package.json', import
 const sourceSha = 'a'.repeat(40);
 const treeSha256 = 'b'.repeat(64);
 const peerPath = '/peerjs-0123456789abcdef01234567';
-const firefoxUserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0';
+// HF-331 environment update, Firefox auto-updated 153.0.4 -> 154.0 (2026-08-21).
+const firefoxUserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0';
 const expected = {
   sourceSha,
   treeSha256,
@@ -93,7 +94,10 @@ function soloCycle(label) {
     botCount: 1,
     requestedBackend: 'webgpu',
     backend: 'webgpu',
-    failClosed: true,
+    // HF-331: healthy fail-closed WebGPU telemetry reports failClosed === false
+    // (true means "requested WebGPU but fell back"); polarity corrected to
+    // match render-runtime.ts and the de476b56 verify-installed-firefox fix.
+    failClosed: false,
     deviceLost: false,
     uncapturedErrors: 0,
     qualityAssetState: 'ready',
@@ -153,8 +157,9 @@ function validReceipt() {
         executablePath: 'C:/Program Files/Mozilla Firefox/firefox.exe',
         executableName: 'firefox.exe',
         sha256: PASS70_FIREFOX_GECKODRIVER_IDENTITY.firefox.sha256,
-        expectedVersion: '153.0.4',
-        sessionVersions: ['153.0.4', '153.0.4'],
+        // HF-331 environment update, Firefox auto-updated 153.0.4 -> 154.0.
+        expectedVersion: '154.0',
+        sessionVersions: ['154.0', '154.0'],
         userAgents: [firefoxUserAgent, firefoxUserAgent],
         headless: true,
         automation: 'raw-w3c-http+bidi',
@@ -296,6 +301,8 @@ mutation('the GeckoDriver archive contains another entry', (receipt) => { receip
 mutation('the two sessions share a Firefox process', (receipt) => { receipt.ownership.drivers[1].firefoxProcessId = receipt.ownership.drivers[0].firefoxProcessId; }, /independent Firefox sessions/u);
 mutation('an owned Firefox process survives cleanup', (receipt) => { receipt.cleanup.allOwnedProcessesExited = false; }, /cleanup proof/u);
 mutation('the solo match contains more than one bot', (receipt) => { receipt.soloCycles[0].botCount = 2; }, /exact one-bot/u);
+// HF-331: failClosed === true is the fallback signal, never the healthy state.
+mutation('the WebGPU route reports a fail-closed fallback', (receipt) => { receipt.soloCycles[0].failClosed = true; }, /did not use fail-closed native WebGPU/u);
 mutation('the solo pointer lock is absent', (receipt) => { receipt.soloCycles[0].pointerLock = false; }, /pointer-lock\/ADS/u);
 mutation('the native canvas hit point is obscured', (receipt) => { receipt.soloCycles[0].canvasTarget.topElementId = 'banner'; }, /native canvas input target/u);
 mutation('the automatic request is still pending at native retry', (receipt) => {

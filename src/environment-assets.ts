@@ -1,19 +1,24 @@
 import * as THREE from 'three';
 import {
+  CENTRAL_BUS,
   COVER_LAYOUT,
   GARAGE_LAYOUT,
   HOUSE_LAYOUT,
   NEIGHBOURHOOD_BENCH_LAYOUT,
   NEIGHBOURHOOD_BIN_POSITIONS,
+ STREET_CRATE_HEIGHT, STREET_CRATE_LOW_X, STREET_CRATE_TALL_HEIGHT, STREET_CRATE_TALL_X,
 } from './arena-layout';
 import {
   batchStaticMeshes,
   buildRetroCoach,
-  buildRetroShuttleBus,
   roundedBox,
   texturedMaterial,
 } from './art-kit';
 import { arenaAnimationAt } from './arena-storytelling';
+import { authoredLargeCoverIdAt } from './map';
+import { buildNuketownForestSurround, buildNuketownYardVegetation } from './nuketown-forest-surround';
+import { buildNuketownLawnField } from './nuketown-lawn-field';
+import { buildNuketownMountainBackdrop } from './nuketown-mountain-backdrop';
 
 export { NEIGHBOURHOOD_BIN_POSITIONS } from './arena-layout';
 
@@ -29,11 +34,13 @@ const LEGACY_VEHICLE_NAMES = new Set([
 function addTree(root: THREE.Group, x: number, z: number, scale: number): void {
   const bark = texturedMaterial('./assets/original/textures/wood-deck.png', { color: 0x80593d, roughness: 0.98, repeatY: 4 });
   const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.32 * scale, 0.64 * scale, 4.75 * scale, 14, 4), bark);
+  trunk.name = 'yard-trunk-bole';
   trunk.position.set(x, 2.37 * scale, z);
   trunk.castShadow = true;
   root.add(trunk);
   for (const rotation of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
     const rootFlare = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * scale, 0.2 * scale, 1.35 * scale, 8), bark);
+    rootFlare.name = 'yard-root-flare';
     rootFlare.position.set(x + Math.sin(rotation) * 0.47 * scale, 0.22 * scale, z + Math.cos(rotation) * 0.47 * scale);
     rootFlare.rotation.z = Math.PI / 2.8;
     rootFlare.rotation.y = rotation;
@@ -45,6 +52,7 @@ function addTree(root: THREE.Group, x: number, z: number, scale: number): void {
   ));
   for (const [rotation, length, height] of [[-0.7, 2.3, 4.05], [0.55, 2.1, 4.25], [1.7, 1.8, 4.5], [2.65, 1.7, 4.65], [-2.4, 1.55, 4.8]] as Array<[number, number, number]>) {
     const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * scale, 0.17 * scale, length * scale, 9), bark);
+    branch.name = 'yard-tree-branch';
     branch.position.set(x + Math.sin(rotation) * 0.62 * scale, height * scale, z + Math.cos(rotation) * 0.62 * scale);
     branch.rotation.z = Math.PI / 2.9; branch.rotation.y = rotation; branch.castShadow = true; root.add(branch);
   }
@@ -56,6 +64,7 @@ function addTree(root: THREE.Group, x: number, z: number, scale: number): void {
   ];
   clusters.forEach(([ox, oy, oz, rx, ry, rz], index) => {
     const crown = new THREE.Mesh(new THREE.SphereGeometry(scale, 12, 8), leafMaterials[index % leafMaterials.length]);
+    crown.name = 'yard-tree-canopy';
     crown.position.set(x + ox * scale, oy * scale, z + oz * scale);
     crown.scale.set(rx, ry, rz);
     crown.rotation.set(index * 0.17, index * 0.43, index * 0.11);
@@ -72,9 +81,9 @@ function addModernGroundDetails(root: THREE.Group, reduced: boolean): void {
   details.userData.blocksShots = false;
   const drainMaterial = texturedMaterial('./assets/original/textures/weapon-gunmetal.png', { color: 0x718089, roughness: 0.5, metalness: 0.55, repeatX: 2 });
   const drainLayout: Array<[number, number]> = reduced
-    ? [[-6.6, -26], [6.6, 26]]
-    : [[-6.6, -31], [6.6, -17], [-6.6, -3], [6.6, 11], [-6.6, 25], [6.6, 35]];
-  const drains = new THREE.InstancedMesh(new THREE.BoxGeometry(0.75, 0.055, 1.35), drainMaterial, drainLayout.length);
+    ? [[-22, -4.2], [22, 4.2]]
+    : [[-26, -4.2], [-14, 4.2], [-2, -4.2], [10, 4.2], [22, -4.2], [30, 4.2]];
+  const drains = new THREE.InstancedMesh(new THREE.BoxGeometry(1.35, 0.055, 0.75), drainMaterial, drainLayout.length);
   const matrix = new THREE.Matrix4();
   drainLayout.forEach(([dx, dz], index) => {
     matrix.identity().setPosition(dx, 0.07, dz);
@@ -87,8 +96,8 @@ function addModernGroundDetails(root: THREE.Group, reduced: boolean): void {
   details.add(drains);
 
   const reflectorMaterial = new THREE.MeshStandardMaterial({ color: 0xffa15d, emissive: 0x642008, emissiveIntensity: 0.48, roughness: 0.4, metalness: 0.2 });
-  const reflectorLayout: Array<[number, number]> = [[-7.15, -30], [7.15, -20], [-7.15, -10], [7.15, 0], [-7.15, 10], [7.15, 20], [-7.15, 30], [7.15, 36]];
-  const reflectors = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 0.16, 0.34), reflectorMaterial, reduced ? 4 : reflectorLayout.length);
+  const reflectorLayout: Array<[number, number]> = [[-28, -4.7], [-20, 4.7], [-12, -4.7], [-4, 4.7], [4, -4.7], [12, 4.7], [20, -4.7], [28, 4.7]];
+  const reflectors = new THREE.InstancedMesh(new THREE.BoxGeometry(0.34, 0.16, 0.1), reflectorMaterial, reduced ? 4 : reflectorLayout.length);
   reflectorLayout.slice(0, reflectors.count).forEach(([rx, rz], index) => {
     matrix.makeRotationY(index % 2 === 0 ? 0 : Math.PI).setPosition(rx, 0.14, rz);
     reflectors.setMatrixAt(index, matrix);
@@ -116,23 +125,25 @@ function addStreetProps(root: THREE.Group): void {
     const box = roundedBox('mailbox', [0.7, 0.48, 0.95], metal, 0.12, 4); box.position.set(0, 1.35, 0);
     mailbox.add(post, box); root.add(mailbox);
   }
-  for (const [x, z] of [[-9, 15], [10, -18], [-29, -2], [29, 4]] as Array<[number, number]>) {
+  for (const [x, z] of [[-16, 8.2], [16, -8.2], [-30, -20], [30, 20]] as Array<[number, number]>) {
     const hydrant = new THREE.Group(); hydrant.position.set(x, 0, z);
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.9, 12), hydrantRed); body.position.y = 0.45; body.castShadow = true;
     const cap = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), hydrantRed); cap.position.y = 0.9;
     hydrant.add(body, cap); root.add(hydrant);
   }
-  for (const [x, z] of [[-18, 10], [20, -12], [-22, -24], [22, 25]] as Array<[number, number]>) {
+  // v3: the planter pair follows the rear strips.
+  for (const [x, z] of [[-16, -28.5], [16, 28.5]] as Array<[number, number]>) {
     const planter = roundedBox('concrete-planter', [2.2, 0.7, 1.05], concrete, 0.12); planter.position.set(x, 0.35, z); root.add(planter);
     for (const offset of [-0.6, 0, 0.6]) {
       const shrub = new THREE.Mesh(shrubGeometry, shrubMaterial);
+      shrub.name = 'planter-shrub';
       shrub.position.set(x + offset, 0.92 + (offset === 0 ? 0.08 : 0), z);
       shrub.scale.set(1, offset === 0 ? 1.15 : 0.86, 0.82);
       shrub.rotation.y = offset * 1.7;
       shrub.castShadow = true; root.add(shrub);
     }
   }
-  for (const [x, z] of [[-13, -16], [13, 16], [-13, 22], [13, -22]] as Array<[number, number]>) {
+  for (const [x, z] of [[-18, -16], [18, 16], [-26, -2], [26, 2]] as Array<[number, number]>) {
     const direction = x < 0 ? 1 : -1;
     const arm = roundedBox('streetlamp-arm', [1.15, 0.14, 0.14], metal, 0.035, 2);
     arm.position.set(x + direction * 0.5, 5.45, z); decorative(arm); root.add(arm);
@@ -141,13 +152,40 @@ function addStreetProps(root: THREE.Group): void {
     const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 0.08, 10), lampGlow);
     lens.position.set(x + direction, 5.18, z); decorative(lens); root.add(lens);
   }
+
+  // HF-344 audit close-out. map.ts authors three substantial colliders on the
+  // service lanes (`authored-extra-lamp-collider-0/1` at (-30,-8)/(30,8) and
+  // `authored-reclamation-tank-collider` at (-29.5,-14)) whose planned visuals
+  // were specified in the Pass 27 world-identity spec ("reclamation tank")
+  // but never shipped in any art layer, leaving up to 5.6 m tall, 2.7 m wide
+  // volumes that block players with nothing visible to explain the stop -
+  // exactly the owner's "invisible assets blocking me" fault. Build the
+  // visible props the colliders always promised. Collider bounds stay in
+  // map.ts untouched; src/invisible-blocker-audit.test.ts pins the parity.
+  for (const [index, [x, z]] of ([[-30, -8], [30, 8]] as Array<[number, number]>).entries()) {
+    const mast = new THREE.Group();
+    mast.name = `service-mast-${index}`;
+    mast.position.set(x, 0, z);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.5, 10), concrete);
+    base.name = 'service-mast-base'; base.position.y = 0.25; base.castShadow = true;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 5, 10), metal);
+    pole.name = 'service-mast-pole'; pole.position.y = 2.75; pole.castShadow = true;
+    const head = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.14, 0.34, 10), metal);
+    head.name = 'service-mast-head'; head.position.y = 5.42;
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.09, 10), lampGlow);
+    lens.name = 'service-mast-lens'; lens.position.y = 5.24;
+    decorative(head); decorative(lens);
+    mast.add(base, pole, head, lens);
+    root.add(mast);
+  }
+  // DECLUTTER 2026-08-29: the reclamation tank left with its collider.
 }
 
 type FaunaFlight = Readonly<{ x: number; z: number; radius: number; height: number; phase: number; speed: number }>;
 
 export const NEIGHBOURHOOD_FLOWER_BEDS: ReadonlyArray<readonly [number, number]> = Object.freeze([
-  [-21.2, -29], [-13.8, -18.2], [-27.8, 18],
-  [21.2, 29], [13.8, 18.2], [27.8, -18],
+  [-24, -29.2], [-6, -7.6], [-33, 20],
+  [24, 29.2], [6, 7.6], [33, -20],
 ]);
 
 export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): THREE.Group {
@@ -209,7 +247,13 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
   for (const [x, z, rotation] of NEIGHBOURHOOD_BENCH_LAYOUT) {
     const bench = new THREE.Group(); bench.name = 'street-bench'; bench.position.set(x, 0, z); bench.rotation.y = rotation;
     const seat = streetBox('bench-seat', [2.5, 0.16, 0.62], timber); seat.position.y = 0.72;
-    const back = streetBox('bench-back', [2.5, 0.92, 0.14], timber); back.position.set(0, 1.22, 0.29); back.rotation.x = -0.1;
+    // Owner 2026-08-30 ("collision is bad on things like the bench"): the
+    // backrest used to top out at y 1.6847 and reach z +0.4056 while the
+    // registered collider is [2.5, 1.34, 0.72] about the anchor - 0.345 m of
+    // backrest and 0.046 m of its rear face were phantom geometry you could
+    // shoot and walk through. Re-seated so the visible bench sits exactly
+    // inside its collider: y [0, 1.34], z +/-0.31.
+    const back = streetBox('bench-back', [2.5, 0.92, 0.14], timber); back.position.set(0, 0.87531, 0.194); back.rotation.x = -0.1;
     for (const side of [-1, 1]) {
       const leg = streetBox('bench-leg', [0.13, 0.72, 0.42], steel); leg.position.set(side * 0.9, 0.36, 0); bench.add(leg);
     }
@@ -222,8 +266,158 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
     bin.position.set(x, 0.54, z); decorative(bin); group.add(bin);
   }
 
+  // v3 (owner HITL 2026-08-29): the mannequin art is DELETED with its
+  // colliders - "random manekins that look like bots standing around".
+
+  // Owner 2026-08-30 richness pass: suburban streetscape props. All pieces
+  // deliberately sit under the collider-visual parity gate's walk-through
+  // thresholds (min footprint < 0.35 m or height < 0.9 m), so like the
+  // benches they are honest thin/short dressing with no gameplay authority.
+  {
+    const poleTimber = new THREE.MeshStandardMaterial({ color: 0x6b5138, roughness: 0.94 });
+    const wireMaterial = new THREE.MeshStandardMaterial({ color: 0x181b1c, roughness: 0.6 });
+    const polePositions: ReadonlyArray<readonly [number, number]> = [[-27, -8.6], [-9, -8.6], [9, -8.6], [27, -8.6]];
+    const attachY = 6.9;
+    for (const [x, z] of polePositions) {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 7.2, 7), poleTimber);
+      pole.name = 'street-power-pole';
+      pole.position.set(x, 3.6, z);
+      const crossarm = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.09), poleTimber);
+      crossarm.name = 'street-power-crossarm';
+      crossarm.position.set(x, attachY, z);
+      const brace = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.7, 0.05), poleTimber);
+      brace.name = 'street-power-brace';
+      brace.position.set(x + 0.35, attachY - 0.35, z);
+      brace.rotation.z = 0.55;
+      decorative(pole); decorative(crossarm); decorative(brace);
+      group.add(pole, crossarm, brace);
+      for (const side of [-0.55, 0.55]) {
+        const insulator = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.14, 6), wireMaterial);
+        insulator.name = 'street-power-insulator';
+        insulator.position.set(x + side, attachY + 0.11, z);
+        decorative(insulator); group.add(insulator);
+      }
+    }
+    for (let span = 0; span < polePositions.length - 1; span += 1) {
+      const [ax, az] = polePositions[span];
+      const [bx, bz] = polePositions[span + 1];
+      for (const side of [-0.55, 0.55]) {
+        const curve = new THREE.QuadraticBezierCurve3(
+          new THREE.Vector3(ax + side, attachY + 0.16, az),
+          new THREE.Vector3((ax + bx) / 2 + side, attachY - 0.55, (az + bz) / 2),
+          new THREE.Vector3(bx + side, attachY + 0.16, bz),
+        );
+        const wire = new THREE.Mesh(new THREE.TubeGeometry(curve, 14, 0.014, 5, false), wireMaterial);
+        wire.name = 'street-power-line';
+        decorative(wire); group.add(wire);
+      }
+    }
+
+    const hydrantRed = new THREE.MeshStandardMaterial({ color: 0xa63a2c, roughness: 0.55, metalness: 0.25 });
+    for (const [x, z] of [[-13, 7.9], [13, -7.9]] as const) {
+      const hydrant = new THREE.Group();
+      hydrant.name = 'street-hydrant';
+      hydrant.position.set(x, 0, z);
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.17, 0.62, 8), hydrantRed);
+      barrel.position.y = 0.31;
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.14, 0.16, 8), hydrantRed);
+      cap.position.y = 0.68;
+      const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.14, 6), hydrantRed);
+      nozzle.rotation.z = Math.PI / 2;
+      nozzle.position.set(0.16, 0.42, 0);
+      hydrant.add(barrel, cap, nozzle);
+      decorative(hydrant); group.add(hydrant);
+    }
+
+    const mailSteel = new THREE.MeshStandardMaterial({ color: 0x3a4c55, roughness: 0.5, metalness: 0.4 });
+    for (const [x, z, yaw] of [[-16.5, -9.2, Math.PI / 2], [16.5, 9.2, -Math.PI / 2]] as const) {
+      const mailbox = new THREE.Group();
+      mailbox.name = 'street-mailbox';
+      mailbox.position.set(x, 0, z);
+      mailbox.rotation.y = yaw;
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.05, 0.08), poleTimber);
+      post.position.y = 0.52;
+      const box = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.26, 0.24), mailSteel);
+      box.position.y = 1.14;
+      const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.5, 8, 1, false, 0, Math.PI), mailSteel);
+      lid.rotation.z = Math.PI / 2;
+      lid.position.y = 1.27;
+      const flag = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.16, 0.05), hydrantRed);
+      flag.position.set(0.2, 1.3, 0.15);
+      mailbox.add(post, box, lid, flag);
+      decorative(mailbox); group.add(mailbox);
+    }
+
+    const acShell = new THREE.MeshStandardMaterial({ color: 0xb9bfc0, roughness: 0.42, metalness: 0.55 });
+    const acGrille = new THREE.MeshStandardMaterial({ color: 0x50585a, roughness: 0.7, metalness: 0.35 });
+    for (const [x, z] of [[-22.8, -13.8], [22.8, 13.8]] as const) {
+      const unit = new THREE.Group();
+      unit.name = 'street-ac-unit';
+      unit.position.set(x, 0, z);
+      const shell = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.72, 0.42), acShell);
+      shell.position.y = 0.4;
+      const fan = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.05, 12), acGrille);
+      fan.rotation.x = Math.PI / 2;
+      fan.position.set(0, 0.46, 0.22);
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.08, 0.52), acGrille);
+      pad.position.y = 0.04;
+      unit.add(shell, fan, pad);
+      decorative(unit); group.add(unit);
+    }
+
+    const grateMaterial = new THREE.MeshStandardMaterial({ color: 0x22282a, roughness: 0.8, metalness: 0.3 });
+    for (const [x, z] of [[-7, -6.2], [7, 6.2], [-21, 6.2], [21, -6.2]] as const) {
+      const grate = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.4), grateMaterial);
+      grate.name = 'street-drain-grate';
+      grate.position.set(x, 0.045, z);
+      decorative(grate); group.add(grate);
+    }
+  }
+
   group.userData.streetBatchStats = batchStaticMeshes(group, group, () => '', 'vertex-lit');
-  group.userData.neighbourhoodLife = { flowers: flowerCount, flowerBeds: flowerBeds.length, benches: 4, bins: 6, bicycles: 0, markers: 0, butterflies: 0, birds: 0 };
+
+  // Pass 82 "better grass and surrounding mountains in nuketown". Both layers
+  // live HERE, in the street-life group, for the same reason the mannequins
+  // do: the default 'blender' render profile hides the whole procedural arena
+  // root behind the Quality GLB, while this group is a sibling of the arena
+  // and renders on EVERY profile. Added after the batch pass on purpose - the
+  // lawn is InstancedMesh (the batcher skips those) and the backdrop must
+  // keep its vertex-coloured ridge materials instead of being collapsed into
+  // a palette batch.
+  const lawn = buildNuketownLawnField(group, reduced);
+  const backdrop = buildNuketownMountainBackdrop(group);
+  // DECLUTTER 2026-08-29: the corner earth banks became a real instanced
+  // forest ring between the fence and the foothills.
+  const forest = buildNuketownForestSurround(group);
+  // Owner 2026-08-31: "trees ... still feel poor on nuketown". The eight yard
+  // trees the Quality profile used to draw were a cylinder plus four identical
+  // UV spheres baked into the arena GLB; those nodes are deleted from the
+  // Blender source and re-baked, and the real trees are planted here instead -
+  // in this group, because it is the only layer that renders on EVERY profile.
+  // It also answers "you cannot walk up to a tree": until now the only
+  // vegetation inside the fence was grass.
+  const yardVegetation = buildNuketownYardVegetation(group);
+  group.userData.nuketownYardVegetationStats = yardVegetation.stats;
+  group.userData.nuketownForestStats = forest.stats;
+  group.userData.nuketownLawnStats = lawn.stats;
+  group.userData.nuketownBackdropStats = backdrop.stats;
+  // updateArenaArt drives the lawn's GPU wind clock through this hook (the
+  // per-frame caller in legacy-main already passes this group + now-ms).
+  group.userData.nuketownLawnWind = (seconds: number) => lawn.advanceWind(seconds);
+  // Owner 2026-08-30 breakable grass: gunfire and blasts flatten blades.
+  group.userData.nuketownLawnCrush = (x: number, z: number, radiusM: number) => lawn.crushAt(x, z, radiusM);
+
+  group.userData.neighbourhoodLife = {
+    flowers: flowerCount,
+    flowerBeds: flowerBeds.length,
+    benches: 4,
+    bins: 6,
+    mannequins: 0,
+    bicycles: 0,
+    markers: 0,
+    butterflies: 0,
+    birds: 0,
+  };
   root.add(group);
   return group;
 }
@@ -316,7 +510,7 @@ function addStreetInfrastructure(root: THREE.Group): void {
   const steel = new THREE.MeshStandardMaterial({ color: 0x39484d, roughness: 0.56, metalness: 0.56 });
   const porcelain = new THREE.MeshStandardMaterial({ color: 0xd7d0bd, roughness: 0.42 });
   const cable = new THREE.LineBasicMaterial({ color: 0x20292c, transparent: true, opacity: 0.72 });
-  const polePositions: Array<[number, number]> = [[-29, -35], [-29, 0], [-29, 35], [29, -35], [29, 0], [29, 35]];
+  const polePositions: Array<[number, number]> = [[-26, -33], [0, -33], [26, -33], [-26, 33], [0, 33], [26, 33]];
   for (const [x, z] of polePositions) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.25, 9.6, 10), steel);
     pole.position.set(x, 4.8, z); decorative(pole); root.add(pole);
@@ -328,14 +522,14 @@ function addStreetInfrastructure(root: THREE.Group): void {
     }
   }
   const wireSegments: THREE.Vector3[] = [];
-  for (const x of [-29, 29]) {
+  for (const z of [-33, 33]) {
     for (const offset of [-1, 0, 1]) {
-      for (const [fromZ, toZ] of [[-35, 0], [0, 35]] as Array<[number, number]>) {
-        let previous = new THREE.Vector3(x + offset, 9.02, fromZ);
+      for (const [fromX, toX] of [[-26, 0], [0, 26]] as Array<[number, number]>) {
+        let previous = new THREE.Vector3(fromX, 9.02, z + offset);
         for (let segment = 1; segment <= 12; segment += 1) {
           const t = segment / 12;
           const sag = Math.sin(Math.PI * t) * 0.65;
-          const current = new THREE.Vector3(x + offset, 9.02 - sag, THREE.MathUtils.lerp(fromZ, toZ, t));
+          const current = new THREE.Vector3(THREE.MathUtils.lerp(fromX, toX, t), 9.02 - sag, z + offset);
           wireSegments.push(previous, current);
           previous = current;
         }
@@ -346,7 +540,7 @@ function addStreetInfrastructure(root: THREE.Group): void {
   decorative(wires); root.add(wires);
 
   const signMaterial = new THREE.MeshStandardMaterial({ color: 0xe7b542, roughness: 0.48, metalness: 0.28 });
-  for (const [x, z, rotation] of [[-11.3, -6, 0], [11.3, 6, Math.PI]] as Array<[number, number, number]>) {
+  for (const [x, z, rotation] of [[-24, -6.6, 0], [24, 6.6, Math.PI]] as Array<[number, number, number]>) {
     const gantry = new THREE.Group(); gantry.position.set(x, 0, z); gantry.rotation.y = rotation;
     const post = roundedBox('lane-sign-post', [0.15, 4.2, 0.15], steel, 0.025); post.position.y = 2.1;
     const plate = roundedBox('lane-sign', [3.2, 0.92, 0.12], signMaterial, 0.08); plate.position.set(0, 3.65, 0);
@@ -357,7 +551,12 @@ function addStreetInfrastructure(root: THREE.Group): void {
 function addAtomicLandmark(root: THREE.Group): void {
   const landmark = new THREE.Group();
   landmark.name = 'original-atomic-landmark';
-  landmark.position.set(27, 0, -1.5);
+  // DECLUTTER 2026-08-29: the sculpture leaves the playable yard (its plinth
+  // collider is deleted) and becomes the out-of-bounds test-site landmark in
+  // the forest ring off the north-east corner - the reference's own tower
+  // lives outside the block the same way. Scaled up to read at 60 m.
+  landmark.position.set(44, 0, -40);
+  landmark.scale.setScalar(2.6);
   const ringMaterial = new THREE.MeshStandardMaterial({ color: 0x54c8c7, emissive: 0x123b42, emissiveIntensity: 1.2, roughness: 0.36, metalness: 0.64 });
   const animationRings: THREE.Mesh[] = [];
   for (const [index, rotation] of [0, Math.PI / 3, -Math.PI / 3].entries()) {
@@ -380,10 +579,6 @@ function addRouteArchitecture(root: THREE.Group): void {
   const frame = new THREE.MeshStandardMaterial({ color: 0x26343a, roughness: 0.42, metalness: 0.68 });
   const trim = new THREE.MeshStandardMaterial({ color: 0xe5bd4b, roughness: 0.52, metalness: 0.32 });
   const concrete = texturedMaterial('./assets/original/textures/concrete-poured.png', { roughness: 0.9, repeatX: 2, repeatY: 4 });
-  const glass = new THREE.MeshPhysicalMaterial({ color: 0x7fc6c3, transparent: true, opacity: 0.32, roughness: 0.18, metalness: 0.08, depthWrite: false });
-  const solar = new THREE.MeshStandardMaterial({ color: 0x173d58, emissive: 0x071d2c, emissiveIntensity: 0.7, roughness: 0.3, metalness: 0.72 });
-  const vineMaterial = new THREE.MeshStandardMaterial({ color: 0x496f47, roughness: 0.96 });
-  const vineGeometry = new THREE.IcosahedronGeometry(0.46, 1);
   const routeBox = (name: string, size: [number, number, number], material: THREE.Material, radius: number) => roundedBox(name, size, material, radius, 2);
   const routePanel = (name: string, size: [number, number, number], material: THREE.Material) => {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
@@ -391,74 +586,18 @@ function addRouteArchitecture(root: THREE.Group): void {
     return mesh;
   };
 
-  // West "skyline garden" route: a folded trellis reveal leading into a framed greenhouse.
-  for (const x of [-29, -22]) for (const z of [-15, -5]) {
-    const column = routeBox('trellis-column', [0.55, 3.8, 0.55], frame, 0.08);
-    column.position.set(x, 1.9, z); decorative(column); root.add(column);
-  }
-  for (const z of [-15, -11.7, -8.3, -5]) {
-    const rib = routeBox('trellis-rib', [8.1, 0.22, 0.36], frame, 0.05);
-    rib.position.set(-25.5, 4.0, z); decorative(rib); root.add(rib);
-  }
-  for (const x of [-28.5, -27, -25.5, -24, -22.5]) {
-    const slat = routeBox('trellis-slat', [0.18, 0.16, 10.8], trim, 0.04);
-    slat.position.set(x, 4.08, -10); decorative(slat); root.add(slat);
-  }
-  for (const [x, y, z, scale] of [
-    [-28.7, 4.08, -14.2, 1.05], [-27.1, 4.16, -12.1, 0.82], [-25.5, 4.1, -9.5, 1.1],
-    [-23.7, 4.05, -6.4, 0.9], [-22.35, 3.92, -13.7, 0.78], [-27.8, 3.98, -6.1, 0.84],
-  ] as Array<[number, number, number, number]>) {
-    const vine = new THREE.Mesh(vineGeometry, vineMaterial);
-    vine.name = 'trellis-vine-cluster';
-    vine.position.set(x, y, z);
-    vine.scale.set(scale * 1.3, scale * 0.52, scale * 1.45);
-    vine.rotation.set(x * 0.07, z * 0.11, y * 0.09);
-    decorative(vine); root.add(vine);
-  }
-
-  for (const [x, z, sx, sz] of [
-    [-29, 16, 0.45, 8], [-22, 16, 0.45, 8], [-25.5, 19.8, 7.5, 0.45],
-    [-28, 12.2, 2.2, 0.45], [-23, 12.2, 2.2, 0.45],
-  ] as Array<[number, number, number, number]>) {
-    const sill = routeBox('greenhouse-frame-wall', [sx, 3, sz], frame, 0.08);
-    sill.position.set(x, 1.5, z); decorative(sill); root.add(sill);
-  }
-  for (const x of [-27.7, -25.5, -23.3]) {
-    const roof = routeBox('greenhouse-roof-rib', [0.18, 0.18, 8.4], trim, 0.04);
-    roof.position.set(x, 3.45, 16); roof.rotation.z = x < -25.5 ? -0.22 : x > -25.5 ? 0.22 : 0; decorative(roof); root.add(roof);
-  }
-  for (const x of [-27.2, -23.8]) {
-    const pane = routeBox('greenhouse-glass', [2.8, 0.08, 8], glass, 0.02);
-    pane.position.set(x, 3.5, 16); pane.rotation.z = x < -25.5 ? -0.22 : 0.22; decorative(pane); root.add(pane);
-  }
-  for (const [x, z] of [[-28, 14], [-25.5, 18], [-23, 14]] as Array<[number, number]>) {
-    const planter = routeBox('greenhouse-planter', [1.5, 0.55, 0.8], concrete, 0.12);
-    planter.position.set(x, 0.28, z); decorative(planter); root.add(planter);
-  }
-
-  // East "service lane": waist-high channel walls and a folded solar maintenance canopy.
-  for (const x of [22.5, 28.5]) {
-    const wall = routeBox('service-channel-wall', [0.7, 1.5, 10], concrete, 0.12);
-    wall.position.set(x, 0.75, 9); decorative(wall); root.add(wall);
-    for (const z of [6, 9, 12]) {
-      const marker = routeBox('service-marker', [0.78, 0.16, 1.35], trim, 0.03);
-      marker.position.set(x, 1.18, z); decorative(marker); root.add(marker);
-    }
-  }
-  for (const x of [22.5, 29.5]) for (const z of [-20, -12]) {
-    const column = routeBox('solar-column', [0.6, 4.2, 0.6], frame, 0.08);
-    column.position.set(x, 2.1, z); decorative(column); root.add(column);
-  }
-  const canopy = routeBox('solar-canopy', [8.2, 0.34, 9.2], solar, 0.12);
-  canopy.position.set(26, 4.45, -16); canopy.rotation.z = -0.08; decorative(canopy); root.add(canopy);
-  for (const x of [23.3, 25.1, 26.9, 28.7]) {
-    const seam = routeBox('solar-seam', [0.06, 0.04, 8.5], trim, 0.01);
-    seam.position.set(x, 4.66 + (26 - x) * 0.08, -16); seam.rotation.z = -0.08; decorative(seam); root.add(seam);
-  }
-
+  // DECLUTTER 2026-08-29: trellis garden + greenhouse visuals deleted with
+  // their colliders - the west flank is open garden now.
+  // DECLUTTER 2026-08-29: service channel + solar canopy visuals deleted
+  // with their colliders - the east flank is open garden now.
   // Layered modular lane barriers retain the exact invisible gameplay box while losing the blockout-cube silhouette.
+  // Keyed by ANCHOR COORDINATE, never by COVER_LAYOUT array index: HF-383 removed
+  // the two leading entries, which shifted every index and silently deleted the
+  // skip and generator shells here while re-pointing the cargo and pipe shells at
+  // anchors they are not modelled for. See AUTHORED_LARGE_COVER_ANCHORS in map.ts.
   COVER_LAYOUT.forEach(([x, z, width, depth], index) => {
-    if (index === 4) {
+    const authoredId = authoredLargeCoverIdAt(x, z);
+    if (authoredId === 'north-cargo-stack') {
       const cargo = new THREE.Group(); cargo.name = 'north-authored-cargo-stack';
       for (const [cx, cy, cz, sx, sy, sz] of [
         [-0.95, 0.62, 0, 1.72, 1.18, 1.78], [0.95, 0.62, 0, 1.72, 1.18, 1.78], [0, 1.65, 0, 1.72, 0.86, 1.78],
@@ -471,7 +610,7 @@ function addRouteArchitecture(root: THREE.Group): void {
         }
       }
       cargo.position.set(x, 0, z); decorative(cargo); root.add(cargo);
-    } else if (index === 5) {
+    } else if (authoredId === 'south-pipe-stack') {
       const pipes = new THREE.Group(); pipes.name = 'south-authored-pipe-stack';
       for (const [offsetX, y] of [[-0.9, 0.62], [0, 0.62], [0.9, 0.62], [-0.45, 1.48], [0.45, 1.48]] as Array<[number, number]>) {
         const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.43, 0.43, Math.max(1.2, width - 0.3), 16, 1, true), concrete);
@@ -479,7 +618,7 @@ function addRouteArchitecture(root: THREE.Group): void {
         pipe.position.set(offsetX, y, 0); pipe.rotation.z = Math.PI / 2; pipes.add(pipe);
       }
       pipes.position.set(x, 0, z); decorative(pipes); root.add(pipes);
-    } else if (index === 6) {
+    } else if (authoredId === 'west-service-skip') {
       const skip = new THREE.Group(); skip.name = 'west-authored-service-skip'; skip.position.set(x, 0, z);
       const body = routeBox('service-skip-body', [width - 0.12, 1.72, depth - 0.18], concrete, 0.16);
       body.position.y = 0.91; skip.add(body);
@@ -489,7 +628,7 @@ function addRouteArchitecture(root: THREE.Group): void {
       }
       const label = routeBox('service-skip-warning-panel', [width - 0.45, 0.5, 0.06], trim, 0.03);
       label.position.set(0, 1.05, depth / 2); skip.add(label); decorative(skip); root.add(skip);
-    } else if (index === 7) {
+    } else if (authoredId === 'east-generator-trailer') {
       const generator = new THREE.Group(); generator.name = 'east-authored-generator-trailer'; generator.position.set(x, 0, z);
       const shell = routeBox('generator-shell', [width - 0.18, 1.72, depth - 0.42], frame, 0.14);
       shell.position.y = 1.1; generator.add(shell);
@@ -505,21 +644,28 @@ function addRouteArchitecture(root: THREE.Group): void {
       }
       decorative(generator); root.add(generator);
     }
+    // Owner 2026-08-29/30: the street crates are a jump STAIRWAY to the bus
+    // roof - dressing scales to each step's real collider height (outer pair
+    // 0.75 m, inner pair 1.5 m).
+    const crateHeight = authoredLargeCoverIdAt(x, z) ? 2.2
+      : Math.abs(x) === STREET_CRATE_LOW_X ? STREET_CRATE_HEIGHT
+        : Math.abs(x) === STREET_CRATE_TALL_X ? STREET_CRATE_TALL_HEIGHT : 1.6;
     const cap = routeBox('barrier-cap', [width + 0.18, 0.16, depth + 0.18], index % 2 ? trim : frame, 0.05);
-    cap.position.set(x, 1.58, z); decorative(cap); root.add(cap);
+    cap.position.set(x, crateHeight - 0.02, z); decorative(cap); root.add(cap);
+    const bodyHeight = Math.max(0.4, crateHeight - 0.42);
     for (const side of [-1, 1]) {
-      const rib = routeBox('barrier-rib', [0.12, 1.18, depth + 0.1], frame, 0.03);
-      rib.position.set(x + side * (width / 2 - 0.18), 0.78, z); decorative(rib); root.add(rib);
+      const rib = routeBox('barrier-rib', [0.12, bodyHeight, depth + 0.1], frame, 0.03);
+      rib.position.set(x + side * (width / 2 - 0.18), bodyHeight / 2 + 0.08, z); decorative(rib); root.add(rib);
       const foot = routePanel('barrier-foot', [0.48, 0.14, depth + 0.34], frame);
       foot.position.set(x + side * (width / 2 - 0.34), 0.08, z); decorative(foot); root.add(foot);
     }
     for (const face of [-1, 1]) {
       const faceZ = z + face * (depth / 2 + 0.035);
-      const panel = routePanel('barrier-recessed-panel', [Math.max(0.7, width - 0.48), 0.92, 0.07], frame);
-      panel.position.set(x, 0.78, faceZ); decorative(panel); root.add(panel);
+      const panel = routePanel('barrier-recessed-panel', [Math.max(0.7, width - 0.48), Math.min(0.92, bodyHeight), 0.07], frame);
+      panel.position.set(x, bodyHeight / 2 + 0.1, faceZ); decorative(panel); root.add(panel);
       for (const side of [-1, 1]) {
         const warning = routePanel('barrier-warning-stripe', [Math.max(0.42, width * 0.29), 0.13, 0.075], trim);
-        warning.position.set(x + side * width * 0.21, 0.8, faceZ + face * 0.006);
+        warning.position.set(x + side * width * 0.21, bodyHeight / 2 + 0.12, faceZ + face * 0.006);
         warning.rotation.z = side * 0.48;
         decorative(warning); root.add(warning);
       }
@@ -665,6 +811,20 @@ export function addSemanticHouseInteriors(root: THREE.Group): void {
     addPiece(houseIndex, house, 'workstation-monitor', [deskX, 4.75, deskZ - 0.38], [1.35, 0.88, 0.12], darkEquipment, 'dark-equipment');
     addPiece(houseIndex, house, 'workstation-leg-left', [deskX - 0.95, 3.55, deskZ], [0.13, 0.82, 0.72], metal, 'metal');
     addPiece(houseIndex, house, 'workstation-leg-right', [deskX + 0.95, 3.55, deskZ], [0.13, 0.82, 0.72], metal, 'metal');
+
+    // Owner 2026-08-30 richness: the rooms carried furniture but no LIFE -
+    // rug, wall art, lamp, backsplash, nightstand. All presentation-only.
+    addPiece(houseIndex, house, 'living-rug', [sofaX - 0.2, 0.03, sofaZ - 0.9], [3.6, 0.05, 2.6], fabric, 'fabric');
+    addPiece(houseIndex, house, 'wall-art-a', [sofaX - 2.6, 1.75, 3.32], [1.1, 0.78, 0.06], timber, 'timber');
+    addPiece(houseIndex, house, 'wall-art-b', [diningX + 0.4, 1.85, -3.32], [0.85, 0.6, 0.06], timber, 'timber');
+    const lampShade = addPiece(houseIndex, house, 'floor-lamp-shade', [sofaX + 1.9, 1.62, sofaZ + 0.3], [0.42, 0.36, 0.42], fabric, 'fabric');
+    const shadeMaterial = (lampShade.material as THREE.MeshStandardMaterial).clone();
+    shadeMaterial.emissive = new THREE.Color(0xffc27a);
+    shadeMaterial.emissiveIntensity = 1.4;
+    lampShade.material = shadeMaterial;
+    addPiece(houseIndex, house, 'floor-lamp-pole', [sofaX + 1.9, 0.8, sofaZ + 0.3], [0.07, 1.6, 0.07], metal, 'metal');
+    addPiece(houseIndex, house, 'kitchen-backsplash', [kitchenX, 1.45, kitchenZ + 0.35], [6.3, 0.6, 0.05], metal, 'metal');
+    addPiece(houseIndex, house, 'nightstand', [bedX + 1.9, 3.85, bedZ + 0.7], [0.55, 0.5, 0.5], timber, 'timber');
   });
 
   root.add(interiors);
@@ -678,8 +838,84 @@ export function addSemanticHouseInteriors(root: THREE.Group): void {
   };
 }
 
+function addBackyardLiving(root: THREE.Group): void {
+  const yards = new THREE.Group();
+  yards.name = 'backyard-living-sets';
+  const timberYard = new THREE.MeshStandardMaterial({ color: 0x8a6844, roughness: 0.92 });
+  const clothMaterial = new THREE.MeshStandardMaterial({ color: 0xe7e3d6, roughness: 0.95, side: THREE.DoubleSide });
+  const soil = new THREE.MeshStandardMaterial({ color: 0x5c4a33, roughness: 1 });
+  const yardBox = (name: string, size: [number, number, number], material: THREE.Material): THREE.Mesh => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+    mesh.name = name;
+    return mesh;
+  };
+  for (const mirror of [1, -1] as const) {
+    // Behind-house yard anchor (west house yard when mirror=1).
+    const ax = -22 * mirror;
+    const az = -23.5 * mirror;
+    const set = new THREE.Group();
+    set.name = 'backyard-set';
+    // Round garden table with two chairs.
+    const tableTop = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.06, 14), timberYard);
+    tableTop.name = 'backyard-table-top';
+    tableTop.position.set(ax, 0.74, az);
+    const tablePole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 0.72, 8), timberYard);
+    tablePole.name = 'backyard-table-pole';
+    tablePole.position.set(ax, 0.37, az);
+    set.add(tableTop, tablePole);
+    for (const seatAngle of [0.6, 3.5]) {
+      const chair = yardBox('backyard-chair', [0.5, 0.48, 0.5], timberYard);
+      chair.position.set(ax + Math.cos(seatAngle) * 1.15, 0.24, az + Math.sin(seatAngle) * 1.15);
+      const back = yardBox('backyard-chair-back', [0.5, 0.5, 0.08], timberYard);
+      back.position.set(ax + Math.cos(seatAngle) * 1.38, 0.72, az + Math.sin(seatAngle) * 1.38);
+      back.lookAt(ax, 0.72, az);
+      set.add(chair, back);
+    }
+    // Raised planter bed with soil fill (flowers from the bed system nearby).
+    const planterX = ax + 4.5 * mirror;
+    const planterZ = az - 3 * mirror;
+    const frame = yardBox('backyard-planter-frame', [2.6, 0.42, 1.2], timberYard);
+    frame.position.set(planterX, 0.21, planterZ);
+    const fill = yardBox('backyard-planter-soil', [2.4, 0.06, 1.0], soil);
+    fill.position.set(planterX, 0.4, planterZ);
+    set.add(frame, fill);
+    // Firewood stack against the garage line.
+    const stackX = ax - 3.4 * mirror;
+    for (let log = 0; log < 8; log += 1) {
+      const piece = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.85, 7), timberYard);
+      piece.name = 'backyard-firewood';
+      piece.rotation.z = Math.PI / 2;
+      piece.position.set(stackX + (log % 4) * 0.24 * mirror, 0.12 + Math.floor(log / 4) * 0.22, az + 2.4 * mirror);
+      set.add(piece);
+    }
+    // Washing line: two posts, a line, three hung sheets.
+    const lineZ = az + 4.2 * mirror;
+    for (const postOffset of [-2.2, 2.2]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 2.0, 7), timberYard);
+      post.name = 'backyard-line-post';
+      post.position.set(ax + postOffset, 1.0, lineZ);
+      set.add(post);
+    }
+    const line = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 4.4, 5), soil);
+    line.name = 'backyard-line';
+    line.rotation.z = Math.PI / 2;
+    line.position.set(ax, 1.92, lineZ);
+    set.add(line);
+    for (const sheetOffset of [-1.3, 0, 1.3]) {
+      const sheet = yardBox('backyard-sheet', [1.0, 0.85, 0.02], clothMaterial);
+      sheet.position.set(ax + sheetOffset, 1.48, lineZ + 0.01);
+      sheet.rotation.y = (sheetOffset === 0 ? 0.04 : -0.05);
+      set.add(sheet);
+    }
+    set.traverse((node) => { decorative(node); });
+    yards.add(set);
+  }
+  root.add(yards);
+}
+
 function addNarrativeDressing(root: THREE.Group, reduced: boolean): void {
   addSemanticHouseInteriors(root);
+  addBackyardLiving(root);
   const dark = new THREE.MeshStandardMaterial({ color: 0x25343a, roughness: 0.62, metalness: 0.28 });
   const gold = new THREE.MeshStandardMaterial({ color: 0xe5b842, emissive: 0x6b4210, emissiveIntensity: 0.5, roughness: 0.52, metalness: 0.2 });
   const routeMarkers: Array<[string, number, number, number, number]> = [
@@ -723,6 +959,10 @@ const arenaFlightScale = new THREE.Vector3();
 
 /** Updates only explicitly presentation-only arena nodes without per-instance frame allocations. */
 export function updateArenaArt(root: THREE.Group, now: number): void {
+  // Pass 82 lawn wind: one uniform write per frame; the sway itself is fully
+  // GPU-side in the field's TSL graph (no-op on the WebGL2 compat route).
+  const lawnWind = root.userData.nuketownLawnWind as ((seconds: number) => void) | undefined;
+  if (lawnWind) lawnWind(now * 0.001);
   const state = arenaAnimationAt(now);
   const rings = (root.userData.animationRings as THREE.Mesh[] | undefined) ?? [];
   for (let index = 0; index < rings.length; index += 1) {
@@ -766,6 +1006,24 @@ export function updateArenaArt(root: THREE.Group, now: number): void {
 }
 
 /** Builds original Atomic Acres hero vehicles and environmental props. */
+/**
+ * The Quality art coach, built AND placed. HF-536: this used to be three
+ * inline lines inside `loadArenaArt`, which meant the only way to get the
+ * coach into a test was to run the whole async GLB-loading art path — so the
+ * Quality composition parity gate simply never saw it, and the four brass
+ * stanchion poles inside the bus (`coach-stanchion`, art-kit.ts) could not
+ * explain the four `central bus stanchion` colliders they physically stand
+ * in. The gate reported invisible geometry that has been visible all along.
+ * One function, two callers, no drift.
+ */
+export function placeArenaCoach(): THREE.Group {
+  const coach = buildRetroCoach();
+  coach.position.set(CENTRAL_BUS.x, 0, CENTRAL_BUS.z);
+  coach.rotation.y = Math.PI / 2 + 0.02;
+  coach.traverse((node) => { node.userData.blocksShots = true; });
+  return coach;
+}
+
 export async function loadArenaArt(
   scene: THREE.Scene,
   onProgress?: (loaded: number, total: number) => void,
@@ -782,28 +1040,25 @@ export async function loadArenaArt(
   scene.add(root);
 
   addNarrativeDressing(root, reduced);
-  const coach = buildRetroCoach();
-  coach.position.set(-3.8, 0, 7);
-  coach.rotation.y = 0.03;
-  coach.traverse((node) => { node.userData.blocksShots = true; });
-  root.add(coach);
+  root.add(placeArenaCoach());
   onProgress?.(1, 12);
-
-  const shuttle = buildRetroShuttleBus();
-  shuttle.position.set(4.2, 0, -8.8);
-  shuttle.traverse((node) => { node.userData.blocksShots = true; });
-  root.add(shuttle);
   onProgress?.(2, 12);
 
-  addTree(root, -29, -23, 1.05); onProgress?.(3, 12);
-  addTree(root, 29, 24, 1.1); onProgress?.(4, 12);
-  addTree(root, -28, 29, 0.82); onProgress?.(5, 12);
-  addTree(root, 27, -31, 0.9); onProgress?.(6, 12);
+  // Trunks are the visible half of map.ts's authored tree colliders.
+  addTree(root, -9, -28.5, 1); onProgress?.(3, 12);
+  addTree(root, 9, 28.5, 1);
+  addTree(root, -33.5, -26, 0.9); onProgress?.(4, 12);
+  addTree(root, 33.5, 26, 0.9);
+  addTree(root, -13, 27.5, 0.85); onProgress?.(5, 12);
+  addTree(root, 13, -27.5, 0.85); onProgress?.(6, 12);
+  // v3: one tree per spawn yard (see map.ts twin list).
+  addTree(root, -34.5, 10, 0.9);
+  addTree(root, 34.5, -10, 0.9);
   addStreetProps(root); onProgress?.(7, 12);
   addModernGroundDetails(root, reduced);
 
   const tower = new THREE.Group();
-  tower.position.set(29, 0, -36);
+  tower.position.set(29, 0, -34);
   const steel = new THREE.MeshStandardMaterial({ color: 0x4c5960, roughness: 0.48, metalness: 0.55 });
   for (const x of [-1.4, 1.4]) for (const z of [-1.4, 1.4]) {
     const leg = roundedBox('test-tower-leg', [0.22, 9, 0.22], steel, 0.04); leg.position.set(x, 4.5, z); tower.add(leg);

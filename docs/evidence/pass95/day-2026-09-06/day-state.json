@@ -1,0 +1,257 @@
+{
+  "schema": 1,
+  "owner": "Claude Code (Fable 5.1) day shift, HF-535",
+  "start": "2026-09-06T06:05:00+01:00",
+  "target": "2026-09-06T14:00:00+01:00 to 15:00 BST: HITL local inspection build on 127.0.0.1:4285 (publish only with owner HITL verdict + release contract + ancestry reconciliation)",
+  "integration": "C:/Users/david/projects/aa-astra-pass95-hitl",
+  "integrationBranch": "contrib/dave-gaming-pc/codex/pass95-hitl-45m",
+  "base": "b5b06e0f2511e6925835484b1fc99f9dba3cfc40",
+  "ledgerRow": "HF-535 in aa-claude-hotfix docs/PASS84_OWNER_FEEDBACK_2026-09-02.md @ b8118209 (pushed)",
+  "machine": {
+    "memoryCorrection": "06:20 BST: CDPUserSvc_7b6e9 svchost (24.9 GB private) and explorer (24.7 GB private) restarted per gotcha-commit-exhaustion-kills-hooks; commit 103.1 -> 52.8 GB, available RAM 2.9 -> 6.5 GB",
+    "powerPlan": "High performance verified 06:06",
+    "akp": "adoption PASS; pull-only sync BLOCKED (local main 1 unpushed, 2 behind) - owner-side reconcile"
+  },
+  "lanes": {
+    "mp": {
+      "worktree": "C:/Users/david/projects/aa-day-mp",
+      "branch": "contrib/dave-gaming-pc/omp/day-mp",
+      "model": "meta-contributor/muse-spark-1.3-contributor",
+      "port": 4291,
+      "phase": "DONE 06:32 RED-as-RED: telemetry 477c3ab6; latch hypothesis falsified; guest self-kill at resume demonstrated",
+      "runId": "delegated-omp-dd4a45e8-3f7d-428c-a58a-03da22d03b9f",
+      "telemetryCommit": "477c3ab6",
+      "heavy": "holds lock since 06:21 for evidence soak",
+      "integrated": "477c3ab6 cherry-picked"
+    },
+    "roof": {
+      "worktree": "C:/Users/david/projects/aa-day-roof",
+      "branch": "contrib/dave-gaming-pc/omp/day-roof",
+      "model": "meta-contributor/muse-spark-1.3-contributor",
+      "port": 4293,
+      "phase": "VERDICT VOID 07:35: all 14 roof-lane captures were answered by a stale vite preview squatting :41931 (aa-claude-nuketown6 Pass-93 dist 07388f97: 10 stations, blue/yellow pre-HF-477 siding, no rooflines). Black roofs remain UNREFUTED (overnight 0d8e1df8 captures are genuine). Test-only commit 846c832b kept (unit-level batcher pin). Squatter PID 27168 stopped; capture script hardened (b639b751).",
+      "heavyPriority": 1,
+      "runId": "delegated-omp-03dd7e8d-5734-4d4e-8236-ae4797db7729"
+    },
+    "visual-a": {
+      "worktree": "C:/Users/david/projects/aa-day-visual-a",
+      "branch": "contrib/dave-gaming-pc/omp/day-visual-a",
+      "model": "meta-contributor/muse-spark-1.3-contributor",
+      "port": 4295,
+      "phase": "DONE 06:36: 37cac123 mountains two-tone/haze, wet asphalt, verge/wildflowers, kerbs; 150/150, tsc clean; captures OPEN (root)",
+      "runId": "delegated-omp-dc091be8-64a4-4dd5-8d8e-e6e095f64c5f",
+      "integrated": "37cac123 cherry-picked"
+    },
+    "visual-b": {
+      "worktree": "C:/Users/david/projects/aa-day-visual-b",
+      "branch": "contrib/dave-gaming-pc/omp/day-visual-b",
+      "model": "meta-contributor/muse-spark-1.3-contributor",
+      "port": 4296,
+      "phase": "DONE 06:44: edaffb43 forest spires/standouts, avenue lean+crown notch, clipped hedges; 65/65, tsc 0; veg 43,104 tris, forest 66,713, 12 draws; captures OPEN (root)",
+      "runId": "delegated-omp-209155ec-b494-4ecb-b00a-44ddb1c69949"
+    },
+    "visual-c": {
+      "worktree": "C:/Users/david/projects/aa-day-visual-c",
+      "branch": "contrib/dave-gaming-pc/omp/day-visual-c",
+      "model": "meta-contributor/muse-spark-1.3-contributor",
+      "port": 4297,
+      "phase": "DONE 06:55: cde72677 lit lamp heads (glass-family lampHead, emissive), nuketown2-effects.ts sun shafts + dust (+6 draws, +10 tris, 0 lights); light rig unchanged; 214/214, tsc 0; captures OPEN (root)",
+      "runId": "delegated-omp-38b420d5-510d-41bf-8e96-ae7874787bb7"
+    },
+    "freeze": {
+      "worktree": "C:/Users/david/projects/aa-day-freeze",
+      "branch": "contrib/dave-gaming-pc/omp/day-freeze",
+      "model": "meta-contributor/muse-spark-1.3-contributor",
+      "port": 4292,
+      "phase": "DONE 07:15: c242a0b6 host-mode attributor (--mode host --host-bots N), 5eaf14e4 evidence. Host 4-bot Terminal 120 s: p50 10.3/p95 14.6/p99 18.3/p99.9 24.7/max 54.3, 1 hitch (repro: 5 hitches max 61.4, coverage 72.8%); Nuke host 2-bot: p99.9 24.0, max 39.4, 0 hitches. No freeze reproduced; no repair per gate."
+    },
+    "mp-repair": {
+      "worktree": "C:/Users/david/projects/aa-day-mp",
+      "branch": "contrib/dave-gaming-pc/omp/day-mp",
+      "model": "claude-opus high via Workflow wf_bef10078-988 (+ Opus skeptic stage)",
+      "phase": "DONE-RED 07:36 (skeptic running): 5c64bce9 guest reconnect pacing + readmit, 62686251 host latch tick recovery + fail-closed deadline, 2297ee52 evidence; soak day-mp-fix 6/8, divergences 91->33, guestB alive/replicating all 73 post-rejoin samples, guestA replica continuous, reload-after-death PASS; tests 103 files/1088 green, tsc 0; remaining: replication = 30 blind-window rows (gate semantics, owner call), rejoin-damage guestA conjunct = broadcast reuses last admitted seq (health sequencing lane)",
+      "rootCause": "guest sendClientWorldRepairReady fires twice in 1 ms, both reconnect attempts spent; host join burst sends killstreak-state before resume authority; raw-count fence at legacy-main ~13037 calls handleGuestResumeTimeout -> silent hp0/alive false, pump off, latch never releases, guestA prunes at 12 s",
+      "brief": "lanes/mp-repair/BRIEF.md",
+      "evidence": "lanes/mp-repair/TRACERS.md",
+      "skeptic": "accept-with-required-fixes 07:55: (1) fail-closed branch can disarm the latch with no pending record -> silent idle (must re-arm); (2) readmit mutation runs before admission -> reorder inside accepted path; (3) first tick resend unthrottled (duplicate authority 5 ms later); (4) widened sendGuestResumeAuthority gate opens the mint branch to a guest-authored pose -> require awaitingReplacementState on the mint. No test weakening; ratchet exactly 37,396; all bundle facts confirmed (five immaterial numbers off by one)."
+    },
+    "roof-repair": {
+      "worktree": "C:/Users/david/projects/aa-day-roof",
+      "branch": "contrib/dave-gaming-pc/omp/day-roof",
+      "model": "claude-opus high via Workflow wf_4976395c-72c (+ skeptic)",
+      "phase": "DONE 08:20 but commit 947b937f REJECTED by skeptic: worker proved the roof fragment is poisoned by NaN from the SHARED baseColor uniform node (material-uniforms.ts SHARED_NODES singleton, per-draw onObjectUpdate) and replaced it with a literal; skeptic measured that this RELOCATES the exact-zero clamp onto ground/asphalt/lawn (road black on 25/29 stations, north-yard lawn 100% R=0 B=0). Not integrated. Real fix: per-program uniform bindings in material-uniforms.ts. Provenance clean (bundles verified). Also: second black surface at north-yard frame-left, capture script GPU flags vs contract noted.",
+      "brief": "lanes/roof-repair/BRIEF.md"
+    },
+    "mp-damage": {
+      "worktree": "C:/Users/david/projects/aa-day-mp",
+      "branch": "contrib/dave-gaming-pc/omp/day-mp",
+      "model": "claude-opus high (planned)",
+      "phase": "DONE-RED 08:40: 8267b0ba + 3d2a5945 dedicated host-authored health-authority event (reliable lane, per-subject revision, four admission clauses, 3 idempotent copies); 143 files/1665 tests green; soak twice 6/8 (divergences 26); bundle shows guestA ACCEPTED the fact at s103 (same second as host); row still RED because the gate probe reads peers sequentially and exits at 120 ms while injecting 60 ms one-way delay (victim measured 183/198 ms). Skeptic: accept-with-required-fixes (6): #1 observer revision ledger never reset on clients (blocks integration), #2 seed rejoining observers, #3 respawn misclassification via lethal fact ahead of pre-death state, #4 state overwrites applied hp, #5 newer-life fact resurrects corpse visibility, #6 ledger records seen not applied.",
+      "brief": "lanes/mp-damage/BRIEF.md"
+    },
+    "critic": {
+      "model": "google-antigravity/gemini-3.8-flash-high",
+      "phase": "DONE 08:01: overhead 22.5->25.5, north-yard 21->23.5, garage 25->27, others flat; regressions: lamp heads black (street-centre), shaft quad reads as bus-roof glint, dense amber haze at nuke-street, yellow speckles on south driveway, dark ground patch north-yard; gaps: lawns muted/no flower beds, lighting key/fill separation, asphalt sheen/striping, mountains flat at overhead, haze uniform",
+      "runId": "delegated-omp-b5e7b88c-2400-462a-a635-ac8a542a319d"
+    },
+    "mp-skeptic-fixes": {
+      "worktree": "C:/Users/david/projects/aa-day-mp",
+      "model": "meta-contributor/muse-spark-1.3-contributor",
+      "phase": "DONE 07:52: 212223ad applies fixes 1-4 exactly; 110 files/1152 tests green, RED-before 4 failed at 2297ee52, tsc 0, ratchet 37,396",
+      "brief": "lanes/mp-skeptic-fixes/BRIEF.md"
+    },
+    "polish": {
+      "worktree": "C:/Users/david/projects/aa-day-polish",
+      "branch": "contrib/dave-gaming-pc/omp/day-polish",
+      "base": "c0df91bf",
+      "model": "meta-contributor/muse-spark-1.3-contributor",
+      "phase": "DONE 07:55: e49dcfff \u2014 shafts moved high/verge-side and faint (0.016-0.030), nuketown2 mist/dust branches (was gun-range fallthrough), wildflowers + straw masked to beyond-fence verge, mountain two-tone swing + shadeStrength up (floor 1.45), turf 0x496438->0x417c33, planter bloom mask; 143 tests, tsc 0"
+    },
+    "uniforms-repair": {
+      "worktree": "C:/Users/david/projects/aa-day-roof",
+      "branch": "contrib/dave-gaming-pc/omp/day-roof",
+      "base": "4236de32 (947b937f held out)",
+      "model": "claude-opus high",
+      "phase": "DONE 09:20: per-material nodes (b7098c70) REJECTED by the worker itself and the skeptic: heals perimeter wall/sand pit/balcony but blackens roads on 13/29 stations (22% at coach-elevation); shared delivery is part of the story, not all of it; shipped only a9ed4c7c (diff gate FAILS on newly-black area). Prime suspect now three r185 Binding.clone() shallow copy sharing update-range state across NodeUniformsGroup clones; cheap falsifier = force full uniform uploads at base."
+    },
+    "mp-damage-fixes": {
+      "worktree": "C:/Users/david/projects/aa-day-mp",
+      "model": "meta-contributor/muse-spark-1.3-contributor",
+      "phase": "DONE 09:17: 178499fa applies fixes 1-6 (epoch-scoped applied ledger, rejoin seeding, continuity-gated respawn classification, hp clamp to held authority, newer-life hold, applied-only ledger); 41/41, 111 files/1193, tsc 0, RED-before on content",
+      "brief": "lanes/mp-damage-fixes/BRIEF.md"
+    },
+    "binding-repair": {
+      "worktree": "C:/Users/david/projects/aa-day-roof",
+      "base": "a9ed4c7c",
+      "model": "claude-opus high (no skeptic; diff gate + canonical boxes verify)",
+      "phase": "DONE 09:50 outcome (b): forced whole-buffer uniform uploads render pixel-identical to base (29/29, 0 newly-black, roofs still [0,0,0]); binding-clone suspect REFUTED; no commits. Next falsifier for a later session: dump/diff generated WGSL + declared uniform types per nuketown2 family program at base vs the literal build (nodeType null -> type derived at build time from a mutable slot is a shader-SOURCE hazard)."
+    },
+    "device-limit": {
+      "worktree": "C:/Users/david/projects/aa-day-roof",
+      "base": "a9ed4c7c",
+      "model": "claude-opus high",
+      "phase": "DONE 10:30: limits hypothesis REFUTED by measurement (nothing near a cap, 0 validation errors, victim/asphalt/siding binding-identical) BUT ROOT CAUSE FOUND in generated WGSL: roof program declares the shared baseColor uniform as f32 (scalar) while healthy programs declare vec3<f32>; uniform(new THREE.Color()) has nodeType null so each program infers the type at build time; three r185 UniformsGroup.updateNumber writes a Color object into a Float32Array slot -> NaN every frame. Explains everything incl. victim relocation with the program set."
+    },
+    "type-pin": {
+      "worktree": "C:/Users/david/projects/aa-day-roof",
+      "base": "a9ed4c7c",
+      "model": "claude-opus high",
+      "phase": "DONE 10:55: 4a60f52f pins uniform node types (correct: roof WGSL f32->vec3, 0 scalar-collapsed programs, roofs heal) BUT asphalt goes black with byte-identical WGSL -> data-path fault decides the victim; newly-black 22.35% coach-elevation; NOT integrated (kept on day-roof branch as a correct hygiene fix + evidence)"
+    }
+  },
+  "queued": [
+    "visual-b vegetation (Muse)",
+    "visual-c lighting/atmosphere/effects (Muse)",
+    "freeze host-mode 4-bot stress (Muse, heavy)",
+    "Opus skeptic reviews per lane before integration",
+    "Gemini blind A/B render critic on integrated captures",
+    "cold admission 21.7 s vs 10 s (OPEN debt)",
+    "Raid only after Nuke qualifies"
+  ],
+  "open": [
+    "MP soak 5/8 at b5b06e0f (replication 98, rejoin-damage null, reload-after-death guestB)",
+    "main-ancestry divergence blocks publication",
+    "cold admission 21.7 s",
+    "black roofs OPEN after three falsified mechanisms (roof family albedo, CPU uniform delivery, GPU uniform upload); defect is in the generated shader program; today's build ships as measured; next falsifier = WGSL/type dump diff per family program"
+  ],
+  "stop": "C:/Users/david/Desktop/stuff/aa-day-2026-09-06/STOP (absent)",
+  "claude": {
+    "opusTracers": "workflow wf_c60e1b9f-bc0: two read-only Opus tracers (host latch, guest side) at b5b06e0f, launched 06:21 \u2014 DONE 06:35, both results in lanes/mp-repair/TRACERS.md",
+    "policy": "Opus only for tracing/skeptic review; at most one Fable worker; coordinator stays Fable",
+    "artGapInvestigator": "workflow wf_013ed0c9-3c1 launched 07:08: why rooflines/HF-477 colours/19 stations miss the live scene at b5b06e0f \u2014 DONE 07:31: not a code defect; port squatter on 41931 (see gotcha-viewpoint-capture-port-squatter)",
+    "opusAgentsUsed": "2 tracers, mp repair+skeptic, art-gap, roof repair+skeptic, mp-damage repair+skeptic (running), uniforms repair+skeptic (running) = 12 Opus calls; 0 Fable workers"
+  },
+  "monitor": "bghno1z2x (wave-1 STATUS/terminal)",
+  "integrationLog": [
+    "06:42 cherry-pick 477c3ab6 (mp telemetry, scripts-only)",
+    "06:42 cherry-pick 37cac123 (visual-a)",
+    "06:45 cherry-pick edaffb43 (visual-b) -> e5810147",
+    "06:57 cherry-pick cde72677 (visual-c) after dropping stale 87fc5493 pick",
+    "07:05 cherry-pick 846c832b (roof batch shadow test)",
+    "07:17 cherry-pick c242a0b6 + 5eaf14e4 (freeze instrument + evidence)",
+    "07:35 b639b751 fix(qa): capture script refuses port squatter",
+    "07:38 c0df91bf fix(qa): capture script reaps its own preview (leaked child squatted :41931 after every run)",
+    "07:53 cherry-pick 5c64bce9, 62686251, 2297ee52, 212223ad (mp rejoin repair + skeptic fixes) -> b155edbf; 144/144 focused + 9/9 contracts",
+    "07:56 cherry-pick e49dcfff (polish) -> 6b8dec23; 139/139 focused",
+    "09:18 cherry-pick 8267b0ba, 3d2a5945, 178499fa (host health-authority event + skeptic fixes)",
+    "09:25 cherry-pick a9ed4c7c (diff gate newly-black tier)",
+    "10:06 reverts 7bac0f78, 5767340c, 31b08e89 + effects-only polish 8f5e08c2 (135 focused tests)",
+    "10:08 final gate run #2 (final-2) launched on 8f5e08c2 with boot smoke on the external :4285 preview",
+    "10:53 reverts c80ed836 (effects polish/composition), bc649bb5 (visual-c) -> base visuals",
+    "11:00 final-3 gates launched solo on bc649bb5 (after killing a preview leaked by the type-pin lane on :41931)"
+  ],
+  "rootCapture": {
+    "script": "root-capture.sh + launch-root-capture.cmd",
+    "attempt1": "06:55 RAM-GATE-FAIL 4022 MB (3 Muse workers + Opus + roof Chrome resident); retry after roof lane exits",
+    "purpose": "what the served b5b06e0f dist renders at the 7 stations and one in-match frame; overnight base captures (0d8e1df8) show different art (flat cream houses, black slabs) from today b5b06e0f captures (textured yellow/blue houses, roofs ~RGB70) despite identical seed/camera",
+    "attempt2": "07:08 POWER-PLAN-FAIL (Git Bash mangled /getactivescheme); attempt3 07:11 waiting: lock day-freeze then day-mp-repair; RAM dips to 1.8 GB during the soak",
+    "attempt4": "07:23-07:26 DONE: served b5b06e0f dist (D1KZmZ-u) 29/29 stations + in-match frame; CONFIRMS black north roof + garage roof at overhead, black butterfly roof at north-yard, black ceiling inside the north house in-match; in-match 20 s p50 10.2/p99 17.4/max 29.5 ms, 0 hitches; outputs root-captures/served-b5b06e0f/",
+    "integrated1": "07:40-07:47 DONE at c0df91bf: bundle BeI2kItE, 29/29, in-match frame; roofs now textured (side effect of visual commits: batch-key reshuffle), NEW regression: lamp heads black (visual-c lampHead shares coachGlass batch key); fence wall black in-match; sun shafts visible as faint streaks"
+  },
+  "decisionsForOwner": [
+    "MP-SOAK-REPLICATION cannot go green with the leave/rejoin inside the 180 s sample window: the gate counts guestB missing everyone during its own scripted 15 s absence (30 samples). Options: exempt directed pairs involving a peer between host-observed leave and admitted rejoin, or move the rejoin scenario outside the sampled window. Both are gate-semantics changes and need your call; not changed today.",
+    "MP-SOAK-REJOIN-DAMAGE 120 ms bound: damage now propagates (guestB 225 ms, guestA via next relayed state ~1 s) but not within 120 ms for all three peers. Needs either a faster damage path (direct reliable health event applied immediately on guests) or a bound decision.",
+    "MP-SOAK-REJOIN-DAMAGE 120 ms probe: the gate reads host/guestA/guestB with sequential page.evaluate calls in one round and exits at 120 ms, while injecting a deterministic 60 ms one-way delay on every send; the victim alone measured 183/198 ms even though guestA accepted the host health fact in the same second. The row cannot pass as written; fix = concurrent probe reads or more than one sampling round inside the bound (gate change, reserved to you)."
+  ],
+  "hypothesis": "SUPERSEDED: not materialBatchKey; the shared mutable uniform nodes in src/nuketown2-materials/material-uniforms.ts (SHARED_NODES spread into every family, written per draw via onObjectUpdate) make each program output a function of WHICH programs reference the node (binding/layout defect) -> NaN/black on whichever family loses. Explains roofs black at b5b06e0f, roofs cured + lamp heads black after visual-c registry change, black fences.",
+  "ledger": "aa-claude-hotfix checkpoint 08:00 committed",
+  "schedule": {
+    "now": "11:15 lottery L1-L6 running (compositions on bc649bb5) to find a bundle with clean roads; then gates on the winner or ship bc649bb5 with the visual caveat",
+    "next": [
+      "roof-repair result -> integrate -> integrated-2 build+capture (lock) -> critic round 2",
+      "mp-damage result (soak under lock) -> integrate",
+      "~11:30 freeze integration HEAD -> root-final-gates.sh (tsc, vitest, contracts, build dist->:4285, receipt, 29 stations x2, boot smoke all arenas, hitches 90 s, soak, preflight) ~45 min",
+      "~12:30 evidence REPORT + ledger + handoff memory; 13:00-14:00 HITL build ready for owner"
+    ]
+  },
+  "finalGates": {
+    "label": "final-1",
+    "head": "569d82b1",
+    "tsc": "0 errors",
+    "vitest": "134 files / 1453 pass",
+    "contracts": "9/9",
+    "build": "bundle legacy-main-XrM7dnml.js, served bytes match disk, 606 files, dist tree ed465e43...",
+    "stations": "29/29 PASS, bundleAtStart matches",
+    "diff": "FAIL: NEWLY_BLACK 16 stations \u2014 roads black at coach-elevation 19.5%, street-centre 9.8%, vehicle-far 7.5%, appliance-bank-north 8.8% (present already at integrated-1 c0df91bf; polish neutral). Roofs healed (overhead 0% black).",
+    "remaining": "boot smoke, hitches, soak, preflight running"
+  },
+  "decision": "10:30 black roads are unacceptable for HITL; bisect visual lanes a/b/c on their own worktrees (base + one lane each) with the newly-black metric; ship mp fixes + harness + only the visual lanes that keep roads clean; rebuild + re-capture + boot smoke + hitches after; soak not repeated (mp unchanged)",
+  "bisect": {
+    "lane-a (37cac123)": "coach-elevation newlyBlack 19.6%, street-centre 9.4%, vehicle-far 7.6%; overhead roofs healed 2.89%",
+    "lane-b (edaffb43, vegetation only)": "coach-elevation 21.2%, street-centre 9.8%, vehicle-far 7.9%; overhead healed 2.89%",
+    "conclusion": "ANY program-set change moves the NaN clamp from roofs to asphalt with the same footprint -> positional (limit/index) defect, not material-specific",
+    "lane-c (cde72677)": "coach-elevation newlyBlack 0.00%, street-centre 0.51% (lamp head), vehicle-far 0.25%; healed: overhead 2.55%, north-yard 5.43%, coach-elevation 2.60%, street-centre 3.32% -> roofs healed, roads clean"
+  },
+  "planB": "if device-limit refuted: HITL candidate = 569d82b1 minus visual-a/b/c/polish (roads clean, roofs black as at b5b06e0f); rebuild, boot smoke on :4285 external preview, 29 stations, hitches; soak already 6/8 on the mp tree",
+  "composition": "FINAL candidate bc649bb5 = b5b06e0f + mp rejoin repair + skeptic fixes + health-authority + fixes + harness fixes (capture reap/guard, diff newly-black gate, freeze attributor + evidence) + roof batch test; ALL visual files byte-identical to b5b06e0f (visual-a/b/c, polish, type-pin held on lane branches with evidence)",
+  "finalGates2": {
+    "label": "final-2",
+    "head": "8f5e08c2 (plan C: mp + harness + visual-c + effects polish)",
+    "tsc": "0",
+    "vitest": "133 files / 1440",
+    "contracts": "9/9",
+    "build": "legacy-main-BacZz8wS.js served byte-identical, 606 files",
+    "diff": "FAIL NEWLY_BLACK 12 stations: coach-elevation 21.2%, street-centre 10.3%, vehicle-far 8.2%, into-sun 5.3% \u2014 roads black despite lane-c alone being clean; victim depends on build-order/value state at program compile, not on any single lane",
+    "remaining": "boot smoke (external preview), hitches, soak, preflight running",
+    "bootSmoke": "13/13 passed (9.0 min) on external preview :4285 with stock flags",
+    "hitches": "90 s solo 2 bots p50 10.1 / p95 14.3 / p99 17.1 / p99.9 26.2 / max 37.4 ms, 0 hitches",
+    "soak": "5/8: REPLICATION 32 (blind window), REJOIN-DAMAGE damage record null, STAIR-FIRE FAIL guestB (host did not observe stair body position; guestB fire refused + reload no-op PRE-respawn, all fine post-respawn); ran concurrently with the type-pin lane vitest/tsc/build",
+    "suspects": "load-induced flake vs regression from 41dde166 (six health-authority fixes; final-1 with the same code passed, the two day-mp-damage soaks pre-fix passed)"
+  },
+  "planD": "if type-pin fails: revert visual-c + effects polish too (8f5e08c2 -> mp + harness only = day-base visuals); rebuild; gates; roofs black as at b5b06e0f, roads clean (to be verified by capture, since even that can flip)",
+  "resoak": "resoak-1 (final-2 dist, CPU 63% at start from type-pin lane): 5/8 \u2014 STAIR-FIRE PASS this time, RELOAD-AFTER-DEATH guestB FAIL, divergences 69, rejoin scenario record absent. Post-41dde166 soaks: final-1 6/8 (30 div, quiet), final-2 5/8 (32, loaded), resoak-1 5/8 (69, loaded). Pre-fix health-authority soaks: 6/8, 26 both. Load is a confounder; decision: final-3 gates SOLO (no concurrent lanes) after type-pin; if guestB anomalies recur quietly -> revert 9f395d91/5b19a5e7/41dde166 for today.",
+  "finalGates3": {
+    "label": "final-3 (solo)",
+    "head": "bc649bb5",
+    "tsc": "0",
+    "vitest": "132 files / 1433 pass",
+    "contracts": "9/9",
+    "build": "legacy-main-B_HlzZdZ.js served byte-identical, 606 files, dist tree 599dc7c1...",
+    "stations": "29/29, bundleAtStart matches",
+    "bootSmoke": "13/13 passed (8.9 min), stock flags, external preview :4285",
+    "hitches": "90 s solo 2 bots p50 10 / p95 14.3 / p99 17.2 / p99.9 23.5 / max 39.9 ms, 0 hitches",
+    "soak": "6/8: REPLICATION 30 rows = guestB scripted absence only; REJOIN-DAMAGE guestA 120 ms conjunct only; stair/reload/respawn/console/scoreboard PASS both guests -> earlier anomalies were CPU-load flakes",
+    "diff": "FAIL NEWLY_BLACK 12 stations (roads black: coach-elevation 21.2%, street-centre 9.8%, vehicle-far 7.9%) with ALL visual files byte-identical to base -> victim is a deterministic function of the built bundle",
+    "preflight": "pending (expected: untracked evidence paths + inherited ancestry)"
+  }
+}

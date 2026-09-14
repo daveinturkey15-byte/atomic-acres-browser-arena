@@ -1,0 +1,178 @@
+{
+  "contract": "pass95-frame-hitch-attributor-v1",
+  "measuredAt": "2026-09-06T08:52:20.032Z",
+  "label": "final-1",
+  "arena": "nuketown2",
+  "base": "http://127.0.0.1:4298/",
+  "requestedProfile": "high",
+  "viewport": {
+    "width": 2560,
+    "height": 1440
+  },
+  "sampleSeconds": 90,
+  "hitchThresholdMs": 50,
+  "mode": "solo",
+  "hostBots": null,
+  "peerPort": null,
+  "profileState": {
+    "graphicsPreset": "high",
+    "renderBackend": "webgpu",
+    "effective": "EFFECTIVE: HIGH",
+    "hardwareConcurrency": 16
+  },
+  "deployMs": 49625,
+  "consoleErrors": [],
+  "matchState": {
+    "matchPhase": "active",
+    "bots": 2,
+    "alive": true
+  },
+  "traceAligned": true,
+  "traceEventsKept": 33438,
+  "frameCount": 8518,
+  "sampledSeconds": 90,
+  "fps": 94.7,
+  "frameMs": {
+    "p50": 10.1,
+    "p95": 15.3,
+    "p99": 18.7,
+    "p999": 33,
+    "max": 56.5
+  },
+  "hitches": {
+    "thresholdMs": 50,
+    "count": 1,
+    "totalMs": 56.5,
+    "worstMs": 56.5,
+    "over100": 0,
+    "over33": 7
+  },
+  "causeTable": [
+    {
+      "cause": "unattributed-residual",
+      "count": 1,
+      "totalMs": 30,
+      "worstMs": 30,
+      "worstFrame": 3186
+    },
+    {
+      "cause": "gpu-task",
+      "count": 1,
+      "totalMs": 24,
+      "worstMs": 24,
+      "worstFrame": 3186
+    },
+    {
+      "cause": "style-recalculation",
+      "count": 1,
+      "totalMs": 2.4,
+      "worstMs": 2.4,
+      "worstFrame": 3186
+    },
+    {
+      "cause": "pipeline-shader-compile",
+      "count": 1,
+      "totalMs": 0.1,
+      "worstMs": 0.1,
+      "worstFrame": 3186
+    }
+  ],
+  "hitchFrames": [
+    {
+      "i": 3186,
+      "atMs": 86052.4,
+      "frameMs": 56.5,
+      "jsMs": 3.9,
+      "heapDeltaMb": -10.881,
+      "causes": [
+        {
+          "id": "pipeline-shader-compile",
+          "ms": 0.1,
+          "count": 4
+        },
+        {
+          "id": "style-recalculation",
+          "ms": 2.36,
+          "count": 1
+        },
+        {
+          "id": "gpu-task",
+          "ms": 24,
+          "count": 1
+        },
+        {
+          "id": "unattributed-residual",
+          "ms": 30.04,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "pipelines": 3,
+        "shaderModules": 1,
+        "shaderMs": 0.1,
+        "gpuBuffers": 45,
+        "gpuBufferBytes": 579436,
+        "gpuBufferMs": 0.4,
+        "writeBuffer": 871,
+        "writeBufferBytes": 558047,
+        "writeBufferMs": 0.5,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "draws": 233,
+        "triangles": 387896.33,
+        "submits": 25,
+        "passes": 24,
+        "canvas2d": 12,
+        "canvas2dMs": 0.1,
+        "layoutReads": 1,
+        "layoutReadMs": 0.9,
+        "audioStarts": 2
+      }
+    }
+  ],
+  "totals": {
+    "pipelines": 284,
+    "pipelineMs": 7.90000057220459,
+    "shaderModules": 391,
+    "shaderMs": 16.299999713897705,
+    "gpuBuffers": 3211,
+    "gpuBufferBytes": 30959312,
+    "gpuBufferMs": 19.399999976158142,
+    "gpuTextures": 181,
+    "gpuTextureBytes": 0,
+    "gpuTextureMs": 2.600000500679016,
+    "writeBuffer": 2472351,
+    "writeBufferBytes": 3766857864,
+    "writeBufferMs": 2265.100001692772,
+    "writeTexture": 20012,
+    "writeTextureBytes": 304509156,
+    "writeTextureMs": 138.50000131130219,
+    "externalImage": 123,
+    "externalImageMs": 10.100000739097595,
+    "draws": 1256285,
+    "triangles": 2472518298.6666045,
+    "submits": 217678,
+    "passes": 209988,
+    "canvas2d": 31301,
+    "canvas2dMs": 135.29999935626984,
+    "styleReads": 0,
+    "styleReadMs": 0,
+    "layoutReads": 2380,
+    "layoutReadMs": 178.79999792575836,
+    "audioDecode": 0,
+    "audioDecodeMs": 0,
+    "audioStarts": 1749,
+    "geometryBuilds": 0,
+    "geometryBuildMs": 0
+  },
+  "longTasks": {
+    "count": 1,
+    "totalMs": 53,
+    "worstMs": 53
+  },
+  "attributionCoverage": {
+    "attributedMs": 56.5,
+    "hitchTotalMs": 56.5,
+    "pct": 100
+  }
+}

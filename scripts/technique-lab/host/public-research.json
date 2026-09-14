@@ -1,0 +1,1378 @@
+{
+  "schemaVersion": 1,
+  "inputs": [
+    {
+      "file": "docs/technique-lab/group-a/SOURCE_RESEARCH.json",
+      "sha256": "ae25ee48979502675c2fb35ede527864bcacfe57c7468b22375a3ef3e7dc2d5c"
+    },
+    {
+      "file": "docs/technique-lab/group-b/SOURCE_RESEARCH.json",
+      "sha256": "40944e612c8c9553d2a3773a3c7220dd94cbd9c299dce97763287dd4546f7fc6"
+    },
+    {
+      "file": "docs/technique-lab/group-c/SOURCE_RESEARCH.json",
+      "sha256": "a542ff327d6c03c50b51652ae019189af392a7c91af53167b47ce482f3d84d7f"
+    }
+  ],
+  "records": [
+    {
+      "sourceId": 1,
+      "pin": "00dfd5385506022d533c84f6737a09f5f4392623 (resolves; committed 2026-08-18T13:22:54Z)",
+      "licence": "LICENSE fetched (2,045 bytes). Register records the file text reads MIT while GitHub reports NOASSERTION because extra terms are appended. Blender, GVHMR checkpoints, SMPL-X data and Mixamo characters carry separate terms; Mixamo character redistribution is NOT granted.",
+      "cpuCheck": "instantiate/advance/dispose + determinism + finite geometry (group-a-demos.test.ts)",
+      "pixelValidation": "OPEN",
+      "methodExtracted": "FK-only pose evaluation from a declarative action spec; ground contact resolved by searching hip height until the support foot reaches the measured ankle-contact height, with Z-only foot flattening. RIG.md:52-54 states 'No Blender IK, ever' because constraint IK historically put feet at -81 m. Only Hips translates; every other bone is quaternion-only and keyed at zero so stale channels cannot leak. 30 fps integer frames.",
+      "filesRead": [
+        "docs/RIG.md (3,810 B, full)",
+        "action_specs/spin.json (2,865 B)",
+        "pipeline/apply_mixamo_fk.py (28,604 B, fetched)"
+      ],
+      "urls": [
+        {
+          "outcome": "ok",
+          "readDepth": "og:title and og:description served by x.com; author text recovered verbatim, video not retrievable"
+        },
+        {
+          "outcome": "ok",
+          "readDepth": "repository page, then API commit + recursive tree at the pin, then three file bodies"
+        }
+      ],
+      "group": "group-a"
+    },
+    {
+      "sourceId": 2,
+      "pin": "142265f5013b6f27bea4f4f819b832dec75c7bad (resolves; committed 2026-08-18T19:31:55Z)",
+      "licence": "MIT, LICENSE fetched (1,077 bytes).",
+      "cpuCheck": "as above, plus an explicit assertion that the displacement Jacobian drops below 1 (a summed-sine surface never folds) and that gridN is 32",
+      "pixelValidation": "OPEN",
+      "methodExtracted": "3 cascades at 768/121/19 m partitioning k-space without overlap; 512^2 inverse FFT per cascade per frame as a Cooley-Tukey butterfly with a precomputed twiddle/index texture, two MRT slots carrying four complex fields through one butterfly; JONSWAP with TMA shallow-water correction and Donelan-Banner spreading, driven by real wind speed, fetch and depth; Tessendorf h0 = (xi_r + i*xi_i)*sqrt(P); h(k,t) from h0(k) and conj(h0(-k)); foam injected where the Jacobian of the Tessendorf displacement goes negative, then accumulated temporally.",
+      "filesRead": [
+        "index.html (83,466 B) — lines 239-241, 424, 513-528, 532-567, 573-579, 581-699 inspected"
+      ],
+      "urls": [
+        {
+          "outcome": "ok",
+          "readDepth": "author text verbatim from og:description"
+        },
+        {
+          "outcome": "ok",
+          "readDepth": "rendered README on the repository page read for the technique list, plus API commit and tree at the pin, plus the whole implementation file"
+        }
+      ],
+      "group": "group-a"
+    },
+    {
+      "sourceId": 3,
+      "pin": "none — no repository exists",
+      "licence": "none identified",
+      "cpuCheck": "instantiate/advance/dispose + determinism + finite geometry",
+      "pixelValidation": "OPEN",
+      "methodExtracted": "Not an implementation: the recoverable content is a stylised fishing/water composition with harpoon fishing. The reusable object is the comparator list the register names — shallow-water colour layers, shore foam, readable caustic depth, reflection, wake.",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "readDepth": "author text verbatim from og:description; the video itself is not retrievable"
+        }
+      ],
+      "group": "group-a"
+    },
+    {
+      "sourceId": 4,
+      "pin": "none",
+      "licence": "none identified",
+      "cpuCheck": "instantiate/advance/dispose + determinism + finite geometry; tornVertices counter reports the size of the deliberately unsolved cut artefact",
+      "pixelValidation": "OPEN",
+      "methodExtracted": "An underwater mesh distorts the ocean surface with domes and laminar flow around the front. The author states explicitly that the CUTTING of the surface still needs to be better — the source has not solved it.",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "readDepth": "author text verbatim from og:description"
+        }
+      ],
+      "group": "group-a"
+    },
+    {
+      "sourceId": 5,
+      "pin": "n/a",
+      "licence": "MiniMax Community License EXCLUDES use of the model and its output in the UK, EU, US and Korea without separate written authorization. This machine is in the UK. Position re-verified in the register 2026-08-26 and STANDS.",
+      "cpuCheck": "instantiate/advance/dispose + determinism; keyedTexels and poseExtremes counters",
+      "pixelValidation": "OPEN",
+      "methodExtracted": "1 character design still on flat magenta; one 5 s clip per move; cut each clip to its pose extremes; key out the magenta and pack into a sprite atlas.",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "readDepth": "four-step workflow recovered verbatim from og:description"
+        },
+        {
+          "outcome": "ok",
+          "readDepth": "page body cached; read for licence position only"
+        },
+        {
+          "outcome": "ok",
+          "readDepth": "model page cached; read for licence position only"
+        }
+      ],
+      "group": "group-a"
+    },
+    {
+      "sourceId": 6,
+      "pin": "d6673386f89673a58736f8d398dd16ece67874f5 (resolves; committed 2026-08-06T05:23:34Z, 156 files)",
+      "licence": "Apache-2.0, LICENSE fetched (11,337 bytes).",
+      "cpuCheck": "the gate is asserted to REFUSE the runtime-less half and to refuse an empty Group, and to pass the specified half",
+      "pixelValidation": "OPEN",
+      "methodExtracted": "Reference image -> probe and suitability gate -> author an ObjectSculptSpec (components, materials, sockets) -> pass-gated code generation, where the generator emits only the currently unlocked build pass. Gates include a blocking material gate and an Action-ready gate: the model must expose pivots, sockets, colliders and destruction groups via root.userData.sculptRuntime. Output is the spec JSON plus a createObjectNameModel(spec, options) factory returning a THREE.Group.",
+      "filesRead": [
+        "docs/ARCHITECTURE.md (9,487 B) — lines 7-17, 32-53, 63-89, 97-134",
+        "SKILL.md (48,766 B, fetched)"
+      ],
+      "urls": [
+        {
+          "outcome": "ok",
+          "readDepth": "repository page, API commit and recursive tree at the pin, then two file bodies"
+        }
+      ],
+      "group": "group-a"
+    },
+    {
+      "sourceId": 7,
+      "pin": "333f064778105640588a95d2c2d150780044e7bf (resolves; committed 2026-08-13T05:59:28Z)",
+      "licence": "MIT, LICENSE fetched (1,080 bytes).",
+      "cpuCheck": "beforeLights vs afterLights counters; the test asserts no ambient or directional light is added and that local lights are declared",
+      "pixelValidation": "OPEN",
+      "methodExtracted": "Code-only procedural authoring with zero external assets, and a lighting method that is a MEASURED BUDGET: measure what the removed rig cost, derive the level of an artificial source, and prefer emissive geometry over a real light except where the light must do work. TECHNIQUE.md also WITHDRAWS its own display-transform section, which is why no constant is quoted from it.",
+      "filesRead": [
+        "docs/TECHNIQUE.md (58,960 B) — full section index read; 3.1-3.9, 4.1-4.5, 5.1-5.8 headings",
+        "PROMPTS.md (14,956 B)",
+        "src/scene/softShadow.ts (16,800 B, fetched)"
+      ],
+      "urls": [
+        {
+          "outcome": "ok",
+          "readDepth": "author text verbatim"
+        },
+        {
+          "outcome": "ok",
+          "readDepth": "repository page, API commit and tree at the pin, three file bodies"
+        }
+      ],
+      "group": "group-a"
+    },
+    {
+      "sourceId": 8,
+      "pin": "c15640d3a2b6f08ca68e4df98fdfc953ea8a070a (resolves; committed 2026-08-08T06:48:53Z)",
+      "licence": "MIT, LICENSE fetched (1,080 bytes).",
+      "cpuCheck": "beforeDarkEdgeTexels vs afterDarkEdgeTexels counters make the premultiplied-alpha defect measurable",
+      "pixelValidation": "OPEN",
+      "methodExtracted": "Sequential system-by-system build with a blind critic that sees only rendered output. PROMPT.md records the defects that loop caught, two of which are generation bugs any procedural vegetation pass reproduces: dark outlines on every leaf from a premultiplied-alpha bug in the texture baker, and black tree trunks from inverted quad winding compounded by a moss layer. Honest scores are recorded: vegetation 5/10 after six rounds.",
+      "filesRead": [
+        "PROMPT.md (3,328 B, full)",
+        "src/gfx/glsl.js (11,330 B)",
+        "src/render/grade.js (65,101 B)"
+      ],
+      "urls": [
+        {
+          "outcome": "ok",
+          "readDepth": "repository page, API commit and tree at the pin, three file bodies"
+        }
+      ],
+      "group": "group-a"
+    },
+    {
+      "sourceId": 9,
+      "pin": "e183c3519010599d929ed14d99a18bf1f8f8a44c (resolves; committed 2026-08-22T05:03:20Z), path skills/improve-threejs/SKILL.md",
+      "licence": "Modified MIT, LICENSE fetched (1,732 bytes): MIT plus two carve-outs requiring prior written permission from Million Software, Inc. — (a) use as training/fine-tuning/evaluation data or input to an automated ML-training pipeline, (b) sale as a paid hosted product.",
+      "cpuCheck": "perFrameAllocations > 0 on the leaky half; registeredForDisposal > 0 on the clean half",
+      "pixelValidation": "OPEN — every rubric row that needs rendered evidence is unverified here",
+      "methodExtracted": "Severity follows the render loop. HIGH: allocation inside useFrame/RAF, setState inside useFrame, missing disposal of imperatively created GPU resources, object reconstruction in render. MEDIUM: unstable scene-graph props, missing instancing, frameloop=always on a static scene, uncached asset loading. A 10-row visual rubric with an explicit fail condition per row, and a list of checks the scanner always misses.",
+      "filesRead": [
+        "skills/improve-threejs/SKILL.md (9,128 B, all 103 lines)"
+      ],
+      "urls": [
+        {
+          "outcome": "ok",
+          "readDepth": "announcement text verbatim"
+        },
+        {
+          "outcome": "ok",
+          "readDepth": "repository page, API commit, 2.2 MB recursive tree, and the skill body in full"
+        }
+      ],
+      "group": "group-a"
+    },
+    {
+      "sourceId": 10,
+      "pin": "vibe3d fb3ba78a5a21dd69db86018e74d279895501df33 (2026-08-22); thaikit 92095c48ae8792132b60dfb4052c9d7b2ad795f2 (2026-09-10). Both resolve.",
+      "licence": "MIT in both; both LICENSE files fetched (1,076 and 1,077 bytes).",
+      "cpuCheck": "preview lights present on the raw side and zero on the gated side, asserted",
+      "pixelValidation": "OPEN",
+      "methodExtracted": "A shadcn-style registry: models.json declares engine, install paths, aliases and named registries; each prop installs as EDITABLE SOURCE (createObjectModel.ts, model.ts, thaikit.json, colliders.json) rather than as a runtime dependency. three >= 0.185.0 is a PEER dependency and there must be exactly one copy — a second instance means the factory's Mesh is not the renderer's Mesh and nothing draws. Sidecars carry declared and measured metres, pivots, sockets, destruction groups, mass and budgets.",
+      "filesRead": [
+        "vibe3d models.json (394 B, full)",
+        "vibe3d docs/vibe3d-architecture.md (26,731 B)",
+        "thaikit packages/props/README.md (2,324 B, full)",
+        "thaikit packages/props/package.json (885 B)"
+      ],
+      "urls": [
+        {
+          "outcome": "ok",
+          "readDepth": "text verbatim"
+        },
+        {
+          "outcome": "ok",
+          "readDepth": "announcement text verbatim"
+        },
+        {
+          "outcome": "ok",
+          "readDepth": "text verbatim"
+        },
+        {
+          "outcome": "ok",
+          "readDepth": "repository page, API commit, 955 KB tree, models.json and the architecture doc"
+        },
+        {
+          "outcome": "ok",
+          "readDepth": "repository page, API commit, 560 KB tree, package README and manifest"
+        }
+      ],
+      "group": "group-a"
+    },
+    {
+      "sourceId": 11,
+      "pin": "none — opinion post, no repository",
+      "licence": "none",
+      "cpuCheck": "appliedScale and pivotDropMetres counters; determinism and finite geometry",
+      "pixelValidation": "OPEN",
+      "methodExtracted": "Scaffold the project in Three.js first (environment and game actions), then AI-generate a .glb of a hero object, then mix them together.",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "readDepth": "full post text verbatim from og:description"
+        }
+      ],
+      "group": "group-a"
+    },
+    {
+      "sourceId": 12,
+      "pin": "none — no repository; the playable result is hosted",
+      "licence": "none",
+      "cpuCheck": "the harness is asserted to log at least one rejection and one acceptance against declared criteria",
+      "pixelValidation": "OPEN — this is the half of the source's own loop that is missing here",
+      "methodExtracted": "Connect an image-generation API, an image-to-3D API and a browser self-verification loop so the agent can generate assets AND verify them visually, closing the loop.",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "readDepth": "post text verbatim; the threaded workflow detail is recorded in the register"
+        }
+      ],
+      "group": "group-a"
+    },
+    {
+      "sourceId": 13,
+      "pin": "d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853 (resolves; committed 2026-07-25T19:38:53Z)",
+      "licence": "MIT for the example repository, LICENSE fetched (1,064 bytes). The article text is marketing, not code authority.",
+      "cpuCheck": "an adversarial builder that drops a frozen feature is asserted never to be accepted",
+      "pixelValidation": "OPEN",
+      "methodExtracted": "Five steps: give the goal not the implementation; give it a real, concrete, inspectable bar; let the agent split the work into separately judgeable pieces; never let the builder grade itself — spawn a fresh critic with no access to the builder's history; do not fix rounds in advance, stop on result, diminishing returns or spend.",
+      "filesRead": [
+        "prompt.md (941 B, full — the entire prompt that produced the repository)",
+        "ARCHITECTURE.md (9,369 B)"
+      ],
+      "urls": [
+        {
+          "outcome": "ok",
+          "readDepth": "page body 73,735 B; the five HowTo steps read verbatim from the page's own structured data"
+        },
+        {
+          "outcome": "ok",
+          "readDepth": "repository page, API commit and tree at the pin, two file bodies"
+        }
+      ],
+      "group": "group-a"
+    },
+    {
+      "sourceId": 14,
+      "pin": "none",
+      "licence": "none — fan-made, non-commercial; no source or reusable asset licence found",
+      "cpuCheck": "instantiate/advance/dispose + determinism; the local muzzle light is declared in metadata and asserted",
+      "pixelValidation": "OPEN",
+      "methodExtracted": "Not determined from the site. The reusable object is the comparator rubric the register names: offscreen-connected weapon and arm silhouette, weapon material contrast, map-specific light and grade, readable HUD.",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "readDepth": "138,790 B client-rendered application shell; no technique content served to a fetcher"
+        }
+      ],
+      "group": "group-a"
+    },
+    {
+      "sourceId": 15,
+      "pin": "367ec39da837224f076711b5d24d68be8280cc5a (resolves; committed 2026-08-24T15:37:20Z, 12 files, message 'Added Canvas 2d')",
+      "licence": "MIT, LICENSE fetched (1,103 bytes). Caveat carried: threepp is Lars Ivar Hatledal's C++ Three.js port and the ThreeBrowserRuntime RTX work sits on that MIT base; the grant is not a warranty about the Vulkan/RTX sample's own unexamined third-party dependencies.",
+      "cpuCheck": "the manifest test asserts a blocked entry ships no createDemo and carries a stated limitation",
+      "pixelValidation": "n/a",
+      "methodExtracted": "Three.js/WebGPU -> native WebGPU layer -> C++ -> Vulkan + RTX, with NO browser rendering. Scene, materials, lighting and simulation stay in JS; the sample tests dynamic RTX instances and multi-bounce ray-traced reflections.",
+      "filesRead": [
+        "ThreeBrowserRuntime/samples/webgpu_rtx_light_transport_observatory/src/main.mjs (19,212 B, fetched)",
+        "recursive tree: samples include native-reflections.mjs and a compiled observatory_reflections.spv Vulkan shader"
+      ],
+      "urls": [
+        {
+          "outcome": "ok",
+          "readDepth": "author text recovered from the page served by x.com"
+        },
+        {
+          "outcome": "ok",
+          "readDepth": "repository page, API commit, 789 KB recursive tree, LICENSE, and the RTX sample entry point"
+        }
+      ],
+      "group": "group-a"
+    },
+    {
+      "sourceId": 16,
+      "pin": "92341f31940d54d4f0a44aa5975e470b78b2ab5c (resolves; committed 2026-08-26T14:59:58Z, 35 files, 'Add SOMA and G1 model support'). This is the RE-PINNED revision; the earlier pin predates the licence grant.",
+      "licence": "Apache-2.0, LICENSE fetched (11,357 bytes) — read as a file body, not trusted from the API SPDX field. Weights are separate: SOMA/G1 GGUF are NVIDIA Open Model License with NO country exclusion; the SMPL-X RP checkpoint is internal-R&D and must not be used; the converted Llama 3 text bundle retains its own terms.",
+      "cpuCheck": "selectLayout maps 22/30/34 and returns null for an unknown count; motionDim(30) === 369; transition stitching is asserted to lower the worst seam velocity discontinuity versus hard concatenation",
+      "pixelValidation": "OPEN",
+      "methodExtracted": "skeleton.hpp declares three layouts side by side — smplx22 (22 joints), soma30 (30) and g1skel34 (34) — each with parent graph and rest offsets, wrapped in a skeleton_spec whose frame width is motion_dim() = 9 + 12 * joints(). So joint COUNT is the import-time discriminator and the frame stride follows from it. The README's 'gives you SMPL-X' sentence is true only of the checkpoint that may NOT be used. sequence.cpp is the --sequence mode: multiple prompts stitched with an explicit transition, the native answer to the author-stated 10-second generation cap.",
+      "filesRead": [
+        "src/skeleton.hpp (6,872 B) — lines 10-22, 26-31, 45-51, 79, 90",
+        "src/sequence.cpp (7,700 B)"
+      ],
+      "urls": [
+        {
+          "outcome": "ok",
+          "readDepth": "author text verbatim"
+        },
+        {
+          "outcome": "ok",
+          "readDepth": "author text verbatim"
+        },
+        {
+          "outcome": "ok",
+          "readDepth": "repository page, API commit, recursive tree, LICENSE, and two source files"
+        }
+      ],
+      "group": "group-a"
+    },
+    {
+      "sourceId": 17,
+      "pin": "none",
+      "licence": "none — no repository, no published technique",
+      "cpuCheck": "instantiate/advance/dispose + determinism; denseBlades/sparseBlades and triangle/drawable budget counters",
+      "pixelValidation": "OPEN — frame-rate stability, the owner's actual criterion, is entirely unverified here",
+      "methodExtracted": "NOT DETERMINED. The site is a client-rendered application and this fetch failed outright, consistent with the register's own finding. What is recorded is the OWNER'S JUDGEMENT of the result — polish, smoothness, grass, trees, mountains — not an inspected implementation.",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "error",
+          "readDepth": "none — nothing was retrieved"
+        }
+      ],
+      "group": "group-a"
+    },
+    {
+      "sourceId": 18,
+      "canonical": "CK42BB/procedural-grass-threejs@26f072308df12caac68a474cb40300ef576793e1",
+      "licence": "MIT. LICENSE file fetched and read at the pinned revision (1,065 bytes); copyright line reads 'Kingsley'. MIT here means restate, not reproduce.",
+      "readDepth": "SKILL.md read in full (22,187 bytes, 635 lines) plus LICENSE in full and the pinned recursive tree listing.",
+      "method": "Tapered triangle-strip blade swept along a quadratic Bezier; jittered-grid placement with height, slope and density-noise rejection; four wind layers with root-anchored height weighting; concentric LOD rings dropping both density and segment count; per-instance colour variation and root AO.",
+      "cpuCheck": "src/map3/technique-lab/demos/group-b/group-b-manifest.test.ts - instantiate, advance, finite-geometry and bounded-count inspection, determinism, dispose",
+      "pixelValidation": "OPEN - no renderer was executed in this lane",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "eb3c7c647b35c053e172de8f3041dff35da2bb630ac0b0242ed51b2566f40728",
+          "attemptedAt": "2026-09-12T15:28:39Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "f9f091e8fa17d319724d1ef45b984b0d756d250d890d44fd022bd3ec0602d491",
+          "attemptedAt": "2026-09-12T15:28:40Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "0fcdd8bb116755037edd1f07f49ae2ebeeff49a14c7c8b5bc10aa8bce7b7a8fa",
+          "attemptedAt": "2026-09-12T15:28:41Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "5d599db3d21c2fd0027cdb1b81e1d2b235a7b8bfd03f04a1e865e656716fdb65",
+          "attemptedAt": "2026-09-12T15:28:42Z"
+        }
+      ],
+      "group": "group-b"
+    },
+    {
+      "sourceId": 19,
+      "canonical": "erichlof/THREE.js-RayTracing-Renderer@490ca0817ce31781df2cd36af2edcc2f36d9dfcc",
+      "licence": "CC0-1.0. LICENSE fetched and read in full (7,048 bytes). The one source in this group whose expression could lawfully be adapted directly; we still wrote our own. The section 4a trademark carve-out still binds: no endorsement implied.",
+      "readDepth": "shaders/WhittedRayTracing_Fragment.glsl (14,588 bytes) inspected for the material record, bounce loop and Fresnel split; README.md (14,104 bytes) and LICENSE read; pinned tree enumerated (11 shader files).",
+      "method": "Whitted-style classic ray tracing with the Hall shading model: bounded iterative bounce loop carrying a colour mask, Blinn halfway-vector direct lighting, hard shadow rays that transparent occluders do not fully block, metal mirror tint, Fresnel-weighted clearcoat, refraction with Schlick split and TIR handling.",
+      "cpuCheck": "src/map3/technique-lab/demos/group-b/group-b-manifest.test.ts - instantiate, advance, finite-geometry and bounded-count inspection, determinism, dispose",
+      "pixelValidation": "OPEN - no renderer was executed in this lane",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "d4af0aed61dc2c5486c22609ce2cc683bc5026b55ed2d8599551dcc2d1ff55c7",
+          "attemptedAt": "2026-09-12T15:28:42Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "4f3e97a2ebfa1a4e8df2b59bd25dd38162fd8d86f24dc84ce9a1173117cd9083",
+          "attemptedAt": "2026-09-12T15:28:44Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+          "attemptedAt": "2026-09-12T15:28:45Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "2afedd6c09eace2258ed14207568c5300ae14ac116b741229f1cfd04c2c04c8e",
+          "attemptedAt": "2026-09-12T15:30:03Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "9122d1e535e895304a6ec55398ff385cb5df24e6b21294ee2932f28fcab3316a",
+          "attemptedAt": "2026-09-12T15:30:04Z"
+        }
+      ],
+      "group": "group-b"
+    },
+    {
+      "sourceId": 20,
+      "canonical": "Kevin-Liu-01/Claude-of-Tanks@9004ce65a9be52793a3f4130bde034ec4a857f32",
+      "licence": "MIT root LICENSE read (1,069 bytes) AND NOTICE.md read (1,422 bytes). The root MIT covers first-party work only. Carve-outs confirmed to exist outside the LICENSE file, including a COMMERCIAL TYPEFACE committed under the owner's own Dinamo EULA: nothing under public/fonts, public/brand or docs/licenses may be reused.",
+      "readDepth": "src/sim/armor.js read in full this session (590 lines, 21,262 B, sha256 d8b1acbac56cf8a1bfd5a52884ccb74a67f9f07dfb2ef2991ab3b94d07748150); src/sim/ballistics.js read in full (276 lines, 10,838 B, sha256 d8ad010e310a43cccb3851fd76414b3a7e935ca7de13b897a461427bed7eab3c); pinned tree enumerated; play site + LICENSE + NOTICE.md per phase-1 lane.",
+      "method": "Plate-level armour resolution: a world-space shell segment is transformed into four rigid frames (hull, turret, gun-follow, barrel), each the exact inverse of the visual root's transform so hitboxes track the rendered attitude, then intersected against convex quad plates and module boxes for ordered hits. Penetration is interpolated against flight distance (penAtDistanceMm).",
+      "cpuCheck": "group-b-manifest.test.ts source 20: pen curve clamps (180@<=100m, 160@550m, 140@>=1000m); 600 driven frames yield >=4 shells with ordered plate hits and pen+bounce resolutions matching /^(glacis|rear|turretFront|turretSide):(pen|bounce)@Ndeg$|^ammo:module$/; builds/advances/disposes clean with deterministic twin.",
+      "pixelValidation": "OPEN - no renderer ran in this lane; root owns visual verification.",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "8fe9c71194e740bde551fbb88ef2f94ff83c05b1058e49eca09f1de75fb232d2",
+          "attemptedAt": "2026-09-12T15:28:46Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "89ff324dced9be14280b127925244c225cf2fa586ff18ac8e10b6ae1d86e947b",
+          "attemptedAt": "2026-09-12T15:28:47Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "e135d794f7510923f5d3027391e49c36a62e00b9141d216f50cd1bf8f89fe734",
+          "attemptedAt": "2026-09-12T15:28:50Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "ad38336f386eb3abf6158566651d06706f135cf4d2706b7f46c60e7b812418ae",
+          "attemptedAt": "2026-09-12T15:28:52Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "e2b499032c4617caa860916beefb49fa340fa2c6df1042f732cc03a3d872346d",
+          "attemptedAt": "2026-09-12T15:28:52Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "d8b1acbac56cf8a1bfd5a52884ccb74a67f9f07dfb2ef2991ab3b94d07748150",
+          "attemptedAt": "2026-09-12T15:30:04Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "d8ad010e310a43cccb3851fd76414b3a7e935ca7de13b897a461427bed7eab3c",
+          "attemptedAt": "2026-09-12T15:30:04Z"
+        }
+      ],
+      "group": "group-b"
+    },
+    {
+      "sourceId": 21,
+      "canonical": "none - this stub holds no source of its own; row 19 carries the pin.",
+      "licence": "n/a - inherits row 19 (CC0-1.0).",
+      "readDepth": "Register stub read; no separate source exists to read.",
+      "method": "Alias of source 19. Carries no technique of its own and must never be counted as a distinct technique.",
+      "cpuCheck": "src/map3/technique-lab/demos/group-b/group-b-manifest.test.ts - instantiate, advance, finite-geometry and bounded-count inspection, determinism, dispose",
+      "pixelValidation": "OPEN - no renderer was executed in this lane",
+      "filesRead": [],
+      "urls": [],
+      "group": "group-b"
+    },
+    {
+      "sourceId": 22,
+      "canonical": "none for any of the three - no repository, no published technique, no licence.",
+      "licence": "None available; nothing is granted.",
+      "readDepth": "All three original URLs fetched 2026-09-12. revo-realms returned HTTP 200 but only 1,430 bytes - confirming the register's finding that it serves no meaningful HTML to a fetcher and its tech is NOT determined. moon-rover returned 8,822 bytes and sky-fang 33,000 bytes of itch.io page furniture.",
+      "method": "No method is recoverable. These are quality targets, not techniques: dense believable ground cover, wheel-ground interaction that reads as weight and slip, readable multi-target lock-on and a near-miss risk-reward mechanic.",
+      "cpuCheck": "n/a - no code for this row",
+      "pixelValidation": "OPEN - no renderer was executed in this lane",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "f059751a2508e9b3a5757d436e9b97dc1a4f33dda48321b4aed94faefe5aa5ad",
+          "attemptedAt": "2026-09-12T15:28:53Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "cab017e3c0d2eb041416efabb12cda9c62fe19b7fb4994efc5422f1305307c49",
+          "attemptedAt": "2026-09-12T15:28:55Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "48fc25c529da87b47a13b978c31c969c66c602d099a7ff2b35229b5ff12ae7e9",
+          "attemptedAt": "2026-09-12T15:28:56Z"
+        }
+      ],
+      "group": "group-b"
+    },
+    {
+      "sourceId": 23,
+      "canonical": "csanz/battle-of-the-hoth-simulator@bc057e2ce52254bc2e3c2bd6feaaaf4625dddee8",
+      "licence": "NONE. Our own LICENSE probe at the pinned revision returned HTTP 404, independently confirming the register: all rights reserved by default. Read for method; no expression reproduced.",
+      "readDepth": "src/terrain/deformation.js read (11,649 bytes, first 120 lines in detail); src/shaders/lib/deform.glsl fetched (3,706 bytes); live site fetched (17,721 bytes); pinned tree enumerated.",
+      "method": "Deformation as persistent accumulating state: ping-ponged float targets with no clear, copy or readback; a fixed world-metre window snapped to texel boundaries so the field does not swim, addressed toroidally so following the subject is free; one shared brush write path for every effect; recovery BANKED and spent in discrete steps because a per-frame decay is below one ULP of a half-float store.",
+      "cpuCheck": "src/map3/technique-lab/demos/group-b/group-b-manifest.test.ts - instantiate, advance, finite-geometry and bounded-count inspection, determinism, dispose",
+      "pixelValidation": "OPEN - no renderer was executed in this lane",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "a6926c4598552e88768be5bb01fbd1ff43ac495b4309026ddc16f7954e47167b",
+          "attemptedAt": "2026-09-12T15:28:57Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "81e761e6bf8d9f3f4cb2f4844ed1b58aafd426c41888fbf6a30355eda1827406",
+          "attemptedAt": "2026-09-12T15:28:58Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "21e9884161f1c060be26f97b831d5956cccb1a077bedd0c0ae9c5fc4db6e145a",
+          "attemptedAt": "2026-09-12T15:29:00Z"
+        },
+        {
+          "outcome": "http-error",
+          "attemptedAt": "2026-09-12T15:29:01Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "ca842ef63cf81384c33a7156530ef0d796d37054adf3aa625f6362a106d17134",
+          "attemptedAt": "2026-09-12T15:30:05Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "e565057f4d5d76a5d0cdb44f83d65b0a87b97078c892f775e671f18247b05733",
+          "attemptedAt": "2026-09-12T15:30:05Z"
+        }
+      ],
+      "group": "group-b"
+    },
+    {
+      "sourceId": 24,
+      "canonical": "NOT LOCATED. The register's search was closed negative on 2026-08-24 and this lane did not reopen it.",
+      "licence": "Unresolved, because the source is unlocated. The game's own CC/Freesound asset credits bind ITS assets and grant us nothing.",
+      "method": "Not recoverable as a method. Comparator properties only: dense low ground cover with several distinct species, night sky and cloud colour that reads as night rather than as darkness, procedural mountain backdrops, and a light source whose behaviour carries narrative.",
+      "cpuCheck": "n/a - no code for this row",
+      "pixelValidation": "OPEN - no renderer was executed in this lane",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "2fd4712aeecb940bfb88af35a6e5f3652ee9d0672da46604ddc55ab316c3af22",
+          "attemptedAt": "2026-09-12T15:29:02Z"
+        }
+      ],
+      "group": "group-b"
+    },
+    {
+      "sourceId": 25,
+      "canonical": "None available. The author has said the water WILL become available; it is not released as a library today.",
+      "licence": "n/a until published.",
+      "method": "No implementation is published. The register's transferable statement is that a convincing shoreline transition is achievable in a browser: shelving seabed, progressive wade depth, foam and wave energy responding to depth.",
+      "cpuCheck": "n/a - no code for this row",
+      "pixelValidation": "OPEN - no renderer was executed in this lane",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "4b70242d7084af0b1a9e9294fd2de7abb2c8a98040fda4c0df5480f19ba17eab",
+          "attemptedAt": "2026-09-12T15:29:03Z"
+        }
+      ],
+      "group": "group-b"
+    },
+    {
+      "sourceId": 26,
+      "canonical": "No repository. The deployed page is the canonical artefact; re-read before relying on a detail.",
+      "licence": "ALL RIGHTS RESERVED for the page design, markup, CSS, art, audio and code; license.html fetched and read (8,158 bytes). Three.js is MIT and the fonts are OFL, but the page's own expression is reserved and the BGM may not be redistributed. Restate only.",
+      "readDepth": "Page HTML fetched (73,881 bytes), the unminified ES module js/main.js fetched and inspected (51,967 bytes), licence page read.",
+      "method": "Ring geometry derived from item count, short-way rotation modulo N, two-stage commit where only the focus slot launches, and a content-derived accent scored by saturation against distance from mid-lightness then clamped into a legible band with a fixed fallback for neutral art.",
+      "cpuCheck": "src/map3/technique-lab/demos/group-b/group-b-manifest.test.ts - instantiate, advance, finite-geometry and bounded-count inspection, determinism, dispose",
+      "pixelValidation": "OPEN - no renderer was executed in this lane",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "e3e36629e138d80183a63fb27be6b4c5300d94abd6c9fc15a98b056819a29c38",
+          "attemptedAt": "2026-09-12T15:29:05Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "e22c3a8a3f85ae8c2465f5bf865d27d615ecb7de19c390ab5078518ffb4a7ebd",
+          "attemptedAt": "2026-09-12T15:29:07Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "5779895ed44601c6bc41eb443e8ac77b41bcc4effc04538a1a1dff5de4f2bbb1",
+          "attemptedAt": "2026-09-12T15:29:09Z"
+        }
+      ],
+      "group": "group-b"
+    },
+    {
+      "sourceId": 27,
+      "canonical": "majidmanzarpour/threejs-game-skills@7221c1f4a6d2ae189a4d85d058d24f3228499d46",
+      "licence": "MIT. LICENSE fetched and read at the pinned revision (1,073 bytes), 'Copyright (c) 2026 Majid Manzarpour', no carve-outs, and the root carries no NOTICE or ATTRIBUTION file (checked in the pinned tree listing).",
+      "readDepth": "skills/threejs-gameplay-systems/SKILL.md read in full (78 lines, 5,970 B, sha256 b907ece2e2f37f5a8c4ba4f8586c104a000522952f6e5737c3ffca5ea2c194f9); skills/threejs-game-director/SKILL.md read in full (124 lines, 11,280 B, sha256 3f6fa121bb38be935c585de5e8fb7754304171b6969d89e47f4ecb32baaec894); pinned tree per phase-1.",
+      "method": "A non-visual harness technique: a skill pack covering gameplay, AAA-style graphics, UI, QA and optional AI-generated assets. The register's decision for this row is COMPARISON against our own library, not import.",
+      "cpuCheck": "source 27 test: >=2 hits in 300 frames; hitstop frames consumed bounded per hit; shake amplitude >0; cooldown gating counter >0; deterministic twin; dispose clean.",
+      "pixelValidation": "OPEN - no renderer ran in this lane.",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "9a82f23dde97601f2d9e1a5db71ce098604c525d5ff0129c944e382b3e0e4181",
+          "attemptedAt": "2026-09-12T15:29:10Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "9a60384eeff80e804f8f8be13b88accaa6133db094d2b5113b12bd0bcc8fedc6",
+          "attemptedAt": "2026-09-12T15:29:12Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "306512561953da83863404efe11ba8845c6a7cf47a8744321c7cbd67f9944304",
+          "attemptedAt": "2026-09-12T15:29:13Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "62a66c3d9cf382b15d73bf8cb198df9b557449b4e1c1d7d6f40489df41e4c9de",
+          "attemptedAt": "2026-09-12T15:30:06Z"
+        }
+      ],
+      "group": "group-b"
+    },
+    {
+      "sourceId": 28,
+      "canonical": "dgreenheck/webgpu-claude-skill@af2319bd01bb7cc881267a9ef42cafdaf5e9029d",
+      "licence": "NONE. Our own LICENSE probe at the pinned revision returned HTTP 404, independently confirming the register: all rights reserved. Inspect, restate, write our own.",
+      "readDepth": "skills/webgpu-threejs-tsl/SKILL.md read in full (93 lines, 3,202 B, sha256 734ac9724c9dae2a2c9ad1e59f96d37498a87871eaddb6e8a7fd903d36b2cb90); docs/materials.md read in full (353 lines, 8,786 B, sha256 3e9073bf4360577babe0d69650401aa3aa9b308444a1a830bb6996942bcd943c).",
+      "method": "Non-visual harness technique: WebGPU/TSL practice guidance (core concepts, node materials, compute shaders, device loss, limits and features, post-processing, WGSL integration).",
+      "cpuCheck": "source 28 test: edge band appears during the threshold sweep; threshold stays within [0, 0.85]; builds/advances/disposes clean with deterministic twin.",
+      "pixelValidation": "OPEN - no renderer ran in this lane.",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "1a68c78a1e8de883a0a3a60ae275399a786c3186529c9688c0d35d0626926140",
+          "attemptedAt": "2026-09-12T15:29:14Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "921d955f4019137dc9ee716869d92d5991270af635f001c2dd6de9b7e1b9a0f1",
+          "attemptedAt": "2026-09-12T15:29:14Z"
+        },
+        {
+          "outcome": "http-error",
+          "attemptedAt": "2026-09-12T15:29:14Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "734ac9724c9dae2a2c9ad1e59f96d37498a87871eaddb6e8a7fd903d36b2cb90",
+          "attemptedAt": "2026-09-12T15:30:06Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "3e9073bf4360577babe0d69650401aa3aa9b308444a1a830bb6996942bcd943c",
+          "attemptedAt": "2026-09-12T15:30:06Z"
+        }
+      ],
+      "group": "group-b"
+    },
+    {
+      "sourceId": 29,
+      "canonical": "CloudAI-X/threejs-skills@b1c623076c661fc9b03dac19292e825a5d106823",
+      "licence": "NONE. Our own LICENSE probe at the pinned revision returned HTTP 404, confirming the register: all rights reserved.",
+      "readDepth": "skills/threejs-geometry/SKILL.md read in full (548 lines, 13,829 B, sha256 8337bcf86621411f54ef39727b338c84890815e4b3612ce635d593dd9c321a3e); skills/threejs-materials/SKILL.md fetched (13,418 B) but NOT read this session - recorded in skillsNotRead. Other eight topic skills covered by pinned-tree enumeration only.",
+      "method": "Non-visual harness technique. The register asked what this most-starred row actually CONTAINS: the pinned tree resolves it as ten topic skills - fundamentals, geometry, materials, lighting, textures, loaders, animation, interaction, shaders and postprocessing. That is a Three.js tutorial set, not a game-production pack.",
+      "cpuCheck": "source 29 test: 240 individual drawables vs exactly 1 instanced drawable, 240 instances, 240 matrices re-uploaded on update; deterministic twin; dispose clean.",
+      "pixelValidation": "OPEN - no renderer ran in this lane.",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "da779d21cec52e6c11eaa3746e87fd7b821c91aeb69d207d12f1daf84e68518a",
+          "attemptedAt": "2026-09-12T15:29:15Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "295161afb1d54aef94e27e026212f9bc2e2c36ce96ad0a4ddcc1e5527549426f",
+          "attemptedAt": "2026-09-12T15:29:15Z"
+        },
+        {
+          "outcome": "http-error",
+          "attemptedAt": "2026-09-12T15:29:15Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "1ecd94808b3684e0da4e00cf37b2d80a31e2186feda26db93f1e863476ef57bd",
+          "attemptedAt": "2026-09-12T15:30:06Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "8337bcf86621411f54ef39727b338c84890815e4b3612ce635d593dd9c321a3e",
+          "attemptedAt": "2026-09-12T15:30:06Z"
+        }
+      ],
+      "group": "group-b"
+    },
+    {
+      "sourceId": 30,
+      "canonical": "None. This row is a composition of rows 1, 5 and 16, not a third-party artefact.",
+      "licence": "Component-dependent. The operating rule is that the generated reference video is private scaffolding that never ships, is never redistributed and is never committed; only rig data authored from it ships.",
+      "readDepth": "Register row read in full. The carrier skill game-animation-asset-pipeline was NOT read in full in this lane, and this row's entry is therefore recorded as blocked on evidence we did hold rather than on a skill body we did not read.",
+      "method": "Describe a motion in words, generate a reference video, reconstruct pose from it or author against it, retarget onto our own rig, ship only the rig data.",
+      "cpuCheck": "n/a - no code for this row",
+      "pixelValidation": "OPEN - no renderer was executed in this lane",
+      "filesRead": [],
+      "urls": [],
+      "group": "group-b"
+    },
+    {
+      "sourceId": 31,
+      "canonical": "OpenGameArt asset page; no repository. Page fetched 2026-09-12 (27,846 bytes).",
+      "licence": "CC0 per the asset page - public domain, no attribution required. OpenGameArt licences are PER-ASSET; the page was re-read in this lane rather than assuming a site default.",
+      "readDepth": "Asset page re-read (27,846 B, sha256 5086559aa889fc753972c8aaaedbe8617a40f3b03fac27f461d0ef398c27b243); author rig description (IK + handle bone, finger-curl constraint, ~4k verts/8k tris, MakeHuman origin, T-pose + animated files) recovered verbatim from the page body. Carrier skill game-animation-asset-pipeline SKILL.md read in full this session (361 lines, 31,855 B) - CC0 asset, lane discipline and artifact-type separation govern this demo.",
+      "method": "A first-person arm RIG method: two-bone IK driven by a handle target for fast arm posing, plus a single constraint-driven parameter that curls the finger joints.",
+      "cpuCheck": "source 31 test: 121/121 driven frames solve IK with finite reach ratio; handle path stays inside the solvable annulus (0.2 < reachRatio < 0.95); curl bounded [0,1]; deterministic twin; dispose clean.",
+      "pixelValidation": "OPEN - no renderer ran in this lane.",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "b5e28834023982739d4344bd9459a9398e17e343ee307636302dd54e1f07a6e8",
+          "attemptedAt": "2026-09-12T15:29:16Z"
+        }
+      ],
+      "group": "group-b"
+    },
+    {
+      "sourceId": 32,
+      "canonical": "Weights NOT PINNED. The register requires pinning exact safetensors revisions and reading the licence shipped WITH the weights; this lane did neither.",
+      "licence": "Apache 2.0 per the documentation, which we read from the author-owned docs repository. NOT verified against the weights themselves - and row 20 is the standing proof that a stated licence and the real terms can differ.",
+      "method": "Mixture-of-experts video diffusion split by denoising timestep, text-to-video and image-to-video, run locally in ComfyUI from a diffusion model plus VAE plus text encoder.",
+      "cpuCheck": "n/a - no code for this row",
+      "pixelValidation": "OPEN - no renderer was executed in this lane",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "url-error",
+          "attemptedAt": "2026-09-12T15:29:17Z"
+        },
+        {
+          "outcome": "url-error",
+          "attemptedAt": "2026-09-12T15:30:08Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "3e0c0fca889fd02069460b6d16098ab17040025daa77c6b60587bfecf78ec0eb",
+          "attemptedAt": "2026-09-12T15:30:08Z"
+        }
+      ],
+      "group": "group-b"
+    },
+    {
+      "sourceId": 33,
+      "canonical": "vibe-stack/super-terrain@e417c048c29fc0193005df4f3e39dff44cef5d31",
+      "licence": "NONE. Our own LICENSE probe at the pinned revision returned HTTP 404, confirming the register's 2026-08-26 re-inspection: all rights reserved. Method only.",
+      "readDepth": "src/terrain/lod/LodSelector.ts read in full (7,444 bytes, 241 lines); src/terrain/partition/MeshPartition.ts fetched (7,005 bytes); demo page and repository page fetched; pinned tree enumerated (92,588 bytes).",
+      "method": "Screen-space projected geometric error for LOD choice, asymmetric hysteresis against level flapping, and a neighbour constraint settling adjacent sections to min(level + Manhattan distance) so no seam differs by more than one level.",
+      "cpuCheck": "src/map3/technique-lab/demos/group-b/group-b-manifest.test.ts - instantiate, advance, finite-geometry and bounded-count inspection, determinism, dispose",
+      "pixelValidation": "OPEN - no renderer was executed in this lane",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "ca5517fbd7f9513a84529524be5320d89397f2f9997487bdc5d70bc42be81b08",
+          "attemptedAt": "2026-09-12T15:29:17Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "1dc3ef02bbecd71f5f0933bbb2421ffbdc223aa7a180893156fe856f12df5af0",
+          "attemptedAt": "2026-09-12T15:29:18Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "3000076a1a0fcfb5b394ee431c0ed40cbf4537c1cae5e19557357af6db96f3c6",
+          "attemptedAt": "2026-09-12T15:29:18Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "dacd0cfdf7e0c53dc47b8878529f797f4618eeb5994e608a65db3e82676ed1d0",
+          "attemptedAt": "2026-09-12T15:29:19Z"
+        },
+        {
+          "outcome": "http-error",
+          "attemptedAt": "2026-09-12T15:29:19Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "6d6ea9b5348aa125e67b8df0c5d08567e3a717c61b2cdd80fa686824eed40430",
+          "attemptedAt": "2026-09-12T15:30:07Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "7994db75e668b0dec50319fe3de9df5f01f9b588b6b7ddbd7f3a928b3471454f",
+          "attemptedAt": "2026-09-12T15:30:07Z"
+        }
+      ],
+      "group": "group-b"
+    },
+    {
+      "sourceId": 34,
+      "canonical": "mshumer/Claude-of-Duty@d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853",
+      "licence": "MIT. LICENSE fetched and read at the pinned revision (1,064 bytes), 'Copyright (c) 2026 mshumer'.",
+      "readDepth": "README.md read in full (130 lines, 7,135 B, sha256 fcc3a970e809f4dec2f4ce288338dffcfaf54dae1684c1e4a978030141f27153); src/weapons/ballistics.js read in full (166 lines, 4,968 B, sha256 2ff289410b3827f832b0e526ec2b578844f6d7d7622ce678ea7d5e40d9a5c085); pinned tree per phase-1; X post per phase-1 lane.",
+      "method": "An architectural, non-visual technique: decompose into single-owner subsystems with defined interfaces, a cross-subsystem event vocabulary, shared surface types and directory-ownership contracts, iterated against a visual reference.",
+      "cpuCheck": "source 34 test: eventsEmitted >= 2 in 300 frames; contractedDeliveries == eventsEmitted x 7 (2+3+2 declared consumers); broadcastDeliveries == eventsEmitted x 15; broadcast strictly greater; deterministic twin; dispose clean.",
+      "pixelValidation": "OPEN - no renderer ran in this lane.",
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "64f303e0709c10ca7974b0019e2b241c77bc3cf00bfb6335f5011b44b707112c",
+          "attemptedAt": "2026-09-12T15:29:19Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "8104111afc6bb0e15ff36b7ed271bdedd5b2ea4f0fec1b49e014227d87d6cd15",
+          "attemptedAt": "2026-09-12T15:29:21Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "ade8c484e8c245f7f8b089892078b7e48e639edfbf98dd92529a59a0d47e4a3c",
+          "attemptedAt": "2026-09-12T15:29:22Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "7ba018b28d540012029c1d39acd134ec1ab3693108c9d05a5e1122cc84054af5",
+          "attemptedAt": "2026-09-12T15:29:22Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "2ff289410b3827f832b0e526ec2b578844f6d7d7622ce678ea7d5e40d9a5c085",
+          "attemptedAt": "2026-09-12T15:30:08Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "fcc3a970e809f4dec2f4ce288338dffcfaf54dae1684c1e4a978030141f27153",
+          "attemptedAt": "2026-09-12T15:30:08Z"
+        }
+      ],
+      "group": "group-b"
+    },
+    {
+      "sourceId": 35,
+      "canonical": "Canonical:** `StarKnightt/gas-station-highway` @ `3e1b7cbb1f46bb0b0601b4d06ceef63438ae132c`",
+      "licence": "Licence:** **NO LICENSE FILE at the pinned revision (checked LICENSE/LICENSE.md/LICENSE.txt/license 2026-08-30; all 404)** although the README summary claims MIT. Authority 2b applies: learn the technique, never copy the expression.",
+      "methodConsumer": "applyBrief() enforces the three-verb whitelist and returns a reason per refusal; the surface is hashed from src/map3/noise.ts with no external asset.",
+      "decision": "Decision:** the one-page-brief pattern (atmosphere pin, strict verb whitelist, all-procedural clause, departures appendix) is the template for the owner's Test1/Test2 map briefs. No code reuse.",
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel.",
+      "carrierReadComplete": true,
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "59377d24ca5a5657ea2cd00dd10737fb6aa50d30544bae839ade35cfe0301348",
+          "attemptedAt": "2026-09-12T15:28:55Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "98afb775ce700e36ed99b202020f492ff9b2c687cb186b53bd463bf5bb81ee2f",
+          "attemptedAt": "2026-09-12T15:28:58Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "9bea4813c553be94110516087e193e42aa8347c88787c829fe3de2699f3da882",
+          "attemptedAt": "2026-09-12T15:29:01Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "d062b12842409c820dab1c979bc7714c75fb33258f2e80578f43a0887ab4b11b",
+          "attemptedAt": "2026-09-12T15:29:02Z"
+        },
+        {
+          "outcome": "http-error",
+          "sha256": "d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed",
+          "attemptedAt": "2026-09-12T15:29:03Z"
+        }
+      ],
+      "group": "group-c"
+    },
+    {
+      "sourceId": 36,
+      "licence": "Licence:** proprietary hosted webapp (paid). Nothing to copy; usage is a per-asset owner decision.",
+      "methodConsumer": "voxelRemesh() clusters vertices on a settable grid and averages the highpoly normals into the replacing cell.",
+      "decision": "Decision (2026-08-30, direction unchanged and reinforced 2026-09-03):** candidate optimization station for heavy AI-generated GLBs before game import; surface to the owner as an option (paid tool - never auto-purchase). Blender remesh+bake remains the free lane.",
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel.",
+      "carrierReadComplete": true,
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "1d9c2aaee10dd8265c38890781607a174659aa988d5c466964182fba31b2deaa",
+          "attemptedAt": "2026-09-12T15:29:04Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "cd683a2e8fd4c1e3e100cae5cceb087e0382903863f3276efeaa9b77b2f1bff8",
+          "attemptedAt": "2026-09-12T15:29:07Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "b82a2c8bdd8ae7b9d5c65af212e9dcf451462c2c9efb5b2ef15e4f434f398582",
+          "attemptedAt": "2026-09-12T15:29:08Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "9d5869e3e127933a3c9cd1bd2e8d6b3e4a63a4e2b711eb66788d799bc81b8e76",
+          "attemptedAt": "2026-09-12T15:29:10Z"
+        }
+      ],
+      "group": "group-c"
+    },
+    {
+      "sourceId": 37,
+      "canonical": "Canonical:** `SamG-Coder/fable-test` @ `bfa60fb9e0fae613585344b4e5f8b034d2dcd481`",
+      "licence": "Licence:** MIT (LICENSE file read 2026-08-30).",
+      "methodConsumer": "convertZupCentimetres() is the single ingest boundary; the cache pass reveals a record only as its entry completes.",
+      "decision": "Decision:** archive reference only, per the owner's own framing - at-scale WebGPU scene streaming, cache-build UX, coordinate-convention conversion. No integration planned.",
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel.",
+      "carrierReadComplete": true,
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "28a26d26ac0e0c9ee5ce3fe87a4a2ba48b940bdca4efbc48f71a343a3b90a2c1",
+          "attemptedAt": "2026-09-12T15:29:11Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "875a3c6e362bfbab3f87e33451d3f1d2ee5e490e3c11bc2f50f88c5150a11401",
+          "attemptedAt": "2026-09-12T15:29:15Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "59816393d70d7fef8188c88c7c8b88d0cfbab1876afae76123340cff55278ca2",
+          "attemptedAt": "2026-09-12T15:29:16Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "f78613e1d5d015b0a25f8d37ee23daf0cc981ed0b80752cac26f39a2b6cbf293",
+          "attemptedAt": "2026-09-12T15:29:17Z"
+        }
+      ],
+      "group": "group-c"
+    },
+    {
+      "sourceId": 38,
+      "canonical": "Canonical:** `vibe-stack/super-terrain`, default branch `main`, HEAD pushed 2026-08-30T23:33Z. Re-pin before use; row 33's pin `e417c048c29fc0193005df4f3e39dff44cef5d31` predates the forest work.",
+      "licence": "Licence:** **STILL NO LICENCE FILE — re-checked 2026-08-31.** `LICENSE`, `LICENSE.md`, `LICENCE`, `COPYING` and `LICENSE.txt` all return 404 on `main`; GitHub API `license` is `null`. Row 33's 2026-08-26 finding stands unchanged five days later. **Authority 2b applies: inspect and learn the general technique, never copy its expression** — no files, functions, shader bodies, constants tables or distinctive comments, and no vendoring.",
+      "methodConsumer": "splineDensity() and maskField() are separate functions; the mask decides admissibility before density is consulted.",
+      "decision": "Decision:** the spline-field-driven scatter and the species/mask separation are the two ideas worth restating into `threejs-procedural-vegetation`; Atomic Acres already ships its own tuft-grass and scatter systems, so this is an upgrade path, not a replacement. The tree editor is the owner's \"editor\" interest (see row 42) and is a product question, not an agent decision. **Do not treat \"30+ tree types\" as a verified count** — it is an author claim in a post.",
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel.",
+      "carrierReadComplete": false,
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "9d1bf9f6b9599750cd6291712b21b64efe9b82181db2051bd90864ff08d2f850",
+          "attemptedAt": "2026-09-12T15:29:17Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "2a2a2fae9aa5c28c34c79f35c5685c8d52831f15a8690201e07de7f60952effe",
+          "attemptedAt": "2026-09-12T15:29:20Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "bc9c9bd3d4f70dbeff0d394f6363f046097b6cec5d3ddd28d508d9d376ea20e3",
+          "attemptedAt": "2026-09-12T15:29:21Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "907eafb6f2ada8bd8fdba031204dba3c1f947c21ba965c613d053a5dd58cb0d8",
+          "attemptedAt": "2026-09-12T15:29:22Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "08c6499c17cd0bf4e1b143b0fb692de508e9869acf5edecfe478709bfc67c96e",
+          "attemptedAt": "2026-09-12T15:29:22Z"
+        }
+      ],
+      "group": "group-c"
+    },
+    {
+      "sourceId": 39,
+      "canonical": "Canonical:** none for either. No repository, no released bridge, no licence. The Unreal demo runs inside Epic's Electric Dreams sample and uses **Megascans** foliage — i.e. it is explicitly *not* an assets-free technique, which is the opposite of what Map 3 is testing.",
+      "methodConsumer": "replay() walks OPERATION_LOG and rejects an operation whose precondition is unmet instead of reordering it.",
+      "decision": "Decision:** the reusable atom is **the agent drives the engine's own authoring tools through an MCP bridge, instead of generating engine-independent code** — the agent is wired to both the engine API and its docs, and level generation becomes a sequence of editor operations. This is the natural route if Atomic Acres work ever branches into Unreal, Unity or TheForge, and it is genuinely different from our current route (we generate code that the engine runs). Carry the honest caveat: both demos lean on the host engine's asset libraries, so neither is evidence that procedural-from-nothing is faster. Comparator only until a bridge with a licence exists.",
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel.",
+      "carrierReadComplete": true,
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "fed7d4535a933f8589e3dcb536fac55dcdb5a329cc728d0262afed20e92394c4",
+          "attemptedAt": "2026-09-12T15:29:23Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "89a493fd759ad193b401ee4b33dd8c7a659f2dea68cfdf6dda8c590324ba359e",
+          "attemptedAt": "2026-09-12T15:29:25Z"
+        }
+      ],
+      "group": "group-c"
+    },
+    {
+      "sourceId": 40,
+      "canonical": "Canonical:** none. Commercial game by Endstreet Studio, free to play in-browser at `endstreet.itch.io/voxpolia`; no public source, nothing to pin, nothing to copy.",
+      "methodConsumer": "litRoomCells() recomputes emission from the live voxel grid; no THREE light object exists in the demo.",
+      "decision": "Decision — three separable atoms, all restatable from the descriptions alone:**",
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel.",
+      "carrierReadComplete": false,
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "124bf16ab751dfcbd9e17620567a7399fa24ae9a4f72e656b896f594a4f48389",
+          "attemptedAt": "2026-09-12T15:29:26Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "48bae992affcaafd3e72769b085d687d924f836f9e0260cbe80495d4fb9aaa33",
+          "attemptedAt": "2026-09-12T15:29:27Z"
+        },
+        {
+          "outcome": "http-error",
+          "sha256": "d4342d1fd9095def68701f99ef615082298815f696d198d8682538d4d5fc402d",
+          "attemptedAt": "2026-09-12T15:29:27Z"
+        }
+      ],
+      "group": "group-c"
+    },
+    {
+      "sourceId": 41,
+      "canonical": "Canonical:** none — hosted portfolio, no repository found, no licence. Nothing to copy.",
+      "methodConsumer": "Each bay is built by index and is resolvable without constructing any other.",
+      "decision": "Decision — the reusable object is the FORMAT, not any one sketch.** Each technique is a named, isolated, individually reachable exhibit with a title that states what it is. That is exactly the shape of the owner's \"Map 3 Demo Showcase\" brief — a hub with signed corridors, one technique each — and it is the strongest evidence in this register that the format works as a way to keep techniques discoverable and comparable rather than buried inside one big scene. The sketch **titles** are also a good naming discipline: noun-phrase, technique-first, no cleverness. Adopt the format; independently build any effect the names suggest.",
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel.",
+      "carrierReadComplete": false,
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "3b63c4d91665a78431ca2d5fdfd25d047defeed39c74b13fd672f9d5f29ba738",
+          "attemptedAt": "2026-09-12T15:29:29Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "ca75e8dabc74f9cda321951644bee64c0da95796a997b8886a0c1ce90d1a685f",
+          "attemptedAt": "2026-09-12T15:29:31Z"
+        }
+      ],
+      "group": "group-c"
+    },
+    {
+      "sourceId": 42,
+      "canonical": "Canonical:** none single — this row indexes an ORGANISATION, `vibe-stack`, whose repositories are listed in the table above with their own licences. Pin the specific repository at the moment it is adopted; nothing here is pinned by recording it.",
+      "methodConsumer": "deriveBuilding() rewrites a footprint into podium/shaft/crown and derives bay count from face width over bay width.",
+      "decision": "Decision:** register the shelf so it stops being rediscovered one repo at a time. Nothing is adopted by recording it. Before any use: re-verify the licence file, pin the commit, and run our own silhouette/scale/triangle-count/LOD gates. `vibeviz`'s licence must be file-verified before it moves past this row.",
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel.",
+      "carrierReadComplete": false,
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "4366a323512a5813cba3b81d787eb4d3a2d1715d45c16a7a039e59caef64c677",
+          "attemptedAt": "2026-09-12T15:29:33Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "aff6c54aef3c746d91c6b66d7de5524998605d96c9bc33c18af51f13db34ac82",
+          "attemptedAt": "2026-09-12T15:29:35Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "ad68e89b2e51961dc0368458d547f452d26f4c6d665caac7af271cc66844a61b",
+          "attemptedAt": "2026-09-12T15:29:36Z"
+        }
+      ],
+      "group": "group-c"
+    },
+    {
+      "sourceId": 43,
+      "canonical": "Canonical:** none usable. A paper page with no released code or weights; nothing to pin, nothing to licence-check, nothing to run.",
+      "methodConsumer": "The same props are built twice: merged with irradiance in vertex colour, and separable under one positioned light that moves in update().",
+      "decision": "Decision:** **not adoptable today, and the row exists to stop it being re-evaluated as if it were.** The transferable *principle* is real and free: when reconstructing a scene from a reference image, keep objects separable and keep lighting as engine parameters rather than baked into textures — which is precisely what `img2threejs` already does by generating code instead of baked meshes. Re-check for a code release before any plan depends on it. Note the direct tension with the owner's Map 3 thesis: this is an image-to-asset route, whereas Map 3 is testing whether maths-and-code beats importing assets at all.",
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel.",
+      "carrierReadComplete": false,
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "0199bb4862cc981d413f6851ad19f5db2a4d31944884079fe2da062025884b02",
+          "attemptedAt": "2026-09-12T15:29:38Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "e8a9cf9d757aff3c60d69d7df37ceec9bd9182a0c391d4ee9cd7238eb3b66347",
+          "attemptedAt": "2026-09-12T15:29:41Z"
+        }
+      ],
+      "group": "group-c"
+    },
+    {
+      "sourceId": 44,
+      "canonical": "Canonical:** none for either — neither post resolves to a repository, a released tool or a licence, which is the finding rather than a gap in the search.",
+      "methodConsumer": "None. Blocked: no factory is exported and the manifest entry carries no createDemo.",
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel.",
+      "carrierReadComplete": false,
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "abe2a891bba2a753da79f2b440cd5158ea65273e3b9215f0a00787daab8db0ce",
+          "attemptedAt": "2026-09-12T15:29:42Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "b27427b7fca40322a377d940701b73f33520f465c76e757aea0db758855035d5",
+          "attemptedAt": "2026-09-12T15:29:46Z"
+        }
+      ],
+      "group": "group-c"
+    },
+    {
+      "sourceId": 45,
+      "canonical": "Canonical:** `comfyanonymous/ComfyUI` @ `0e65cb907193cf1013bda474593eb48d8c53d848` (the merge commit of PR #14718 \"feat: Support Pixal3d and TRELLIS2\", merged 2026-08-22T00:32Z into `master`; shipped in release **v0.34.0**, which is the version installed here). Upstream generators: `microsoft/TRELLIS.2` @ `75fbf0183001ed9876c8dbb35de6b68552ee08bd` and `TencentARC/Pixal3D` @ `f7cf38429b0bd264f1995f0f8743a88b1c728b94` (SIGGRAPH 2026, \"Pixel-Aligned 3D Generation from Images\").",
+      "licence": "Licence:** CLEAR for the generators, with one **observed-vs-claimed discrepancy that the announcement's own wording hides**. Read as files on 2026-09-02, not from SPDX fields: `microsoft/TRELLIS.2/LICENSE` is MIT (c) Microsoft Corporation; `TencentARC/Pixal3D/LICENSE` (GitHub `master`, and a real `LICENSE` file in the HF weights repo too) is MIT (c) 2026 Tencent with **no non-commercial or jurisdiction clause**; that repo's `NOTICE` names dinov2 (Apache-2.0), TRELLIS.2 (MIT, Microsoft), Direct3D-S2 (MIT, DreamTech) and MoGe (MIT, Microsoft). MoGe's Comfy-Org repackage carries a real MIT+Apache-2.0 `LICENSE` file. **The discrepancy:** the three Comfy-Org repackaged repos actually used by the workflow - `Comfy-Org/TRELLIS.2` @ `463441b1c32829ee876e4f297dcfff533cb357a7`, `Comfy-Org/Pixal3D` @ `b35ffffa61fa02a86c377d94b755d9fe65d185d9`, `Comfy-Org/BiRefNet` @ `5a1bd8ae750548f8cd42e3c8afa854fd3eba0fb1` - contain **no LICENSE file whatsoever**; MIT is only a model-card metadata field, i.e. a claim about a bundle. And the required image encoder `dino_v3_L_naf_fp32.safetensors` is a **DINOv3** backbone (Meta's custom DINOv3 License: commercial use permitted, but with an attribution condition and redistribution terms, and explicitly not Apache/MIT - DINOv2 was Apache-2.0, DINOv3 is not) with a NAF upsampler vendored from `valeoai/NAF` (Apache-2.0, credited in `comfy/image_encoders/naf.py`). So \"no non-commercial license traps\" is TRUE; \"it's all MIT\" is NOT. If anything generated by this route ships publicly, clear the DINOv3 attribution condition with the owner first.",
+      "methodConsumer": "voxelToMesh() -> weldVertices() -> fillHoles() -> averaged normals, in that order, with the order itself asserted by the CPU check.",
+      "decision": "Decision:** ADOPT as the executable form of the \"AI-generated mesh\" supply route in `ai-3d-asset-generation-loop` - free, local, commercially usable, no paid API, one bounded prop at a time. It does **not** relax any existing boundary: image-to-3D still invents hidden geometry and still produces an unrigged shell, so it is for **static hero props only**, never characters, never first-person arms, never rigged or deforming geometry, and never in preference to a procedural rebuild for terrain, architecture, repeated dressing or anything needing colliders and destruction groups. Atomic Acres remains procedural-art-first: a generated mesh is a per-asset owner exception carried by `assets.manifest.json` and `qa:asset-provenance`, not a general licence to import geometry. ComfyUI's own `Preview3D` is never acceptance evidence. Do not update, restart or queue work on the owner's ComfyUI beyond a single authorised bounded test with an idle queue.",
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel.",
+      "carrierReadComplete": true,
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "d45fa14fb825f253f458aa45e8ce2a89d5732785189d0ecade87b114799c0c01",
+          "attemptedAt": "2026-09-12T15:29:47Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "ecc64683ee1a33d15f733a98febe17f86d4aae215541ddfa5da48ce09d3078c4",
+          "attemptedAt": "2026-09-12T15:29:50Z"
+        },
+        {
+          "outcome": "error",
+          "attemptedAt": "2026-09-12T15:29:52Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "ac1cc63b9bd5efa1beac4c274c3b76dc5938faf48fc4d648f77b4a4372d80a27",
+          "attemptedAt": "2026-09-12T15:29:52Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "d9a1b1e30d633d5732ea18e3cba9538d293ebc53e1a9e4e96ab739e0c5c4f1cb",
+          "attemptedAt": "2026-09-12T15:29:53Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "8e28d8efae5a9ac269c3b7c5df67a5ea4b5f1ae02543d6407dc35ea4b8346ab7",
+          "attemptedAt": "2026-09-12T15:29:53Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "80b26f09a60060ba082d152feb3a81e7512c3325ae3530913ed6bddb40c7e177",
+          "attemptedAt": "2026-09-12T15:29:54Z"
+        }
+      ],
+      "group": "group-c"
+    },
+    {
+      "sourceId": 46,
+      "canonical": "Canonical:** **none available, and that is the finding.** `dgreenheck/webgpu-water` (the",
+      "licence": "Licence:** the shipped library is **Commercial Software License Agreement v2.2 (14 Aug",
+      "methodConsumer": "shadeCorrect() injects the bubble term inside the absorption integral; shadeTintedAfter() adds the same energy afterwards, and the test asserts only the first produces a green shift.",
+      "decision": "Decision - what we may do, and what is out of bounds.**",
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel.",
+      "carrierReadComplete": true,
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "a0bb3004f76de4ba9ba1040473db49b0cf190d0f25937e614acf016d6349a175",
+          "attemptedAt": "2026-09-12T15:29:56Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "eda1019227ccf0367445dc8e847c68eeca5cc0d0a7e6b05b48670a49ad10939c",
+          "attemptedAt": "2026-09-12T15:29:58Z"
+        },
+        {
+          "outcome": "http-error",
+          "sha256": "359756979766b1ee491532df977744d8c5672bb6e2d98eaf361da348360e8a09",
+          "attemptedAt": "2026-09-12T15:29:58Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "49d3c646d97bfac01a4ab12f665f5a137d727d5d6050fe474d70613a19f71ce1",
+          "attemptedAt": "2026-09-12T15:29:59Z"
+        }
+      ],
+      "group": "group-c"
+    },
+    {
+      "sourceId": 47,
+      "canonical": "Canonical:** **none for the city build.** The only canonical artefact in this author's",
+      "licence": "Licence:** article prose **copyrighted, marketing** - restate, never copy. Video",
+      "methodConsumer": "The cell is authored road first, then paving and kerb, then instanced facade bays, then furniture.",
+      "decision": "Decision:** the honest finding is that **HF-419 is not a new technique**. The method it",
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel.",
+      "carrierReadComplete": false,
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "0fff550daced1539489e2db9ce9e0dc95326ad880988dbe1016a2f19b798c6f0",
+          "attemptedAt": "2026-09-12T15:30:00Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "3594a5d4bf3abf36f386aa7ce5ab292dd052846155599c4a98c16b94dea3553f",
+          "attemptedAt": "2026-09-12T15:30:02Z"
+        }
+      ],
+      "group": "group-c"
+    },
+    {
+      "sourceId": 48,
+      "canonical": "Canonical:** none - the game is not published and runs on the author's `localhost:8080`.",
+      "licence": "Licence: UNKNOWN, therefore all-rights-reserved.** No licence is stated and no code exists",
+      "methodConsumer": "A narrow desaturated value band, emissive fixtures, two declared short-range lights on visible fixtures, and per-vertex distance darkening.",
+      "decision": "Decision:** ADOPT the *method*, and record loudly that **the look is not bought with",
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel.",
+      "carrierReadComplete": false,
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "fa5f11a2d3aff2b81842bf975bcecb8fa73f8fe446b1ffe3b2f579def493e0a8",
+          "attemptedAt": "2026-09-12T15:30:03Z"
+        },
+        {
+          "outcome": "error",
+          "attemptedAt": "2026-09-12T15:30:04Z"
+        }
+      ],
+      "group": "group-c"
+    },
+    {
+      "sourceId": 49,
+      "canonical": "Canonical:** `localai-org/motion-bricks.cpp` @ `6fdb75e15ddb7f97dd1a4abb8017a57b936bc7a3`",
+      "licence": "Licence:** **CLEAR, on the same terms row 16 already cleared, all files read as file bodies on",
+      "methodConsumer": "stepCriticallyDamped() places each constraint; the last four produced frames are retained as the next window's context.",
+      "decision": "Decision:** **ADOPT AS A COMPLEMENT TO ROW 16, OFFLINE ONLY, AND NOT YET.**",
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel.",
+      "carrierReadComplete": false,
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "3d949b932e0c2bf98ad7de926364a89188d58b9b8918bae3eac4f65d151eb470",
+          "attemptedAt": "2026-09-12T15:30:04Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "d846db92d5f61383843006ea35b02aa855577504cd116f3e41b0e3cb5fe7ff37",
+          "attemptedAt": "2026-09-12T15:30:07Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "attemptedAt": "2026-09-12T15:30:08Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "128ed53888942f957a34f24c2ecbe5c7ad1d51b5d21931382b7413e2ac2a8906",
+          "attemptedAt": "2026-09-12T15:30:10Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "cbecfaff7b536a672d3d2744accb4819f2912260e1e2309b483f512edcf1c948",
+          "attemptedAt": "2026-09-12T15:30:11Z"
+        }
+      ],
+      "group": "group-c"
+    },
+    {
+      "sourceId": 50,
+      "canonical": "Canonical:** `PhiloLabs/fable51-worlds` @ `1dcc255adc5600cfec8a7e3e38c896074668dd1e` (merge of PR #1 \"Add Higashiyama, Kyoto\", 2026-09-03T06:09:40Z), default branch `main`.",
+      "licence": "Licence:** **MIT, read as a FILE not an API field** - `LICENSE` fetched raw (HTTP 200, 1,066 B), \"MIT License / Copyright (c) 2026 PhiloLabs\". The README adds layered terms an SPDX field would have hidden: **code and generated assets MIT; geometry derived from OpenStreetMap is ODbL; USGS 3DEP elevation is public domain; reference photographs are deliberately not redistributed** (provenance recorded per sector in each world's `refs/*/SOURCES.md`); brand names and logos belong to their owners. So the SF world's *shape* carries an ODbL share-alike obligation the MIT header does not describe - relevant only if we ever derive from real-world geometry, which we do not.",
+      "methodConsumer": "sweepCorridor() walks the centreline every 1.5 m and admits a 0.34 m disc or records a blocked run; the companion script exits non-zero on any survivor.",
+      "decision": "Decision: INGEST THE QA HARNESS PATTERN ONLY. No code reuse, no vendoring, no port.** The repository is WebGL / three 0.180 with no TSL and no WebGPU, so nothing in it drops into our renderer, and its art direction is not ours. What transfers is atom 1 (with 2), which is engine-agnostic and is exactly the class of gate this project keeps re-learning it needs: a green gate that never asked the real question. Recorded against the standing lesson in `gotcha-hardcoded-gate-rosters` and `gotcha-gate-drives-debug-backdoor`.",
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel.",
+      "carrierReadComplete": true,
+      "filesRead": [],
+      "urls": [
+        {
+          "outcome": "ok",
+          "sha256": "8aba666b890814c9e126cf569b7701ad971d8c7a6d0b1ca822900a92390583db",
+          "attemptedAt": "2026-09-12T15:30:11Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "f0ea75bb97656ba4f13dc19fc74ac65e5b57909b2ea0a008fbcb8dbb1a37fcbb",
+          "attemptedAt": "2026-09-12T15:30:12Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "6184e5409feb4d8971fbd2a2c7a51c331558aabe695485f81c6e7af09eb87922",
+          "attemptedAt": "2026-09-12T15:30:13Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "239193c2768a8a5d43a543054236e106acc760d59def3b3619e371c518328e7f",
+          "attemptedAt": "2026-09-12T15:30:13Z"
+        },
+        {
+          "outcome": "ok",
+          "sha256": "b19ab7ff6bf1f7ad8636b836182c9349f58bd03295ae6530165a46c1f495ca72",
+          "attemptedAt": "2026-09-12T15:30:14Z"
+        }
+      ],
+      "group": "group-c"
+    }
+  ]
+}

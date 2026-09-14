@@ -9,6 +9,7 @@ import {
   chopperMissileGroundTarget,
   type KillstreakWorld,
 } from './killstreak-runtime';
+import { isImpactEvent } from './killstreak-protocol';
 
 const LOADOUT = parseKillstreakLoadout({
   schemaVersion: 1,
@@ -42,7 +43,9 @@ function setup(enterControl = true): Readonly<{ runtime: HostKillstreakRuntime; 
 }
 
 describe('Pass 70 host-authoritative Chopper Gunner missiles', () => {
-  it('admits only possessed edge requests, owns six rounds, and never queues cooldown clicks', () => {
+  // HF-458 item 1 (owner 2026-09-02): the payload is twelve, not six. The
+  // autopilot's half of it is covered by chopper-autopilot-rockets.test.ts.
+  it('admits only possessed edge requests, owns twelve rounds, and never queues cooldown clicks', () => {
     const outside = setup(false);
     expect(outside.runtime.control({
       by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, entityId: outside.entityId,
@@ -81,7 +84,7 @@ describe('Pass 70 host-authoritative Chopper Gunner missiles', () => {
         const cooldown = runtime.advance(now + 500, world());
         expect(cooldown.shotEvents).toEqual([]);
         expect(cooldown.impactEvents.filter((event) => event.phase === 'drop')).toEqual([]);
-        expect(runtime.snapshotFor('owner', now + 500).entities[0].missileAmmo).toBe(5);
+        expect(runtime.snapshotFor('owner', now + 500).entities[0].missileAmmo).toBe(CHOPPER_MISSILE_CAPACITY - 1);
       }
       now += CHOPPER_MISSILE_CADENCE_MS;
     }
@@ -158,6 +161,58 @@ describe('Pass 70 host-authoritative Chopper Gunner missiles', () => {
     expect(rematch.runtime.endMatch()).toContain(rematch.entityId);
     expect(rematch.runtime.advance(2_000, world())).toEqual({
       damageEvents: [], shotEvents: [], impactEvents: [], expiredEntityIds: [],
+      // HF-334: host killstreak result object includes careWeaponGrantEvents
+      // (care-package weapon grants, e.g. the 10% flamethrower reward).
+      careWeaponGrantEvents: [],
+      // HF-458: and taserStunEvents (Piloted Drone taser hits).
+      taserStunEvents: [],
     });
+  });
+
+  it('HF-335: launches from alternating wing sockets along the true 3D vector and admits launchPosition on replication', () => {
+    const { runtime, entityId } = setup();
+    let sequence = 2;
+    let now = 1_100;
+    for (let ordinal = 0; ordinal < 2; ordinal += 1) {
+      expect(runtime.control({
+        by: 'owner', matchEpoch: 7, lifeId: 1, sequence, entityId,
+        action: 'pilot-control', yawQ: 0.2, pitchQ: -1, missileFire: true,
+      }, now).accepted).toBe(true);
+      sequence += 1;
+      const launch = runtime.advance(now, world());
+      const drop = launch.impactEvents.find((event) => event.phase === 'drop');
+      expect(drop).toBeDefined();
+      expect(drop!.launchPosition).toBeDefined();
+      // Launch origin must NOT be the impact point or directly above it (true
+      // 3D vector, not a vertical bomb drop from the target), and must sit
+      // within one wing-span of the ground target.
+      expect(drop!.launchPosition).not.toEqual(drop!.position);
+      const horizontal = Math.hypot(
+        drop!.launchPosition![0] - drop!.position[0],
+        drop!.launchPosition![2] - drop!.position[2],
+      );
+      expect(horizontal).toBeGreaterThan(0.5);
+      expect(Math.hypot(
+        drop!.launchPosition![0] - drop!.position[0],
+        drop!.launchPosition![1] - drop!.position[1],
+        drop!.launchPosition![2] - drop!.position[2],
+      )).toBeLessThan(30);
+
+      // Protocol admission: present field validates; missing field fails open.
+      expect(isImpactEvent({ ...drop })).toBe(true);
+      const withoutLaunch = { ...drop };
+      delete (withoutLaunch as Record<string, unknown>).launchPosition;
+      expect(isImpactEvent(withoutLaunch)).toBe(true);
+      // Corrupt launchPosition still rejected — bounds not weakened.
+      expect(isImpactEvent({ ...drop, launchPosition: ['x', 'y'] })).toBe(false);
+
+      // Impact event forwards the same launch origin.
+      const impactAtMs = drop!.impactAtMs;
+      const impactStep = runtime.advance(Math.max(now + 1, impactAtMs), world());
+      const impact = impactStep.impactEvents.find((event) => event.phase === 'impact' && event.ordinal === ordinal);
+      expect(impact?.launchPosition).toEqual(drop!.launchPosition);
+
+      now += CHOPPER_MISSILE_CADENCE_MS;
+    }
   });
 });

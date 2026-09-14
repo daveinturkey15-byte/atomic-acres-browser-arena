@@ -1,4 +1,4 @@
-import { PASS65_KILLSTREAK_CATALOG, type Pass65KillstreakId } from './killstreak-catalog';
+import { PASS65_KILLSTREAK_CATALOG, type SelectableKillstreakId } from './killstreak-catalog';
 
 export const KILLSTREAK_DEMO_CAPTURE_SCHEMA_VERSION = 5;
 export const KILLSTREAK_DEMO_MEDIA_MANIFEST_SCHEMA_VERSION = 4;
@@ -9,8 +9,16 @@ export const KILLSTREAK_DEMO_MAXIMUM_P95_PRESENTED_GAP_MS = 80;
 export const KILLSTREAK_DEMO_MAXIMUM_PRESENTED_GAP_MS = 250;
 export const KILLSTREAK_DEMO_MAXIMUM_NEAR_DUPLICATE_RATIO = 0.35;
 export const KILLSTREAK_DEMO_MAXIMUM_NEAR_DUPLICATE_RUN = 6;
+/**
+ * HF-334: demos exist for killstreaks a player can put in a slot. A
+ * care-package-only weapon reward has no activation to film, so it is excluded
+ * here rather than given a fabricated capture plan — the exclusion is derived
+ * from availability, so a future care-only reward is handled automatically.
+ */
 export const KILLSTREAK_DEMO_CAPTURE_IDS = Object.freeze(
-  PASS65_KILLSTREAK_CATALOG.definitions.map(({ id }) => id),
+  PASS65_KILLSTREAK_CATALOG.definitions
+    .filter(({ availability }) => availability !== 'care-only')
+    .map(({ id }) => id as SelectableKillstreakId),
 );
 export const KILLSTREAK_DEMO_CAPTURE_SOURCE_ROOTS = Object.freeze(['src', 'public', 'shared'] as const);
 export const KILLSTREAK_DEMO_CAPTURE_EXCLUDED_SOURCE_PREFIXES = Object.freeze([
@@ -43,7 +51,7 @@ export const KILLSTREAK_DEMO_CAPTURE_FIXED_SOURCE_INPUTS = Object.freeze([
  * The retained tail is deliberately short enough for a menu loop while giving
  * every real support time to become legible after the normal F-key commit.
  */
-export const KILLSTREAK_DEMO_CLIP_DURATION_MS: Readonly<Record<Pass65KillstreakId, number>> = Object.freeze({
+export const KILLSTREAK_DEMO_CLIP_DURATION_MS: Readonly<Record<SelectableKillstreakId, number>> = Object.freeze({
   'scout-sweep': 4_500,
   adrenaline: 4_500,
   'care-package': 7_000,
@@ -70,7 +78,7 @@ export type KillstreakDemoProofKind =
   | 'drone-swarm-entities'
   | 'nuke-sequence';
 
-export const KILLSTREAK_DEMO_EXPECTED_PROOF: Readonly<Record<Pass65KillstreakId, Readonly<{
+export const KILLSTREAK_DEMO_EXPECTED_PROOF: Readonly<Record<SelectableKillstreakId, Readonly<{
   kind: KillstreakDemoProofKind;
   minimumCount: number;
 }>>> = Object.freeze({
@@ -102,7 +110,7 @@ export type KillstreakDemoVisualProofKind =
 
 export type KillstreakDemoCameraStrategy = 'dynamic-world-subjects' | 'bay-hud-overview';
 
-export const KILLSTREAK_DEMO_VISUAL_REQUIREMENTS: Readonly<Record<Pass65KillstreakId, Readonly<{
+export const KILLSTREAK_DEMO_VISUAL_REQUIREMENTS: Readonly<Record<SelectableKillstreakId, Readonly<{
   kind: KillstreakDemoVisualProofKind;
   cameraStrategy: KillstreakDemoCameraStrategy;
   minimumSubjectCount: number;
@@ -164,7 +172,7 @@ type KillstreakDemoCameraPlan = Readonly<{
   fov: number;
 }>;
 
-const KILLSTREAK_DEMO_CAMERA_PLANS: Readonly<Record<Pass65KillstreakId, KillstreakDemoCameraPlan>> = Object.freeze({
+const KILLSTREAK_DEMO_CAMERA_PLANS: Readonly<Record<SelectableKillstreakId, KillstreakDemoCameraPlan>> = Object.freeze({
   'scout-sweep': Object.freeze({ azimuthRadians: 0.62, elevationRatio: 0.2, minimumElevationM: 3.6, minimumDistanceM: 24, fov: 68 }),
   adrenaline: Object.freeze({ azimuthRadians: -0.58, elevationRatio: 0.16, minimumElevationM: 2.8, minimumDistanceM: 20, fov: 62 }),
   'care-package': Object.freeze({ azimuthRadians: 0.78, elevationRatio: 0.22, minimumElevationM: 4, minimumDistanceM: 16, fov: 72 }),
@@ -254,7 +262,7 @@ export function projectKillstreakDemoWorldPoint(
 }
 
 export function resolveKillstreakDemoCameraPose(
-  id: Pass65KillstreakId,
+  id: SelectableKillstreakId,
   subjectPositions: readonly KillstreakDemoWorldPoint[],
 ): KillstreakDemoCameraPose {
   if (subjectPositions.length === 0 || subjectPositions.some((point) => !finitePoint(point))) {
@@ -345,7 +353,7 @@ export type KillstreakDemoCaptureSourceInput = Readonly<{
 }>;
 
 export type KillstreakDemoCaptureEntry = Readonly<{
-  id: Pass65KillstreakId;
+  id: SelectableKillstreakId;
   artifactPath: string;
   sha256: string;
   sizeBytes: number;
@@ -556,7 +564,7 @@ export function validateKillstreakDemoCaptureReceipt(value: unknown): readonly s
       'visualProof', 'runtimeCadence',
     ], `captures[${index}]`, errors);
     const id = capture.id;
-    if (typeof id !== 'string' || !expectedIds.includes(id as Pass65KillstreakId)) {
+    if (typeof id !== 'string' || !expectedIds.includes(id as SelectableKillstreakId)) {
       errors.push(`captures[${index}] has unknown id`);
       continue;
     }
@@ -582,7 +590,7 @@ export function validateKillstreakDemoCaptureReceipt(value: unknown): readonly s
       || (capture.videoSizeBytes as number) > 3_000_000) errors.push(`${id} video size is outside the compact media budget`);
     if (capture.videoWidth !== KILLSTREAK_DEMO_CAPTURE_VIEWPORT.width
       || capture.videoHeight !== KILLSTREAK_DEMO_CAPTURE_VIEWPORT.height) errors.push(`${id} video dimensions mismatch`);
-    const expectedDurationMs = KILLSTREAK_DEMO_CLIP_DURATION_MS[id as Pass65KillstreakId];
+    const expectedDurationMs = KILLSTREAK_DEMO_CLIP_DURATION_MS[id as SelectableKillstreakId];
     if (typeof capture.videoDurationMs !== 'number'
       || Math.abs(capture.videoDurationMs - expectedDurationMs) > 650) errors.push(`${id} video duration is outside the authored tail window`);
     if (!Number.isSafeInteger(capture.videoFrameCount)
@@ -649,7 +657,7 @@ export function validateKillstreakDemoCaptureReceipt(value: unknown): readonly s
       errors.push(`${id} activation proof missing`);
     } else {
       exactKeys(capture.proof, ['kind', 'count', 'activationIds'], `${id}.proof`, errors);
-      const expectedProof = KILLSTREAK_DEMO_EXPECTED_PROOF[id as Pass65KillstreakId];
+      const expectedProof = KILLSTREAK_DEMO_EXPECTED_PROOF[id as SelectableKillstreakId];
       if (capture.proof.kind !== expectedProof.kind) errors.push(`${id} activation proof kind mismatch`);
       if (!Number.isSafeInteger(capture.proof.count) || (capture.proof.count as number) < expectedProof.minimumCount) {
         errors.push(`${id} activation proof count is below ${expectedProof.minimumCount}`);
@@ -681,7 +689,7 @@ export function validateKillstreakDemoCaptureReceipt(value: unknown): readonly s
       }
     }
 
-    const visualRequirement = KILLSTREAK_DEMO_VISUAL_REQUIREMENTS[id as Pass65KillstreakId];
+    const visualRequirement = KILLSTREAK_DEMO_VISUAL_REQUIREMENTS[id as SelectableKillstreakId];
     let validatedCameraPose: KillstreakDemoCameraPose | null = null;
     if (!isRecord(capture.cameraPose)) errors.push(`${id} support-specific camera pose missing`);
     else {
@@ -690,7 +698,7 @@ export function validateKillstreakDemoCaptureReceipt(value: unknown): readonly s
         || !Array.isArray(capture.cameraPose.position) || !finitePoint(capture.cameraPose.position as number[])
         || !Array.isArray(capture.cameraPose.target) || !finitePoint(capture.cameraPose.target as number[])
         || ![capture.cameraPose.yaw, capture.cameraPose.pitch, capture.cameraPose.fov].every(Number.isFinite)
-        || !approximatelyEqual(capture.cameraPose.fov as number, KILLSTREAK_DEMO_CAMERA_PLANS[id as Pass65KillstreakId].fov)) {
+        || !approximatelyEqual(capture.cameraPose.fov as number, KILLSTREAK_DEMO_CAMERA_PLANS[id as SelectableKillstreakId].fov)) {
         errors.push(`${id} support-specific camera pose is invalid`);
       } else {
         validatedCameraPose = {
@@ -754,7 +762,7 @@ export function validateKillstreakDemoCaptureReceipt(value: unknown): readonly s
       }
       if (visualRequirement.cameraStrategy === 'dynamic-world-subjects'
         && validatedCameraPose && subjectPositions.length >= visualRequirement.minimumSubjectCount) {
-        const expectedPose = resolveKillstreakDemoCameraPose(id as Pass65KillstreakId, subjectPositions);
+        const expectedPose = resolveKillstreakDemoCameraPose(id as SelectableKillstreakId, subjectPositions);
         if (!approximatelyEqualPoint(validatedCameraPose.position, expectedPose.position)
           || !approximatelyEqualPoint(validatedCameraPose.target, expectedPose.target)
           || !approximatelyEqual(validatedCameraPose.yaw, expectedPose.yaw)
@@ -857,10 +865,10 @@ export function validateKillstreakDemoCaptureReceipt(value: unknown): readonly s
   return Object.freeze(errors);
 }
 
-export function killstreakDemoPosterPath(id: Pass65KillstreakId): string {
+export function killstreakDemoPosterPath(id: SelectableKillstreakId): string {
   return `./assets/original/killstreak-demo/${id}.jpg`;
 }
 
-export function killstreakDemoVideoPath(id: Pass65KillstreakId): string {
+export function killstreakDemoVideoPath(id: SelectableKillstreakId): string {
   return `./assets/original/killstreak-demo/${id}.mp4`;
 }

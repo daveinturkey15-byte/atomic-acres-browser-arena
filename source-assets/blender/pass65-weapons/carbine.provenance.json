@@ -14,11 +14,11 @@
   "blenderVersion": "5.1.2",
   "generator": {
     "path": "scripts/blender/create-pass65-weapon-families.py",
-    "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+    "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
   },
   "geometryModule": {
     "path": "scripts/blender/pass65_weapon_production_geometry.py",
-    "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+    "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
   },
   "sourceBlend": {
     "path": "source-assets/blender/pass65-weapon-families.blend",
@@ -36,21 +36,21 @@
     "firstPersonGlbs": [
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/carbine/carbine-fp-lod0.glb",
-        "sha256": "5e015b68b554d78a619bebbc29a0079bedb8b15f55abdeb7ec4788ce05fa129e",
+        "sha256": "3e181f006a102150a64bfe22ea88f96d3525dcc96fa7edf0056f32ce8d58594e",
         "variant": "first-person-lod0",
         "lod": 0,
-        "triangles": 11892,
-        "bytes": 336652,
+        "triangles": 12080,
+        "bytes": 338312,
         "meshNodes": 7,
         "renderPrimitives": 7
       },
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/carbine/carbine-fp-lod1.glb",
-        "sha256": "1c998f772831293ea1d251d3ea781c912f2c08966d10b8e3ecd60182cd3f9868",
+        "sha256": "5f593e1d238f2773ecd63821dd507c8c2cab77fa4151976ffc4a2b51f61beac1",
         "variant": "first-person-lod1",
         "lod": 1,
-        "triangles": 9118,
-        "bytes": 299328,
+        "triangles": 9272,
+        "bytes": 300768,
         "meshNodes": 7,
         "renderPrimitives": 7
       }
@@ -58,31 +58,31 @@
     "worldGlbs": [
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/carbine/carbine-world-lod0.glb",
-        "sha256": "c0d005b370a863804b8ecba76f51a40305870dd3e987627858cf7788de98f320",
+        "sha256": "206ce89361c48630b229db419d51e5b3ca4667e98a446fb110655dbcd303d9cb",
         "variant": "world-lod0",
         "lod": 0,
-        "triangles": 12252,
-        "bytes": 341036,
+        "triangles": 12440,
+        "bytes": 342716,
         "meshNodes": 7,
         "renderPrimitives": 7
       },
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/carbine/carbine-world-lod1.glb",
-        "sha256": "8798adddea9c942ca0b6f9b129e27c875fb6045a2e0c845f531d521f514c701b",
+        "sha256": "eabb90877b9f7adf5107630fff4f690a95ecea627ba490641fa7b5d7053f3f76",
         "variant": "world-lod1",
         "lod": 1,
-        "triangles": 10588,
-        "bytes": 324396,
+        "triangles": 10776,
+        "bytes": 326104,
         "meshNodes": 7,
         "renderPrimitives": 7
       },
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/carbine/carbine-world-lod2.glb",
-        "sha256": "6e6e4dcf960ea8eb1744b04bd6e16a1fc6ab85bf8816c045e597d3c52dbac135",
+        "sha256": "6b9786352af9a1336d1ba6f5f2aa9768c27513d693e2723a452a367be2beffd8",
         "variant": "world-lod2",
         "lod": 2,
-        "triangles": 5972,
-        "bytes": 249008,
+        "triangles": 6118,
+        "bytes": 249900,
         "meshNodes": 7,
         "renderPrimitives": 7
       }
@@ -90,11 +90,11 @@
     "dropGlbs": [
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/carbine/carbine-drop-lod0.glb",
-        "sha256": "3a2bd14ef59bd4116665c0490032537a303428a34f0d115f7dbd5779cc6401a9",
+        "sha256": "a26bbc9b851c0687914492caf9be94f93fe33b4daba7e67f9d80fd8df94f9a43",
         "variant": "drop-lod0",
         "lod": 0,
-        "triangles": 10588,
-        "bytes": 324388,
+        "triangles": 10776,
+        "bytes": 326096,
         "meshNodes": 7,
         "renderPrimitives": 7
       }
@@ -182,7 +182,7 @@
     "renders": [
       {
         "path": "docs/assets/pass65-weapons/firearms/carbine/carbine-hero-quarter.png",
-        "sha256": "53b6bdaa482077afa02cda5209deb41f1ba042fc2ac24d0dd7ba0634c24c81e0",
+        "sha256": "1d26f2c74a3411deffcb7f845d2dfdea917ee3ec21ccd0af15233e700d20f8cb",
         "width": 480,
         "height": 360,
         "cameraId": "hero-quarter",
@@ -190,7 +190,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/carbine/carbine-side-silhouette.png",
-        "sha256": "eaa93326e81eee6ad4aa80ae6df7a67bbe3d1c379d31169dbcd4670f6c5d3ace",
+        "sha256": "bce95fd897201c37f31811756d53cd2db77fb6ba6ae71e2571b77687eca64b2c",
         "width": 480,
         "height": 360,
         "cameraId": "side-silhouette",
@@ -198,7 +198,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/carbine/carbine-sight-line.png",
-        "sha256": "f47a15cfe8446a5640a0300ccf0e28e65e2a9b21af7889b7fc36d5dfc450f8dc",
+        "sha256": "ca5dc088f48491100ef81fda7cc629e2c92601b13d9afd649a4d0b498c91daea",
         "width": 480,
         "height": 360,
         "cameraId": "sight-line",
@@ -206,7 +206,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/carbine/carbine-reload-action.png",
-        "sha256": "051c1a69cfcc687b7cc3e13aad49ce59b91abb49275b35b44dd94a60cfeaff00",
+        "sha256": "e49a2a072d7addf06214d3bee029feae56c74a4829463879c77a6bf99266bab8",
         "width": 480,
         "height": 360,
         "cameraId": "reload-action",
@@ -214,7 +214,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/carbine/carbine-world-lod0-silhouette.png",
-        "sha256": "2438b3ed3faf8914c5c296e3697f6ae566b36c1418c9d3b7e1488bffdcb51b41",
+        "sha256": "426ff9c8cf9f6f544524d0d51682b6ab09ff812b9979afeb47f3cd73c73a392e",
         "width": 480,
         "height": 360,
         "cameraId": "world-lod0-silhouette",
@@ -222,7 +222,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/carbine/carbine-world-lod2-silhouette.png",
-        "sha256": "557cab8351e04af822fd4b819b25f6df85306b75ee3cfe32007c99614595420b",
+        "sha256": "ba32a5b08e4b7f3d72c59563221bf8d9bd66a8eef4a2091acea89399d2a73c1a",
         "width": 480,
         "height": 360,
         "cameraId": "world-lod2-silhouette",
@@ -230,7 +230,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/carbine/carbine-drop-lod0-silhouette.png",
-        "sha256": "c1a91faa24542c5b236822ab5a453eeed8776b0ac8f40bc863dd50f8e0906be4",
+        "sha256": "bd4c40290aa83a23f6901c285f88e67075678421fe75a8ad78dab1d98c0bd9d5",
         "width": 480,
         "height": 360,
         "cameraId": "drop-lod0-silhouette",
@@ -239,7 +239,7 @@
     ],
     "contactSheet": {
       "path": "docs/assets/pass65-weapons/firearms/carbine/carbine-contact-sheet.png",
-      "sha256": "1fe14ce051778b808c270734a1c8809f23a69ad5a1d789e58e873763250e261f",
+      "sha256": "6b8f0abf870a18e7df7c3a7ec706728704318dcedb3b47dfb8f55d9e07e2189a",
       "width": 1920,
       "height": 720
     }
@@ -248,8 +248,8 @@
     "deliveries": [
       {
         "variant": "first-person-lod0",
-        "triangles": 11892,
-        "bytes": 336652,
+        "triangles": 12080,
+        "bytes": 338312,
         "meshNodes": 7,
         "renderPrimitives": 7,
         "materials": 5,
@@ -275,12 +275,12 @@
         "sightForwardDot": 0.9999999999999962,
         "declaredLength": 1.36,
         "platformAnatomy": "forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock",
-        "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":11892,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
+        "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":12080,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
       },
       {
         "variant": "first-person-lod1",
-        "triangles": 9118,
-        "bytes": 299328,
+        "triangles": 9272,
+        "bytes": 300768,
         "meshNodes": 7,
         "renderPrimitives": 7,
         "materials": 5,
@@ -306,12 +306,12 @@
         "sightForwardDot": 0.9999999999999962,
         "declaredLength": 1.36,
         "platformAnatomy": "forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock",
-        "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":9118,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
+        "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":9272,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
       },
       {
         "variant": "world-lod0",
-        "triangles": 12252,
-        "bytes": 341036,
+        "triangles": 12440,
+        "bytes": 342716,
         "meshNodes": 7,
         "renderPrimitives": 7,
         "materials": 5,
@@ -337,12 +337,12 @@
         "sightForwardDot": 0.9999999999999962,
         "declaredLength": 1.36,
         "platformAnatomy": "forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock",
-        "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":12252,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
+        "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":12440,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
       },
       {
         "variant": "world-lod1",
-        "triangles": 10588,
-        "bytes": 324396,
+        "triangles": 10776,
+        "bytes": 326104,
         "meshNodes": 7,
         "renderPrimitives": 7,
         "materials": 5,
@@ -368,12 +368,12 @@
         "sightForwardDot": 0.9999999999999962,
         "declaredLength": 1.36,
         "platformAnatomy": "forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock",
-        "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":10588,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
+        "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":10776,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
       },
       {
         "variant": "world-lod2",
-        "triangles": 5972,
-        "bytes": 249008,
+        "triangles": 6118,
+        "bytes": 249900,
         "meshNodes": 7,
         "renderPrimitives": 7,
         "materials": 5,
@@ -399,12 +399,12 @@
         "sightForwardDot": 0.9999999999999962,
         "declaredLength": 1.36,
         "platformAnatomy": "forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock",
-        "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":5972,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
+        "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":6118,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
       },
       {
         "variant": "drop-lod0",
-        "triangles": 10588,
-        "bytes": 324388,
+        "triangles": 10776,
+        "bytes": 326096,
         "meshNodes": 7,
         "renderPrimitives": 7,
         "materials": 5,
@@ -430,7 +430,7 @@
         "sightForwardDot": 0.9999999999999962,
         "declaredLength": 1.36,
         "platformAnatomy": "forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock",
-        "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":10588,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
+        "silhouetteSignature": "{\"designId\":\"hk416-short-stroke-rail-v1\",\"family\":\"assault-rifle\",\"triangles\":10776,\"meshNodes\":7,\"declaredLength\":1.36,\"platformAnatomy\":\"forged-upper-short-stroke-piston-heavy-quad-rail-e1-stock\",\"signatures\":[14,15,25]}"
       }
     ],
     "externalUris": 0

@@ -1,7 +1,15 @@
+import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { buildGunRange } from './additional-maps';
-import { circleIntersectsBox, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes } from './collision';
+import {
+  circleIntersectsBox,
+  segmentIntersectsBox,
+  sphereIntersectsBox,
+  sweepSphereAgainstBoxes,
+  type Box2,
+} from './collision';
+import { gunRangeTestBayDummyColliders } from './test-bay-dummy-colliders';
 import { FLAMETHROWER_GROUND_FIRE_PRESENTATION_RADIUS_M } from './flamethrower-stream-system';
 import {
   GUN_RANGE_TEST_BAY_CONTRACT,
@@ -9,6 +17,7 @@ import {
   advanceGunRangeTestBayDoor,
   createGunRangeTestBayDoorState,
   gunRangeTestBayDoorDynamicColliders,
+  gunRangeTestBayDummyPose,
   gunRangeTestBayStructureBounds,
 } from './gun-range-test-bay';
 import { parseKillstreakLoadout } from './killstreak-catalog';
@@ -25,6 +34,7 @@ import {
   type KillstreakImpactEvent,
   type KillstreakTarget,
   type KillstreakWorld,
+  type SupportVec3,
 } from './killstreak-runtime';
 import {
   CARPET_BOMB_SHELL_PRESENTATION_ALTITUDE_M,
@@ -264,4 +274,186 @@ describe('Gun Range Carpet Bomber collision parity', () => {
       expect(gunRangeTestBayDoorDynamicColliders(doorState).map((entry) => entry.bounds)).toEqual(doorSolids);
     });
   }
+});
+
+/**
+ * HF-403 — "carpet bomber doesnt seem to do dmg in killstreak testing area",
+ * "piloted drone and chopper gunner seem a bit buggy in the killstreak area".
+ *
+ * HF-318 made every active training dummy a solid world box, and the test bay
+ * publishes each dummy as a killstreak target at its own collider's geometric
+ * centre. Every support line-of-sight query to a dummy therefore terminated
+ * 0.36 m deep inside the dummy's own solid and reported "blocked", so carpet
+ * bomber, piloted drone and chopper gunner all went inert against dummies
+ * while working everywhere else. Dummies are the only combatants that are also
+ * world solids, which is why only the test bay was affected.
+ *
+ * The repair is in the LOS predicate, not the solid set: a solid that CONTAINS
+ * an endpoint is not cover for that endpoint.
+ */
+describe('HF-403 a dummy is not its own cover', () => {
+  const LOS_PADDING_M = 0.02;
+  const LOS_INTERIOR_MARGIN_M = 0.05;
+  const DUMMY_POSE_AT_MS = 0;
+  const map = buildGunRange(new THREE.Scene());
+  const dummyIds: readonly string[] = GUN_RANGE_TEST_BAY_CONTRACT.dummies.map((definition) => definition.id);
+  const dummySolids = gunRangeTestBayDummyColliders(dummyIds, DUMMY_POSE_AT_MS).map((entry) => entry.bounds);
+  const solids = Object.freeze([...map.colliders, ...dummySolids]);
+  // Exactly how legacy-main publishes a dummy: the arena root sits at the
+  // dummy's feet and the target rides 1.05 m up, which is also the vertical
+  // centre of the 0..2.10 m collider HF-318 derives from that same pose.
+  const dummyTargets: KillstreakTarget[] = GUN_RANGE_TEST_BAY_CONTRACT.dummies.map((definition) => {
+    const pose = gunRangeTestBayDummyPose(definition, DUMMY_POSE_AT_MS);
+    return {
+      id: definition.id,
+      kind: 'bot',
+      team: 1,
+      lifeId: 1,
+      alive: true,
+      position: [pose.position.x, pose.position.y + 1.05, pose.position.z],
+    };
+  });
+
+  // The shipped predicate, mirrored. The source pin at the end of this suite
+  // keeps the mirror and legacy-main in step.
+  const enclosesPoint = (box: Box2, point: { x: number; y: number; z: number }): boolean => {
+    const margin = LOS_INTERIOR_MARGIN_M;
+    const minY = (box.minY ?? 0) + margin;
+    const maxY = (box.maxY ?? 8) - margin;
+    if (box.maxX - box.minX <= margin * 2 || box.maxZ - box.minZ <= margin * 2 || maxY <= minY) return false;
+    return sphereIntersectsBox(point, 1e-4, {
+      minX: box.minX + margin,
+      maxX: box.maxX - margin,
+      minY,
+      maxY,
+      minZ: box.minZ + margin,
+      maxZ: box.maxZ - margin,
+      rotation: box.rotation,
+    });
+  };
+  const naiveLineOfSight = (from: SupportVec3, to: SupportVec3): boolean => !solids.some((solid) => segmentIntersectsBox(
+    { x: from[0], y: from[1], z: from[2] },
+    { x: to[0], y: to[1], z: to[2] },
+    solid,
+    LOS_PADDING_M,
+  ));
+  const endpointAwareLineOfSight = (from: SupportVec3, to: SupportVec3): boolean => {
+    const start = { x: from[0], y: from[1], z: from[2] };
+    const end = { x: to[0], y: to[1], z: to[2] };
+    return !solids.some((solid) => segmentIntersectsBox(start, end, solid, LOS_PADDING_M)
+      && !enclosesPoint(solid, start)
+      && !enclosesPoint(solid, end));
+  };
+
+  it('reproduces the defect: every dummy occludes itself from a blast at its own feet', () => {
+    for (const dummy of dummyTargets) {
+      // Exactly the origin lift applySupportBlastDamage uses for a ground impact.
+      const blastVisibilityOrigin: SupportVec3 = [dummy.position[0], 0.08, dummy.position[2]];
+      expect(
+        naiveLineOfSight(blastVisibilityOrigin, dummy.position),
+        `${dummy.id} was expected to occlude itself under the old predicate`,
+      ).toBe(false);
+      expect(endpointAwareLineOfSight(blastVisibilityOrigin, dummy.position)).toBe(true);
+    }
+  });
+
+  it('still lets a real wall block two points that are both outside it', () => {
+    const wall = GUN_RANGE_TEST_BAY_STRUCTURE
+      .filter((entry) => entry.material === 'wall')
+      .map(gunRangeTestBayStructureBounds)
+      .find((bounds) => bounds.maxX - bounds.minX < 4)!;
+    const midZ = (wall.minZ + wall.maxZ) / 2;
+    const midY = ((wall.minY ?? 0) + (wall.maxY ?? 8)) / 2;
+    const left: SupportVec3 = [wall.minX - 3, midY, midZ];
+    const right: SupportVec3 = [wall.maxX + 3, midY, midZ];
+    expect(naiveLineOfSight(left, right)).toBe(false);
+    expect(endpointAwareLineOfSight(left, right)).toBe(false);
+  });
+
+  it('does not discount a solid an endpoint is merely standing on', () => {
+    // Zero penetration depth is not containment: a roof still blocks line of
+    // sight for whoever is standing on top of it.
+    const roof = solids.find((solid) => (solid.minY ?? 0) > 5 && solid.maxX - solid.minX > 8)!;
+    const onTop: SupportVec3 = [(roof.minX + roof.maxX) / 2, roof.maxY ?? 8, (roof.minZ + roof.maxZ) / 2];
+    const below: SupportVec3 = [onTop[0], (roof.minY ?? 0) - 1, onTop[2]];
+    expect(naiveLineOfSight(onTop, below)).toBe(false);
+    expect(endpointAwareLineOfSight(onTop, below)).toBe(false);
+  });
+
+  it('damages a dummy with a real Carpet Bomber salvo that the old predicate zeroed', () => {
+    const bay = GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds;
+    const flightBounds = Object.freeze({
+      minX: map.bounds.minX,
+      maxX: map.bounds.maxX,
+      minZ: map.bounds.minZ,
+      maxZ: map.bounds.maxZ,
+      floorY: 0,
+      ceilingY: 18,
+    });
+    const ground = new SupportPlacementGroundSampler({
+      bounds: map.bounds,
+      ceilingY: flightBounds.ceilingY,
+      colliders: solids,
+      prepareRaycastMeshes: () => [],
+    });
+    const runSalvo = (hasLineOfSight: NonNullable<KillstreakWorld['hasLineOfSight']>): ReadonlySet<string> => {
+      const world: KillstreakWorld = {
+        bounds: flightBounds,
+        targets: [
+          { id: 'owner', kind: 'player', team: 0, lifeId: 1, alive: true, position: [53, 1.7, 30] },
+          ...dummyTargets,
+        ],
+        groundHeightAt: (x, z) => ground.heightAt(x, z),
+        hasLineOfSight,
+        supportStrikeBoundsAt: () => bay,
+        resolveFlightEnvelopePosition: (from, desired, envelope) => resolveSupportAircraftEnvelopeStep({
+          bounds: flightBounds,
+          solids,
+          from,
+          desired,
+          envelope,
+        }).position,
+      };
+      const runtime = new HostKillstreakRuntime(70);
+      runtime.registerActor('owner', 0, 1, loadout);
+      expect(runtime.grantTrainingReward('owner', 1, 'carpet-bomber', {
+        arenaId: 'gun-range',
+        stationKind: 'secure-test-bay',
+        authorityRole: 'host',
+      })).toEqual({ accepted: true, reason: 'accepted' });
+      expect(runtime.activate({
+        by: 'owner',
+        matchEpoch: 70,
+        lifeId: 1,
+        sequence: 1,
+        slot: 1,
+        activationId: 'gun-range-dummy-blast',
+        expectedId: 'carpet-bomber',
+        // The salvo weaves +/-5.2 m about the anchor line, and the four dummy
+        // lanes sit 10 m apart at z = -16/-6/4/14, so an anchor on z = -1 puts
+        // the weave's troughs directly down the bravo lane.
+        anchor: [52.1, 0, -1],
+        facing: [1, 0, 0],
+      }, 1_000, world)).toMatchObject({ accepted: true, activatedId: 'carpet-bomber' });
+      const damaged = new Set<string>();
+      for (let elapsed = 0; elapsed < CARE_AIRCRAFT_DURATION_MS; elapsed += 50) {
+        for (const event of runtime.advance(1_000 + elapsed, world).damageEvents) damaged.add(event.targetId);
+      }
+      return damaged;
+    };
+    // The defect, end to end: not one dummy in the bay could be damaged.
+    expect([...runSalvo(naiveLineOfSight)].filter((id) => dummyIds.includes(id))).toEqual([]);
+    expect([...runSalvo(endpointAwareLineOfSight)].filter((id) => dummyIds.includes(id)).length)
+      .toBeGreaterThan(0);
+  });
+
+  it('is the predicate legacy-main actually ships', () => {
+    const main = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    expect(main).toContain(`const KILLSTREAK_LINE_OF_SIGHT_PADDING_M = ${LOS_PADDING_M};`);
+    expect(main).toContain(`const KILLSTREAK_LINE_OF_SIGHT_INTERIOR_MARGIN_M = ${LOS_INTERIOR_MARGIN_M};`);
+    expect(main).toContain('function killstreakSolidEnclosesPoint(box: Box2, point: { x: number; y: number; z: number }): boolean {');
+    expect(main).toContain('return !solids.some((box) => segmentIntersectsBox(start, end, box, KILLSTREAK_LINE_OF_SIGHT_PADDING_M)\n'
+      + '    && !killstreakSolidEnclosesPoint(box, start)\n'
+      + '    && !killstreakSolidEnclosesPoint(box, end));');
+  });
 });

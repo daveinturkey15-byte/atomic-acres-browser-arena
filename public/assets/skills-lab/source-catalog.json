@@ -1,0 +1,2488 @@
+{
+ "adapterNotes": "Wave 1 (2026-09-12, OMP/muse-spark, lane sources-night-20260912). Relation vocabulary: implements = a lab demo or adopted route executes the extracted method with file evidence; informs = method extracted and named as input to a skill area; compares = register decision is COMPARISON against our own library, not import; candidate = plausible mapping NOT verified against the skill body — re-verify before use; blocked = skill-relevant but currently unusable. Status vocabulary: implemented = lab CPU demo exists (pixel validation OPEN unless stated); method-extracted = read and restated, no demo; blocked = no honest demo possible; comparator = quality target, not a technique; alias = stub of another row; archive = reference only. No embedUrl is emitted in wave 1: every row ships a usable link fallback; embeds need Fable's allowlist decision in the URL tab. No local paths, credentials, transcripts, or vault content are embedded in this file. Wave 2 (2026-09-12, same lane): rows 45/48 re-staged implemented->method-extracted (no executing demo on record); row 7 interior cross-ref informs->candidate (skill body not re-read); row 42 candidate->informs (mapped skill read in full this lane) plus a complete per-member file licence census; rows 33/38 re-pin target b82e823 (2026-09-01, MIT LICENSE added at HEAD); row 46 public feature-page physics terms. Validator adds stage-consistency gates V1-V5.",
+ "schemaVersion": 1,
+ "updatedAt": "2026-09-12 (wave 2)",
+ "sources": [
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-a/source-01.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Author post text recovered verbatim from og:description; video itself not retrievable by a fetcher.",
+     "url": "https://x.com/Graalitoo/status/2089469774602633431"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Repo page, API commit + recursive tree at pin, then docs/RIG.md, action_specs/spin.json, pipeline/apply_mixamo_fk.py bodies read.",
+     "pin": "00dfd5385506022d533c84f6737a09f5f4392623",
+     "url": "https://github.com/squall01337/mixamo-llm-mocap"
+    }
+   ],
+   "limitations": [
+    "Pixel validation OPEN (no GPU/browser in lane).",
+    "Upstream is Blender/Python, centimetres, Z-up, 65-bone mixamorig; lab demo is Three.js, metres, Y-up, 9-joint stand-in.",
+    "Mixamo character redistribution NOT granted; no characters fetched or used."
+   ],
+   "method": "FK-only pose evaluation from a declarative action spec; ground contact by searching hip height until the support foot reaches the measured ankle-contact height, Z-only foot flattening. RIG.md:52-54: 'No Blender IK, ever' (constraint IK put feet at -81 m). Only Hips translates; all other bones quaternion-only keyed at zero. 30 fps integer frames.",
+   "skillMappings": [
+    {
+     "relation": "informs",
+     "skill": "game-animation-asset-pipeline",
+     "sourceReference": "docs/RIG.md lines 52-54; pipeline/apply_mixamo_fk.py (fetched, not executed)"
+    }
+   ],
+   "sourceId": 1,
+   "status": "implemented",
+   "title": "Mocap to in-game animation",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Author announcement post (text recovered; video not retrievable)",
+     "url": "https://x.com/Graalitoo/status/2089469774602633431"
+    },
+    {
+     "kind": "repo",
+     "label": "mixamo-llm-mocap repository @ 00dfd53",
+     "url": "https://github.com/squall01337/mixamo-llm-mocap"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-a/source-02.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Author text verbatim from og:description.",
+     "url": "https://x.com/Graalitoo/status/2089656660981862487"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Rendered README technique list + API commit/tree at pin + full index.html implementation inspected (lines 239-241, 424, 513-528, 532-567, 573-579, 581-699). MIT LICENSE fetched (1,077 B).",
+     "pin": "142265f5013b6f27bea4f4f819b832dec75c7bad",
+     "url": "https://github.com/squall01337/abyssal-ocean"
+    }
+   ],
+   "limitations": [
+    "Pixel validation OPEN.",
+    "Lab demo is one cascade at N=32 on CPU (plain radix-2), cos^2s spreading, per-frame Jacobian foam test; upstream is 3 cascades at 512^2 via butterfly texture/MRT, JONSWAP+TMA, Donelan-Banner, temporal foam accumulation.",
+    "Repo forbids ShaderMaterial/GLSL on WebGPU path: surface uses core materials with vertex colours."
+   ],
+   "method": "3 cascades (768/121/19 m) partitioning k-space without overlap; 512^2 inverse FFT per cascade per frame as Cooley-Tukey butterfly with precomputed twiddle/index texture, two MRT slots carrying four complex fields; JONSWAP with TMA shallow-water correction + Donelan-Banner spreading from real wind/fetch/depth; Tessendorf h0 sampling; foam where the displacement Jacobian goes negative, accumulated temporally.",
+   "skillMappings": [
+    {
+     "relation": "informs",
+     "skill": "threejs-webgpu-water",
+     "sourceReference": "abyssal-ocean index.html technique list; spectral cascade + Jacobian-foam terms"
+    }
+   ],
+   "sourceId": 2,
+   "status": "implemented",
+   "title": "Spectral FFT ocean",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Author announcement post (text recovered; video not retrievable)",
+     "url": "https://x.com/Graalitoo/status/2089656660981862487"
+    },
+    {
+     "kind": "repo",
+     "label": "abyssal-ocean repository @ 142265f",
+     "url": "https://github.com/squall01337/abyssal-ocean"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": {
+    "experiment": "None under this row: there is no implementation to test. If shore work starts, test against row 2/46 terms instead.",
+    "reason": "No repository, no published technique, no licence. The recoverable content is a stylised fishing/water composition, not an implementation.",
+    "resources": "None.",
+    "test": "n/a",
+    "unblockAction": "Author publishes code or a technique write-up; until then treat as a comparator list only. Alternate: implement the named comparator list (shallow-water colour layers, shore foam, readable caustic depth, reflection, wake) as original work, not under this title."
+   },
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-a/source-03.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Author text verbatim from og:description; video not retrievable.",
+     "url": "https://x.com/Graalitoo/status/2077373937449648518"
+    }
+   ],
+   "limitations": [
+    "Comparator-only. Attractive imagery is not proof of a WebGPU implementation; the demo does not claim to match the target.",
+    "Pixel validation OPEN."
+   ],
+   "method": "No portable implementation. Reusable object is the register-named comparator list: shallow-water colour layers, shore foam, readable caustic depth, reflection, wake.",
+   "skillMappings": [
+    {
+     "relation": "compares",
+     "skill": "threejs-webgpu-water",
+     "sourceReference": "Register comparator list; no source body exists to carry"
+    }
+   ],
+   "sourceId": 3,
+   "status": "comparator",
+   "title": "Stylized water composition",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Author post (text recovered; video not retrievable)",
+     "url": "https://x.com/Graalitoo/status/2077373937449648518"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": {
+    "experiment": "Vary dome height/flow rate and count torn vertices; the cut must stay visibly unsolved until a real clipping method lands.",
+    "reason": "The author states explicitly the surface CUTTING still needs to be better — the source has not solved it. No repository.",
+    "resources": "None beyond three.",
+    "test": "tornVertices counter reports the size of the deliberately unsolved cut artefact.",
+    "unblockAction": "Author publishes a cut method, or we author an original waterline clip (stencil/cap pass) as separate work. Alternate: use the dome + laminar-flow distortion terms, which are our own formulation."
+   },
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-a/source-04.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Author text verbatim from og:description, including the explicit unsolved-cut statement.",
+     "url": "https://x.com/gruberbuilds/status/2090235767922512234"
+    }
+   ],
+   "limitations": [
+    "The waterline cut is shown FAILING on purpose. Do not read the demo as a solved cut.",
+    "Pixel validation OPEN."
+   ],
+   "method": "An underwater mesh distorts the ocean surface with domes and laminar flow around the front. The cutting of the surface is explicitly unsolved by the source; dome/laminar terms in the demo are our own formulation.",
+   "skillMappings": [
+    {
+     "relation": "informs",
+     "skill": "threejs-webgpu-water",
+     "sourceReference": "Post body: submerged-mesh surface distortion; cut unsolved — do not adopt as solved"
+    }
+   ],
+   "sourceId": 4,
+   "status": "implemented",
+   "title": "Underwater volume and waterline cutting",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Author post (text recovered)",
+     "url": "https://x.com/gruberbuilds/status/2090235767922512234"
+    }
+   ]
+  },
+  {
+   "adaptation": "blocked",
+   "blocker": {
+    "experiment": "None: no H3 model, weights, or output were fetched or used; the lab demo draws input frames locally in code.",
+    "reason": "MiniMax Community License EXCLUDES use of the model and its output in the UK, EU, US and Korea without separate written authorization. This machine is in the UK. Position re-verified in the register 2026-08-26 and STANDS.",
+    "resources": "Would need separate written authorization from MiniMax (owner decision, not an agent action).",
+    "test": "Licence re-check against the model page + blog before any use.",
+    "unblockAction": "Obtain separate written authorization, or relocate the generating step outside excluded jurisdictions (owner decision). Alternate adjusted implementation: row 16 kimodo.cpp (NVIDIA Open Model License, no country exclusion) for text-driven character motion; only the provider-neutral half of this row (magenta key-out + sprite atlas packing) is portable."
+   },
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-a/source-05.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Four-step workflow recovered verbatim from og:description.",
+     "url": "https://x.com/victormustar/status/2089310616854892818"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Page body cached; read for licence position only.",
+     "url": "https://www.minimax.io/blog/minimax-h3"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Model page cached; read for licence position only.",
+     "url": "https://huggingface.co/MiniMaxAI/MiniMax-H3"
+    }
+   ],
+   "limitations": [
+    "H3 model route REJECTED on licence; output is a 2D sprite/billboard, never a 3D skinned rig.",
+    "Pixel validation OPEN."
+   ],
+   "method": "1 character design still on flat magenta; one 5 s clip per move; cut each clip to pose extremes; key out magenta; pack into a sprite atlas. Only the provider-neutral half is portable.",
+   "skillMappings": [
+    {
+     "relation": "blocked",
+     "skill": "game-animation-asset-pipeline",
+     "sourceReference": "Licence exclusion (UK/EU/US/KR) verified 2026-08-26; see row 16 for the usable route"
+    }
+   ],
+   "sourceId": 5,
+   "status": "blocked",
+   "title": "Local H3 video to sprite animation",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Author workflow post (text recovered)",
+     "url": "https://x.com/victormustar/status/2089310616854892818"
+    },
+    {
+     "kind": "docs",
+     "label": "MiniMax H3 announcement (licence position)",
+     "url": "https://www.minimax.io/blog/minimax-h3"
+    },
+    {
+     "kind": "docs",
+     "label": "MiniMax-H3 model page (licence position)",
+     "url": "https://huggingface.co/MiniMaxAI/MiniMax-H3"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-a/source-06.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Repo page, API commit + 156-file recursive tree at pin, then docs/ARCHITECTURE.md (lines 7-17, 32-53, 63-89, 97-134) and SKILL.md (48,766 B) bodies. Apache-2.0 LICENSE fetched (11,337 B).",
+     "pin": "d6673386f89673a58736f8d398dd16ece67874f5",
+     "url": "https://github.com/img2threejs/img2threejs"
+    }
+   ],
+   "limitations": [
+    "Upstream stages 1-3 need the installed skill, Python gate scripts and a vision agent; the demo authors the spec by hand and runs only the action-ready gate.",
+    "Pixel validation OPEN."
+   ],
+   "method": "Reference image -> probe and suitability gate -> author an ObjectSculptSpec (components, materials, sockets) -> pass-gated code generation emitting only the currently unlocked build pass. Blocking material gate + Action-ready gate: model must expose pivots, sockets, colliders, destruction groups via root.userData.sculptRuntime. Output: spec JSON + createObjectNameModel(spec, options) factory returning a THREE.Group.",
+   "skillMappings": [
+    {
+     "relation": "implements",
+     "skill": "img2threejs",
+     "sourceReference": "docs/ARCHITECTURE.md (full section ranges cited in SOURCE_RESEARCH); installed skill read 2026-09-12"
+    },
+    {
+     "relation": "informs",
+     "skill": "ai-3d-asset-generation-loop",
+     "sourceReference": "Spec-gated codegen as the image-to-3D supply route alternative"
+    }
+   ],
+   "sourceId": 6,
+   "status": "implemented",
+   "title": "Image to procedural Three.js model",
+   "urls": [
+    {
+     "kind": "repo",
+     "label": "img2threejs repository @ d667338",
+     "url": "https://github.com/img2threejs/img2threejs"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-a/source-07.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Author text verbatim.",
+     "url": "https://x.com/prasenx/status/2087604022849184080"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Repo page, API commit + tree at pin; docs/TECHNIQUE.md section index + 3.1-3.9/4.1-4.5/5.1-5.8 headings, PROMPTS.md, src/scene/softShadow.ts bodies. MIT LICENSE fetched (1,080 B).",
+     "pin": "333f064778105640588a95d2c2d150780044e7bf",
+     "url": "https://github.com/StarKnightt/night-street"
+    }
+   ],
+   "limitations": [
+    "Upstream is R3F + full post chain (bloom, grade, god rays, DoF, grain, vignette); only the authoring + light-budget half ports (lab host owns tone mapping/post).",
+    "TECHNIQUE.md WITHDRAWS its own display-transform section: no constant quoted from it.",
+    "Pixel validation OPEN."
+   ],
+   "method": "Code-only procedural authoring with zero external assets; lighting as a MEASURED BUDGET: measure what the removed rig cost, derive the level of an artificial source, prefer emissive geometry over a real light except where the light must do work.",
+   "skillMappings": [
+    {
+     "relation": "informs",
+     "skill": "photoreal-procedural-scene-forge",
+     "sourceReference": "TECHNIQUE.md light-budget sections; measured-budget + emissive-first rule"
+    },
+    {
+     "relation": "candidate",
+     "skill": "threejs-webgpu-interior-lighting-look",
+     "sourceReference": "Same light-budget method, interior application (candidate: skill body not re-read this lane; re-verify against the skill body before ingestion)"
+    }
+   ],
+   "sourceId": 7,
+   "status": "implemented",
+   "title": "Code-only procedural scene authoring",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Author post (text recovered)",
+     "url": "https://x.com/prasenx/status/2087604022849184080"
+    },
+    {
+     "kind": "repo",
+     "label": "night-street repository @ 333f064",
+     "url": "https://github.com/StarKnightt/night-street"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-a/source-08.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Repo page, API commit + tree at pin; PROMPT.md (3,328 B full), src/gfx/glsl.js, src/render/grade.js bodies. MIT LICENSE fetched (1,080 B).",
+     "pin": "c15640d3a2b6f08ca68e4df98fdfc953ea8a070a",
+     "url": "https://github.com/StarKnightt/jungle-trail"
+    }
+   ],
+   "limitations": [
+    "Only the texture-bake correctness half + layered instanced leaf cards port; terrain/ruins/water/audio/grade do not.",
+    "Honest recorded scores: vegetation 5/10 after six rounds.",
+    "Pixel validation OPEN."
+   ],
+   "method": "Sequential system-by-system build with a blind critic seeing only rendered output. PROMPT.md records generation bugs any vegetation pass reproduces: dark leaf outlines from a premultiplied-alpha bug in the texture baker; black trunks from inverted quad winding + moss layer.",
+   "skillMappings": [
+    {
+     "relation": "informs",
+     "skill": "threejs-procedural-vegetation",
+     "sourceReference": "PROMPT.md defect log: premultiplied-alpha bake check + winding check"
+    }
+   ],
+   "sourceId": 8,
+   "status": "implemented",
+   "title": "Fully procedural jungle",
+   "urls": [
+    {
+     "kind": "repo",
+     "label": "jungle-trail repository @ c15640d",
+     "url": "https://github.com/StarKnightt/jungle-trail"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-a/source-09.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Announcement text verbatim.",
+     "url": "https://x.com/aidenybai/status/2089400082550620636"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Repo page, API commit, 2.2 MB tree, skills/improve-threejs/SKILL.md in full (9,128 B, 103 lines). Modified MIT LICENSE fetched (1,732 B): carve-outs for (a) training/fine-tuning/evaluation use, (b) sale as paid hosted product.",
+     "pin": "e183c3519010599d929ed14d99a18bf1f8f8a44c",
+     "url": "https://github.com/millionco/react-doctor"
+    }
+   ],
+   "limitations": [
+    "Restated scanner is plain-Three aware, dependency-free, covers the static half only; react-doctor NOT installed/executed.",
+    "Every rubric row needing rendered evidence is unverified here.",
+    "Licence carve-outs: never use as ML-training input; never sell as paid hosted product."
+   ],
+   "method": "Severity follows the render loop. HIGH: allocation in useFrame/RAF, setState in useFrame, missing disposal of imperative GPU resources, object reconstruction in render. MEDIUM: unstable scene-graph props, missing instancing, frameloop=always on static scenes, uncached asset loading. 10-row visual rubric with explicit fail conditions + always-missed checks list.",
+   "skillMappings": [
+    {
+     "relation": "implements",
+     "skill": "threejs-frame-loop-audit",
+     "sourceReference": "skills/improve-threejs/SKILL.md (full); scripts/technique-lab/group-a/frame_loop_audit.mjs"
+    }
+   ],
+   "sourceId": 9,
+   "status": "implemented",
+   "title": "Three.js frame-loop and visual audit",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Announcement post (text recovered)",
+     "url": "https://x.com/aidenybai/status/2089400082550620636"
+    },
+    {
+     "kind": "repo",
+     "label": "react-doctor repository @ e183c35 (skill path skills/improve-threejs/SKILL.md)",
+     "url": "https://github.com/millionco/react-doctor"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-a/source-10.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Three announcement texts verbatim.",
+     "url": "https://x.com/DerekBrenner/status/2089780687708856412"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Repo page, API commit, 955 KB tree; models.json + docs/vibe3d-architecture.md (26,731 B). MIT LICENSE fetched (1,076 B).",
+     "pin": "fb3ba78a5a21dd69db86018e74d279895501df33",
+     "url": "https://github.com/vibe-stack/vibe3d"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Repo page, API commit, 560 KB tree; packages/props/README.md + package.json. MIT LICENSE fetched (1,077 B).",
+     "pin": "92095c48ae8792132b60dfb4052c9d7b2ad795f2",
+     "url": "https://github.com/keysforthewin/thaikit"
+    }
+   ],
+   "limitations": [
+    "180+ model count, whole-pack city import, token savings remain AUTHOR CLAIMS. Catalogue availability is not adoption.",
+    "No package installed; no upstream source vendored.",
+    "Pixel validation OPEN."
+   ],
+   "method": "shadcn-style registry: models.json declares engine, install paths, aliases, named registries; each prop installs as EDITABLE SOURCE (createObjectModel.ts, model.ts, thaikit.json, colliders.json), not a runtime dependency. three >= 0.185.0 is a PEER dependency with exactly one copy (a second instance means the factory's Mesh is not the renderer's Mesh). Sidecars carry declared + measured metres, pivots, sockets, destruction groups, mass, budgets. Lab adaptation injects the host THREE namespace structurally.",
+   "skillMappings": [
+    {
+     "relation": "implements",
+     "skill": "threejs-source-prop-ingestion",
+     "sourceReference": "vibe3d models.json + architecture doc; thaikit README + manifest; installed skill read 2026-09-12 (sha256 c98a730f…)"
+    }
+   ],
+   "sourceId": 10,
+   "status": "implemented",
+   "title": "Vibe3D asset registry",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Announcement post",
+     "url": "https://x.com/DerekBrenner/status/2089780687708856412"
+    },
+    {
+     "kind": "owner-post",
+     "label": "Announcement post",
+     "url": "https://x.com/alightinastorm/status/2088712139364041161"
+    },
+    {
+     "kind": "owner-post",
+     "label": "Announcement post",
+     "url": "https://x.com/alightinastorm/status/2097598580546470197"
+    },
+    {
+     "kind": "repo",
+     "label": "vibe3d registry @ fb3ba78",
+     "url": "https://github.com/vibe-stack/vibe3d"
+    },
+    {
+     "kind": "repo",
+     "label": "thaikit props source @ 92095c4",
+     "url": "https://github.com/keysforthewin/thaikit"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": {
+    "experiment": "None under this row: opinion post, no artefact.",
+    "reason": "Opinion post, no repository. The register's caveat stands: the hard part is harmonising assets, animation, gameplay and difficulty, not producing a GLB.",
+    "resources": "None.",
+    "test": "n/a",
+    "unblockAction": "Nothing to unblock — method statement only. Alternate: the demo implements the harmonisation step the post omits (scale/pivot grounding of a generated hero GLB)."
+   },
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-a/source-11.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Full post text verbatim from og:description.",
+     "url": "https://x.com/filiksyos/status/2089297181026951425"
+    }
+   ],
+   "limitations": [
+    "No generator invoked; method statement, not a technique.",
+    "Pixel validation OPEN."
+   ],
+   "method": "Scaffold the project in Three.js first (environment + game actions), then AI-generate a .glb hero object, then mix them together — plus the harmonisation step the post omits.",
+   "skillMappings": [
+    {
+     "relation": "informs",
+     "skill": "ai-3d-asset-generation-loop",
+     "sourceReference": "Post body: scaffold-first, hero-GLB-second ordering"
+    }
+   ],
+   "sourceId": 11,
+   "status": "method-extracted",
+   "title": "Scaffold in code, generate the hero asset",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Opinion post (full text recovered)",
+     "url": "https://x.com/filiksyos/status/2089297181026951425"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": {
+    "experiment": "None runnable here: fal.ai/Gemini never invoked; browser leg not run in this lane.",
+    "reason": "Needs paid external APIs (fal.ai, Gemini) + agent-browser CLI; none invoked. The browser self-verification half is missing here.",
+    "resources": "Paid API access (owner decision; no new enrollment in this lane) + browser/GPU run.",
+    "test": "Harness must log at least one rejection and one acceptance against declared criteria (CPU-asserted).",
+    "unblockAction": "Fund/connect the APIs and run the browser leg with pixel evidence. Alternate: CPU-inspectable acceptance criteria only (current demo)."
+   },
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-a/source-12.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Post text verbatim; threaded workflow detail recorded in the register.",
+     "url": "https://x.com/anshuc/status/2065598069790716294"
+    }
+   ],
+   "limitations": [
+    "Pixel validation OPEN — the missing half of the source's own loop.",
+    "CPU criteria only."
+   ],
+   "method": "Connect an image-generation API + image-to-3D API + browser self-verification loop so the agent generates assets AND verifies them visually, closing the loop.",
+   "skillMappings": [
+    {
+     "relation": "informs",
+     "skill": "ai-3d-asset-generation-loop",
+     "sourceReference": "Post body + register thread detail: close the loop with visual self-verification"
+    }
+   ],
+   "sourceId": 12,
+   "status": "implemented",
+   "title": "Closed-loop asset generation with browser self-verification",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Workflow post (text recovered)",
+     "url": "https://x.com/anshuc/status/2065598069790716294"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-a/source-13.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Page body 73,735 B; five HowTo steps read verbatim from the page's own structured data. Article text is marketing, not code authority.",
+     "url": "https://somethingbig.ai/gauntlet-loop"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Repo page, API commit + tree at pin; prompt.md (941 B full — the entire prompt that produced the repo) + ARCHITECTURE.md (9,369 B). MIT LICENSE fetched (1,064 B).",
+     "pin": "d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853",
+     "url": "https://github.com/mshumer/Claude-of-Duty"
+    }
+   ],
+   "limitations": [
+    "Example's own notes expose low gameplay FPS + lazy-shader stalls; reported visual iteration does not prove gameplay.",
+    "Builder/critic are pure functions here; no model called.",
+    "Pixel validation OPEN."
+   ],
+   "method": "Five steps: goal not implementation; a real concrete inspectable bar; agent splits work into separately judgeable pieces; builder never grades itself — fresh critic with no builder history; no fixed rounds, stop on result/diminishing returns/spend. Lab addition the article leaves implicit: a frozen regression list that may only grow + hard round/wall-clock budgets.",
+   "skillMappings": [
+    {
+     "relation": "implements",
+     "skill": "visual-gauntlet-loop",
+     "sourceReference": "Article five steps + frozen-regression/budget additions; installed skill is the loop owner per forge skill §ref"
+    }
+   ],
+   "sourceId": 13,
+   "status": "implemented",
+   "title": "Gauntlet loop",
+   "urls": [
+    {
+     "kind": "article",
+     "label": "Gauntlet-loop method article (marketing prose, not code authority)",
+     "url": "https://somethingbig.ai/gauntlet-loop"
+    },
+    {
+     "kind": "repo",
+     "label": "Claude-of-Duty example repository @ d9b237b (shares pin with source 34)",
+     "url": "https://github.com/mshumer/Claude-of-Duty"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": {
+    "experiment": "None under this row: client-rendered shell serves no technique content to a fetcher.",
+    "reason": "138,790 B client-rendered application shell; no technique content served. Fan-made, non-commercial; no reusable asset licence.",
+    "resources": "A browser inspection session (not a fetcher) to determine anything further.",
+    "test": "n/a",
+    "unblockAction": "Inspect in a real browser and record which comparator (weapon/arm silhouette, material contrast, light/grade, HUD) is actually observable. Alternate: keep as comparator rubric only; copy no code, map, asset or brand."
+   },
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-a/source-14.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Fetched shell carries no technique content; finding matches the register.",
+     "url": "https://www.modernclaudefare.com/"
+    }
+   ],
+   "limitations": [
+    "Method NOT determined from the site; comparator rubric only.",
+    "Pixel validation OPEN."
+   ],
+   "method": "Reusable object is the register-named comparator rubric: offscreen-connected weapon + arm silhouette, weapon material contrast, map-specific light and grade, readable HUD.",
+   "skillMappings": [],
+   "sourceId": 14,
+   "status": "comparator",
+   "title": "Modern Claudefare",
+   "urls": [
+    {
+     "kind": "live-site",
+     "label": "Fan-made showcase (client-rendered; no technique content for fetchers)",
+     "url": "https://www.modernclaudefare.com/"
+    }
+   ]
+  },
+  {
+   "adaptation": "blocked",
+   "blocker": {
+    "experiment": "None honest in-browser: no browser exposes a hardware ray-tracing pipeline in WebGPU today.",
+    "reason": "The method REPLACES the browser with a native desktop runtime (Three.js/WebGPU -> native WebGPU layer -> C++ -> Vulkan + RTX, no browser rendering). Product decision for the owner, never an agent assumption. C++/Vulkan build outside lane scope (no third-party build, no GPU job).",
+    "resources": "Owner product decision + native build environment.",
+    "test": "Manifest test asserts a blocked entry ships no createDemo and carries a stated limitation.",
+    "unblockAction": "Owner decides on a native RTX runtime product line. Alternate explicitly REJECTED by the register: substituting the unrelated in-browser hybrid RT library a search surfaces repeats the recorded row-15 substitution error."
+   },
+   "demo": {
+    "status": "blocked"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Author text recovered from the served page.",
+     "url": "https://x.com/samgcoder/status/2091775237646114921"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Repo page, API commit, 789 KB tree, LICENSE, RTX sample entry ThreeBrowserRuntime/samples/webgpu_rtx_light_transport_observatory/src/main.mjs (19,212 B). MIT LICENSE fetched (1,103 B); caveat: threepp is Hatledal's C++ port, grant is not a warranty on the sample's unexamined third-party deps.",
+     "pin": "367ec39da837224f076711b5d24d68be8280cc5a",
+     "url": "https://github.com/SamG-Coder/threepp"
+    }
+   ],
+   "limitations": [
+    "Manifest entry only — no createDemo, by design."
+   ],
+   "method": "Three.js/WebGPU -> native WebGPU layer -> C++ -> Vulkan + RTX with NO browser rendering. JS keeps scene/materials/lighting/simulation; sample tests dynamic RTX instances + multi-bounce ray-traced reflections.",
+   "skillMappings": [
+    {
+     "relation": "blocked",
+     "skill": "threejs-rtx-runtime-route",
+     "sourceReference": "threepp sample entry; owner-only product decision per register"
+    }
+   ],
+   "sourceId": 15,
+   "status": "blocked",
+   "title": "Native RTX runtime for Three.js (ThreeRuntime)",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Author post (text recovered)",
+     "url": "https://x.com/samgcoder/status/2091775237646114921"
+    },
+    {
+     "kind": "repo",
+     "label": "threepp repository @ 367ec39 (RTX sample entry)",
+     "url": "https://github.com/SamG-Coder/threepp"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-a/source-16.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Author text verbatim.",
+     "url": "https://x.com/stefan_3d_ai/status/2091531702183350276"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Author text verbatim.",
+     "url": "https://x.com/jichiep/status/2091277918521417834"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Repo page, API commit, tree, LICENSE + src/skeleton.hpp (lines 10-22, 26-31, 45-51, 79, 90) and src/sequence.cpp. Apache-2.0 LICENSE read as file body (11,357 B), not from SPDX. Weights separate: SOMA/G1 GGUF are NVIDIA Open Model License (NO country exclusion); SMPL-X RP checkpoint is internal-R&D and must NOT be used; Llama 3 text bundle retains its own terms.",
+     "pin": "92341f31940d54d4f0a44aa5975e470b78b2ab5c",
+     "url": "https://github.com/localai-org/kimodo.cpp"
+    }
+   ],
+   "limitations": [
+    "kimodo.cpp NOT built; GGUF weights NOT downloaded.",
+    "Only the portable contract ported (layout/stride/retarget/stitch); no native inference.",
+    "Pixel validation OPEN."
+   ],
+   "method": "skeleton.hpp declares smplx22/soma30/g1skel34 side by side with parent graphs + rest offsets in a skeleton_spec; frame width motion_dim() = 9 + 12*joints(), so joint COUNT is the import-time discriminator. README's 'gives you SMPL-X' is true only of the checkpoint that may NOT be used. sequence.cpp --sequence mode stitches multiple prompts with explicit transitions (native answer to the 10 s generation cap).",
+   "skillMappings": [
+    {
+     "relation": "implements",
+     "skill": "game-animation-asset-pipeline",
+     "sourceReference": "skeleton.hpp layout/stride contract; sequence.cpp transition stitching (retarget + smoothstep stitch in TS)"
+    }
+   ],
+   "sourceId": 16,
+   "status": "implemented",
+   "title": "Text to character animation, locally (kimodo.cpp)",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Author post (text recovered)",
+     "url": "https://x.com/stefan_3d_ai/status/2091531702183350276"
+    },
+    {
+     "kind": "owner-post",
+     "label": "Author post (text recovered)",
+     "url": "https://x.com/jichiep/status/2091277918521417834"
+    },
+    {
+     "kind": "repo",
+     "label": "kimodo.cpp repository @ 92341f3 (RE-PINNED: earlier pin predates the licence grant)",
+     "url": "https://github.com/localai-org/kimodo.cpp"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": {
+    "experiment": "None under this row: nothing was retrievable.",
+    "reason": "Client-rendered application; fetch failed outright with a transport error (no HTTP status), consistent with the register's own finding. No repository, no published technique.",
+    "resources": "A browser session to inspect the live site (determines look, not method).",
+    "test": "n/a",
+    "unblockAction": "Record the OWNER'S JUDGEMENT (polish, smoothness, grass, trees, mountains) as the bar; never present the lab scene as Cadle's. Alternate: meet the bar via row 18 (grass) + row 38 (scatter) methods under our own titles. ANTI-CONFLATION: MIT procedural-grass/landscape projects a search surfaces are a DIFFERENT row; no evidence Cadle uses them."
+   },
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-a/source-17.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Transport error, nothing retrieved; see fetch-attempts.json for the exact recorded error.",
+     "url": "https://cadle.gg/"
+    }
+   ],
+   "limitations": [
+    "Method NOT DETERMINED; owner's judgement of result only.",
+    "Frame-rate stability (the owner's actual criterion) entirely unverified here.",
+    "Pixel validation OPEN."
+   ],
+   "method": "No portable method. Recorded: owner's judgement of polish/smoothness/grass/trees/mountains as a quality bar with dense-blade + triangle/drawable budget counters.",
+   "skillMappings": [],
+   "sourceId": 17,
+   "status": "comparator",
+   "title": "Environment-art quality bar (Cadle)",
+   "urls": [
+    {
+     "kind": "live-site",
+     "label": "Cadle live site (fetch failed: transport error, no HTTP status)",
+     "url": "https://cadle.gg/"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-b/source-18.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Repo page fetched (293,908 B).",
+     "url": "https://github.com/CK42BB/procedural-grass-threejs"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "SKILL.md read in full (22,187 B, 635 lines); LICENSE read in full (1,065 B, MIT, copyright 'Kingsley'); pinned recursive tree enumerated.",
+     "pin": "26f072308df12caac68a474cb40300ef576793e1",
+     "url": "https://raw.githubusercontent.com/CK42BB/procedural-grass-threejs/26f072308df12caac68a474cb40300ef576793e1/SKILL.md"
+    }
+   ],
+   "limitations": [
+    "Source 50K-2M blade figures are AUTHOR CLAIMS, not measured here; bounded lab blade budget.",
+    "Rigid-blade bend is not the source's per-vertex quadratic bend; no WGSL compute placement path.",
+    "Pixel validation OPEN (no renderer run in lane)."
+   ],
+   "method": "Tapered triangle-strip blade swept along a quadratic Bezier; jittered-grid placement with height/slope/density-noise rejection; four wind layers with root-anchored height weighting; concentric LOD rings dropping density + segment count; per-instance colour variation + root AO. (SKILL.md lines 39-103 blade, 120-181 placement, 216-256 wind, 258-348 shading, 350-401 LOD, 555-604 presets.)",
+   "skillMappings": [
+    {
+     "relation": "implements",
+     "skill": "threejs-procedural-vegetation",
+     "sourceReference": "SKILL.md blade/placement/wind/LOD line ranges above; CPU rigid-rotation wind + emissive SSS approximation (GLSL forbidden on WebGPU path)"
+    }
+   ],
+   "sourceId": 18,
+   "status": "implemented",
+   "title": "Procedural grass and landscape systems for Three.js",
+   "urls": [
+    {
+     "kind": "repo",
+     "label": "procedural-grass-threejs @ 26f0723",
+     "url": "https://github.com/CK42BB/procedural-grass-threejs"
+    },
+    {
+     "kind": "pinned-file",
+     "label": "SKILL.md at pin (method body)",
+     "url": "https://raw.githubusercontent.com/CK42BB/procedural-grass-threejs/26f072308df12caac68a474cb40300ef576793e1/SKILL.md"
+    },
+    {
+     "kind": "licence",
+     "label": "LICENSE at pin (MIT)",
+     "url": "https://raw.githubusercontent.com/CK42BB/procedural-grass-threejs/26f072308df12caac68a474cb40300ef576793e1/LICENSE"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-b/source-19.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Repo page fetched (326,280 B); pinned tree enumerated (11 shader files).",
+     "url": "https://github.com/erichlof/THREE.js-RayTracing-Renderer"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "shaders/WhittedRayTracing_Fragment.glsl (14,588 B) inspected: Material struct (l.23), Re/Tr (l.155), bounce loop < 12 (l.171), Blinn halfway (l.288), CLEARCOAT (l.316), metal (l.336), TRANSPARENT IoR (ll.345-352). README (14,104 B) + CC0-1.0 LICENSE (7,048 B, incl. 4a trademark carve-out) read.",
+     "pin": "490ca0817ce31781df2cd36af2edcc2f36d9dfcc",
+     "url": "https://raw.githubusercontent.com/erichlof/THREE.js-RayTracing-Renderer/490ca0817ce31781df2cd36af2edcc2f36d9dfcc/shaders/WhittedRayTracing_Fragment.glsl"
+    }
+   ],
+   "limitations": [
+    "CPU tracer at 160x120 into a DataTexture; no BVH, no depth of field.",
+    "Author's 60 fps target describes the GPU path, not measured.",
+    "Classic RT has no diffuse GI (author-stated, inherited).",
+    "Pixel validation OPEN."
+   ],
+   "method": "Whitted-style classic ray tracing with the Hall shading model: bounded iterative bounce loop carrying a colour mask, Blinn halfway-vector direct lighting, hard shadow rays transparent occluders do not fully block, metal mirror tint, Fresnel-weighted clearcoat, refraction with Schlick split + TIR.",
+   "skillMappings": [],
+   "sourceId": 19,
+   "status": "implemented",
+   "title": "Classic ray tracing in the browser (THREE.js-RayTracing-Renderer)",
+   "urls": [
+    {
+     "kind": "repo",
+     "label": "THREE.js-RayTracing-Renderer @ 490ca08",
+     "url": "https://github.com/erichlof/THREE.js-RayTracing-Renderer"
+    },
+    {
+     "kind": "pinned-file",
+     "label": "Whitted fragment shader at pin (method body)",
+     "url": "https://raw.githubusercontent.com/erichlof/THREE.js-RayTracing-Renderer/490ca0817ce31781df2cd36af2edcc2f36d9dfcc/shaders/WhittedRayTracing_Fragment.glsl"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-b/source-20.ts",
+    "status": "delivered"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Deployed playable page fetched.",
+     "url": "https://cot.kevinliu.studio/"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "src/sim/armor.js read in full (590 lines; frame definitions ll.9-20, matrices ll.98-131, segment localisation ll.138-146); src/sim/ballistics.js read in full (276 lines; pen-vs-distance ll.187-199, gun lay ll.63-92). Root MIT LICENSE (1,069 B) + NOTICE.md (1,422 B) read: root MIT covers first-party work ONLY; carve-outs (incl. commercial typeface) live outside LICENSE.",
+     "pin": "9004ce65a9be52793a3f4130bde034ec4a857f32",
+     "url": "https://github.com/Kevin-Liu-01/Claude-of-Tanks"
+    }
+   ],
+   "limitations": [
+    "Honest subset: thickness/cos(impact) vs pen@distance only. No damage normalisation, module rolls, ERA, track prisms, spotting, physics, destructibles.",
+    "Lab shells hit at ~3 m so interpolated pen clamps to pen100; curve itself unit-checked.",
+    "Pixel validation OPEN."
+   ],
+   "method": "Plate-level armour resolution: world-space shell segment transformed into four rigid frames (hull, turret, gun-follow, barrel), each the exact inverse of the visual root's transform, intersected against convex quad plates + module boxes for ordered hits. Penetration interpolated against flight distance (penAtDistanceMm).",
+   "skillMappings": [],
+   "sourceId": 20,
+   "status": "implemented",
+   "title": "Engine-free Three.js armour, ballistics and destructible battlefields (Claude of Tanks)",
+   "urls": [
+    {
+     "kind": "live-site",
+     "label": "Playable deployment (reference behaviour)",
+     "url": "https://cot.kevinliu.studio/"
+    },
+    {
+     "kind": "repo",
+     "label": "Claude-of-Tanks @ 9004ce6",
+     "url": "https://github.com/Kevin-Liu-01/Claude-of-Tanks"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-b/source-19.ts",
+    "status": "implemented"
+   },
+   "evidence": [],
+   "limitations": [
+    "Alias of source 19; must never be counted as a distinct technique."
+   ],
+   "method": "Alias of source 19. Carries no technique of its own.",
+   "skillMappings": [],
+   "sourceId": 21,
+   "status": "alias",
+   "title": "Classic ray tracing as a shipped option - see row 19",
+   "urls": []
+  },
+  {
+   "adaptation": "blocked",
+   "blocker": {
+    "experiment": "Fetch-only probe per URL (byte counts recorded); no implementation attempted under this title by design.",
+    "reason": "No repository, no published technique, no licence for any of the three. revo-realms serves 1,430 B of no meaningful HTML; moon-rover/sky-fang fetches return itch.io page furniture only.",
+    "resources": "None.",
+    "test": "n/a",
+    "unblockAction": "Authors publish sources. Alternate: build ORIGINAL ground-cover/wheel-feel/lock-on scenes under our own titles using row 18/38 methods — never wearing this row's title (the substitution the register warns against)."
+   },
+   "demo": {
+    "status": "blocked"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "HTTP 200 but 1,430 B: no meaningful HTML, tech NOT determined (confirms register).",
+     "url": "https://revo-realms.aleksandargjoreski.dev/"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "8,822 B of itch.io page furniture; no technique.",
+     "url": "https://winchxyz.github.io/moon-rover/"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "33,000 B of itch.io page furniture; no technique.",
+     "url": "https://yugiriworks.itch.io/sky-fang"
+    }
+   ],
+   "limitations": [
+    "BLOCKED: comparator-only row with no primary source."
+   ],
+   "method": "No recoverable method. Quality targets only: dense believable ground cover, wheel-ground interaction reading as weight/slip, readable multi-target lock-on, near-miss risk-reward.",
+   "skillMappings": [],
+   "sourceId": 22,
+   "status": "comparator",
+   "title": "Environment-art comparators, 2026-08-24 batch",
+   "urls": [
+    {
+     "kind": "live-site",
+     "label": "revo-realms (no retrievable technique)",
+     "url": "https://revo-realms.aleksandargjoreski.dev/"
+    },
+    {
+     "kind": "live-site",
+     "label": "moon-rover (page furniture only)",
+     "url": "https://winchxyz.github.io/moon-rover/"
+    },
+    {
+     "kind": "live-site",
+     "label": "sky-fang (page furniture only)",
+     "url": "https://yugiriworks.itch.io/sky-fang"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-b/source-23.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Live site fetched (17,721 B).",
+     "url": "https://battle-of-the-hoth-simulator.vercel.app/"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "src/terrain/deformation.js (11,649 B, first 120 lines in detail) + src/shaders/lib/deform.glsl (3,706 B) fetched; pinned tree enumerated. Own LICENSE probe at pin returned 404: NO licence, all rights reserved — read for method, no expression reproduced.",
+     "pin": "bc057e2ce52254bc2e3c2bd6feaaaf4625dddee8",
+     "url": "https://github.com/csanz/battle-of-the-hoth-simulator"
+    }
+   ],
+   "limitations": [
+    "No GPU pass, no float-target capability gate, no snow shading/compression/berm model.",
+    "CPU Float32Array 96x96 over 8 m on displaced vertices vs source GLSL over RGBA16F 2048 over 80 m: same state machine, different target/cost.",
+    "Pixel validation OPEN."
+   ],
+   "method": "Deformation as persistent accumulating state: ping-ponged float targets with no clear/copy/readback; fixed world-metre window snapped to texel boundaries (no swim), addressed toroidally (free follow); one shared brush write path; recovery BANKED and spent in discrete steps (per-frame decay is below one ULP of a half-float store). (deformation.js ll.1-19, 26-34, 40-41, 107-115, 12-15, 48-54.)",
+   "skillMappings": [],
+   "sourceId": 23,
+   "status": "implemented",
+   "title": "Hand-written GLSL combat sim with deforming terrain (Battle of Hoth)",
+   "urls": [
+    {
+     "kind": "live-site",
+     "label": "Playable deployment",
+     "url": "https://battle-of-the-hoth-simulator.vercel.app/"
+    },
+    {
+     "kind": "repo",
+     "label": "battle-of-the-hoth-simulator @ bc057e2 (NO LICENCE: 404 on LICENSE probe — method only)",
+     "url": "https://github.com/csanz/battle-of-the-hoth-simulator"
+    }
+   ]
+  },
+  {
+   "adaptation": "blocked",
+   "blocker": {
+    "experiment": "Fetch of the playable page only (69,243 B); no repo link resolves from it.",
+    "reason": "Source NOT LOCATED: register search closed negative 2026-08-24; lane did not reopen it. No source, no pin, no licence (game's own CC/Freesound credits bind ITS assets and grant us nothing).",
+    "resources": "A re-opened source search (owner-directed, not silent).",
+    "test": "n/a",
+    "unblockAction": "Locate an actual source (repo, write-up, author statement). Alternate: dense low ground cover via row 18 method + own night-sky/backdrop work under our own titles — never credited to this source."
+   },
+   "demo": {
+    "status": "blocked"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Playable page retrieved (69,243 B); no linked repository resolves.",
+     "url": "https://www.taken-game.com/play"
+    }
+   ],
+   "limitations": [
+    "BLOCKED: no source exists to implement."
+   ],
+   "method": "Not recoverable as a method. Comparator properties only: dense low ground cover with distinct species, night sky/cloud colour reading as night not darkness, procedural mountain backdrops, narrative-carrying light source.",
+   "skillMappings": [],
+   "sourceId": 24,
+   "status": "blocked",
+   "title": "TAKEN - browser survival horror, dense ground cover and night sky (VOIDMODE)",
+   "urls": [
+    {
+     "kind": "live-site",
+     "label": "Playable page (no linked source resolves)",
+     "url": "https://www.taken-game.com/play"
+    }
+   ]
+  },
+  {
+   "adaptation": "blocked",
+   "blocker": {
+    "experiment": "None: nothing published to inspect.",
+    "reason": "Unreleased technique, no source. Author has said the water WILL become available; it is not a library today. Plain-fetcher recovery of the post body failed (X client shell, 194,515 B); post contents NOT fabricated.",
+    "resources": "Author's future release (watch, do not pester).",
+    "test": "n/a",
+    "unblockAction": "Adopt on release: pin, licence-check, inspect. Alternate: shoreline via rows 2 + 46-transferable statement (shelving seabed, progressive wade depth, depth-responsive foam/wave energy) as original work — not this source's method."
+   },
+   "demo": {
+    "status": "blocked"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "X client shell only; post text NOT recovered and NOT reproduced. Register's 2026-08-24 browser-session reading retained as prior evidence.",
+     "url": "https://x.com/voidmode/status/2079334222217588842"
+    }
+   ],
+   "limitations": [
+    "BLOCKED: unreleased technique."
+   ],
+   "method": "No published implementation. Register's transferable statement: convincing browser shoreline transitions are achievable — shelving seabed, progressive wade depth, foam + wave energy responding to depth.",
+   "skillMappings": [
+    {
+     "relation": "blocked",
+     "skill": "threejs-webgpu-water",
+     "sourceReference": "Register transferable statement only; adopt on release"
+    }
+   ],
+   "sourceId": 25,
+   "status": "blocked",
+   "title": "Browser water with shoreline waves and blending (VOIDMODE)",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Author post (body not recoverable by fetcher; not reproduced)",
+     "url": "https://x.com/voidmode/status/2079334222217588842"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-b/source-26.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Page HTML (73,881 B) + unminified ES module js/main.js (51,967 B) inspected: R = N(W+GAP)/TAU and STEP = TAU/N (main.js ll.11, 101-102, confirmed in the fetched module, not trusted from summary). license.html (8,158 B): page expression ALL RIGHTS RESERVED; Three.js MIT + fonts OFL.",
+     "url": "https://amix-design.com/tl/web-g-games/"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Licence page read: design/markup/CSS/art/audio/code reserved.",
+     "url": "https://amix-design.com/tl/web-g-games/license.html"
+    }
+   ],
+   "limitations": [
+    "Demo advances on a timer (no input listeners in demos).",
+    "Semantic-<li>-roster-as-single-data-source, degradation branches, entry gate, audio fork, deterministic capture: stated, not demonstrated (a demo owns no DOM).",
+    "Pixel validation OPEN."
+   ],
+   "method": "Ring geometry derived from item count (R = N(W+GAP)/TAU, STEP = TAU/N), short-way rotation modulo N, two-stage commit where only the focus slot launches; content-derived accent scored by saturation vs distance from mid-lightness, clamped into a legible band, fixed fallback for neutral art.",
+   "skillMappings": [
+    {
+     "relation": "candidate",
+     "skill": "game-hud-menu-overhaul",
+     "sourceReference": "main.js ll.11, 101-102 (ring math); two-stage commit + legibility-clamped accent — skill body NOT re-read this lane, verify before ingestion"
+    }
+   ],
+   "sourceId": 26,
+   "status": "implemented",
+   "title": "Arcade attract-loop game-select menu (AMIX GAMES)",
+   "urls": [
+    {
+     "kind": "live-site",
+     "label": "Deployed page (canonical artefact; ALL RIGHTS RESERVED — method only)",
+     "url": "https://amix-design.com/tl/web-g-games/"
+    },
+    {
+     "kind": "pinned-file",
+     "label": "Unminified main.js (inspected method lines)",
+     "url": "https://amix-design.com/tl/web-g-games/js/main.js"
+    },
+    {
+     "kind": "licence",
+     "label": "Licence page (page expression reserved)",
+     "url": "https://amix-design.com/tl/web-g-games/license.html"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-b/source-27.ts",
+    "status": "delivered"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "skills/threejs-gameplay-systems/SKILL.md (78 lines) + skills/threejs-game-director/SKILL.md (124 lines) read in full; MIT LICENSE (1,073 B, 'Copyright (c) 2026 Majid Manzarpour', no carve-outs); no NOTICE/ATTRIBUTION in pinned tree. Register decision: COMPARISON, not import.",
+     "pin": "7221c1f4a6d2ae189a4d85d058d24f3228499d46",
+     "url": "https://github.com/majidmanzarpour/threejs-game-skills"
+    }
+   ],
+   "limitations": [
+    "Feel-loop demonstration only: no scaffold creator, reference ledgers, AAA builder, UI designer, QA-release pipeline, generator skills.",
+    "Pixel validation OPEN."
+   ],
+   "method": "Non-visual harness technique: skill pack covering gameplay, AAA-style graphics, UI, QA, optional AI assets. Pinned tree: skills/threejs-{3d-generator,aaa-graphics-builder,audio-generator,debug-profiler,game-director,game-ui-designer,gameplay-systems,image-generator,qa-release}/SKILL.md. Scene implements the extracted game-feel loop only.",
+   "skillMappings": [
+    {
+     "relation": "compares",
+     "skill": "majidmanzarpour/threejs-game-skills",
+     "sourceReference": "docs/technique-lab/group-b/skill-pack-comparisons.md (register COMPARISON deliverable)"
+    }
+   ],
+   "sourceId": 27,
+   "status": "implemented",
+   "title": "Three.js game skill pack (majidmanzarpour)",
+   "urls": [
+    {
+     "kind": "repo",
+     "label": "threejs-game-skills @ 7221c1f (MIT)",
+     "url": "https://github.com/majidmanzarpour/threejs-game-skills"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-b/source-28.ts",
+    "status": "delivered"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "skills/webgpu-threejs-tsl/SKILL.md (93 lines) + docs/materials.md (353 lines) read in full. Own LICENSE probe at pin returned 404: NO licence, all rights reserved — concepts restated, nothing copied.",
+     "pin": "af2319bd01bb7cc881267a9ef42cafdaf5e9029d",
+     "url": "https://github.com/dgreenheck/webgpu-claude-skill"
+    }
+   ],
+   "limitations": [
+    "Per-vertex CPU approximation of a per-fragment GPU graph; no device-loss/limits/compute coverage.",
+    "Pixel validation OPEN."
+   ],
+   "method": "Non-visual harness technique: WebGPU/TSL practice guidance (core concepts, node materials, compute shaders, device loss, limits/features, post-processing, WGSL integration). Demo evaluates the threshold/hash-noise/edge-band graph shape per-vertex on CPU.",
+   "skillMappings": [
+    {
+     "relation": "compares",
+     "skill": "dgreenheck/webgpu-claude-skill",
+     "sourceReference": "docs/technique-lab/group-b/skill-pack-comparisons.md (incl. our own TSL recipe note)"
+    }
+   ],
+   "sourceId": 28,
+   "status": "implemented",
+   "title": "WebGPU Claude skill (dgreenheck)",
+   "urls": [
+    {
+     "kind": "repo",
+     "label": "webgpu-claude-skill @ af2319b (NO LICENCE: 404 probe — restate only)",
+     "url": "https://github.com/dgreenheck/webgpu-claude-skill"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-b/source-29.ts",
+    "status": "delivered"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "skills/threejs-geometry/SKILL.md read in full (548 lines); README read; pinned tree enumerated: ten topic skills. skills/threejs-materials/SKILL.md fetched but NOT read (recorded in skillsNotRead). Own LICENSE probe 404: NO licence — concepts restated, nothing copied.",
+     "pin": "b1c623076c661fc9b03dac19292e825a5d106823",
+     "url": "https://github.com/CloudAI-X/threejs-skills"
+    }
+   ],
+   "limitations": [
+    "Only the geometry body read; the row is a tutorial collection, not a production pack — no production-pack capability claimed.",
+    "Scene derives instance transforms from a seeded PRNG (lab determinism), not the body's Math.random.",
+    "Pixel validation OPEN."
+   ],
+   "method": "Non-visual harness technique. Register-resolved contents: ten topic skills (fundamentals, geometry, materials, lighting, textures, loaders, animation, interaction, shaders, postprocessing) — a Three.js tutorial set, not a game-production pack.",
+   "skillMappings": [
+    {
+     "relation": "compares",
+     "skill": "CloudAI-X/threejs-skills",
+     "sourceReference": "docs/technique-lab/group-b/skill-pack-comparisons.md"
+    }
+   ],
+   "sourceId": 29,
+   "status": "implemented",
+   "title": "Three.js skills collection (CloudAI-X)",
+   "urls": [
+    {
+     "kind": "repo",
+     "label": "threejs-skills @ b1c6230 (NO LICENCE: 404 probe — restate only)",
+     "url": "https://github.com/CloudAI-X/threejs-skills"
+    }
+   ]
+  },
+  {
+   "adaptation": "blocked",
+   "blocker": {
+    "experiment": "None: first step (generate a reference video) cannot be performed in this lane at all.",
+    "reason": "Composition of rows 1, 5 and 16, not a third-party artefact. Needs a local video generator (row 32, itself blocked) + Blender or GVHMR pose reconstruction; lane forbids GPU jobs and may not execute either. A rig-retarget scene without a reference video would demonstrate retargeting, not this row's bridge.",
+    "resources": "Local video generator + Blender/GVHMR route.",
+    "test": "Ship ONLY rig data derived from the reference; the generated video is private scaffolding that never ships, is never redistributed, never committed.",
+    "unblockAction": "Unblock row 32 (or any owner-approved generator) + a pose-reconstruction route. Operating rule stands regardless: reference video never ships. Alternate: direct mocap (row 1) or text-to-motion (row 16) with no video bridge."
+   },
+   "demo": {
+    "status": "blocked"
+   },
+   "evidence": [],
+   "limitations": [
+    "BLOCKED: recorded as blocked rather than counterfeited."
+   ],
+   "method": "Describe a motion in words, generate a reference video, reconstruct pose from it or author against it, retarget onto our own rig, ship only the rig data.",
+   "skillMappings": [
+    {
+     "relation": "blocked",
+     "skill": "game-animation-asset-pipeline",
+     "sourceReference": "Register row (carrier skill body NOT read in this lane — recorded as blocked on held evidence)"
+    }
+   ],
+   "sourceId": 30,
+   "status": "blocked",
+   "title": "Generated video as MOTION REFERENCE, not as the asset (the owner's bridge)",
+   "urls": []
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-b/source-31.ts",
+    "status": "delivered"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Asset page re-read (27,846 B): CC0 per page (per-asset licences re-checked, not assumed); author rig description recovered verbatim (IK + handle bone, finger-curl constraint, ~4k verts/8k tris, MakeHuman origin, T-pose + animated files).",
+     "url": "https://opengameart.org/content/fps-arms-rigged-only"
+    }
+   ],
+   "limitations": [
+    "Rigid-segment stand-in for the smooth skinned mesh; no weights, blend shapes, or sample animation playback.",
+    "Mesh NOT loaded (lane vendors no binaries, runs no Blender): RIG METHOD reimplemented.",
+    "Pixel validation OPEN."
+   ],
+   "method": "First-person arm RIG method: two-bone IK driven by a handle target for fast arm posing (analytic law-of-cosines, fixed pole) + one constraint-driven parameter curling the finger joints.",
+   "skillMappings": [
+    {
+     "relation": "informs",
+     "skill": "game-animation-asset-pipeline",
+     "sourceReference": "Asset page rig description; analytic two-bone IK + single curl parameter"
+    }
+   ],
+   "sourceId": 31,
+   "status": "implemented",
+   "title": "Rigged first-person arms, CC0 (para / OpenGameArt)",
+   "urls": [
+    {
+     "kind": "live-site",
+     "label": "OpenGameArt asset page (CC0, per-asset licence re-read)",
+     "url": "https://opengameart.org/content/fps-arms-rigged-only"
+    }
+   ]
+  },
+  {
+   "adaptation": "blocked",
+   "blocker": {
+    "experiment": "None: no artefact producible without a GPU generation this lane may not run.",
+    "reason": "Weights NOT PINNED: register requires exact safetensors revisions + reading the licence shipped WITH the weights; neither done. Primary docs URL failed with expired-SSL (recorded verbatim, certificate NOT bypassed); author-owned mirror (Comfy-Org docs raw mdx) read instead. ComfyUI + safetensors + umt5 encoder absent here.",
+    "resources": "ComfyUI host + WAN 2.2 safetensors (pinned) + umt5 encoder + GPU run.",
+    "test": "Pin exact weight revisions; read shipped licence; produce a bounded generation.",
+    "unblockAction": "Pin weights, verify licence against the weights, run a bounded GPU generation. Alternate: no local video generation — procedural animation only (rows 1/16)."
+   },
+   "demo": {
+    "status": "blocked"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Author-owned mirror read (Comfy-Org docs raw mdx): MoE video diffusion split by denoising timestep, T2V + I2V in ComfyUI from diffusion model + VAE + text encoder.",
+     "url": "https://raw.githubusercontent.com/Comfy-Org/docs/main/tutorials/video/wan/wan2_2.mdx"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "URLError SSL CERTIFICATE_VERIFY_FAILED (expired); recorded verbatim, not worked around.",
+     "url": "https://docs.comfy.org/tutorials/video/wan/wan2_2"
+    }
+   ],
+   "limitations": [
+    "BLOCKED: documentation licence (Apache-2.0) NOT verified against the weights — row 20 is the standing proof a stated licence and the real terms can differ."
+   ],
+   "method": "Mixture-of-experts video diffusion split by denoising timestep, text-to-video + image-to-video, run locally in ComfyUI from diffusion model + VAE + text encoder.",
+   "skillMappings": [
+    {
+     "relation": "blocked",
+     "skill": "local-video-generation",
+     "sourceReference": "Comfy-Org wan2_2.mdx mirror; weights unpinned, licence unverified vs weights"
+    }
+   ],
+   "sourceId": 32,
+   "status": "blocked",
+   "title": "WAN 2.2 - local text-to-video and image-to-video, Apache 2.0",
+   "urls": [
+    {
+     "kind": "docs",
+     "label": "WAN 2.2 tutorial mirror (author-owned; primary URL has expired SSL)",
+     "url": "https://raw.githubusercontent.com/Comfy-Org/docs/main/tutorials/video/wan/wan2_2.mdx"
+    },
+    {
+     "kind": "docs",
+     "label": "Primary docs URL (SSL expired 2026-09-12; NOT bypassed)",
+     "url": "https://docs.comfy.org/tutorials/video/wan/wan2_2"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-b/source-33.ts",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Author post + demo page + repo page fetched.",
+     "url": "https://x.com/alightinastorm/status/2091649089272156592"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "src/terrain/lod/LodSelector.ts read in full (7,444 B, 241 lines): projectedGeometricError (ll.23-31), selectLod with 1.16x/0.72x hysteresis (ll.33-84), constrainNeighborLods relaxation (ll.191-240). MeshPartition.ts fetched (7,005 B). Pinned tree enumerated (92,588 B). Own LICENSE probe 404, confirming 2026-08-26: NO licence — method only.",
+     "pin": "e417c048c29fc0193005df4f3e39dff44cef5d31",
+     "url": "https://github.com/vibe-stack/super-terrain"
+    },
+    {
+     "url": "https://github.com/vibe-stack/super-terrain/commit/b82e82397fb95ccafcf4f5398c8b5af4d1063c71",
+     "inspectedAt": "2026-09-12",
+     "observation": "Wave-2 re-check: HEAD b82e823 (2026-09-01) postdates pin e417c04 (2026-08-23) by foliage-sheen/detail-fade (789236b), firefly-rejection (ac507c3), terrain-material-octave (406b229) and scatter-rock (b82e823) commits. Re-pin to b82e823+ before any adoption.",
+     "pin": "b82e82397fb95ccafcf4f5398c8b5af4d1063c71"
+    },
+    {
+     "url": "https://raw.githubusercontent.com/vibe-stack/super-terrain/b82e82397fb95ccafcf4f5398c8b5af4d1063c71/LICENSE",
+     "inspectedAt": "2026-09-12",
+     "observation": "MIT License file (copyright 2026 alightinastorm) present at HEAD b82e823: licence ADDED upstream after the pin. Adoption still requires pin + file-read at the adopted revision."
+    }
+   ],
+   "limitations": [
+    "Headline features explicitly NOT demonstrated: no QEF dual contouring, live CSG, tunnels/caves, worker pool, IndexedDB, Godot export.",
+    "Main-thread cached-geometry swaps vs source off-thread worker pool + frame-budget scheduler.",
+    "Pixel validation OPEN.",
+    "Wave-2 re-pin target: HEAD b82e82397fb95ccafcf4f5398c8b5af4d1063c71 (2026-09-01) carries an MIT LICENSE file; pin e417c04 (2026-08-23) predates the foliage-sheen, firefly-rejection, material-octave and scatter-rock commits."
+   ],
+   "method": "Screen-space projected geometric error for LOD choice, asymmetric hysteresis against level flapping, neighbour constraint settling adjacent sections to min(level + Manhattan distance) so no seam differs by more than one level.",
+   "skillMappings": [],
+   "sourceId": 33,
+   "status": "implemented",
+   "title": "ThreeJS Super Terrain - partitioned mesh terrain with live CSG and worker LOD",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Author post",
+     "url": "https://x.com/alightinastorm/status/2091649089272156592"
+    },
+    {
+     "kind": "live-site",
+     "label": "Super-terrain demo page",
+     "url": "https://vibe-stack.github.io/super-terrain"
+    },
+    {
+     "kind": "repo",
+     "label": "super-terrain @ e417c04 (NO LICENCE: 404 probe — method only)",
+     "url": "https://github.com/vibe-stack/super-terrain"
+    },
+    {
+     "kind": "repo",
+     "label": "super-terrain HEAD b82e823 (MIT LICENSE added; re-pin target)",
+     "url": "https://github.com/vibe-stack/super-terrain/commit/b82e82397fb95ccafcf4f5398c8b5af4d1063c71"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "entrypoint": "src/map3/technique-lab/demos/group-b/source-34.ts",
+    "status": "delivered"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Author post (phase-1 lane).",
+     "url": "https://x.com/mattshumer_/status/2081054356405731740"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "README.md in full (130 lines) + src/weapons/ballistics.js in full (166 lines); MIT LICENSE (1,064 B, 'Copyright (c) 2026 mshumer'). One-shot process claims treated as marketing.",
+     "pin": "d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853",
+     "url": "https://github.com/mshumer/Claude-of-Duty"
+    }
+   ],
+   "limitations": [
+    "Scale model, not the game; not the full event vocabulary.",
+    "No render pipeline, physics, weapons or AI behaviour.",
+    "Pixel validation OPEN."
+   ],
+   "method": "Architectural, non-visual: decompose into single-owner subsystems with defined interfaces, a cross-subsystem event vocabulary, shared surface types + directory-ownership contracts, iterated against a visual reference. Demo: six named boxes for eleven subsystems, three-event vocabulary, contracted-vs-broadcast delivery with source quadratic falloff per pulse.",
+   "skillMappings": [],
+   "sourceId": 34,
+   "status": "implemented",
+   "title": "Claude-of-Duty - full-procedural FPS from a subsystem-contract prompt",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Author post",
+     "url": "https://x.com/mattshumer_/status/2081054356405731740"
+    },
+    {
+     "kind": "repo",
+     "label": "Claude-of-Duty @ d9b237b (MIT; shares pin with source 13's example repo)",
+     "url": "https://github.com/mshumer/Claude-of-Duty"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "status": "absent"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Owner-shared post fetched (174,579 B); X shell — post text via register's browser-session reading.",
+     "url": "https://x.com/prasenx/status/2093762240361173305"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Author-owned repo fetched (356,217 B); PROMPT.md + README at pin read: one-page-brief pattern with atmosphere pin, strict verb whitelist, all-procedural clause, departures appendix. LICENSE probe at pin 404 (all four names): NO LICENCE FILE although README summary claims MIT — learn the technique, never copy the expression.",
+     "pin": "3e1b7cbb1f46bb0b0601b4d06ceef63438ae132c",
+     "url": "https://github.com/StarKnightt/gas-station-highway"
+    }
+   ],
+   "limitations": [
+    "No code reuse (unlicensed). No lab demo under this row; pattern only.",
+    "README's MIT claim is contradicted by the absent file — authority 2b applies."
+   ],
+   "method": "The one-page-brief pattern: atmosphere pin, strict verb whitelist, all-procedural clause, departures appendix. Template for the owner's Test1/Test2 map briefs.",
+   "skillMappings": [
+    {
+     "relation": "informs",
+     "skill": "brief-driven-scene-production",
+     "sourceReference": "PROMPT.md at pin: brief-as-production-contract template (HF-416; skill authorship OPEN)"
+    },
+    {
+     "relation": "informs",
+     "skill": "photoreal-procedural-scene-forge",
+     "sourceReference": "All-procedural clause + atmosphere pin (forge skill gate 1: freeze the brief with a DO-NOT list)"
+    }
+   ],
+   "sourceId": 35,
+   "status": "method-extracted",
+   "title": "gas-station-highway - one-page photoreal-scene brief, all-procedural",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Owner-shared author post",
+     "url": "https://x.com/prasenx/status/2093762240361173305"
+    },
+    {
+     "kind": "repo",
+     "label": "gas-station-highway @ 3e1b7cb (NO LICENCE FILE at pin — pattern only)",
+     "url": "https://github.com/StarKnightt/gas-station-highway"
+    },
+    {
+     "kind": "pinned-file",
+     "label": "One-page brief at pin",
+     "url": "https://raw.githubusercontent.com/StarKnightt/gas-station-highway/3e1b7cbb1f46bb0b0601b4d06ceef63438ae132c/PROMPT.md"
+    },
+    {
+     "kind": "pinned-file",
+     "label": "README at pin",
+     "url": "https://raw.githubusercontent.com/StarKnightt/gas-station-highway/3e1b7cbb1f46bb0b0601b4d06ceef63438ae132c/README.md"
+    }
+   ]
+  },
+  {
+   "adaptation": "blocked",
+   "blocker": {
+    "experiment": "None: hosted tool, nothing to inspect beyond the marketing/docs surface.",
+    "reason": "Proprietary hosted webapp (paid). No public source repository, no commit to pin, nothing to copy.",
+    "resources": "Owner purchase decision per asset (never auto-purchase).",
+    "test": "Owner judges output quality per asset; provenance recorded per asset.",
+    "unblockAction": "Owner decides per-asset purchase. Alternate adjusted implementation: Blender remesh + bake remains the FREE lane (group-C blender/source-36 artefact)."
+   },
+   "demo": {
+    "entrypoint": "source-assets: docs/technique-lab/group-c/blender/source-36-remesh.blend",
+    "status": "implemented"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Owner-shared post fetched (558,531 B).",
+     "url": "https://x.com/hybridherbst/status/2093299068441092380"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Hosted SvelteKit app index fetched (8,366 B); vendor docs + pricing read: proprietary paid tool.",
+     "url": "https://mesh-baker.needle.tools/"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Product documentation read.",
+     "url": "https://engine.needle.tools/docs/products/needle-mesh-baker"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Pricing/licence terms read.",
+     "url": "https://cloud.needle.tools/pricing?source=baker"
+    }
+   ],
+   "limitations": [
+    "Paid tool: surface to the owner as an option, never auto-purchase.",
+    "Free-lane artefact is a Blender remesh proof, not a hosted-baker equivalence."
+   ],
+   "method": "Candidate optimization station for heavy AI-generated GLBs before game import (highpoly -> lowpoly remesh + texture baking in-browser). Usage is a per-asset owner decision.",
+   "skillMappings": [
+    {
+     "relation": "candidate",
+     "skill": "atomic-acres-production-asset-governance",
+     "sourceReference": "Per-asset provenance/licence decision pattern — skill body NOT re-read this lane, verify before ingestion"
+    }
+   ],
+   "sourceId": 36,
+   "status": "blocked",
+   "title": "Needle Mesh Baker - browser highpoly->lowpoly remesh + texture baking",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Owner-shared author post",
+     "url": "https://x.com/hybridherbst/status/2093299068441092380"
+    },
+    {
+     "kind": "tool",
+     "label": "Hosted baker app (proprietary, paid)",
+     "url": "https://mesh-baker.needle.tools/"
+    },
+    {
+     "kind": "docs",
+     "label": "Vendor product documentation",
+     "url": "https://engine.needle.tools/docs/products/needle-mesh-baker"
+    },
+    {
+     "kind": "docs",
+     "label": "Vendor pricing terms",
+     "url": "https://cloud.needle.tools/pricing?source=baker"
+    }
+   ]
+  },
+  {
+   "adaptation": "none",
+   "blocker": null,
+   "demo": {
+    "status": "absent"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Owner-shared post fetched (185,016 B).",
+     "url": "https://x.com/samgcoder/status/2093773310203191312"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Author-owned repo fetched (285,070 B); LICENSE read (MIT); README read: at-scale WebGPU scene streaming, cache-build UX, coordinate-convention conversion.",
+     "pin": "bfa60fb9e0fae613585344b4e5f8b034d2dcd481",
+     "url": "https://github.com/SamG-Coder/fable-test"
+    }
+   ],
+   "limitations": [
+    "Archive reference only; no integration planned.",
+    "Commercial-level-from-user-owned-data framing is the owner's own; no endorsement of ripping."
+   ],
+   "method": "At-scale WebGPU scene streaming + cache-build UX + coordinate-convention conversion, per the author's own framing.",
+   "skillMappings": [],
+   "sourceId": 37,
+   "status": "archive",
+   "title": "fable-test - WebGPU rebuild of a commercial level from user-owned game data",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Owner-shared author post",
+     "url": "https://x.com/samgcoder/status/2093773310203191312"
+    },
+    {
+     "kind": "repo",
+     "label": "fable-test @ bfa60fb (MIT)",
+     "url": "https://github.com/SamG-Coder/fable-test"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "status": "absent"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Owner-shared post + third-party writeup post fetched.",
+     "url": "https://x.com/alightinastorm/status/2093648383202259325"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Repo fetched; src/foliage tree listing read. STILL NO LICENCE FILE (re-checked 2026-08-31: LICENSE/LICENSE.md/LICENCE/COPYING/LICENSE.txt all 404, API license null) — inspect and learn the general technique, never copy expression.",
+     "url": "https://github.com/vibe-stack/super-terrain"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Third-party writeup post fetched (216,662 B).",
+     "url": "https://x.com/tokengremlin/status/2094265309360185606"
+    },
+    {
+     "url": "https://github.com/vibe-stack/super-terrain/commit/b82e82397fb95ccafcf4f5398c8b5af4d1063c71",
+     "inspectedAt": "2026-09-12",
+     "observation": "Wave-2: HEAD b82e823 moves the surface under this row (foliage sheen/detail fade 789236b, scatter-rock placement b82e823) after pin e417c04. Re-pin to b82e823+ before restating further; unlicensed-file rule still applied at the pin.",
+     "pin": "b82e82397fb95ccafcf4f5398c8b5af4d1063c71"
+    },
+    {
+     "url": "https://raw.githubusercontent.com/vibe-stack/super-terrain/b82e82397fb95ccafcf4f5398c8b5af4d1063c71/LICENSE",
+     "inspectedAt": "2026-09-12",
+     "observation": "MIT License file present at HEAD b82e823 (copyright 2026 alightinastorm); still unlicensed AT THE PIN, so the restate-never-copy rule stands until a re-pin + file-read."
+    }
+   ],
+   "limitations": [
+    "Same artefact as row 33; pin e417c04 (2026-08-23) predates the forest/foliage work — re-pin to b82e823+ (2026-09-01, MIT LICENSE added at HEAD) before use.",
+    "'30+ tree types' is an author claim in a post, not a verified count.",
+    "Unlicensed: no files/functions/shaders/constants/comments copied, no vendoring."
+   ],
+   "method": "Spline-field-driven scatter + species/mask separation restated into threejs-procedural-vegetation; an upgrade path for our tuft-grass/scatter systems, not a replacement. The tree editor is a product question (see row 42), not an agent decision.",
+   "skillMappings": [
+    {
+     "relation": "informs",
+     "skill": "threejs-procedural-vegetation",
+     "sourceReference": "src/foliage tree listing; spline-field scatter + species/mask separation"
+    }
+   ],
+   "sourceId": 38,
+   "status": "method-extracted",
+   "title": "Procedural forest, foliage and tree editor — the SAME artefact as row 33",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Owner-shared author post",
+     "url": "https://x.com/alightinastorm/status/2093648383202259325"
+    },
+    {
+     "kind": "owner-post",
+     "label": "Third-party writeup post",
+     "url": "https://x.com/tokengremlin/status/2094265309360185606"
+    },
+    {
+     "kind": "repo",
+     "label": "super-terrain main (NO LICENCE FILE — technique only)",
+     "url": "https://github.com/vibe-stack/super-terrain"
+    }
+   ]
+  },
+  {
+   "adaptation": "none",
+   "blocker": {
+    "experiment": "None: no bridge, no repo, no licence exists to test.",
+    "reason": "No repository, no released bridge, no licence. Both demos run inside Epic's Electric Dreams sample and use Megascans foliage — explicitly NOT assets-free, the opposite of what Map 3 tests.",
+    "resources": "A released bridge with a licence (does not exist today).",
+    "test": "n/a",
+    "unblockAction": "Re-evaluate if a licensed bridge releases. Alternate: our current route (generate code the engine runs) stays; this row is comparator-only until then."
+   },
+   "demo": {
+    "status": "absent"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Owner-shared post fetched (149,996 B).",
+     "url": "https://x.com/fabianofirmo/status/2094044844804993523"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Second instance of the same pattern (profile fetched).",
+     "url": "https://x.com/Stefan_3D_AI"
+    }
+   ],
+   "limitations": [
+    "Comparator only. Neither demo is evidence procedural-from-nothing is faster (both lean on host asset libraries)."
+   ],
+   "method": "Reusable atom: the agent drives the engine's own authoring tools through an MCP bridge instead of generating engine-independent code — level generation as editor operations. Natural route if work ever branches into Unreal/Unity/TheForge.",
+   "skillMappings": [],
+   "sourceId": 39,
+   "status": "comparator",
+   "title": "Engine-native procedural level generation over an MCP bridge (Unreal, Unity)",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Owner-shared demo post (Unreal instance)",
+     "url": "https://x.com/fabianofirmo/status/2094044844804993523"
+    },
+    {
+     "kind": "profile",
+     "label": "Second instance of the pattern (profile)",
+     "url": "https://x.com/Stefan_3D_AI"
+    }
+   ]
+  },
+  {
+   "adaptation": "none",
+   "blocker": null,
+   "demo": {
+    "status": "absent"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Author profile fetched (235,076 B).",
+     "url": "https://x.com/VoxpoliaGame"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Playable build page fetched (37,487 B). No public source, nothing to pin or copy. The packet's github.com URL for this row is malformed; the exact malformed URL was attempted for the record (404).",
+     "url": "https://endstreet.itch.io/voxpolia"
+    }
+   ],
+   "limitations": [
+    "Commercial game; descriptions only — all atoms restated, nothing copied.",
+    "No public source, nothing to pin."
+   ],
+   "method": "Three separable atoms restated from descriptions: voxel structural failure; topology-derived lighting; silhouette carving.",
+   "skillMappings": [
+    {
+     "relation": "candidate",
+     "skill": "atomic-acres-destructible-world",
+     "sourceReference": "Voxel structural-failure atom (descriptions only) — skill body NOT re-read this lane, verify before ingestion"
+    }
+   ],
+   "sourceId": 40,
+   "status": "method-extracted",
+   "title": "Voxel structural failure, topology-derived lighting, and silhouette carving (Voxpolia)",
+   "urls": [
+    {
+     "kind": "profile",
+     "label": "Author profile",
+     "url": "https://x.com/VoxpoliaGame"
+    },
+    {
+     "kind": "live-site",
+     "label": "Playable build page (commercial; reference only)",
+     "url": "https://endstreet.itch.io/voxpolia"
+    }
+   ]
+  },
+  {
+   "adaptation": "none",
+   "blocker": null,
+   "demo": {
+    "status": "absent"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Author profile fetched (192,822 B).",
+     "url": "https://x.com/curllmooha"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Live catalogue fetched (17,869 B): the FORMAT is the reusable object — named, isolated, individually reachable exhibits with technique-first noun-phrase titles.",
+     "url": "https://sketchesbycurllmooha.vercel.app/"
+    }
+   ],
+   "limitations": [
+    "Format adopted; any effect the names suggest is independently built.",
+    "Hosted portfolio, no repository, no licence: nothing to copy."
+   ],
+   "method": "The reusable object is the FORMAT: a hub of self-contained sketches, each a named isolated exhibit with a technique-first title. Matches the owner's 'Map 3 Demo Showcase' brief (hub with signed corridors, one technique each).",
+   "skillMappings": [],
+   "sourceId": 41,
+   "status": "method-extracted",
+   "title": "The technique-demo hub — a portfolio as a catalogue of self-contained sketches",
+   "urls": [
+    {
+     "kind": "profile",
+     "label": "Author profile",
+     "url": "https://x.com/curllmooha"
+    },
+    {
+     "kind": "live-site",
+     "label": "Live sketch catalogue (the format itself)",
+     "url": "https://sketchesbycurllmooha.vercel.app/"
+    }
+   ]
+  },
+  {
+   "adaptation": "none",
+   "blocker": null,
+   "demo": {
+    "status": "absent"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Author profile fetched.",
+     "url": "https://x.com/stefan_3d_ai?s=11"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "procedural-bank LICENSE read (1,072 B, MIT claimed); src/grammar module listing read. Other shelf repos NOT individually verified — vibeviz's licence must be file-verified before it moves past this row.",
+     "url": "https://raw.githubusercontent.com/vibe-stack/procedural-bank/main/LICENSE"
+    },
+    {
+     "url": "https://raw.githubusercontent.com/vibe-stack/ggez/main/LICENSE",
+     "inspectedAt": "2026-09-12",
+     "observation": "Wave-2 file read: ggez LICENSE (MIT, file-read 2026-09-12)"
+    },
+    {
+     "url": "https://raw.githubusercontent.com/vibe-stack/three-maps/main/LICENSE.md",
+     "inspectedAt": "2026-09-12",
+     "observation": "Wave-2 file read: three-maps LICENSE.md (MIT-style grant, file-read 2026-09-12)"
+    },
+    {
+     "url": "https://raw.githubusercontent.com/vibe-stack/freed/main/LICENSE.md",
+     "inspectedAt": "2026-09-12",
+     "observation": "Wave-2 file read: freed LICENSE.md (MIT-style grant, file-read 2026-09-12)"
+    },
+    {
+     "url": "https://raw.githubusercontent.com/vibe-stack/three-roads/main/LICENSE",
+     "inspectedAt": "2026-09-12",
+     "observation": "Wave-2 file read: three-roads LICENSE (MIT, file-read 2026-09-12)"
+    },
+    {
+     "url": "https://raw.githubusercontent.com/vibe-stack/vibeviz/main/LICENSE.md",
+     "inspectedAt": "2026-09-12",
+     "observation": "Wave-2 file read: vibeviz LICENSE.md (MIT-style grant, file-read 2026-09-12; closes the prior gap)"
+    },
+    {
+     "url": "https://api.github.com/repos/vibe-stack/fenix/contents/",
+     "inspectedAt": "2026-09-12",
+     "observation": "Wave-2 root listing: .github, .gitignore, PRD.md, README.md, TODOS.md, bun.lock, configs, index.html, package.json, public, src, tsconfigs, vite.config.ts — no licence file of any name. Register NO-LICENCE finding stands."
+    }
+   ],
+   "limitations": [
+    "Wave-2 licence census 2026-09-12: ggez / three-maps / freed / three-roads / procedural-bank / vibeviz carry MIT-style grants read as files; fenix has no licence file (root listing) and stays excluded from any reuse.",
+    "Nothing adopted by recording. Before ANY use: re-verify licence file, pin commit, run silhouette/scale/triangle/LOD gates."
+   ],
+   "method": "Shelf index of six MIT/file-verified Three.js tools by the row 10/33/38 author (ggez LICENSE, three-maps LICENSE.md, freed LICENSE.md, three-roads LICENSE, procedural-bank LICENSE: MIT-style grants read as files 2026-09-12; fenix has no licence file of any name at its main root listing 2026-09-12 and stays excluded), plus vibeviz (MIT-style LICENSE.md file-verified 2026-09-12, closing the prior gap). Pin the specific repo at adoption moment.",
+   "skillMappings": [
+    {
+     "relation": "informs",
+     "skill": "threejs-source-prop-ingestion",
+     "sourceReference": "Shelf index with per-member file-verified licences (this row); per-repo pin + licence file-check + gates before any install (threejs-source-prop-ingestion procedure, skill read in full 2026-09-12)"
+    }
+   ],
+   "sourceId": 42,
+   "status": "method-extracted",
+   "title": "The vibe-stack shelf — six further MIT Three.js tools by the row 10/33/38 author",
+   "urls": [
+    {
+     "kind": "profile",
+     "label": "Author profile (shelf index entry point)",
+     "url": "https://x.com/stefan_3d_ai?s=11"
+    },
+    {
+     "kind": "licence",
+     "label": "procedural-bank LICENSE (MIT claimed; file read, not SPDX)",
+     "url": "https://raw.githubusercontent.com/vibe-stack/procedural-bank/main/LICENSE"
+    },
+    {
+     "kind": "licence",
+     "label": "ggez LICENSE (MIT, file-read 2026-09-12)",
+     "url": "https://raw.githubusercontent.com/vibe-stack/ggez/main/LICENSE"
+    },
+    {
+     "kind": "licence",
+     "label": "three-maps LICENSE.md (MIT-style grant, file-read 2026-09-12)",
+     "url": "https://raw.githubusercontent.com/vibe-stack/three-maps/main/LICENSE.md"
+    },
+    {
+     "kind": "licence",
+     "label": "freed LICENSE.md (MIT-style grant, file-read 2026-09-12)",
+     "url": "https://raw.githubusercontent.com/vibe-stack/freed/main/LICENSE.md"
+    },
+    {
+     "kind": "licence",
+     "label": "three-roads LICENSE (MIT, file-read 2026-09-12)",
+     "url": "https://raw.githubusercontent.com/vibe-stack/three-roads/main/LICENSE"
+    },
+    {
+     "kind": "licence",
+     "label": "vibeviz LICENSE.md (MIT-style grant, file-read 2026-09-12; closes the prior gap)",
+     "url": "https://raw.githubusercontent.com/vibe-stack/vibeviz/main/LICENSE.md"
+    },
+    {
+     "kind": "repo",
+     "label": "fenix (NO LICENCE FILE at main root listing 2026-09-12 — reference only)",
+     "url": "https://github.com/vibe-stack/fenix"
+    }
+   ]
+  },
+  {
+   "adaptation": "none",
+   "blocker": {
+    "experiment": "None: paper page only (1,087 B), code and weights marked Soon.",
+    "reason": "Paper page with no released code or weights; nothing to pin, licence-check, or run. Row exists to stop re-evaluation as if it were adoptable.",
+    "resources": "A code release (re-check before any plan depends on it).",
+    "test": "n/a",
+    "unblockAction": "Re-check for a code release. Alternate adjusted implementation: row 6 img2threejs code route already does the transferable principle — reconstruct with separable objects, keep lighting as engine parameters rather than baked into textures. Note tension with Map 3's thesis (image-to-asset vs maths-and-code)."
+   },
+   "demo": {
+    "status": "absent"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Owner-shared post fetched (199,040 B).",
+     "url": "https://x.com/stefan_3d_ai/status/2093937170717585657"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Paper page fetched (1,087 B): code and weights marked Soon.",
+     "url": "https://haidilao0328.github.io/Lumera/"
+    }
+   ],
+   "limitations": [
+    "Not adoptable today; principle only."
+   ],
+   "method": "Transferable principle (free): when reconstructing from a reference image, keep objects separable and lighting as engine parameters, not baked into textures.",
+   "skillMappings": [
+    {
+     "relation": "compares",
+     "skill": "img2threejs",
+     "sourceReference": "Code-instead-of-baked-meshes principle shared with row 6; Map 3 thesis tension noted"
+    }
+   ],
+   "sourceId": 43,
+   "status": "blocked",
+   "title": "Image to engine-native editable scene, with lighting kept as a parameter (Lumera)",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Owner-shared author post",
+     "url": "https://x.com/stefan_3d_ai/status/2093937170717585657"
+    },
+    {
+     "kind": "paper",
+     "label": "Paper page (code/weights Soon — nothing to adopt)",
+     "url": "https://haidilao0328.github.io/Lumera/"
+    }
+   ]
+  },
+  {
+   "adaptation": "none",
+   "blocker": {
+    "experiment": "None: neither post resolves to anything further.",
+    "reason": "Neither post resolves to a repository, released tool, or licence — which is the finding, not a search gap.",
+    "resources": "None.",
+    "test": "n/a",
+    "unblockAction": "None owed. Alternate: treat as one-line comparators; any technique they suggest is built originally under our own title."
+   },
+   "demo": {
+    "status": "absent"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Comparator post 1 fetched (205,605 B).",
+     "url": "https://x.com/lexnlin/status/2093982122197627217"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Comparator post 2 fetched (loop mode).",
+     "url": "https://x.com/Stefan_3D_AI"
+    }
+   ],
+   "limitations": [
+    "Thin comparators; no technique content."
+   ],
+   "method": "No method. One-line visual comparators from the 2026-08-31 sweep.",
+   "skillMappings": [],
+   "sourceId": 44,
+   "status": "comparator",
+   "title": "Thin comparators from the 2026-08-31 sweep",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Comparator post 1",
+     "url": "https://x.com/lexnlin/status/2093982122197627217"
+    },
+    {
+     "kind": "owner-post",
+     "label": "Comparator post 2 (loop mode)",
+     "url": "https://x.com/Stefan_3D_AI"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "status": "absent"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Owner-shared announcement post + second owner share (philippsieben) fetched.",
+     "url": "https://x.com/comfyui/status/2094561833638404449"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Vendor announcement read (220,753 B).",
+     "url": "https://blog.comfy.org/p/trellis2-and-pixal3d-are-now-native"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Mesh post-processing node implementations at pin read (nodes_mesh_postprocess.py). Docs tutorial URL failed (recorded). Upstream generators: microsoft/TRELLIS.2 @ 75fbf018 (MIT, file-read) + TencentARC/Pixal3D @ f7cf384 (MIT, file-read, with NOTICE naming dinov2/TRELLIS.2/Direct3D-S2/MoGe). DISCREPANCY: Comfy-Org repackaged repos actually used carry licences that do not match the announcement wording — re-verify at install.",
+     "pin": "0e65cb907193cf1013bda474593eb48d8c53d848",
+     "url": "https://raw.githubusercontent.com/comfyanonymous/ComfyUI/0e65cb907193cf1013bda474593eb48d8c53d848/comfy_extras/nodes_mesh_postprocess.py"
+    },
+    {
+     "inspectedAt": "2026-09-02",
+     "observation": "Generator licences read as files: TRELLIS.2 MIT (Microsoft); Pixal3D MIT (2026 Tencent, no non-commercial/jurisdiction clause).",
+     "url": "https://raw.githubusercontent.com/microsoft/TRELLIS.2/75fbf0183001ed9876c8dbb35de6b68552ee08bd/LICENSE"
+    }
+   ],
+   "limitations": [
+    "Image-to-3D invents hidden geometry + unrigged shell: STATIC HERO PROPS ONLY — never characters, arms, rigged/deforming geometry; never preferred over procedural rebuild for terrain/architecture/dressing/colliders/destruction.",
+    "Generated mesh is a per-asset owner exception (assets.manifest.json + qa:asset-provenance), not a general licence.",
+    "Comfy-Org repackage licence discrepancy must be re-verified at install.",
+    "Wave-2 re-stage: no lab demo or bounded generation executes this route under this row (demo.status absent); the ADOPT decision + pinned supply route are recorded, execution stays OPEN."
+   ],
+   "method": "ADOPTED as the executable 'AI-generated mesh' supply route in ai-3d-asset-generation-loop: free, local, commercially usable, no paid API, one bounded prop at a time. ComfyUI @ 0e65cb9 (PR #14718, shipped v0.34.0 = installed version) with native Trellis.2/Pixal3D nodes + full PBR bake.",
+   "skillMappings": [
+    {
+     "relation": "informs",
+     "skill": "ai-3d-asset-generation-loop",
+     "sourceReference": "ADOPT decision: executable supply route for static hero props; register boundaries stand"
+    },
+    {
+     "relation": "informs",
+     "skill": "comfyui-3d-native-pipeline",
+     "sourceReference": "Native Trellis.2/Pixal3D nodes @ ComfyUI 0e65cb9 (v0.34.0)"
+    }
+   ],
+   "sourceId": 45,
+   "status": "method-extracted",
+   "title": "Trellis.2 and Pixal3D as CORE ComfyUI nodes - local image-to-3D with a full PBR bake",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Owner-shared announcement post",
+     "url": "https://x.com/comfyui/status/2094561833638404449"
+    },
+    {
+     "kind": "article",
+     "label": "Vendor announcement (licence wording hides a repackage discrepancy — see evidence)",
+     "url": "https://blog.comfy.org/p/trellis2-and-pixal3d-are-now-native"
+    },
+    {
+     "kind": "docs",
+     "label": "Node-chain tutorial",
+     "url": "https://docs.comfy.org/tutorials/3d/trellis2"
+    },
+    {
+     "kind": "pinned-file",
+     "label": "Mesh post-processing nodes at pin",
+     "url": "https://raw.githubusercontent.com/comfyanonymous/ComfyUI/0e65cb907193cf1013bda474593eb48d8c53d848/comfy_extras/nodes_mesh_postprocess.py"
+    },
+    {
+     "kind": "owner-post",
+     "label": "Second owner share",
+     "url": "https://x.com/philippsieben/status/2095440655170294085"
+    }
+   ]
+  },
+  {
+   "adaptation": "blocked",
+   "blocker": {
+    "experiment": "None against the product (commercial, unreleased as a library). Restatement test: our water shows depth-responsive foam/energy terms without using product expression.",
+    "reason": "Shipped library is Commercial Software License Agreement v2.2 — out of bounds for code reuse. Author repo dgreenheck/webgpu-water 404s (verified). No public source.",
+    "resources": "A commercial licence purchase (owner decision) if the product itself is wanted.",
+    "test": "Licence-page terms re-read before any product use.",
+    "unblockAction": "Purchase/decide on the product, or adopt the restatable physics only. Alternate: rows 2 + 4 methods plus the bubble-backscatter colour term restated from the licence-adjacent description."
+   },
+   "demo": {
+    "status": "absent"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Owner-shared post fetched (210,622 B).",
+     "url": "https://x.com/dangreenheck/status/2095028187063280085"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Commercial licence text read (42,143 B): terms read, product source never touched.",
+     "url": "https://docs.threejswaterpro.com/license.html"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Author repo 404 (register's finding re-verified); author repo enumeration via API (100 repos) read for any public water source.",
+     "url": "https://github.com/dgreenheck/webgpu-water"
+    },
+    {
+     "url": "https://docs.threejswaterpro.com/",
+     "inspectedAt": "2026-09-12",
+     "observation": "Wave-2: public feature page read (VitePress): JONSWAP 3-cascade FFT (swell/waves/ripples), subsurface scattering, Jacobian + procedural foam, clipmap infinite water, underwater refraction/caustics, Rayleigh sky, buoyancy sampling. Restatable physics only; commercial v2.2 still bounds all reuse."
+    }
+   ],
+   "limitations": [
+    "Commercial product: no code reuse, no vendoring, no port.",
+    "Bubble-backscatter term restated, not implemented against the product."
+   ],
+   "method": "Decision split: what we may do (physically-based FFT ocean discipline + subsurface-scattering and Jacobian-foam terms restated from the public feature page 2026-09-12; bubble-backscatter term per register reading, not present on that page) vs out of bounds (the product source, shaders, constants).",
+   "skillMappings": [
+    {
+     "relation": "blocked",
+     "skill": "threejs-webgpu-water",
+     "sourceReference": "Commercial v2.2 licence page; restatable physics only"
+    }
+   ],
+   "sourceId": 46,
+   "status": "blocked",
+   "title": "Physically-based FFT ocean, and bubble backscatter as the missing colour term (Three.js Water Pro)",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Owner-shared author post",
+     "url": "https://x.com/dangreenheck/status/2095028187063280085"
+    },
+    {
+     "kind": "licence",
+     "label": "Commercial licence text (terms read; product source untouched)",
+     "url": "https://docs.threejswaterpro.com/license.html"
+    },
+    {
+     "kind": "repo",
+     "label": "Author water repo (404 — no public source)",
+     "url": "https://github.com/dgreenheck/webgpu-water"
+    },
+    {
+     "kind": "docs",
+     "label": "Public feature description (terms read; product source untouched)",
+     "url": "https://docs.threejswaterpro.com/"
+    }
+   ]
+  },
+  {
+   "adaptation": "none",
+   "blocker": null,
+   "demo": {
+    "status": "absent"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Owner-shared post fetched (259,550 B).",
+     "url": "https://x.com/mattshumer_/status/2095187868746383758"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Only linked method article in the author's orbit: the gauntlet loop (row 13). Article prose copyrighted marketing — restate, never copy.",
+     "url": "https://somethingbig.ai/gauntlet-loop"
+    }
+   ],
+   "limitations": [
+    "HF-419 is not a new technique: the loop is already rows 13 + 34.",
+    "Video/output referenced by the post is a bar, not a pipeline."
+   ],
+   "method": "Honest finding: no separable city-art technique beyond the gauntlet loop + subsystem-contract decomposition. The city build is the bar the loop must clear, not a method.",
+   "skillMappings": [
+    {
+     "relation": "compares",
+     "skill": "visual-gauntlet-loop",
+     "sourceReference": "somethingbig.ai article = row 13's article; no new method beyond rows 13+34"
+    }
+   ],
+   "sourceId": 47,
+   "status": "method-extracted",
+   "title": "GTA-style open-world city art - a bar, not a pipeline (the loop is already rows 13 and 34)",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Owner-shared author post",
+     "url": "https://x.com/mattshumer_/status/2095187868746383758"
+    },
+    {
+     "kind": "article",
+     "label": "Linked method article (= row 13's article)",
+     "url": "https://somethingbig.ai/gauntlet-loop"
+    }
+   ]
+  },
+  {
+   "adaptation": "adapted",
+   "blocker": null,
+   "demo": {
+    "status": "absent"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Owner-shared post fetched (193,837 B). Game unreleased, runs on author's localhost:8080. No code, no licence stated: UNKNOWN therefore all-rights-reserved.",
+     "url": "https://x.com/bijanbowen/status/2094931925513261273"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Recorded fxtwitter mirror attempted: error, nothing retrieved (recorded, not worked around).",
+     "url": "https://api.fxtwitter.com/bijanbowen/status/2094931925513261273"
+    }
+   ],
+   "limitations": [
+    "Look not bought with lighting technology: interiors lane must still add real lights that work in gameplay.",
+    "No code exists to copy; method restated from the post + register reading.",
+    "Unreleased game: no playable verification.",
+    "Wave-2 re-stage: no lab demo executes this method under this row (demo.status absent); recorded as interiors/lighting input, execution stays OPEN."
+   ],
+   "method": "ADOPTED method: the dark-interior look is bought with VALUE COMPOSITION, not lighting tech — emissive fixtures, restrained palette discipline, fog falloff, decal grime, filmic post chain — while keeping combat readability. Direct input to the interiors + lighting lanes.",
+   "skillMappings": [
+    {
+     "relation": "informs",
+     "skill": "threejs-webgpu-interior-lighting-look",
+     "sourceReference": "Post body: value-composition-over-lighting-tech; emissive-fixture + fog-falloff + restrained-palette terms"
+    }
+   ],
+   "sourceId": 48,
+   "status": "method-extracted",
+   "title": "The dark-interior look bought with no lighting technology at all (browser subway FPS)",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Owner-shared author post (game unreleased; method restated, nothing copied)",
+     "url": "https://x.com/bijanbowen/status/2094931925513261273"
+    }
+   ]
+  },
+  {
+   "adaptation": "none",
+   "blocker": null,
+   "demo": {
+    "status": "absent"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Owner-shared post fetched (287,686 B).",
+     "url": "https://x.com/jichiep/status/2095157236658315288"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Author-owned repo fetched (323,385 B); LICENSE read as file body (Apache-2.0, same cleared terms as row 16); docs/IMPLEMENTATION.md read (planner contract + explicit WebAssembly deferral); docs/DEMO.md read (G1-only skeleton statement).",
+     "pin": "6fdb75e15ddb7f97dd1a4abb8017a57b936bc7a3",
+     "url": "https://github.com/localai-org/motion-bricks.cpp"
+    }
+   ],
+   "limitations": [
+    "ADOPTED but NOT YET: offline only; WebAssembly port explicitly deferred by upstream.",
+    "G1-only skeleton per DEMO.md; SOMA/SMPL-X checkpoint caveats from row 16 carry over."
+   ],
+   "method": "Realtime motion PLANNER with Kimodo as authoring input: author motion in Kimodo's text-to-motion, plan/blend at runtime in MotionBricks. Complement to row 16, offline only.",
+   "skillMappings": [
+    {
+     "relation": "candidate",
+     "skill": "game-animation-asset-pipeline",
+     "sourceReference": "IMPLEMENTATION.md planner contract (offline-only; WASM deferred) — verify against skill body before ingestion"
+    }
+   ],
+   "sourceId": 49,
+   "status": "method-extracted",
+   "title": "MotionBricks - a realtime motion PLANNER, with Kimodo as its authoring input (motion-bricks.cpp)",
+   "urls": [
+    {
+     "kind": "owner-post",
+     "label": "Owner-shared author post",
+     "url": "https://x.com/jichiep/status/2095157236658315288"
+    },
+    {
+     "kind": "repo",
+     "label": "motion-bricks.cpp @ 6fdb75e (Apache-2.0, file-read)",
+     "url": "https://github.com/localai-org/motion-bricks.cpp"
+    },
+    {
+     "kind": "pinned-file",
+     "label": "Planner contract at pin (WASM deferral explicit)",
+     "url": "https://raw.githubusercontent.com/localai-org/motion-bricks.cpp/6fdb75e15ddb7f97dd1a4abb8017a57b936bc7a3/docs/IMPLEMENTATION.md"
+    }
+   ]
+  },
+  {
+   "adaptation": "none",
+   "blocker": null,
+   "demo": {
+    "status": "absent"
+   },
+   "evidence": [
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Owner-shared repo fetched (297,788 B).",
+     "url": "https://github.com/PhiloLabs/fable51-worlds"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "LICENSE fetched raw at pin (1,066 B): MIT for code + generated assets; LAYERED terms in README: OSM-derived geometry is ODbL (share-alike on the SF world's shape); USGS 3DEP public domain; reference photos not redistributed; brands belong to owners. Relevant only if deriving from real-world geometry, which we do not.",
+     "pin": "1dcc255adc5600cfec8a7e3e38c896074668dd1e",
+     "url": "https://raw.githubusercontent.com/PhiloLabs/fable51-worlds/1dcc255adc5600cfec8a7e3e38c896074668dd1e/LICENSE"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Passability sweep implementation read at pin (the QA pattern's atom 1).",
+     "url": "https://raw.githubusercontent.com/PhiloLabs/fable51-worlds/1dcc255adc5600cfec8a7e3e38c896074668dd1e/kyoto-higashiyama/tools/passability.mjs"
+    },
+    {
+     "inspectedAt": "2026-09-12",
+     "observation": "Draw-calls-before-milliseconds ordering read at pin (atom 2).",
+     "url": "https://raw.githubusercontent.com/PhiloLabs/fable51-worlds/1dcc255adc5600cfec8a7e3e38c896074668dd1e/kyoto-higashiyama/tools/perf.mjs"
+    }
+   ],
+   "limitations": [
+    "QA HARNESS PATTERN ONLY: no code reuse, no vendoring, no port (repo is WebGL/three 0.180, no TSL/WebGPU; art direction not ours).",
+    "Passability sweep answers a REAL question (mechanical), never a hardcoded roster — recorded against gotcha-hardcoded-gate-rosters."
+   ],
+   "method": "INGESTED pattern: a mechanical world-QA harness — passability sweep over the real world + perf ordering (draw calls before milliseconds) — the class of gate that asks whether the world is traversable/cheap instead of asserting a roster.",
+   "skillMappings": [
+    {
+     "relation": "informs",
+     "skill": "realtime-browser-qa",
+     "sourceReference": "passability.mjs + perf.mjs at pin: mechanical sweep + draw-calls-first ordering"
+    }
+   ],
+   "sourceId": 50,
+   "status": "method-extracted",
+   "title": "fable51-worlds - agent-swarm-built explorable cities, and a world QA harness that is mechanical",
+   "urls": [
+    {
+     "kind": "repo",
+     "label": "fable51-worlds @ 1dcc255 (MIT code; ODbL on OSM-derived shape)",
+     "url": "https://github.com/PhiloLabs/fable51-worlds"
+    },
+    {
+     "kind": "pinned-file",
+     "label": "Passability sweep at pin (QA atom 1)",
+     "url": "https://raw.githubusercontent.com/PhiloLabs/fable51-worlds/1dcc255adc5600cfec8a7e3e38c896074668dd1e/kyoto-higashiyama/tools/passability.mjs"
+    },
+    {
+     "kind": "pinned-file",
+     "label": "Perf ordering at pin (QA atom 2)",
+     "url": "https://raw.githubusercontent.com/PhiloLabs/fable51-worlds/1dcc255adc5600cfec8a7e3e38c896074668dd1e/kyoto-higashiyama/tools/perf.mjs"
+    }
+   ]
+  }
+ ]
+}

@@ -70,6 +70,98 @@ def action_for(clip: str) -> bpy.types.Action:
     return matches[0]
 
 
+# HF-388 root cause, measured 2026-08-28 against the shipped bytes.
+#
+# Every authored action in the manual master keys `rotation_euler` - see
+# `add_armature_action` in build-pass65-djmaesen-first-person-arms.py, which
+# sets `bone.rotation_mode = "XYZ"` before inserting its three keys. This
+# function used to force every pose bone to "QUATERNION" immediately before
+# export. With `export_force_sampling=False` the glTF exporter resolves an
+# armature's animation channels by each bone's CURRENT rotation mode, found no
+# `rotation_quaternion` f-curves, and emitted only the static rest rotation:
+# two identical keys per track, 0.0000 deg of travel, the same hold pose in all
+# thirteen clips. The whole authored corpus - arm chain AND the finger tracks
+# the live mixer plays - was silently dropped at export for months.
+#
+# Forcing sampling does not fix it either (verified by exporting that variant
+# and decoding it): the depsgraph itself ignores euler f-curves on a
+# quaternion-mode bone, so sampling bakes the rest pose at every frame.
+# `export_optimize_animation_size` was never the cause and stays on; with the
+# mode correct it only drops genuinely unchanged channels, saving ~400 KB.
+#
+# The corpus is authored in euler, so the pose bones must be in euler mode when
+# it is read. src/first-person-arms-authored-motion.test.ts is the gate:
+# restore "QUATERNION" here and it goes red on the shipped GLB.
+POSE_ROTATION_MODE = "XYZ"
+#: Data path suffix the exporter can only read while the bones are in that mode.
+POSE_ROTATION_PROPERTY = "rotation_euler"
+#: The chain the viewmodel's authored pose layer decomposes; see operator-model.ts.
+ARM_CHAIN_BONES = (
+    "UpperArmL", "UpperArmR", "LowerArmL", "LowerArmR", "WristL", "WristR",
+)
+#: Quietest authored clip is `idle` at 0.012 rad; anything at or below this is
+#: an action that lost its middle pose key, not an authored subtlety.
+MIN_ARM_TRAVEL_RADIANS = 1e-4
+
+
+def action_fcurves(action: bpy.types.Action):
+    """Yield an action's f-curves across both the legacy and slotted layouts.
+
+    Blender 5.x moved f-curves under `action.layers[].strips[].channelbags[]`
+    and dropped `Action.fcurves`. The manual master is authored in 5.1.2.
+    """
+    legacy = getattr(action, "fcurves", None)
+    if legacy is not None:
+        yield from legacy
+        return
+    for layer in action.layers:
+        for strip in layer.strips:
+            for channelbag in getattr(strip, "channelbags", []):
+                yield from channelbag.fcurves
+
+
+def authored_clip_travel(clip: str) -> dict:
+    """Peak per-channel travel of each core clip, in the authored corpus.
+
+    Fail-closed on the HF-388 defect class: if the clip does not actually move
+    the arm chain in the source actions there is nothing for the exporter to
+    write, and shipping a bind-pose corpus is exactly the silent regression
+    that survived months of green suites.
+    """
+    action = action_for(clip)
+    arm_travel = 0.0
+    keyed_bones = set()
+    properties = set()
+    for curve in action_fcurves(action):
+        path = curve.data_path
+        bone = path.split('["')[1].split('"]')[0] if '["' in path else None
+        prop = path.rsplit(".", 1)[-1]
+        if not prop.startswith("rotation"):
+            continue
+        properties.add(prop)
+        if bone is not None:
+            keyed_bones.add(bone)
+        if bone in ARM_CHAIN_BONES:
+            values = [point.co[1] for point in curve.keyframe_points]
+            if values:
+                arm_travel = max(arm_travel, max(abs(value - values[0]) for value in values))
+    unreadable = properties - {POSE_ROTATION_PROPERTY}
+    if unreadable:
+        raise RuntimeError(
+            f"{clip}: rotation channels {sorted(unreadable)} cannot be read while pose bones "
+            f"are in {POSE_ROTATION_MODE} mode; the exporter would ship the bind pose"
+        )
+    if arm_travel <= MIN_ARM_TRAVEL_RADIANS:
+        raise RuntimeError(
+            f"{clip}: arm-chain travel {arm_travel:.6f} rad is at or below "
+            f"{MIN_ARM_TRAVEL_RADIANS} - the authored pose is missing"
+        )
+    missing = set(ARM_CHAIN_BONES) - keyed_bones
+    if missing:
+        raise RuntimeError(f"{clip}: arm-chain bones {sorted(missing)} carry no rotation channel")
+    return {"armTravelRadians": round(arm_travel, 6), "rotationProperty": sorted(properties)[0]}
+
+
 def reset_pose(armature: bpy.types.Object) -> None:
     if armature.animation_data is None:
         armature.animation_data_create()
@@ -77,7 +169,8 @@ def reset_pose(armature: bpy.types.Object) -> None:
     for track in armature.animation_data.nla_tracks:
         track.mute = True
     for bone in armature.pose.bones:
-        bone.rotation_mode = "QUATERNION"
+        bone.rotation_mode = POSE_ROTATION_MODE
+        bone.rotation_euler = (0.0, 0.0, 0.0)
         bone.rotation_quaternion = (1.0, 0.0, 0.0, 0.0)
         bone.location = (0.0, 0.0, 0.0)
         bone.scale = (1.0, 1.0, 1.0)
@@ -234,8 +327,13 @@ def validate_master() -> tuple[bpy.types.Object, bpy.types.Object, list[bpy.type
             "upAxis": contact.get("palm_up_axis"),
             "determinant": contact.matrix_world.determinant(),
         }
-    for clip in CORE_ACTIONS:
-        action_for(clip)
+    authored_travel = {clip: authored_clip_travel(clip) for clip in CORE_ACTIONS}
+    distinct_travel = {entry["armTravelRadians"] for entry in authored_travel.values()}
+    if len(distinct_travel) < 2:
+        raise RuntimeError(
+            f"all {len(CORE_ACTIONS)} clips share one arm-chain amplitude {distinct_travel} - "
+            "the corpus is a single hold pose, not thirteen actions"
+        )
     return root, armature, meshes, {
         "masterSha256": sha256(MASTER),
         "baselineBlendSha256": sha256(BASELINE_BLEND),
@@ -247,6 +345,8 @@ def validate_master() -> tuple[bpy.types.Object, bpy.types.Object, list[bpy.type
         },
         "bones": len(armature.data.bones),
         "clips": list(CORE_ACTIONS),
+        "poseRotationMode": POSE_ROTATION_MODE,
+        "authoredClipTravel": authored_travel,
         "palmContacts": contact_receipts,
         "weighting": weight_metrics(meshes),
         "authoredSleeveGeometry": authored_sleeve_geometry_metrics(

@@ -1,0 +1,88 @@
+{
+  "contract": "pipeline-compile-stall-probe-v1",
+  "measuredAt": "2026-09-02T17:37:22.114Z",
+  "label": "run",
+  "arena": "atomic-acres",
+  "idle": false,
+  "dist": "C:\\Users\\david\\projects\\aa-claude-hf395\\dist",
+  "seconds": 75,
+  "hooked": true,
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "window": {
+    "windowS": 75.01,
+    "rafCallbacks": 3554,
+    "stallCount": 3,
+    "stallsPerMinute": 2.4,
+    "frozenFractionPercent": 0.47,
+    "medianStallMs": 116.8,
+    "maxStallMs": 127.9
+  },
+  "pipelines": {
+    "beforeWindow": 374,
+    "inWindow": 0,
+    "perMinuteInWindow": 0,
+    "inStall": 0,
+    "inStallSharePercent": null,
+    "expectedIfUnrelatedPercent": 0.47,
+    "enrichment": null
+  },
+  "shaderModules": {
+    "beforeWindow": 431,
+    "inWindow": 0,
+    "perMinuteInWindow": 0,
+    "inStall": 0,
+    "inStallSharePercent": null,
+    "expectedIfUnrelatedPercent": 0.47,
+    "enrichment": null
+  },
+  "stateTransitions": [
+    {
+      "atMs": 85410,
+      "alive": true,
+      "weapon": "carbine"
+    }
+  ],
+  "cacheKeyDiffs": [],
+  "cacheKeyDiffCount": 0,
+  "determinantFlips": [
+    {
+      "atMs": 85168,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:9.28e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    }
+  ],
+  "determinantFlipCount": 1,
+  "samplePipelineLabels": [],
+  "stalls": [
+    {
+      "startMs": 121480.2,
+      "endMs": 121597,
+      "durationMs": 116.8
+    },
+    {
+      "startMs": 122863.5,
+      "endMs": 122969,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 144291.1,
+      "endMs": 144419,
+      "durationMs": 127.9
+    }
+  ]
+}

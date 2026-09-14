@@ -1,0 +1,100 @@
+{
+  "contract": "viewmodel-penetration-ratchet-v2",
+  "arenas": [
+    "atomic-acres",
+    "test2"
+  ],
+  "weapons": [
+    "carbine"
+  ],
+  "yawSteps": 12,
+  "stances": [
+    "stand",
+    "crouch",
+    "prone"
+  ],
+  "scenarios": {
+    "atomic-acres/house-front-wall": {
+      "gradedRows": 36,
+      "penetrating": 0,
+      "worstM": 0,
+      "belowFloor": 0,
+      "worstBelowFloorM": 0,
+      "worstClippedFraction": 0
+    },
+    "atomic-acres/bus-van-gap": {
+      "gradedRows": 36,
+      "penetrating": 0,
+      "worstM": 0,
+      "belowFloor": 0,
+      "worstBelowFloorM": 0,
+      "worstClippedFraction": 0
+    },
+    "atomic-acres/garage-door": {
+      "gradedRows": 12,
+      "penetrating": 12,
+      "worstM": 0.178,
+      "belowFloor": 0,
+      "worstBelowFloorM": 0,
+      "worstClippedFraction": 0
+    },
+    "atomic-acres/west-fence-corner": {
+      "gradedRows": 36,
+      "penetrating": 0,
+      "worstM": 0,
+      "belowFloor": 0,
+      "worstBelowFloorM": 0,
+      "worstClippedFraction": 0
+    },
+    "atomic-acres/open-ground-down": {
+      "gradedRows": 3,
+      "penetrating": 0,
+      "worstM": 0,
+      "belowFloor": 0,
+      "worstBelowFloorM": 0,
+      "worstClippedFraction": 0
+    },
+    "atomic-acres/grass-slope-down": {
+      "gradedRows": 36,
+      "penetrating": 0,
+      "worstM": 0,
+      "belowFloor": 0,
+      "worstBelowFloorM": 0,
+      "worstClippedFraction": 0
+    },
+    "test2/zone-a-wall": {
+      "gradedRows": 36,
+      "penetrating": 0,
+      "worstM": 0,
+      "belowFloor": 0,
+      "worstBelowFloorM": 0,
+      "worstClippedFraction": 0
+    },
+    "test2/zone-b-court": {
+      "gradedRows": 36,
+      "penetrating": 0,
+      "worstM": 0,
+      "belowFloor": 0,
+      "worstBelowFloorM": 0,
+      "worstClippedFraction": 0
+    },
+    "test2/zone-c-wall": {
+      "gradedRows": 36,
+      "penetrating": 0,
+      "worstM": 0,
+      "belowFloor": 0,
+      "worstBelowFloorM": 0,
+      "worstClippedFraction": 0
+    },
+    "test2/upper-room": {
+      "gradedRows": 36,
+      "penetrating": 0,
+      "worstM": 0,
+      "belowFloor": 0,
+      "worstBelowFloorM": 0,
+      "worstClippedFraction": 0
+    }
+  },
+  "measuredFrom": "docs/evidence/pass85/hf410/penetration-after-repair-summary.json",
+  "measuredNote": "HF-410 (repair pass, 2026-09-02 19:33Z, installed Chrome, native WebGPU, headless, quiet GPU): tightened from the PASS 84 floor to what the fitted rig actually measures. Every scenario the instrument authors is recorded. There is no exclusion list: rows that could not be posed drop out individually (gradedRows) and the count itself is ratcheted. Superseded floor, for the record: garage-door 12 penetrating at 0.323 m, 155 belowFloor rows across six scenarios at 0.012 m, worstClippedFraction 1.0 at bus-van-gap. A regression back to any of those now fails."
+}

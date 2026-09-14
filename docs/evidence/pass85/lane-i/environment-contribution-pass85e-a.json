@@ -1,0 +1,382 @@
+{
+  "generatedAt": "2026-09-02T17:09:20.709Z",
+  "label": "pass85e-a",
+  "base": "http://127.0.0.1:41948",
+  "gitSha": "bf92195dc6fc8f6fe18bd446d3178caac0fe7da0",
+  "method": "in-place environment suppression on the shipped build; suppressed = pre-2026-08-31 presented state",
+  "isGate": false,
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "seed": "iblparity",
+  "machine": {
+    "comfyUi": "idle",
+    "gpuFreeMiB": 13564,
+    "gpuTotalMiB": 16303
+  },
+  "arenas": {
+    "atomic-acres": {
+      "ok": true,
+      "backend": "webgpu",
+      "adapter": {
+        "gpu": true,
+        "adapter": true,
+        "device": true
+      },
+      "observation": {
+        "reviewCameraIds": [
+          "nuke-town-overview",
+          "nuke-town-plan",
+          "nuke-town-street-axis",
+          "nuke-town-west-garden",
+          "nuke-town-aqua-upper-roof",
+          "nuke-town-aqua-wall-closed",
+          "nuke-town-aqua-door-open"
+        ],
+        "sceneEnvironment": "pass64-arena-environment-atomic-acres-256",
+        "sceneEnvironmentIntensity": 0.24,
+        "sceneBackground": "pass66-generated-sky-backdrop-sunset-farmland",
+        "published": {
+          "arenaId": "atomic-acres",
+          "reflectionQuality": "high",
+          "present": true,
+          "environmentName": "pass64-arena-environment-atomic-acres-256",
+          "environmentIntensity": 0.24,
+          "expectedEnvironmentIntensity": 0.24,
+          "matchesIblState": true,
+          "sourceTextureName": "pass66-generated-sky-backdrop-sunset-farmland",
+          "resolutionTier": 256,
+          "generatedCubeSize": 4096
+        }
+      },
+      "shots": [
+        {
+          "cameraId": "nuke-town-overview",
+          "ok": true,
+          "heldName": "pass64-arena-environment-atomic-acres-256",
+          "heldIntensity": 0.24,
+          "suppressedEnvironment": null,
+          "suppressedIntensity": 1,
+          "restored": {
+            "environment": "pass64-arena-environment-atomic-acres-256",
+            "intensity": 0.24
+          },
+          "meanLuminanceSuppressed": 0.172,
+          "meanLuminanceShipped": 0.179,
+          "meanLuminanceDeltaPercent": 4.07,
+          "pixelsMovedPercent": 20.7,
+          "meanAbsDelta": 0.00727,
+          "floorLuminancePercent": 0.01,
+          "floorPixelsMovedPercent": 1.2
+        },
+        {
+          "cameraId": "nuke-town-plan",
+          "ok": true,
+          "heldName": "pass64-arena-environment-atomic-acres-256",
+          "heldIntensity": 0.24,
+          "suppressedEnvironment": null,
+          "suppressedIntensity": 1,
+          "restored": {
+            "environment": "pass64-arena-environment-atomic-acres-256",
+            "intensity": 0.24
+          },
+          "meanLuminanceSuppressed": 0.1176,
+          "meanLuminanceShipped": 0.1245,
+          "meanLuminanceDeltaPercent": 5.85,
+          "pixelsMovedPercent": 20.8,
+          "meanAbsDelta": 0.00705,
+          "floorLuminancePercent": 0.01,
+          "floorPixelsMovedPercent": 0.6
+        }
+      ],
+      "errors": [],
+      "combat": {
+        "hp": 100,
+        "alive": true,
+        "lowHealthOpacity": 0,
+        "lowHealthActive": false,
+        "damageMarkerOpacity": 0
+      },
+      "combatAfter": {
+        "hp": 100,
+        "alive": true,
+        "lowHealthOpacity": 0,
+        "lowHealthActive": false,
+        "damageMarkerOpacity": 0
+      }
+    },
+    "skyline-terminal": {
+      "ok": true,
+      "backend": "webgpu",
+      "adapter": {
+        "gpu": true,
+        "adapter": true,
+        "device": true
+      },
+      "observation": {
+        "reviewCameraIds": [
+          "terminal-overview",
+          "terminal-cabin-ceiling",
+          "terminal-concourse-wall-closed",
+          "terminal-boarding-open",
+          "terminal-port-wing-authority",
+          "terminal-starboard-wing-authority"
+        ],
+        "sceneEnvironment": "pass64-arena-environment-skyline-terminal-256",
+        "sceneEnvironmentIntensity": 0.22,
+        "sceneBackground": "pass66-generated-sky-backdrop-airport-dawn",
+        "published": {
+          "arenaId": "skyline-terminal",
+          "reflectionQuality": "high",
+          "present": true,
+          "environmentName": "pass64-arena-environment-skyline-terminal-256",
+          "environmentIntensity": 0.22,
+          "expectedEnvironmentIntensity": 0.22,
+          "matchesIblState": true,
+          "sourceTextureName": "pass66-generated-sky-backdrop-airport-dawn",
+          "resolutionTier": 256,
+          "generatedCubeSize": 4096
+        }
+      },
+      "shots": [
+        {
+          "cameraId": "terminal-overview",
+          "ok": true,
+          "heldName": "pass64-arena-environment-skyline-terminal-256",
+          "heldIntensity": 0.22,
+          "suppressedEnvironment": null,
+          "suppressedIntensity": 1,
+          "restored": {
+            "environment": "pass64-arena-environment-skyline-terminal-256",
+            "intensity": 0.22
+          },
+          "meanLuminanceSuppressed": 0.2926,
+          "meanLuminanceShipped": 0.2966,
+          "meanLuminanceDeltaPercent": 1.38,
+          "pixelsMovedPercent": 9.4,
+          "meanAbsDelta": 0.00435,
+          "floorLuminancePercent": 0,
+          "floorPixelsMovedPercent": 0
+        },
+        {
+          "cameraId": "terminal-cabin-ceiling",
+          "ok": true,
+          "heldName": "pass64-arena-environment-skyline-terminal-256",
+          "heldIntensity": 0.22,
+          "suppressedEnvironment": null,
+          "suppressedIntensity": 1,
+          "restored": {
+            "environment": "pass64-arena-environment-skyline-terminal-256",
+            "intensity": 0.22
+          },
+          "meanLuminanceSuppressed": 0.1095,
+          "meanLuminanceShipped": 0.1744,
+          "meanLuminanceDeltaPercent": 59.32,
+          "pixelsMovedPercent": 94.3,
+          "meanAbsDelta": 0.06494,
+          "floorLuminancePercent": 0.01,
+          "floorPixelsMovedPercent": 0
+        }
+      ],
+      "errors": [],
+      "combat": {
+        "hp": 100,
+        "alive": true,
+        "lowHealthOpacity": 0,
+        "lowHealthActive": false,
+        "damageMarkerOpacity": 0
+      },
+      "combatAfter": {
+        "hp": 100,
+        "alive": true,
+        "lowHealthOpacity": 0,
+        "lowHealthActive": false,
+        "damageMarkerOpacity": 0
+      }
+    },
+    "rustworks-1v1": {
+      "ok": true,
+      "backend": "webgpu",
+      "adapter": {
+        "gpu": true,
+        "adapter": true,
+        "device": true
+      },
+      "observation": {
+        "reviewCameraIds": [
+          "rustrig-overview",
+          "rustrig-tower-support",
+          "rustrig-container-wall",
+          "rustrig-container-dynamic-northwest",
+          "rustrig-container-dynamic-southeast",
+          "rustrig-mounted-work-lights",
+          "rustrig-deck-surface"
+        ],
+        "sceneEnvironment": "pass64-arena-environment-rustworks-1v1-256",
+        "sceneEnvironmentIntensity": 0.14,
+        "sceneBackground": "pass66-generated-sky-backdrop-industrial-night",
+        "published": {
+          "arenaId": "rustworks-1v1",
+          "reflectionQuality": "high",
+          "present": true,
+          "environmentName": "pass64-arena-environment-rustworks-1v1-256",
+          "environmentIntensity": 0.14,
+          "expectedEnvironmentIntensity": 0.14,
+          "matchesIblState": true,
+          "sourceTextureName": "pass66-generated-sky-backdrop-industrial-night",
+          "resolutionTier": 256,
+          "generatedCubeSize": 4096
+        }
+      },
+      "shots": [
+        {
+          "cameraId": "rustrig-overview",
+          "ok": true,
+          "heldName": "pass64-arena-environment-rustworks-1v1-256",
+          "heldIntensity": 0.14,
+          "suppressedEnvironment": null,
+          "suppressedIntensity": 1,
+          "restored": {
+            "environment": "pass64-arena-environment-rustworks-1v1-256",
+            "intensity": 0.14
+          },
+          "meanLuminanceSuppressed": 0.0423,
+          "meanLuminanceShipped": 0.0425,
+          "meanLuminanceDeltaPercent": 0.44,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00033,
+          "floorLuminancePercent": 0.01,
+          "floorPixelsMovedPercent": 0
+        },
+        {
+          "cameraId": "rustrig-tower-support",
+          "ok": true,
+          "heldName": "pass64-arena-environment-rustworks-1v1-256",
+          "heldIntensity": 0.14,
+          "suppressedEnvironment": null,
+          "suppressedIntensity": 1,
+          "restored": {
+            "environment": "pass64-arena-environment-rustworks-1v1-256",
+            "intensity": 0.14
+          },
+          "meanLuminanceSuppressed": 0.044,
+          "meanLuminanceShipped": 0.0442,
+          "meanLuminanceDeltaPercent": 0.4,
+          "pixelsMovedPercent": 0.1,
+          "meanAbsDelta": 0.00029,
+          "floorLuminancePercent": 0.02,
+          "floorPixelsMovedPercent": 0
+        }
+      ],
+      "errors": [],
+      "combat": {
+        "hp": 100,
+        "alive": true,
+        "lowHealthOpacity": 0,
+        "lowHealthActive": false,
+        "damageMarkerOpacity": 0
+      },
+      "combatAfter": {
+        "hp": 100,
+        "alive": true,
+        "lowHealthOpacity": 0,
+        "lowHealthActive": false,
+        "damageMarkerOpacity": 0
+      }
+    },
+    "gun-range": {
+      "ok": true,
+      "backend": "webgpu",
+      "adapter": {
+        "gpu": true,
+        "adapter": true,
+        "device": true
+      },
+      "observation": {
+        "reviewCameraIds": [
+          "gun-range-overview",
+          "gun-range-armory-support",
+          "gun-range-lane-wall",
+          "gun-range-neon-lanes",
+          "gun-range-lateral-targets",
+          "gun-range-test-bay-corridor",
+          "gun-range-test-bay-door-approach",
+          "gun-range-test-bay-door-relief",
+          "gun-range-test-bay-door-bay-face",
+          "gun-range-test-bay-overview"
+        ],
+        "sceneEnvironment": "pass64-arena-environment-gun-range-256",
+        "sceneEnvironmentIntensity": 0.1,
+        "sceneBackground": "pass66-sky-backdrop-indoor-range",
+        "published": {
+          "arenaId": "gun-range",
+          "reflectionQuality": "high",
+          "present": true,
+          "environmentName": "pass64-arena-environment-gun-range-256",
+          "environmentIntensity": 0.1,
+          "expectedEnvironmentIntensity": 0.1,
+          "matchesIblState": true,
+          "sourceTextureName": "pass66-sky-backdrop-indoor-range",
+          "resolutionTier": 256,
+          "generatedCubeSize": 2048
+        }
+      },
+      "shots": [
+        {
+          "cameraId": "gun-range-overview",
+          "ok": true,
+          "heldName": "pass64-arena-environment-gun-range-256",
+          "heldIntensity": 0.1,
+          "suppressedEnvironment": null,
+          "suppressedIntensity": 1,
+          "restored": {
+            "environment": "pass64-arena-environment-gun-range-256",
+            "intensity": 0.1
+          },
+          "meanLuminanceSuppressed": 0.0726,
+          "meanLuminanceShipped": 0.0673,
+          "meanLuminanceDeltaPercent": -7.36,
+          "pixelsMovedPercent": 11.3,
+          "meanAbsDelta": 0.00984,
+          "floorLuminancePercent": 2.24,
+          "floorPixelsMovedPercent": 5.2
+        },
+        {
+          "cameraId": "gun-range-armory-support",
+          "ok": true,
+          "heldName": "pass64-arena-environment-gun-range-256",
+          "heldIntensity": 0.1,
+          "suppressedEnvironment": null,
+          "suppressedIntensity": 1,
+          "restored": {
+            "environment": "pass64-arena-environment-gun-range-256",
+            "intensity": 0.1
+          },
+          "meanLuminanceSuppressed": 0.0626,
+          "meanLuminanceShipped": 0.0693,
+          "meanLuminanceDeltaPercent": 10.65,
+          "pixelsMovedPercent": 13.6,
+          "meanAbsDelta": 0.00985,
+          "floorLuminancePercent": 6.56,
+          "floorPixelsMovedPercent": 10.1
+        }
+      ],
+      "errors": [],
+      "combat": {
+        "hp": 100,
+        "alive": true,
+        "lowHealthOpacity": 0,
+        "lowHealthActive": false,
+        "damageMarkerOpacity": 0
+      },
+      "combatAfter": {
+        "hp": 100,
+        "alive": true,
+        "lowHealthOpacity": 0,
+        "lowHealthActive": false,
+        "damageMarkerOpacity": 0
+      }
+    }
+  }
+}

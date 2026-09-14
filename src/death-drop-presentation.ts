@@ -8,13 +8,17 @@ import {
   loadPass65WeaponPresentation,
   releasePass65WeaponModel,
 } from './weapon-model';
-import type { WeaponId } from './protocol';
+import { PRIMARY_WEAPON_IDS, type WeaponId } from './protocol';
 
 export type DeathDropPresentationTelemetry = {
   capacity: number;
   active: number;
   prewarmed: boolean;
   dynamicLights: 0;
+  /** Authored drop models constructed since the pool was created. */
+  authoredBuilt: number;
+  /** Constructed models parked for re-use (built once, shown many times). */
+  authoredIdle: number;
 };
 
 type DeathDropSlot = {
@@ -25,10 +29,42 @@ type DeathDropSlot = {
   weaponId: WeaponId | null;
 };
 
+/**
+ * Idle authored drops retained PER WEAPON. Constructing one is a SkeletonUtils
+ * clone, a material clone per mesh, an owner geometry clone and
+ * optimizeAttachedWeapon's second clone + toNonIndexed + mergeGeometries — the
+ * work behind the owner's "just killed a bot and froze for 0.5 seconds"
+ * (2026-08-30), which ran at least twice on every kill frame. Two covers the
+ * common simultaneous-duplicate case (two bots carrying the same gun die
+ * together) without retaining capacity x arsenal clones for a whole match.
+ */
+const AUTHORED_IDLE_PER_WEAPON = 2;
+
+type IdleScope = typeof globalThis & {
+  requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+};
+
+/**
+ * Resolve OFF the current frame. Every 'drop' GLB is decoded during the shared
+ * asset prewarm, so loadPass65WeaponPresentation returns an already-resolved
+ * promise and its .then body would otherwise run as a MICROTASK on the frame
+ * that asked — the kill frame. A macrotask/idle hop cannot land there.
+ */
+function whenIdle(timeoutMs = 120): Promise<void> {
+  return new Promise((resolve) => {
+    const scope = globalThis as IdleScope;
+    if (typeof scope.requestIdleCallback === 'function') scope.requestIdleCallback(() => resolve(), { timeout: timeoutMs });
+    else setTimeout(resolve, 0);
+  });
+}
+
 export class DeathDropPresentationPool {
   readonly root = new THREE.Group();
   private readonly slots: DeathDropSlot[];
   private wasPrewarmed = false;
+  /** Built-once authored drops, parked by weapon id while nothing shows them. */
+  private readonly idleAuthored = new Map<WeaponId, THREE.Group[]>();
+  private authoredBuilt = 0;
 
   constructor(
     scene: THREE.Scene,
@@ -116,21 +152,79 @@ export class DeathDropPresentationPool {
       node.userData.blocksShots = false;
       node.raycast = () => undefined;
     });
+    this.authoredBuilt += 1;
     return model;
   }
 
+  /** Pop a previously constructed drop for this weapon, or null if none is parked. */
+  private takeAuthoredModel(weaponId: WeaponId): THREE.Group | null {
+    return this.idleAuthored.get(weaponId)?.pop() ?? null;
+  }
+
+  /**
+   * Park a shown drop back under its weapon id instead of destroying it. This
+   * is the whole fix: the pool now owns the constructed presentation for the
+   * match, so a kill re-shows an existing object. Overflow past the per-weapon
+   * cap (and anything without a weapon identity) still retires behind the GPU
+   * fence, so the retained set stays bounded.
+   */
+  private stashAuthoredModel(model: THREE.Object3D): void {
+    const weaponId = model.userData.weaponId as WeaponId | undefined;
+    if (!weaponId || !(model instanceof THREE.Group)) {
+      this.retireAuthoredModel(model);
+      return;
+    }
+    const idle = this.idleAuthored.get(weaponId) ?? [];
+    if (idle.length >= AUTHORED_IDLE_PER_WEAPON) {
+      this.retireAuthoredModel(model);
+      return;
+    }
+    model.removeFromParent();
+    idle.push(model);
+    this.idleAuthored.set(weaponId, idle);
+  }
+
+  private clearSlotWeapon(slot: DeathDropSlot): void {
+    for (const previous of [...slot.weapon.children]) {
+      this.stashAuthoredModel(previous);
+    }
+  }
+
+  /**
+   * Show `weaponId` on `slot`. A weapon that has been dropped before is
+   * re-shown SYNCHRONOUSLY — one add(), no clone, no merge — because on a kill
+   * frame this runs inside processDeath -> spawnDeathDrop. Only a weapon
+   * nobody has dropped yet still needs construction, and that is pushed off
+   * the frame entirely; after prewarm the whole primary set is already built,
+   * so this fallback should never fire mid-match.
+   */
   private installWeapon(slot: DeathDropSlot, weaponId: WeaponId, request: number): void {
-    void loadPass65WeaponPresentation(weaponId, 'drop').then(() => {
+    const parked = this.takeAuthoredModel(weaponId);
+    if (parked) {
+      slot.weapon.add(parked);
+      return;
+    }
+    void loadPass65WeaponPresentation(weaponId, 'drop').then(() => whenIdle()).then(() => {
       if (!slot.active || slot.request !== request || slot.weaponId !== weaponId) return;
-      const model = this.createAuthoredDrop(weaponId);
+      const model = this.takeAuthoredModel(weaponId) ?? this.createAuthoredDrop(weaponId);
       if (!model) throw new Error(`Pass 65 authored death-drop model unavailable after load: ${weaponId}`);
-      for (const previous of [...slot.weapon.children]) {
-        this.retireAuthoredModel(previous);
-      }
+      this.clearSlotWeapon(slot);
       slot.weapon.add(model);
     }).catch((error: unknown) => {
       slot.root.userData.pass65DropWeaponLoadError = error instanceof Error ? error.message : String(error);
       console.error(`Pass 65 authored death-drop load failed for ${weaponId}`, error);
+    });
+  }
+
+  /**
+   * Tint the pooled markers only. The authored gun keeps its own authored
+   * materials — it used to escape this traverse purely because it arrived a
+   * microtask after acquire() returned, and a re-used model must not
+   * accumulate drop colours across the kills it serves.
+   */
+  private tintPooledMarkers(slot: DeathDropSlot, color: number): void {
+    slot.root.traverse((node) => {
+      if (node instanceof THREE.Mesh && node.material instanceof THREE.MeshBasicMaterial) node.material.color.setHex(color);
     });
   }
 
@@ -144,15 +238,9 @@ export class DeathDropPresentationPool {
     slot.root.userData.deathDropId = id;
     slot.weaponId = weaponId;
     slot.request += 1;
-    if (typeof document !== 'undefined') {
-      for (const previous of [...slot.weapon.children]) {
-        this.retireAuthoredModel(previous);
-      }
-      this.installWeapon(slot, weaponId, slot.request);
-    }
-    slot.root.traverse((node) => {
-      if (node instanceof THREE.Mesh && node.material instanceof THREE.MeshBasicMaterial) node.material.color.setHex(color);
-    });
+    if (typeof document !== 'undefined') this.clearSlotWeapon(slot);
+    this.tintPooledMarkers(slot, color);
+    if (typeof document !== 'undefined') this.installWeapon(slot, weaponId, slot.request);
     return slot.root;
   }
 
@@ -164,11 +252,7 @@ export class DeathDropPresentationPool {
     slot.root.userData.deathDropId = null;
     slot.weaponId = null;
     slot.request += 1;
-    if (typeof document !== 'undefined') {
-      for (const model of [...slot.weapon.children]) {
-        this.retireAuthoredModel(model);
-      }
-    }
+    if (typeof document !== 'undefined') this.clearSlotWeapon(slot);
   }
 
   /**
@@ -181,27 +265,38 @@ export class DeathDropPresentationPool {
     if (!slot || !slot.active || slot.weaponId === weaponId) return;
     slot.weaponId = weaponId;
     slot.request += 1;
-    if (typeof document !== 'undefined') {
-      for (const previous of [...slot.weapon.children]) {
-        this.retireAuthoredModel(previous);
-      }
-      this.installWeapon(slot, weaponId, slot.request);
-    }
-    slot.root.traverse((node) => {
-      if (node instanceof THREE.Mesh && node.material instanceof THREE.MeshBasicMaterial) node.material.color.setHex(color);
-    });
+    if (typeof document !== 'undefined') this.clearSlotWeapon(slot);
+    this.tintPooledMarkers(slot, color);
+    if (typeof document !== 'undefined') this.installWeapon(slot, weaponId, slot.request);
   }
 
   async prewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera, weaponId: WeaponId = 'carbine'): Promise<void> {
     if (this.wasPrewarmed) return;
     const parentScene = this.root.parent;
     if (!(parentScene instanceof THREE.Scene)) throw new Error('Death-drop presentation must be attached to a scene before prewarm');
-    let prewarmModel: THREE.Group | null = null;
+    const prewarmModels: THREE.Group[] = [];
     if (typeof document !== 'undefined') {
-      await loadPass65WeaponPresentation(weaponId, 'drop');
-      prewarmModel = this.createAuthoredDrop(weaponId);
-      if (!prewarmModel) throw new Error(`Pass 65 authored death-drop prewarm unavailable: ${weaponId}`);
-      this.slots[0]?.weapon.add(prewarmModel);
+      // A corpse only ever drops a primary (spawnDeathDrop gates on
+      // isPrimaryWeaponId), so the primary set IS the match's drop corpus.
+      // Building all of it here — one model per slot, riding the single
+      // compile pass below — means the first kill of every weapon costs an
+      // add() instead of a clone/merge. The slice keeps the loop inside the
+      // pool's own capacity, which is the number of models the compile pass
+      // can host at once (MAX_DEATH_DROPS 12 == 12 primaries today).
+      const corpus: WeaponId[] = [weaponId, ...PRIMARY_WEAPON_IDS.filter((id) => id !== weaponId)];
+      for (const id of corpus.slice(0, this.slots.length)) {
+        await loadPass65WeaponPresentation(id, 'drop');
+        const model = this.createAuthoredDrop(id);
+        if (!model) {
+          if (id === weaponId) throw new Error(`Pass 65 authored death-drop prewarm unavailable: ${id}`);
+          continue;
+        }
+        this.slots[prewarmModels.length].weapon.add(model);
+        prewarmModels.push(model);
+        // Bootstrap owns the frame here, but 12 clones back to back is a long
+        // task; hand the browser a beat between them.
+        await whenIdle(16);
+      }
     }
     for (const slot of this.slots) {
       slot.root.visible = true;
@@ -211,8 +306,8 @@ export class DeathDropPresentationPool {
       await runtime.compileAndRender(this.root, camera, parentScene);
       this.wasPrewarmed = true;
     } finally {
-      if (prewarmModel) {
-        this.retireAuthoredModel(prewarmModel);
+      for (const model of prewarmModels) {
+        this.stashAuthoredModel(model);
       }
       for (const slot of this.slots) {
         slot.root.visible = slot.active;
@@ -222,11 +317,15 @@ export class DeathDropPresentationPool {
   }
 
   telemetry(): DeathDropPresentationTelemetry {
+    let authoredIdle = 0;
+    for (const parked of this.idleAuthored.values()) authoredIdle += parked.length;
     return {
       capacity: this.slots.length,
       active: this.slots.filter((slot) => slot.active).length,
       prewarmed: this.wasPrewarmed,
       dynamicLights: 0,
+      authoredBuilt: this.authoredBuilt,
+      authoredIdle,
     };
   }
 }

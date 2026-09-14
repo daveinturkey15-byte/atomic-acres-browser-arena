@@ -1,0 +1,81 @@
+{
+  "contract": "arena-viewpoint-regression-capture-v1",
+  "verdict": "PASS",
+  "label": "candidate7",
+  "sha": "ae79572410f02639bb189622d34703b42425ce4d",
+  "url": "http://127.0.0.1:4300",
+  "renderer": "webgpu",
+  "backend": "webgpu",
+  "adapter": {
+    "gpu": true,
+    "adapter": true,
+    "device": true,
+    "vendor": "nvidia",
+    "architecture": "blackwell"
+  },
+  "bundleAtStart": "/legacy-main-CO_TtT3v.js",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "seed": "viewpoint",
+  "settleMs": 2500,
+  "samples": 3,
+  "capturedAt": "2026-09-05T05:07:40.252Z",
+  "environmentInvalid": null,
+  "arenas": [
+    {
+      "arena": "skyline-terminal",
+      "ok": true,
+      "shots": [
+        {
+          "cameraId": "terminal-overview",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\skyline-terminal\\skyline-terminal\\terminal-overview.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\skyline-terminal\\skyline-terminal\\terminal-overview.png",
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\skyline-terminal\\skyline-terminal\\terminal-overview.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\skyline-terminal\\skyline-terminal\\terminal-overview.s2.png"
+          ],
+          "committedFrame": 234,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.06,
+          "frame": 259
+        },
+        {
+          "cameraId": "terminal-cabin-ceiling",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\skyline-terminal\\skyline-terminal\\terminal-cabin-ceiling.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\skyline-terminal\\skyline-terminal\\terminal-cabin-ceiling.png",
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\skyline-terminal\\skyline-terminal\\terminal-cabin-ceiling.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\skyline-terminal\\skyline-terminal\\terminal-cabin-ceiling.s2.png"
+          ],
+          "committedFrame": 513,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.06,
+          "frame": 540
+        },
+        {
+          "cameraId": "terminal-concourse-wall-closed",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\skyline-terminal\\skyline-terminal\\terminal-concourse-wall-closed.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\skyline-terminal\\skyline-terminal\\terminal-concourse-wall-closed.png",
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\skyline-terminal\\skyline-terminal\\terminal-concourse-wall-closed.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\skyline-terminal\\skyline-terminal\\terminal-concourse-wall-closed.s2.png"
+          ],
+          "committedFrame": 891,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.06,
+          "frame": 917
+        }
+      ],
+      "ms": 66118,
+      "errors": []
+    }
+  ]
+}

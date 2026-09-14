@@ -14,11 +14,11 @@
   "blenderVersion": "5.1.2",
   "generator": {
     "path": "scripts/blender/create-pass65-weapon-families.py",
-    "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+    "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
   },
   "geometryModule": {
     "path": "scripts/blender/pass65_weapon_production_geometry.py",
-    "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+    "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
   },
   "sourceBlend": {
     "path": "source-assets/blender/pass65-weapon-families.blend",
@@ -36,21 +36,21 @@
     "firstPersonGlbs": [
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/slug-shotgun/slug-shotgun-fp-lod0.glb",
-        "sha256": "63a3760613685c6300298320397ff3f9c18fcf68d48fecca6e58862888708de5",
+        "sha256": "8f74adb17d1d81dd555166e91fc233774c793fce5d1df07dc320759dc225494d",
         "variant": "first-person-lod0",
         "lod": 0,
-        "triangles": 8000,
-        "bytes": 252032,
+        "triangles": 8376,
+        "bytes": 255576,
         "meshNodes": 8,
         "renderPrimitives": 8
       },
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/slug-shotgun/slug-shotgun-fp-lod1.glb",
-        "sha256": "d0a9f79bff138cd0e4b2c9590895ad76d7cb352cc739f5507d1597c0fcd61b8a",
+        "sha256": "320043c8855d30363382f896bdc036353be8f2ae43129b50d89569c614806dac",
         "variant": "first-person-lod1",
         "lod": 1,
-        "triangles": 7058,
-        "bytes": 239352,
+        "triangles": 7366,
+        "bytes": 242368,
         "meshNodes": 8,
         "renderPrimitives": 8
       }
@@ -58,31 +58,31 @@
     "worldGlbs": [
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/slug-shotgun/slug-shotgun-world-lod0.glb",
-        "sha256": "6502244a23858bf42160c7e32c647e98b7f5d5949cf0d83966ec14dcd5ff1d7b",
+        "sha256": "3eeccb2600247f9c83b3191cb1ad97fd60dbb50bd13ce817b34ca0dec0b581fd",
         "variant": "world-lod0",
         "lod": 0,
-        "triangles": 9656,
-        "bytes": 273872,
+        "triangles": 10032,
+        "bytes": 277396,
         "meshNodes": 8,
         "renderPrimitives": 8
       },
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/slug-shotgun/slug-shotgun-world-lod1.glb",
-        "sha256": "6711118a8f0bbf05d1517d0431a1d6853a04acd4b9831390d35c120816858f54",
+        "sha256": "49141e6952c61a1efb2be7708b85acbb2510fe1320973659859abd5fce94b39a",
         "variant": "world-lod1",
         "lod": 1,
-        "triangles": 7904,
-        "bytes": 256872,
+        "triangles": 8280,
+        "bytes": 260424,
         "meshNodes": 8,
         "renderPrimitives": 8
       },
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/slug-shotgun/slug-shotgun-world-lod2.glb",
-        "sha256": "3a168af61b8bfe2159d2d8f1679c0111e124243752101fbaf4959c491d9913ba",
+        "sha256": "359c75008e13088247122f875c58b52cbe08438af5cf948e5330b42192484019",
         "variant": "world-lod2",
         "lod": 2,
-        "triangles": 4754,
-        "bytes": 215152,
+        "triangles": 5046,
+        "bytes": 215904,
         "meshNodes": 8,
         "renderPrimitives": 8
       }
@@ -90,11 +90,11 @@
     "dropGlbs": [
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/slug-shotgun/slug-shotgun-drop-lod0.glb",
-        "sha256": "b555e4f33b86a18d91daabf65d87c277c7669652e800e8928a983b700c01f467",
+        "sha256": "b1511d7fe964541811f6fd3f4e788981ce8f8a12cbd2a9a1c6d85c200dd3c1e2",
         "variant": "drop-lod0",
         "lod": 0,
-        "triangles": 7904,
-        "bytes": 256856,
+        "triangles": 8280,
+        "bytes": 260416,
         "meshNodes": 8,
         "renderPrimitives": 8
       }
@@ -182,7 +182,7 @@
     "renders": [
       {
         "path": "docs/assets/pass65-weapons/firearms/slug-shotgun/slug-shotgun-hero-quarter.png",
-        "sha256": "fc6a4e865fe6541422e0f85e3bf6e93ccb0e68888980a5b8bf9a09a813445bac",
+        "sha256": "4b00a38f4a7548555bf1f9f5524615206dc51f4c5f1366aad125cd07034d3dfa",
         "width": 480,
         "height": 360,
         "cameraId": "hero-quarter",
@@ -190,7 +190,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/slug-shotgun/slug-shotgun-side-silhouette.png",
-        "sha256": "67352f128a492b85f0b520b3bccdc08ef095b29c66144c3fcd8908b4080d5514",
+        "sha256": "5ed78cb8d167a11d4313eb29ae7634a385e1c6f46b505227d079707b099738e5",
         "width": 480,
         "height": 360,
         "cameraId": "side-silhouette",
@@ -198,7 +198,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/slug-shotgun/slug-shotgun-sight-line.png",
-        "sha256": "2ff0c273f87eefb6b967dc482e2e069d491b218cfa387f2378f5cf040b48d29a",
+        "sha256": "a2932e9190fc1680dfcb593daac0ee4d31aba51211051fca7c216dd9f917c6ea",
         "width": 480,
         "height": 360,
         "cameraId": "sight-line",
@@ -206,7 +206,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/slug-shotgun/slug-shotgun-reload-action.png",
-        "sha256": "a772ccb42a1351173fb64dfebe542a58144d245cb6652f8353131ac1763089ca",
+        "sha256": "3cc342cfd4616c1aeac867b562b5514257e6b00d71d1e35e1a7f818bca1f9151",
         "width": 480,
         "height": 360,
         "cameraId": "reload-action",
@@ -214,7 +214,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/slug-shotgun/slug-shotgun-world-lod0-silhouette.png",
-        "sha256": "eb0ce2300f4ac65ed4872a0a2f72a196d53dfa653a96ebface06832982517337",
+        "sha256": "504446644f205817061065d8927d29523251c610002305959f866017fda63f24",
         "width": 480,
         "height": 360,
         "cameraId": "world-lod0-silhouette",
@@ -222,7 +222,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/slug-shotgun/slug-shotgun-world-lod2-silhouette.png",
-        "sha256": "a7020e87ca7df7e28d05c391d85de76b962a6a57121a63cfad9655c89c3a47bf",
+        "sha256": "36457ebf7bc8d1cd0e44d0554558a92b7f83865d44d39eff3f16adf514cd5fb3",
         "width": 480,
         "height": 360,
         "cameraId": "world-lod2-silhouette",
@@ -230,7 +230,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/slug-shotgun/slug-shotgun-drop-lod0-silhouette.png",
-        "sha256": "5bf6d1876426f151093689a2a8eea6a5f1bbe8d4f2495a314eb7247cede37ac2",
+        "sha256": "5fc853d1264bf66f5d3bdc78e30b1d6aac61595aabc5f0676c643237ebf4c126",
         "width": 480,
         "height": 360,
         "cameraId": "drop-lod0-silhouette",
@@ -239,7 +239,7 @@
     ],
     "contactSheet": {
       "path": "docs/assets/pass65-weapons/firearms/slug-shotgun/slug-shotgun-contact-sheet.png",
-      "sha256": "7960beb1073c4789bf2ebea7bda4e9510897c51125413ae856d21470c29a905e",
+      "sha256": "bdd401ee30b2e55c9f9414f762c176b1471140631c70439243048c85343448e1",
       "width": 1920,
       "height": 720
     }
@@ -248,8 +248,8 @@
     "deliveries": [
       {
         "variant": "first-person-lod0",
-        "triangles": 8000,
-        "bytes": 252032,
+        "triangles": 8376,
+        "bytes": 255576,
         "meshNodes": 8,
         "renderPrimitives": 8,
         "materials": 5,
@@ -275,12 +275,12 @@
         "sightForwardDot": 0.9999999999999963,
         "declaredLength": 1.36,
         "platformAnatomy": "argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle",
-        "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":8000,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
+        "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":8376,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
       },
       {
         "variant": "first-person-lod1",
-        "triangles": 7058,
-        "bytes": 239352,
+        "triangles": 7366,
+        "bytes": 242368,
         "meshNodes": 8,
         "renderPrimitives": 8,
         "materials": 5,
@@ -306,12 +306,12 @@
         "sightForwardDot": 0.9999999999999963,
         "declaredLength": 1.36,
         "platformAnatomy": "argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle",
-        "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":7058,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
+        "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":7366,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
       },
       {
         "variant": "world-lod0",
-        "triangles": 9656,
-        "bytes": 273872,
+        "triangles": 10032,
+        "bytes": 277396,
         "meshNodes": 8,
         "renderPrimitives": 8,
         "materials": 5,
@@ -337,12 +337,12 @@
         "sightForwardDot": 0.9999999999999963,
         "declaredLength": 1.36,
         "platformAnatomy": "argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle",
-        "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":9656,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
+        "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":10032,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
       },
       {
         "variant": "world-lod1",
-        "triangles": 7904,
-        "bytes": 256872,
+        "triangles": 8280,
+        "bytes": 260424,
         "meshNodes": 8,
         "renderPrimitives": 8,
         "materials": 5,
@@ -368,12 +368,12 @@
         "sightForwardDot": 0.9999999999999963,
         "declaredLength": 1.36,
         "platformAnatomy": "argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle",
-        "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":7904,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
+        "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":8280,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
       },
       {
         "variant": "world-lod2",
-        "triangles": 4754,
-        "bytes": 215152,
+        "triangles": 5046,
+        "bytes": 215904,
         "meshNodes": 8,
         "renderPrimitives": 8,
         "materials": 5,
@@ -399,12 +399,12 @@
         "sightForwardDot": 0.9999999999999963,
         "declaredLength": 1.36,
         "platformAnatomy": "argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle",
-        "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":4754,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
+        "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":5046,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
       },
       {
         "variant": "drop-lod0",
-        "triangles": 7904,
-        "bytes": 256856,
+        "triangles": 8280,
+        "bytes": 260416,
         "meshNodes": 8,
         "renderPrimitives": 8,
         "materials": 5,
@@ -430,7 +430,7 @@
         "sightForwardDot": 0.9999999999999963,
         "declaredLength": 1.36,
         "platformAnatomy": "argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle",
-        "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":7904,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
+        "silhouetteSignature": "{\"designId\":\"benelli-m4-gas-slug-v1\",\"family\":\"shotgun\",\"triangles\":8280,\"meshNodes\":8,\"declaredLength\":1.36,\"platformAnatomy\":\"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle\",\"signatures\":[17,10,9]}"
       }
     ],
     "externalUris": 0

@@ -28,20 +28,44 @@ const mutationRunner = readFileSync('scripts/qa/run-pass25a-mutation.mjs', 'utf8
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
 const ownerFeedbackGraph = JSON.parse(readFileSync('docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json', 'utf8'));
 const topologyBrowserVerifier = readFileSync('scripts/qa/verify-release-topology-browser.mjs', 'utf8');
+const releaseChannels = JSON.parse(readFileSync('release-channels.json', 'utf8'));
+const verificationReceiptWriter = readFileSync('scripts/release/write-verification-receipt.mjs', 'utf8');
 
 describe('production release workflow', () => {
-  it('configures a repository-local bot identity before publishing gh-pages', () => {
-    const identityStep = workflow.indexOf('Configure release commit identity');
-    const publishStep = workflow.indexOf('Publish complete exact dist snapshot');
-
-    expect(identityStep).toBeGreaterThan(-1);
-    expect(publishStep).toBeGreaterThan(identityStep);
-    expect(workflow).toContain('git config user.name "github-actions[bot]"');
-    expect(workflow).toContain('git config user.email "41898282+github-actions[bot]@users.noreply.github.com"');
-    expect(workflow).not.toContain('git config --global');
+  // LANE AD (PASS 87). This workflow no longer publishes, so the assertions that pinned its
+  // publish sequence are replaced by assertions that it CANNOT publish - a strictly stronger
+  // safety property than "the identity step precedes the publish step".
+  //
+  // Why: Lane F (PASS 84) found that the workflow still staged and pushed the pre-PASS-80
+  // topology. Its publish step replaced the whole gh-pages branch from `dist`, so one
+  // dispatch would have deleted the pinned PASS 85 safe backup (HF-400) and resurrected six
+  // retired trees over the live site. Every pass since 74 shipped through
+  // scripts/orchestration/publish_pass<N>.py, which enumerates the live trees at run time and
+  // asserts its exact post-state before committing.
+  it('has no write path to any branch and cannot publish', () => {
+    for (const forbidden of ['deploy:ci', 'gh-pages -d', 'git remote set-url', 'x-access-token',
+      'pages/builds/latest', 'contents: write', 'Publish complete exact dist snapshot',
+      'Configure release commit identity', 'git config user.name']) {
+      expect(workflow, `release-production.yml must not contain ${forbidden}`).not.toContain(forbidden);
+    }
+    expect(workflow).toContain('contents: read');
+    expect(workflow).not.toContain('git config ');
+    expect(workflow).toContain('scripts/orchestration/publish_pass<N>.py');
+    // ...and the publish route it names is the one that actually implements the policy.
+    expect(workflow).toContain('node scripts/release/verify-two-channel-policy.mjs');
+    expect(workflow).toContain('node --test scripts/release/release-policy-contract.test.mjs');
+    expect(workflow).toContain('node --test scripts/orchestration/publish-sibling-drift.test.mjs');
+    expect(packageJson.scripts['verify:publish-sibling-drift'])
+      .toBe('node --test scripts/orchestration/publish-sibling-drift.test.mjs');
+    expect(packageJson.scripts['verify:two-channel-policy']).toBe('node scripts/release/verify-two-channel-policy.mjs');
+    expect(packageJson.scripts['verify:release-policy:contract'])
+      .toBe('node --test scripts/release/release-policy-contract.test.mjs');
+    // The one deploy script left in package.json must still never append to gh-pages, so a
+    // hand run of it cannot silently grow the branch back past the two-channel policy.
+    expect(readFileSync('package.json', 'utf8')).not.toContain('"deploy:ci": "gh-pages -d dist --add"');
   });
 
-  it('stages live Pass 73, previous Pass 72, retained Pass 70 and Pass 69, stable Pass 67.1 and rollback Pass 63 before a complete publish', () => {
+  it('stages and verifies the whole channel topology locally, deriving every path from the config', () => {
     expect(workflow).toContain('npm run stage:release-topology');
     expect(workflow).toContain('npm run verify:release-topology');
     expect(workflow).toContain('SOURCE_SHA: ${{ inputs.source_sha }}');
@@ -49,35 +73,68 @@ describe('production release workflow', () => {
     expect(workflow).toContain('RELEASE_ROLLBACK_DIST: ${{ env.RELEASE_ROLLBACK_DIST }}');
     expect(workflow).toContain('git worktree add artifacts/pass63-rollback-src "$rollback_source_sha"');
     expect(workflow).not.toContain('stage:stable-channel');
-    expect(workflow).toContain('Stage live Pass 73, exact previous Pass 72, retained Pass 70 and Pass 69, rebuilt Pass 67.1 and Pass 63 rollback');
+    expect(workflow).toContain('Stage the full local channel topology and verify it end to end');
     expect(workflow).toContain('for channel_key in previous retained historical; do');
     expect(workflow).toContain('git cat-file -e "${pinned_pages_sha}^{commit}"');
-    expect(readFileSync('package.json', 'utf8')).toContain('"deploy:ci": "gh-pages -d dist"');
-    expect(readFileSync('package.json', 'utf8')).not.toContain('"deploy:ci": "gh-pages -d dist --add"');
+    // No step name may pin a pass number: the old one said "Stage live Pass 73" while the
+    // config staged PASS 86, which is the same staleness class as the channel-path literals.
+    const stagingStepLine = workflow.split('\n').find((line) => line.includes('Stage the full local channel topology'));
+    expect(stagingStepLine).not.toMatch(/Pass 7\d|Pass 8\d/u);
   });
 
-  it('verifies four public choices while retaining unlinked stable provenance', () => {
+  it('requires the core channels, allows published extras, and counts cards from the config', () => {
+    // The core four (five with a staged rollback) are still REQUIRED to be present. What
+    // changed is that the check is a superset, not an equality: the owner keeps every
+    // published pass selectable, so the channel set grows, and an equality check meant a
+    // correctly published PASS 80 made the config illegal.
     expect(staticTopologyVerifier).toContain("['experimental', 'previous', 'retained', 'historical', 'stable']");
     expect(staticTopologyVerifier).toContain("['experimental', 'previous', 'retained', 'historical']");
+    expect(staticTopologyVerifier).toContain('const missingChannelKeys = requiredChannelKeys.filter((key) => !publicConfig[key]);');
+    expect(staticTopologyVerifier).not.toContain('Root chooser must expose exactly');
+    // Newly enforced, and never enforced before: an offered channel must actually be staged.
+    expect(staticTopologyVerifier).toContain('which is not staged');
+    // And a release must never REMOVE a pass the owner can currently select. The staging
+    // script still rebuilds the config from a closed set, so without this a production
+    // release would silently drop pass80 from the chooser.
+    expect(staticTopologyVerifier).toContain("execFileSync('git', ['show', 'origin/gh-pages:release-channel-config.js']");
+    expect(staticTopologyVerifier).toContain('would remove live channel(s)');
+    // A verifier that could not run must never read as one that passed.
+    expect(staticTopologyVerifier).toContain('NOT a pass - fetch gh-pages to enable this check.');
     expect(staticTopologyVerifier).toContain('publicConfig.retained.pass !== config.retained.pass');
     expect(staticTopologyVerifier).toContain('publicConfig.historical.pass !== config.historical.pass');
     expect(staticTopologyVerifier).toContain('publicConfig.stable.pass !== config.rollback.pass');
-    expect(liveTopologyVerifier).toContain('await buttons.count() !== 4');
-    expect(liveTopologyVerifier).toContain("for (const choice of ['experimental', 'previous', 'retained', 'historical'])");
-    expect(liveTopologyVerifier).toContain("await verifyChoice('previous', 'channels/pass72-retained', 'PASS 72', 'pass72');");
-    expect(liveTopologyVerifier).toContain("await verifyChoice('retained', 'channels/pass70-retained', 'PASS 70', 'pass70');");
-    expect(liveTopologyVerifier).toContain("await verifyChoice('historical', 'channels/pass69-retained', 'PASS 69', 'pass69');");
+    expect(liveTopologyVerifier).toContain('await buttons.count() !== configuredChannelKeys.length');
+    expect(liveTopologyVerifier).not.toContain('await buttons.count() !== 4');
+    expect(liveTopologyVerifier).toContain("for (const choice of Object.keys(channelConfig).filter((key) => channelConfig[key]?.path))");
+    // LANE AD (PASS 87): derived from the config, not spelled out. The retained aliases keep
+    // their exact pass pins; only the PATH now comes from release-channels.json, so a
+    // renamed or retired channel fails here instead of being asserted into existence.
+    expect(liveTopologyVerifier).toContain("await verifyChoice('previous', channelConfig.previous.path, channelConfig.previous.pass,");
+    expect(liveTopologyVerifier).toContain("await verifyChoice('retained', channelConfig.retained.path, channelConfig.retained.pass,");
+    expect(liveTopologyVerifier).toContain("await verifyChoice('historical', channelConfig.historical.path, channelConfig.historical.pass,");
     expect(liveTopologyVerifier).not.toContain("await verifyChoice('stable'");
-    expect(liveTopologyVerifier).toContain("verifyLegacyRoute('stable', (params) => params.set('release', 'stable'), 'channels/pass72-retained', 'PASS 72')");
-    expect(liveTopologyVerifier).toContain("verifyLegacyRoute('rollback', (params) => params.set('release', 'rollback'), 'channels/pass72-retained', 'PASS 72')");
+    expect(liveTopologyVerifier).toContain("verifyLegacyRoute('stable', (params) => params.set('release', 'stable'), channelConfig.previous.path, channelConfig.previous.pass)");
+    expect(liveTopologyVerifier).toContain("verifyLegacyRoute('rollback', (params) => params.set('release', 'rollback'), channelConfig.previous.path, channelConfig.previous.pass)");
     expect(liveTopologyVerifier).not.toContain("await verifyChoice('rollback'");
   });
 
-  it('allows the external Pages deployment queue to drain without weakening exact-SHA verification', () => {
-    expect(workflow).toContain('for attempt in $(seq 1 120); do');
-    expect(workflow).toContain('if [[ "$build_sha" == "$pages_sha" && "$status" == "built" ]]');
-    expect(workflow).toContain('if [[ "$build_sha" == "$pages_sha" && "$status" == "errored" ]]; then exit 1; fi');
-    expect(workflow).toContain('sleep 10');
+  // LANE AD (PASS 87): the Pages deployment queue is not this workflow's problem any more -
+  // it deploys nothing, so it polls nothing. The exact-SHA discipline that loop protected
+  // now lives on the publish script, which asserts the exact post-state of the branch it
+  // pushed before it returns, and on the two-channel policy guard below.
+  it('does not wait on, or poll, a Pages deployment it never triggers', () => {
+    expect(workflow).not.toContain('for attempt in $(seq 1 120); do');
+    // The pinned-channel rebuild steps still read `*_pages_sha` values out of the config to
+    // fetch historical Pages commits; what must be gone is reading the branch TIP and
+    // polling the Pages build API for it.
+    expect(workflow).not.toContain('git ls-remote origin refs/heads/gh-pages');
+    expect(workflow).not.toContain('sleep 10');
+    expect(workflow).not.toContain('gh api');
+    // Derived, so this pin cannot name a publish script the config stopped staging.
+    const liveChannelId = releaseChannels.experimental.path.replace('channels/', '');
+    const publishScript = readFileSync(`scripts/orchestration/publish_${liveChannelId}.py`, 'utf8');
+    expect(publishScript).toContain('def assert_post_state(gh_pages_dir)');
+    expect(publishScript).toContain('EXPECTED_POST_STATE = {LIVE_TREE, BACKUP_TREE}');
   });
 
   it('injects one production timestamp before building and records it in the receipt', () => {
@@ -102,36 +159,77 @@ describe('production release workflow', () => {
     expect(staticTopologyVerifier).toContain('rollbackProvenance.treeSha256 !== treeDigest(rollbackRoot, rollbackFiles)');
     expect(topologyBrowserVerifier).toContain('rollbackOriginal.releasedAt, expectedRollbackReleasedAt');
     expect(topologyBrowserVerifier).toContain('expectsPendingCandidate = isCurrentCandidate && !expectedReleasedAt');
-    expect(topologyBrowserVerifier).toContain("lastReleaseLabel !== 'HITL CANDIDATE · NOT LIVE'");
+    // HF-406: the label pin used to be the literal `HITL CANDIDATE · NOT LIVE`, a string
+    // that named no pass. The gate now requires the badge to LEAD with the pass of the
+    // channel under test in both the pending and the published branch, and forbids the
+    // internal review acronym from ever being a pinned player-facing label again.
+    expect(topologyBrowserVerifier).toContain('badgeLeadsWithItsPass = normalizedPass(lastReleaseLabel).startsWith(`${normalizedPass(expectedPass)}·`)');
+    expect(topologyBrowserVerifier).toContain('if (!badgeLeadsWithItsPass');
+    expect(topologyBrowserVerifier).toContain("? !lastReleaseLabel.includes('RELEASE CANDIDATE')");
+    expect(topologyBrowserVerifier).toContain("lastReleaseLabel.includes('PENDING_PRODUCTION') || lastReleaseLabel.includes('RELEASE CANDIDATE')");
+    expect(topologyBrowserVerifier).not.toContain('HITL');
     expect(topologyBrowserVerifier).toContain('verifyProductionReleaseTimestamp');
+    expect(topologyBrowserVerifier).toContain('expectedPass,');
     expect(workflow.match(/test -n "\$\{RELEASE_BUILT_AT:-\}"/g)).toHaveLength(2);
     expect(topologyBrowserVerifier).toContain('process.env.RELEASE_BUILT_AT?.trim()');
-    expect(workflow).toContain('node scripts/release/write-production-receipt.mjs');
+    // LANE AD (PASS 87): a run that publishes nothing must not write a receipt that reads
+    // like a publication. The schema-3 production envelope still exists and still demands a
+    // Pages build plus a post-Pages live smoke - which is exactly why it cannot be used by a
+    // verification-only job. The verification receipt states `published: false` and carries
+    // the command that does publish.
+    expect(workflow).toContain('node scripts/release/write-verification-receipt.mjs');
+    expect(workflow).not.toContain('node scripts/release/write-production-receipt.mjs');
+    expect(verificationReceiptWriter).toContain('releaseBuiltAt: process.env.RELEASE_BUILT_AT');
+    expect(verificationReceiptWriter).toContain('published: false');
+    expect(verificationReceiptWriter).toContain('publishCommand:');
+    expect(verificationReceiptWriter).toContain("kind: 'release-verification'");
     expect(receiptWriter).toContain('releaseBuiltAt: process.env.RELEASE_BUILT_AT');
+    expect(receiptWriter).toContain("throw new Error('Pages build is not exact and built')");
   });
 
-  it('requires the published build to expose its exact UK-local day, date, and time instead of the pending sentinel', () => {
+  it('requires the published build to expose its own pass plus its exact UK-local day, date, and time instead of the pending sentinel', () => {
     const releasedAt = '2026-08-03T16:52:00Z';
-    const label = 'LAST RELEASE · 3 AUG 2026 · 17:52 BST';
-    expect(expectedLastReleaseLabel(releasedAt)).toBe(label);
+    // HF-406: the published badge leads with the pass the build IS, then the instant it
+    // went live. The old expected label was `LAST RELEASE · <date>` - it named no pass, so
+    // a build that published under the PREVIOUS pass number (PASS 82 shipped stamped
+    // PASS 81, and PASS 81 before it) satisfied this contract. The pass is now required
+    // and pinned, so that class fails here as loudly as a wrong timestamp does.
+    const label = 'PASS 84 · 3 AUG 2026 · 17:52 BST';
+    expect(expectedLastReleaseLabel(releasedAt, 'PASS 84')).toBe(label);
+    // A JS caller (every consumer here is .mjs) can still omit the pass; the runtime
+    // guard, not the type, is what stops a publish from being verified without one.
+    const untyped = expectedLastReleaseLabel as unknown as (releasedAt: string) => string;
+    expect(() => untyped(releasedAt)).toThrow('needs the pass it publishes as');
+    expect(() => expectedLastReleaseLabel(releasedAt, 'LAST RELEASE')).toThrow('needs the pass it publishes as');
     expect(verifyProductionReleaseTimestamp({
       expectedReleasedAt: releasedAt,
+      expectedPass: 'PASS 84',
       observedReleasedAt: releasedAt,
       observedLabel: label,
       observedState: 'CURRENT LIVE',
     })).toEqual({ releasedAt, label, state: 'CURRENT LIVE' });
     expect(() => verifyProductionReleaseTimestamp({
       expectedReleasedAt: releasedAt,
+      expectedPass: 'PASS 84',
       observedReleasedAt: 'PENDING_PRODUCTION',
-      observedLabel: 'LAST RELEASE · PENDING_PRODUCTION',
+      observedLabel: 'PASS 84 · PENDING_PRODUCTION',
       observedState: 'CURRENT BUILD',
     })).toThrow('Production candidate still exposes PENDING_PRODUCTION');
     expect(() => verifyProductionReleaseTimestamp({
       expectedReleasedAt: releasedAt,
+      expectedPass: 'PASS 84',
       observedReleasedAt: '2026-08-03T16:53:00Z',
       observedLabel: label,
       observedState: 'CURRENT LIVE',
     })).toThrow('Production release timestamp mismatch');
+    // The new half: right instant, previous pass on the badge.
+    expect(() => verifyProductionReleaseTimestamp({
+      expectedReleasedAt: releasedAt,
+      expectedPass: 'PASS 84',
+      observedReleasedAt: releasedAt,
+      observedLabel: 'PASS 83 · 3 AUG 2026 · 17:52 BST',
+      observedState: 'CURRENT LIVE',
+    })).toThrow('Production Last Release label mismatch');
   });
 
   it('binds production and immutable preview diagnostics to the exact source SHA', () => {
@@ -158,22 +256,22 @@ describe('production release workflow', () => {
     expect(staticJob).toContain('fetch-depth: 0');
   });
 
-  it('blocks production on accepted requirements and verifies the canonical site after Pages builds', () => {
+  it('blocks the release candidate on accepted requirements, the two-channel policy and the staged topology', () => {
     const candidateBuildStep = workflow.indexOf('Build exact frozen-evidence candidate bytes');
     const acceptanceStep = workflow.indexOf('Validate accepted requirement manifest');
-    const publishStep = workflow.indexOf('Publish complete exact dist snapshot');
-    const pagesStep = workflow.indexOf('Wait for exact Pages build');
-    const liveStep = workflow.indexOf('Verify canonical live release');
-    const receiptStep = workflow.indexOf('Write acceptance-bound production receipt and timings');
+    const policyStep = workflow.indexOf('Verify the HF-400 two-channel release policy');
+    const topologyStep = workflow.indexOf('Stage the full local channel topology and verify it end to end');
+    const receiptStep = workflow.indexOf('Write the release-candidate verification receipt');
     expect(candidateBuildStep).toBeGreaterThan(-1);
     // Pass 68+ uses the dynamic acceptance-gate; stale Pass 65/66 evidence
     // catalog and preview-provenance steps were removed from production.
     expect(acceptanceStep).toBeGreaterThan(candidateBuildStep);
-    expect(acceptanceStep).toBeGreaterThan(-1);
-    expect(acceptanceStep).toBeLessThan(publishStep);
-    expect(liveStep).toBeGreaterThan(pagesStep);
-    expect(receiptStep).toBeGreaterThan(liveStep);
-    expect(workflow).toContain('QA_OUTPUT: artifacts/pipeline/live-release-smoke.json');
+    expect(policyStep).toBeGreaterThan(acceptanceStep);
+    expect(topologyStep).toBeGreaterThan(policyStep);
+    // The receipt is written last and only after every gate above it, so a receipt file can
+    // never exist for a candidate whose topology or policy check did not run.
+    expect(receiptStep).toBeGreaterThan(topologyStep);
+    expect(workflow).toContain('artifacts/pipeline/two-channel-policy.json');
     expect(workflow).toContain('checks: read');
   });
 
@@ -351,11 +449,18 @@ describe('production release workflow', () => {
     expect(section).toContain('artifacts/pipeline/pr-preview-provenance.json');
   });
 
-  it('records the schema 3 receipt envelope with the complete staged topology', () => {
-    expect(workflow).toContain('node scripts/release/write-production-receipt.mjs');
+  it('records a receipt envelope with the complete staged topology', () => {
+    // LANE AD (PASS 87): the workflow writes the VERIFICATION envelope now (it publishes
+    // nothing). The schema-3 production envelope is unchanged and still demands the Pages
+    // build and post-Pages live smoke it always did, so it remains the only receipt shape
+    // that can claim a publication.
+    expect(workflow).toContain('node scripts/release/write-verification-receipt.mjs');
     expect(receiptWriter).toContain('schemaVersion: 3');
     expect(receiptWriter).toContain('topology,');
     expect(receiptWriter).toContain("readJson('artifacts/pipeline/release-topology.json')");
+    expect(verificationReceiptWriter).toContain('topology,');
+    expect(verificationReceiptWriter).toContain("readJson('artifacts/pipeline/release-topology.json')");
+    expect(verificationReceiptWriter).toContain("readJson('artifacts/pipeline/two-channel-policy.json')");
   });
 
   it('does not use a blocking GitHub Actions watcher inside the workflow', () => {
@@ -363,10 +468,19 @@ describe('production release workflow', () => {
   });
 
   it('binds live browser proof to four public builds, retained provenance, remapped legacy aliases, and Last Release', () => {
-    expect(liveTopologyVerifier).toContain("verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass73')");
-    expect(liveTopologyVerifier).toContain("verifyChoice('previous', 'channels/pass72-retained', 'PASS 72', 'pass72')");
-    expect(liveTopologyVerifier).toContain("verifyChoice('retained', 'channels/pass70-retained', 'PASS 70', 'pass70')");
-    expect(liveTopologyVerifier).toContain("verifyChoice('historical', 'channels/pass69-retained', 'PASS 69', 'pass69')");
+    // LANE AD (PASS 87): these four pinned the LITERAL channel paths the verifier checked.
+    // `channels/the-big-one` stopped being the live channel at the pass80 cut, so this test
+    // was green while pinning a verifier that asserted a topology no deploy produces. Every
+    // path is now read from release-channels.json, and the pin moved with it - strictly
+    // stronger, because the retired literal is now banned outright rather than merely
+    // banned in one combination with 'PASS 65'.
+    expect(liveTopologyVerifier).toContain("const liveChannelPath = channelConfig.experimental.path");
+    expect(liveTopologyVerifier).toContain("const liveChannelId = liveChannelPath.slice('channels/'.length)");
+    expect(liveTopologyVerifier).toContain("verifyChoice('experimental', liveChannelPath, channelConfig.experimental.pass, liveChangelogId)");
+    expect(liveTopologyVerifier).toContain("verifyChoice('previous', channelConfig.previous.path, channelConfig.previous.pass,");
+    expect(liveTopologyVerifier).toContain("verifyChoice('retained', channelConfig.retained.path, channelConfig.retained.pass,");
+    expect(liveTopologyVerifier).toContain("verifyChoice('historical', channelConfig.historical.path, channelConfig.historical.pass,");
+    expect(liveTopologyVerifier).not.toContain("'channels/the-big-one'");
     expect(liveTopologyVerifier).not.toContain("verifyChoice('stable'");
     expect(liveTopologyVerifier).not.toContain("verifyChoice('rollback'");
     expect(liveTopologyVerifier).toContain('pinned-channel-provenance.json');
@@ -375,10 +489,12 @@ describe('production release workflow', () => {
     expect(liveTopologyVerifier).toContain("verifyLegacyRoute('normal'");
     expect(liveTopologyVerifier).toContain("verifyLegacyRoute('room'");
     expect(liveTopologyVerifier).toContain('Last Release timestamp is not a published instant');
-    expect(liveTopologyVerifier).toContain("lastReleaseLabel !== 'HITL CANDIDATE · NOT LIVE'");
+    // HF-406: same re-pin as above, on the live verifier's own copy of the check.
+    expect(liveTopologyVerifier).toContain('badgeLeadsWithItsPass = normalizedPass(lastReleaseLabel).startsWith(`${normalizedPass(expectedPass)}·`)');
+    expect(liveTopologyVerifier).not.toContain('HITL');
     expect(liveTopologyVerifier).toContain("releaseState !== 'LOCAL CANDIDATE'");
     expect(liveTopologyVerifier).toContain("timeText.includes('NOT PUBLISHED')");
-    expect(liveTopologyVerifier).not.toContain("'channels/the-big-one', 'PASS 65'");
+    expect(liveTopologyVerifier).toContain("timeText.includes('RELEASE CANDIDATE')");
   });
 
   it('records the narrow standing Pass 66 authorization without fabricating preview HITL', () => {

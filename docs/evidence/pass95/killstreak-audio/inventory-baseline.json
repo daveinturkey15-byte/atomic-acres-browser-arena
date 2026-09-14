@@ -1,0 +1,800 @@
+[
+  {
+    "cue": "killstreakAnnounce.hostile",
+    "scheduledVoices": 4,
+    "admittedVoices": 4,
+    "oscVoices": 3,
+    "noiseVoices": 1,
+    "envelopeGains": 4,
+    "stage3": 3,
+    "stage4plus": 1,
+    "defaultAttackVoices": 3,
+    "minAttackMs": 0.9,
+    "maxAttackMs": 4,
+    "peakSum": 0.325,
+    "admittedPeakSum": 0.325,
+    "maxPeak": 0.11,
+    "saturators": 0,
+    "distinctWaves": [
+      "sawtooth",
+      "sine"
+    ],
+    "spanSeconds": 0.7,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "announcements": 2,
+      "sfx": 1,
+      "ui": 1
+    },
+    "peakConcurrentByBus": {
+      "announcements": 2,
+      "sfx": 1,
+      "ui": 1
+    }
+  },
+  {
+    "cue": "killstreakAnnounce.own",
+    "scheduledVoices": 3,
+    "admittedVoices": 3,
+    "oscVoices": 3,
+    "noiseVoices": 0,
+    "envelopeGains": 3,
+    "stage3": 2,
+    "stage4plus": 1,
+    "defaultAttackVoices": 2,
+    "minAttackMs": 0.9000000000000015,
+    "maxAttackMs": 3,
+    "peakSum": 0.21999999999999997,
+    "admittedPeakSum": 0.21999999999999997,
+    "maxPeak": 0.09,
+    "saturators": 0,
+    "distinctWaves": [
+      "sine",
+      "triangle"
+    ],
+    "spanSeconds": 0.36,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "announcements": 2,
+      "sfx": 1
+    },
+    "peakConcurrentByBus": {
+      "announcements": 2,
+      "sfx": 1
+    }
+  },
+  {
+    "cue": "supportInbound.yardhawk",
+    "scheduledVoices": 2,
+    "admittedVoices": 2,
+    "oscVoices": 2,
+    "noiseVoices": 0,
+    "envelopeGains": 2,
+    "stage3": 2,
+    "stage4plus": 0,
+    "defaultAttackVoices": 2,
+    "minAttackMs": 0.899999999999998,
+    "maxAttackMs": 0.9,
+    "peakSum": 0.12,
+    "admittedPeakSum": 0.12,
+    "maxPeak": 0.065,
+    "saturators": 0,
+    "distinctWaves": [
+      "sawtooth",
+      "square"
+    ],
+    "spanSeconds": 0.58,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "announcements": 1,
+      "ambience": 1
+    },
+    "peakConcurrentByBus": {
+      "announcements": 1,
+      "ambience": 1
+    }
+  },
+  {
+    "cue": "supportInbound.tri-pass",
+    "scheduledVoices": 4,
+    "admittedVoices": 4,
+    "oscVoices": 3,
+    "noiseVoices": 1,
+    "envelopeGains": 4,
+    "stage3": 4,
+    "stage4plus": 0,
+    "defaultAttackVoices": 4,
+    "minAttackMs": 0.899999999999998,
+    "maxAttackMs": 0.9000000000000119,
+    "peakSum": 0.22,
+    "admittedPeakSum": 0.22,
+    "maxPeak": 0.055,
+    "saturators": 0,
+    "distinctWaves": [
+      "sawtooth"
+    ],
+    "spanSeconds": 0.96,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "announcements": 3,
+      "ambience": 1
+    },
+    "peakConcurrentByBus": {
+      "announcements": 3,
+      "ambience": 1
+    }
+  },
+  {
+    "cue": "supportInbound.hunter-swarm",
+    "scheduledVoices": 5,
+    "admittedVoices": 4,
+    "oscVoices": 5,
+    "noiseVoices": 0,
+    "envelopeGains": 5,
+    "stage3": 0,
+    "stage4plus": 5,
+    "defaultAttackVoices": 0,
+    "minAttackMs": 8,
+    "maxAttackMs": 8.000000000000007,
+    "peakSum": 0.2,
+    "admittedPeakSum": 0.16,
+    "maxPeak": 0.04,
+    "saturators": 0,
+    "distinctWaves": [
+      "square"
+    ],
+    "spanSeconds": 0.72,
+    "dropped": 1,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "announcements": 4
+    },
+    "peakConcurrentByBus": {
+      "announcements": 5
+    }
+  },
+  {
+    "cue": "scoutSweep",
+    "scheduledVoices": 10,
+    "admittedVoices": 4,
+    "oscVoices": 10,
+    "noiseVoices": 0,
+    "envelopeGains": 10,
+    "stage3": 0,
+    "stage4plus": 10,
+    "defaultAttackVoices": 0,
+    "minAttackMs": 7.999999999999119,
+    "maxAttackMs": 8.000000000000007,
+    "peakSum": 0.3650000000000001,
+    "admittedPeakSum": 0.18,
+    "maxPeak": 0.045,
+    "saturators": 0,
+    "distinctWaves": [
+      "sine",
+      "triangle"
+    ],
+    "spanSeconds": 9.79,
+    "dropped": 6,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "announcements": 4
+    },
+    "peakConcurrentByBus": {
+      "announcements": 2
+    }
+  },
+  {
+    "cue": "hunterLaunch(0)",
+    "scheduledVoices": 2,
+    "admittedVoices": 2,
+    "oscVoices": 1,
+    "noiseVoices": 1,
+    "envelopeGains": 2,
+    "stage3": 2,
+    "stage4plus": 0,
+    "defaultAttackVoices": 2,
+    "minAttackMs": 0.9,
+    "maxAttackMs": 0.9,
+    "peakSum": 0.096,
+    "admittedPeakSum": 0.096,
+    "maxPeak": 0.052,
+    "saturators": 0,
+    "distinctWaves": [
+      "sawtooth"
+    ],
+    "spanSeconds": 0.42,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "sfx": 1,
+      "ambience": 1
+    },
+    "peakConcurrentByBus": {
+      "sfx": 1,
+      "ambience": 1
+    }
+  },
+  {
+    "cue": "bombRelease",
+    "scheduledVoices": 3,
+    "admittedVoices": 3,
+    "oscVoices": 2,
+    "noiseVoices": 1,
+    "envelopeGains": 3,
+    "stage3": 2,
+    "stage4plus": 1,
+    "defaultAttackVoices": 2,
+    "minAttackMs": 0.899999999999998,
+    "maxAttackMs": 1,
+    "peakSum": 0.41000000000000003,
+    "admittedPeakSum": 0.41000000000000003,
+    "maxPeak": 0.16,
+    "saturators": 0,
+    "distinctWaves": [
+      "sine",
+      "square"
+    ],
+    "spanSeconds": 0.74,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "sfx": 3
+    },
+    "peakConcurrentByBus": {
+      "sfx": 3
+    }
+  },
+  {
+    "cue": "missileLaunch",
+    "scheduledVoices": 3,
+    "admittedVoices": 3,
+    "oscVoices": 1,
+    "noiseVoices": 2,
+    "envelopeGains": 3,
+    "stage3": 3,
+    "stage4plus": 0,
+    "defaultAttackVoices": 3,
+    "minAttackMs": 0.9,
+    "maxAttackMs": 0.9,
+    "peakSum": 0.8,
+    "admittedPeakSum": 0.8,
+    "maxPeak": 0.32,
+    "saturators": 0,
+    "distinctWaves": [
+      "sine"
+    ],
+    "spanSeconds": 0.55,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "sfx": 3
+    },
+    "peakConcurrentByBus": {
+      "sfx": 3
+    }
+  },
+  {
+    "cue": "supportGunPositional.chopper",
+    "scheduledVoices": 3,
+    "admittedVoices": 3,
+    "oscVoices": 1,
+    "noiseVoices": 2,
+    "envelopeGains": 3,
+    "stage3": 3,
+    "stage4plus": 0,
+    "defaultAttackVoices": 3,
+    "minAttackMs": 0.9,
+    "maxAttackMs": 0.9,
+    "peakSum": 0.6,
+    "admittedPeakSum": 0.6,
+    "maxPeak": 0.28,
+    "saturators": 0,
+    "distinctWaves": [
+      "sawtooth"
+    ],
+    "spanSeconds": 0.19,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "sfx": 3
+    },
+    "peakConcurrentByBus": {
+      "sfx": 3
+    }
+  },
+  {
+    "cue": "supportGunPositional.drone",
+    "scheduledVoices": 3,
+    "admittedVoices": 3,
+    "oscVoices": 2,
+    "noiseVoices": 1,
+    "envelopeGains": 3,
+    "stage3": 1,
+    "stage4plus": 2,
+    "defaultAttackVoices": 1,
+    "minAttackMs": 0.9,
+    "maxAttackMs": 1.0000000000000009,
+    "peakSum": 0.23500000000000001,
+    "admittedPeakSum": 0.23500000000000001,
+    "maxPeak": 0.095,
+    "saturators": 1,
+    "distinctWaves": [
+      "sawtooth",
+      "triangle"
+    ],
+    "spanSeconds": 0.16,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "sfx": 3
+    },
+    "peakConcurrentByBus": {
+      "sfx": 3
+    }
+  },
+  {
+    "cue": "nukeWarning",
+    "scheduledVoices": 11,
+    "admittedVoices": 5,
+    "oscVoices": 11,
+    "noiseVoices": 0,
+    "envelopeGains": 11,
+    "stage3": 1,
+    "stage4plus": 10,
+    "defaultAttackVoices": 1,
+    "minAttackMs": 0.899999999999998,
+    "maxAttackMs": 8.000000000000007,
+    "peakSum": 0.7350000000000001,
+    "admittedPeakSum": 0.40299999999999997,
+    "maxPeak": 0.107,
+    "saturators": 0,
+    "distinctWaves": [
+      "sawtooth",
+      "square",
+      "triangle"
+    ],
+    "spanSeconds": 4.8999999999999995,
+    "dropped": 6,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "announcements": 4,
+      "ambience": 1
+    },
+    "peakConcurrentByBus": {
+      "announcements": 1,
+      "ambience": 1
+    }
+  },
+  {
+    "cue": "nukeDetonation",
+    "scheduledVoices": 7,
+    "admittedVoices": 7,
+    "oscVoices": 3,
+    "noiseVoices": 4,
+    "envelopeGains": 7,
+    "stage3": 7,
+    "stage4plus": 0,
+    "defaultAttackVoices": 7,
+    "minAttackMs": 0.899999999999998,
+    "maxAttackMs": 0.9000000000000119,
+    "peakSum": 1.8499999999999999,
+    "admittedPeakSum": 1.8499999999999999,
+    "maxPeak": 0.46,
+    "saturators": 0,
+    "distinctWaves": [
+      "sawtooth",
+      "triangle"
+    ],
+    "spanSeconds": 3.7199999999999998,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "sfx": 4,
+      "ambience": 3
+    },
+    "peakConcurrentByBus": {
+      "sfx": 4,
+      "ambience": 3
+    }
+  },
+  {
+    "cue": "overdrivePickup",
+    "scheduledVoices": 4,
+    "admittedVoices": 4,
+    "oscVoices": 4,
+    "noiseVoices": 0,
+    "envelopeGains": 4,
+    "stage3": 4,
+    "stage4plus": 0,
+    "defaultAttackVoices": 4,
+    "minAttackMs": 0.899999999999998,
+    "maxAttackMs": 0.9000000000000119,
+    "peakSum": 0.24200000000000002,
+    "admittedPeakSum": 0.24200000000000002,
+    "maxPeak": 0.095,
+    "saturators": 0,
+    "distinctWaves": [
+      "sawtooth",
+      "sine",
+      "square",
+      "triangle"
+    ],
+    "spanSeconds": 0.6000000000000001,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "ui": 3,
+      "ambience": 1
+    },
+    "peakConcurrentByBus": {
+      "ui": 3,
+      "ambience": 1
+    }
+  },
+  {
+    "cue": "overdriveAvailable",
+    "scheduledVoices": 4,
+    "admittedVoices": 4,
+    "oscVoices": 4,
+    "noiseVoices": 0,
+    "envelopeGains": 4,
+    "stage3": 4,
+    "stage4plus": 0,
+    "defaultAttackVoices": 4,
+    "minAttackMs": 0.899999999999998,
+    "maxAttackMs": 0.9000000000000119,
+    "peakSum": 0.175,
+    "admittedPeakSum": 0.175,
+    "maxPeak": 0.06,
+    "saturators": 0,
+    "distinctWaves": [
+      "sine",
+      "square",
+      "triangle"
+    ],
+    "spanSeconds": 0.55,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "announcements": 3,
+      "ambience": 1
+    },
+    "peakConcurrentByBus": {
+      "announcements": 3,
+      "ambience": 1
+    }
+  },
+  {
+    "cue": "overdriveExpire",
+    "scheduledVoices": 2,
+    "admittedVoices": 2,
+    "oscVoices": 2,
+    "noiseVoices": 0,
+    "envelopeGains": 2,
+    "stage3": 2,
+    "stage4plus": 0,
+    "defaultAttackVoices": 2,
+    "minAttackMs": 0.899999999999998,
+    "maxAttackMs": 0.9,
+    "peakSum": 0.09,
+    "admittedPeakSum": 0.09,
+    "maxPeak": 0.055,
+    "saturators": 0,
+    "distinctWaves": [
+      "sine",
+      "triangle"
+    ],
+    "spanSeconds": 0.34,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "ui": 1,
+      "ambience": 1
+    },
+    "peakConcurrentByBus": {
+      "ui": 1,
+      "ambience": 1
+    }
+  },
+  {
+    "cue": "adrenalineState.on",
+    "scheduledVoices": 4,
+    "admittedVoices": 4,
+    "oscVoices": 3,
+    "noiseVoices": 1,
+    "envelopeGains": 4,
+    "stage3": 4,
+    "stage4plus": 0,
+    "defaultAttackVoices": 4,
+    "minAttackMs": 0.899999999999998,
+    "maxAttackMs": 0.9000000000000119,
+    "peakSum": 0.21,
+    "admittedPeakSum": 0.21,
+    "maxPeak": 0.07,
+    "saturators": 0,
+    "distinctWaves": [
+      "sawtooth",
+      "sine"
+    ],
+    "spanSeconds": 0.43000000000000005,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "announcements": 1,
+      "sfx": 2,
+      "ui": 1
+    },
+    "peakConcurrentByBus": {
+      "announcements": 1,
+      "sfx": 1,
+      "ui": 1
+    }
+  },
+  {
+    "cue": "dominationCue.friendly",
+    "scheduledVoices": 2,
+    "admittedVoices": 2,
+    "oscVoices": 2,
+    "noiseVoices": 0,
+    "envelopeGains": 2,
+    "stage3": 2,
+    "stage4plus": 0,
+    "defaultAttackVoices": 2,
+    "minAttackMs": 0.9,
+    "maxAttackMs": 0.9,
+    "peakSum": 0.32,
+    "admittedPeakSum": 0.32,
+    "maxPeak": 0.16,
+    "saturators": 0,
+    "distinctWaves": [
+      "triangle"
+    ],
+    "spanSeconds": 0.14,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "ui": 2
+    },
+    "peakConcurrentByBus": {
+      "ui": 2
+    }
+  },
+  {
+    "cue": "BURST nuke sequence",
+    "scheduledVoices": 15,
+    "admittedVoices": 7,
+    "oscVoices": 14,
+    "noiseVoices": 1,
+    "envelopeGains": 15,
+    "stage3": 4,
+    "stage4plus": 11,
+    "defaultAttackVoices": 4,
+    "minAttackMs": 0.899999999999998,
+    "maxAttackMs": 8.000000000000007,
+    "peakSum": 1.06,
+    "admittedPeakSum": 0.538,
+    "maxPeak": 0.11,
+    "saturators": 0,
+    "distinctWaves": [
+      "sawtooth",
+      "sine",
+      "square",
+      "triangle"
+    ],
+    "spanSeconds": 4.8999999999999995,
+    "dropped": 8,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "announcements": 4,
+      "sfx": 1,
+      "ui": 1,
+      "ambience": 1
+    },
+    "peakConcurrentByBus": {
+      "announcements": 3,
+      "sfx": 1,
+      "ui": 1,
+      "ambience": 1
+    }
+  },
+  {
+    "cue": "BURST hunter-swarm activation",
+    "scheduledVoices": 18,
+    "admittedVoices": 15,
+    "oscVoices": 13,
+    "noiseVoices": 5,
+    "envelopeGains": 18,
+    "stage3": 12,
+    "stage4plus": 6,
+    "defaultAttackVoices": 12,
+    "minAttackMs": 0.899999999999998,
+    "maxAttackMs": 8.000000000000007,
+    "peakSum": 0.9000000000000002,
+    "admittedPeakSum": 0.7800000000000001,
+    "maxPeak": 0.09,
+    "saturators": 0,
+    "distinctWaves": [
+      "sawtooth",
+      "sine",
+      "square",
+      "triangle"
+    ],
+    "spanSeconds": 0.72,
+    "dropped": 3,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "announcements": 4,
+      "sfx": 6,
+      "ambience": 5
+    },
+    "peakConcurrentByBus": {
+      "announcements": 6,
+      "sfx": 6,
+      "ambience": 5
+    }
+  },
+  {
+    "cue": "BURST tri-pass activation",
+    "scheduledVoices": 10,
+    "admittedVoices": 9,
+    "oscVoices": 8,
+    "noiseVoices": 2,
+    "envelopeGains": 10,
+    "stage3": 8,
+    "stage4plus": 2,
+    "defaultAttackVoices": 8,
+    "minAttackMs": 0.899999999999998,
+    "maxAttackMs": 3,
+    "peakSum": 0.85,
+    "admittedPeakSum": 0.7949999999999999,
+    "maxPeak": 0.16,
+    "saturators": 0,
+    "distinctWaves": [
+      "sawtooth",
+      "sine",
+      "square",
+      "triangle"
+    ],
+    "spanSeconds": 0.96,
+    "dropped": 1,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "announcements": 4,
+      "sfx": 4,
+      "ambience": 1
+    },
+    "peakConcurrentByBus": {
+      "announcements": 4,
+      "sfx": 4,
+      "ambience": 1
+    }
+  },
+  {
+    "cue": "REF shot(carbine)",
+    "scheduledVoices": 13,
+    "admittedVoices": 13,
+    "oscVoices": 6,
+    "noiseVoices": 7,
+    "envelopeGains": 13,
+    "stage3": 0,
+    "stage4plus": 13,
+    "defaultAttackVoices": 1,
+    "minAttackMs": 0.3,
+    "maxAttackMs": 11.999999999999996,
+    "peakSum": 1.1819161500000002,
+    "admittedPeakSum": 1.1819161500000002,
+    "maxPeak": 0.217603,
+    "saturators": 9,
+    "distinctWaves": [
+      "sawtooth",
+      "sine",
+      "square",
+      "triangle"
+    ],
+    "spanSeconds": 0.222,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "sfx": 11,
+      "ambience": 2
+    },
+    "peakConcurrentByBus": {
+      "sfx": 7,
+      "ambience": 2
+    }
+  },
+  {
+    "cue": "REF impact.concrete",
+    "scheduledVoices": 3,
+    "admittedVoices": 3,
+    "oscVoices": 1,
+    "noiseVoices": 2,
+    "envelopeGains": 3,
+    "stage3": 0,
+    "stage4plus": 3,
+    "defaultAttackVoices": 0,
+    "minAttackMs": 0.3,
+    "maxAttackMs": 2.0000000000000018,
+    "peakSum": 0.10305882352941176,
+    "admittedPeakSum": 0.10305882352941176,
+    "maxPeak": 0.05788235294117647,
+    "saturators": 2,
+    "distinctWaves": [
+      "triangle"
+    ],
+    "spanSeconds": 0.244,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "sfx": 3
+    },
+    "peakConcurrentByBus": {
+      "sfx": 3
+    }
+  },
+  {
+    "cue": "REF footstep",
+    "scheduledVoices": 4,
+    "admittedVoices": 4,
+    "oscVoices": 1,
+    "noiseVoices": 3,
+    "envelopeGains": 4,
+    "stage3": 0,
+    "stage4plus": 4,
+    "defaultAttackVoices": 0,
+    "minAttackMs": 0.5,
+    "maxAttackMs": 5.999999999999998,
+    "peakSum": 0.10235999999999999,
+    "admittedPeakSum": 0.10235999999999999,
+    "maxPeak": 0.05096,
+    "saturators": 2,
+    "distinctWaves": [
+      "triangle"
+    ],
+    "spanSeconds": 0.087,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "movement": 4
+    },
+    "peakConcurrentByBus": {
+      "movement": 4
+    }
+  },
+  {
+    "cue": "REF matchStinger.start",
+    "scheduledVoices": 2,
+    "admittedVoices": 2,
+    "oscVoices": 2,
+    "noiseVoices": 0,
+    "envelopeGains": 2,
+    "stage3": 0,
+    "stage4plus": 2,
+    "defaultAttackVoices": 0,
+    "minAttackMs": 3,
+    "maxAttackMs": 4.0000000000000036,
+    "peakSum": 0.15500000000000003,
+    "admittedPeakSum": 0.15500000000000003,
+    "maxPeak": 0.085,
+    "saturators": 0,
+    "distinctWaves": [
+      "sine",
+      "triangle"
+    ],
+    "spanSeconds": 0.37,
+    "dropped": 0,
+    "stolen": 0,
+    "liveVoicesByBus": {
+      "announcements": 1,
+      "ui": 1
+    },
+    "peakConcurrentByBus": {
+      "announcements": 1,
+      "ui": 1
+    }
+  }
+]

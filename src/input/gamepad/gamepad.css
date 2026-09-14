@@ -1,0 +1,81 @@
+/* PASS 84 Lane E — gamepad settings panel + procedural pad glyphs.
+   Glyph faces are text inside the existing <kbd> caps; colour and shape come
+   from CSS only (repo contract: no imported glyph fonts or images). */
+
+#menu-panel-options #gamepad-settings .gamepad-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin: 0 0 10px;
+  font: 700 11px/1.3 Inter, system-ui, sans-serif;
+  letter-spacing: .08em;
+}
+#menu-panel-options #gamepad-settings .gamepad-status-row b {
+  padding: 4px 9px;
+  border: 1px solid rgba(232, 120, 31, 0.45);
+  border-radius: 3px;
+  background: #14100c;
+  color: #f7efe2;
+}
+#menu-panel-options #gamepad-settings .gamepad-status-row[data-connected="true"] b {
+  border-color: rgba(128, 245, 240, 0.85);
+  color: #b9fffb;
+}
+#menu-panel-options #gamepad-settings .gamepad-status-row span { color: #cdb9a4; }
+#menu-panel-options #gamepad-settings .gamepad-assist-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+#menu-panel-options #gamepad-settings .gamepad-assist-row div {
+  padding: 7px 9px;
+  border: 1px solid rgba(231, 178, 143, 0.28);
+  border-radius: 4px;
+  background: rgba(20, 16, 12, 0.7);
+  font: 700 10px/1.35 Inter, system-ui, sans-serif;
+  letter-spacing: .06em;
+  color: #e7d6c3;
+}
+#menu-panel-options #gamepad-settings .gamepad-assist-row div b {
+  display: block;
+  font-size: 12px;
+  color: #ffd27a;
+}
+#menu-panel-options #gamepad-settings .gamepad-assist-row div[data-active="true"] {
+  border-color: rgba(128, 245, 240, 0.85);
+  box-shadow: 0 0 0 1px rgba(128, 245, 240, 0.35) inset;
+}
+#menu-panel-options #gamepad-settings .key-binding-row kbd[data-unbound="true"] { opacity: .55; }
+#menu-panel-options #gamepad-settings .key-binding-row small {
+  font: 600 9px/1 Inter, system-ui, sans-serif;
+  letter-spacing: .08em;
+  color: #9c8b79;
+}
+#menu-panel-options #gamepad-settings p.gamepad-note {
+  margin: 8px 0 0;
+  font: 500 10px/1.45 Inter, system-ui, sans-serif;
+  color: #cdb9a4;
+}
+@media (max-width: 700px) {
+  #menu-panel-options #gamepad-settings .gamepad-assist-row { grid-template-columns: 1fr; }
+}
+
+/* Face-button caps: family colours are the only decoration, drawn by CSS. */
+kbd.pad-glyph { position: relative; }
+kbd.pad-glyph[data-family="xbox"][data-button="0"] { color: #6ee36b; border-color: rgba(110, 227, 107, .8); }
+kbd.pad-glyph[data-family="xbox"][data-button="1"] { color: #ff6b6b; border-color: rgba(255, 107, 107, .8); }
+kbd.pad-glyph[data-family="xbox"][data-button="2"] { color: #6fb8ff; border-color: rgba(111, 184, 255, .8); }
+kbd.pad-glyph[data-family="xbox"][data-button="3"] { color: #ffd84d; border-color: rgba(255, 216, 77, .8); }
+kbd.pad-glyph[data-family="playstation"] { border-radius: 50%; }
+kbd.pad-glyph[data-family="playstation"][data-button="0"] { color: #8fb8ff; }
+kbd.pad-glyph[data-family="playstation"][data-button="1"] { color: #ff7d7d; }
+kbd.pad-glyph[data-family="playstation"][data-button="2"] { color: #f2a6ff; }
+kbd.pad-glyph[data-family="playstation"][data-button="3"] { color: #7ff0c8; }
+kbd.pad-glyph[data-family="nintendo"] { border-radius: 50%; color: #f5f5f5; }
+kbd.pad-glyph[data-family="generic"] { color: #d9e3dc; }
+kbd.pad-glyph[data-family][data-button="6"],
+kbd.pad-glyph[data-family][data-button="7"],
+kbd.pad-glyph[data-family][data-button="4"],
+kbd.pad-glyph[data-family][data-button="5"] { border-radius: 4px 4px 2px 2px; letter-spacing: 0; }

@@ -1,0 +1,395 @@
+{
+  "generatedAt": "2026-09-02T15:32:02.705Z",
+  "renderer": "webgpu",
+  "viewport": [
+    1600,
+    900
+  ],
+  "seconds": 12,
+  "rows": [
+    {
+      "arena": "farcrysis",
+      "admittedMs": 62319,
+      "frames": 564,
+      "meanFrameMs": 21.28,
+      "meanFps": 47,
+      "p50FrameMs": 21.3,
+      "p95FrameMs": 28.6,
+      "p99FrameMs": 33.3,
+      "worstFrameMs": 75.7,
+      "longFrames": 5,
+      "longFramePercent": 0.89,
+      "pipelinesDuringSample": 0,
+      "meshes": 255,
+      "instancedMeshes": 110,
+      "instances": 93372,
+      "triangles": 869888,
+      "transparent": 50,
+      "shadowCasters": 99,
+      "alwaysDrawn": 17,
+      "distinctMaterials": 224,
+      "topObjects": [
+        {
+          "name": "(unnamed)",
+          "instanced": false,
+          "count": 1,
+          "trisEach": 73728,
+          "tris": 73728,
+          "castShadow": true,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-grass-chunk-2-3",
+          "instanced": true,
+          "count": 6643,
+          "trisEach": 5,
+          "tris": 33215,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-grass-chunk-0-1",
+          "instanced": true,
+          "count": 6499,
+          "trisEach": 5,
+          "tris": 32495,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-grass-chunk-3-0",
+          "instanced": true,
+          "count": 6256,
+          "trisEach": 5,
+          "tris": 31280,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-grass-chunk-2-0",
+          "instanced": true,
+          "count": 6013,
+          "trisEach": 5,
+          "tris": 30065,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-grass-chunk-3-3",
+          "instanced": true,
+          "count": 5993,
+          "trisEach": 5,
+          "tris": 29965,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-grass-chunk-3-1",
+          "instanced": true,
+          "count": 5920,
+          "trisEach": 5,
+          "tris": 29600,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-grass-chunk-0-3",
+          "instanced": true,
+          "count": 5879,
+          "trisEach": 5,
+          "tris": 29395,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-interactable-sandbags",
+          "instanced": true,
+          "count": 508,
+          "trisEach": 56,
+          "tris": 28448,
+          "castShadow": true,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-grass-chunk-0-0",
+          "instanced": true,
+          "count": 5654,
+          "trisEach": 5,
+          "tris": 28270,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-grass-chunk-2-2",
+          "instanced": true,
+          "count": 5600,
+          "trisEach": 5,
+          "tris": 28000,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-grass-chunk-0-2",
+          "instanced": true,
+          "count": 5382,
+          "trisEach": 5,
+          "tris": 26910,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-grass-chunk-2-1",
+          "instanced": true,
+          "count": 5100,
+          "trisEach": 5,
+          "tris": 25500,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-grass-chunk-3-2",
+          "instanced": true,
+          "count": 5030,
+          "trisEach": 5,
+          "tris": 25150,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-grass-chunk-1-0",
+          "instanced": true,
+          "count": 4638,
+          "trisEach": 5,
+          "tris": 23190,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-grass-chunk-1-3",
+          "instanced": true,
+          "count": 4562,
+          "trisEach": 5,
+          "tris": 22810,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-grass-chunk-1-2",
+          "instanced": true,
+          "count": 3979,
+          "trisEach": 5,
+          "tris": 19895,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-grass-chunk-1-1",
+          "instanced": true,
+          "count": 3905,
+          "trisEach": 5,
+          "tris": 19525,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-vege-undergrowth-carpet",
+          "instanced": true,
+          "count": 584,
+          "trisEach": 21,
+          "tris": 12264,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-vege-emergent-crowns-lower",
+          "instanced": true,
+          "count": 82,
+          "trisEach": 120,
+          "tris": 9840,
+          "castShadow": true,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-vege-undergrowth-shrubs",
+          "instanced": true,
+          "count": 40,
+          "trisEach": 240,
+          "tris": 9600,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-vege-jungle-vine-clusters",
+          "instanced": true,
+          "count": 30,
+          "trisEach": 300,
+          "tris": 9000,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "(unnamed)",
+          "instanced": false,
+          "count": 1,
+          "trisEach": 8192,
+          "tris": 8192,
+          "castShadow": false,
+          "transparent": true
+        },
+        {
+          "name": "flamethrower-stream-instanced-flame",
+          "instanced": true,
+          "count": 96,
+          "trisEach": 80,
+          "tris": 7680,
+          "castShadow": false,
+          "transparent": true
+        },
+        {
+          "name": "farcrysis-vege-emergent-crowns-upper",
+          "instanced": true,
+          "count": 82,
+          "trisEach": 90,
+          "tris": 7380,
+          "castShadow": true,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-vege-flowering-accents",
+          "instanced": true,
+          "count": 40,
+          "trisEach": 184,
+          "tris": 7360,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-vege-mangrove-canopies",
+          "instanced": true,
+          "count": 18,
+          "trisEach": 400,
+          "tris": 7200,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+          "instanced": false,
+          "count": 1,
+          "trisEach": 6632,
+          "tris": 6632,
+          "castShadow": true,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-interactable-drum-hoops",
+          "instanced": true,
+          "count": 50,
+          "trisEach": 120,
+          "tris": 6000,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-interactable-drum-rims",
+          "instanced": true,
+          "count": 50,
+          "trisEach": 120,
+          "tris": 6000,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-vege-midstorey-clumps",
+          "instanced": true,
+          "count": 212,
+          "trisEach": 28,
+          "tris": 5936,
+          "castShadow": true,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-vege-flowering-bushes",
+          "instanced": true,
+          "count": 36,
+          "trisEach": 160,
+          "tris": 5760,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-vege-flowering-blooms",
+          "instanced": true,
+          "count": 72,
+          "trisEach": 80,
+          "tris": 5760,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-art-enhanced-palm-coconuts",
+          "instanced": true,
+          "count": 156,
+          "trisEach": 36,
+          "tris": 5616,
+          "castShadow": true,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-vege-broadleaf-canopies",
+          "instanced": true,
+          "count": 56,
+          "trisEach": 100,
+          "tris": 5600,
+          "castShadow": true,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-cliff-rocks",
+          "instanced": true,
+          "count": 28,
+          "trisEach": 180,
+          "tris": 5040,
+          "castShadow": true,
+          "transparent": false
+        },
+        {
+          "name": "(unnamed)",
+          "instanced": false,
+          "count": 1,
+          "trisEach": 4952,
+          "tris": 4952,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-vege-small-rocks",
+          "instanced": true,
+          "count": 60,
+          "trisEach": 80,
+          "tris": 4800,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-vege-palm-coconuts",
+          "instanced": true,
+          "count": 132,
+          "trisEach": 36,
+          "tris": 4752,
+          "castShadow": false,
+          "transparent": false
+        },
+        {
+          "name": "farcrysis-vege-bamboo-grove-stems",
+          "instanced": true,
+          "count": 196,
+          "trisEach": 24,
+          "tris": 4704,
+          "castShadow": true,
+          "transparent": false
+        }
+      ]
+    }
+  ]
+}

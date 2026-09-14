@@ -1,0 +1,27 @@
+DRY RUN PUBLISH (HF-400) against C:\Users\david\AppData\Local\Temp\claude\C--Users-david-Desktop-stuff\4cfe1b40-a256-4a42-8146-934f0cf22570\scratchpad\ghpages-ro - nothing will be written, added, committed or pushed
+  build-present: WOULD REFUSE - no build at C:\Users\david\projects\aa-claude-releaseci\dist-pass86
+
+PLAN
+  channel trees on gh-pages now: ['pass85', 'pass86']
+  would keep   ['channels/pass85/']
+  would write channels/pass86/ <- dist-pass86/ (replacing any existing tree)
+  channels/ post-state would be: ['pass85', 'pass86']
+  chooser keys live now: ['experimental', 'previous']; would become: ['experimental', 'previous'] (dropped/re-keyed: [])
+    experimental: PASS 86 -> channels/pass86  "PASS 86"
+    previous: PASS 85 -> channels/pass85  "PASS 85 · SAFE BACKUP"
+  predecessor guard: OK (offering PASS 86, PASS 85)
+  in-build fallback guard: OK (pass85Backup -> channels/pass85 is the HF-400 safe backup and is on gh-pages)
+  root chooser would be published as generation cb0967af4030 (2 channels inlined, 3 superseded asset(s) swept, keeping ['cb0967af4030'])
+  would write index.html
+  would write release-shell.cb0967af4030.js
+  would write release-shell.cb0967af4030.css
+  would write release-manifest.cb0967af4030.json
+  would write release-index.json
+  would write release-shell.js
+  would write release-shell.css
+  would write release-channel-config.js
+  would sweep release-manifest.0d872ac4e574.json
+  would sweep release-shell.0d872ac4e574.css
+  would sweep release-shell.0d872ac4e574.js
+
+DRY RUN: publish WOULD REFUSE (1 guard(s) red: build-present)

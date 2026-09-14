@@ -1,0 +1,74 @@
+[
+  { "sourceId": 35, "role": "owner-shared-post", "url": "https://x.com/prasenx/status/2093762240361173305", "note": "original owner-shared X post" },
+  { "sourceId": 35, "role": "author-owned-repo", "url": "https://github.com/StarKnightt/gas-station-highway", "note": "linked GitHub source" },
+  { "sourceId": 35, "role": "pinned-source-file", "url": "https://raw.githubusercontent.com/StarKnightt/gas-station-highway/3e1b7cbb1f46bb0b0601b4d06ceef63438ae132c/PROMPT.md", "note": "the one-page brief itself, at the register pin" },
+  { "sourceId": 35, "role": "pinned-source-file", "url": "https://raw.githubusercontent.com/StarKnightt/gas-station-highway/3e1b7cbb1f46bb0b0601b4d06ceef63438ae132c/README.md", "note": "README at pin" },
+  { "sourceId": 35, "role": "licence-file", "url": "https://raw.githubusercontent.com/StarKnightt/gas-station-highway/3e1b7cbb1f46bb0b0601b4d06ceef63438ae132c/LICENSE", "note": "register records 404 at this pin; re-verify" },
+
+  { "sourceId": 36, "role": "owner-shared-post", "url": "https://x.com/hybridherbst/status/2093299068441092380", "note": "original owner-shared X post" },
+  { "sourceId": 36, "role": "hosted-tool", "url": "https://mesh-baker.needle.tools/", "note": "hosted SvelteKit app index" },
+  { "sourceId": 36, "role": "vendor-docs", "url": "https://engine.needle.tools/docs/products/needle-mesh-baker", "note": "product documentation" },
+  { "sourceId": 36, "role": "vendor-pricing", "url": "https://cloud.needle.tools/pricing?source=baker", "note": "licence/pricing terms" },
+
+  { "sourceId": 37, "role": "owner-shared-post", "url": "https://x.com/samgcoder/status/2093773310203191312", "note": "original owner-shared X post" },
+  { "sourceId": 37, "role": "author-owned-repo", "url": "https://github.com/SamG-Coder/fable-test", "note": "linked GitHub source" },
+  { "sourceId": 37, "role": "licence-file", "url": "https://raw.githubusercontent.com/SamG-Coder/fable-test/bfa60fb9e0fae613585344b4e5f8b034d2dcd481/LICENSE", "note": "MIT claimed by register; read the file" },
+  { "sourceId": 37, "role": "pinned-source-file", "url": "https://raw.githubusercontent.com/SamG-Coder/fable-test/bfa60fb9e0fae613585344b4e5f8b034d2dcd481/README.md", "note": "coordinate conventions and cache-build UX" },
+
+  { "sourceId": 38, "role": "owner-shared-post", "url": "https://x.com/alightinastorm/status/2093648383202259325", "note": "original owner-shared X post" },
+  { "sourceId": 38, "role": "owner-shared-post", "url": "https://x.com/tokengremlin/status/2094265309360185606", "note": "third-party writeup post" },
+  { "sourceId": 38, "role": "author-owned-repo", "url": "https://github.com/vibe-stack/super-terrain", "note": "linked GitHub source" },
+  { "sourceId": 38, "role": "licence-file", "url": "https://raw.githubusercontent.com/vibe-stack/super-terrain/main/LICENSE", "note": "register records no licence file; re-verify" },
+  { "sourceId": 38, "role": "repo-tree", "url": "https://api.github.com/repos/vibe-stack/super-terrain/contents/src/foliage", "note": "foliage module listing named in the register" },
+
+  { "sourceId": 39, "role": "owner-shared-post", "url": "https://x.com/fabianofirmo/status/2094044844804993523", "note": "original owner-shared X post" },
+  { "sourceId": 39, "role": "owner-shared-profile", "url": "https://x.com/Stefan_3D_AI", "note": "second instance of the same pattern" },
+
+  { "sourceId": 40, "role": "owner-shared-profile", "url": "https://x.com/VoxpoliaGame", "note": "original owner-shared X profile" },
+  { "sourceId": 40, "role": "distribution-page", "url": "https://endstreet.itch.io/voxpolia", "note": "playable build page; packet URL is malformed as a github.com path" },
+  { "sourceId": 40, "role": "packet-url-as-recorded", "url": "https://github.com/endstreet.itch.io/voxpolia", "note": "exact malformed URL as recorded in the packet; attempted for the record" },
+
+  { "sourceId": 41, "role": "owner-shared-profile", "url": "https://x.com/curllmooha", "note": "original owner-shared X profile" },
+  { "sourceId": 41, "role": "live-site", "url": "https://sketchesbycurllmooha.vercel.app/", "note": "the catalogue format itself" },
+
+  { "sourceId": 42, "role": "owner-shared-profile", "url": "https://x.com/stefan_3d_ai?s=11", "note": "original owner-shared X profile" },
+  { "sourceId": 42, "role": "licence-file", "url": "https://raw.githubusercontent.com/vibe-stack/procedural-bank/main/LICENSE", "note": "MIT claimed; read the file" },
+  { "sourceId": 42, "role": "repo-tree", "url": "https://api.github.com/repos/vibe-stack/procedural-bank/contents/src/grammar", "note": "shape-grammar module listing" },
+
+  { "sourceId": 43, "role": "owner-shared-post", "url": "https://x.com/stefan_3d_ai/status/2093937170717585657", "note": "original owner-shared X post" },
+  { "sourceId": 43, "role": "paper-page", "url": "https://haidilao0328.github.io/Lumera/", "note": "paper page; code and weights marked Soon" },
+
+  { "sourceId": 44, "role": "owner-shared-post", "url": "https://x.com/lexnlin/status/2093982122197627217", "note": "comparator post 1" },
+  { "sourceId": 44, "role": "owner-shared-profile", "url": "https://x.com/Stefan_3D_AI", "note": "comparator post 2 (loop mode)" },
+
+  { "sourceId": 45, "role": "owner-shared-post", "url": "https://x.com/comfyui/status/2094561833638404449", "note": "original owner-shared X post" },
+  { "sourceId": 45, "role": "vendor-blog", "url": "https://blog.comfy.org/p/trellis2-and-pixal3d-are-now-native", "note": "announcement" },
+  { "sourceId": 45, "role": "vendor-docs", "url": "https://docs.comfy.org/tutorials/3d/trellis2", "note": "node chain tutorial" },
+  { "sourceId": 45, "role": "pinned-source-file", "url": "https://raw.githubusercontent.com/comfyanonymous/ComfyUI/0e65cb907193cf1013bda474593eb48d8c53d848/comfy_extras/nodes_mesh_postprocess.py", "note": "the actual mesh post-processing node implementations at the register pin" },
+  { "sourceId": 45, "role": "licence-file", "url": "https://raw.githubusercontent.com/microsoft/TRELLIS.2/75fbf0183001ed9876c8dbb35de6b68552ee08bd/LICENSE", "note": "MIT claimed; read the file at pin" },
+  { "sourceId": 45, "role": "licence-file", "url": "https://raw.githubusercontent.com/TencentARC/Pixal3D/f7cf38429b0bd264f1995f0f8743a88b1c728b94/LICENSE", "note": "MIT claimed; read the file at pin" },
+  { "sourceId": 45, "role": "owner-shared-post", "url": "https://x.com/philippsieben/status/2095440655170294085", "note": "second owner share" },
+
+  { "sourceId": 46, "role": "owner-shared-post", "url": "https://x.com/dangreenheck/status/2095028187063280085", "note": "original owner-shared X post" },
+  { "sourceId": 46, "role": "licence-page", "url": "https://docs.threejswaterpro.com/license.html", "note": "commercial licence text - read terms, never the product source" },
+  { "sourceId": 46, "role": "author-owned-repo", "url": "https://github.com/dgreenheck/webgpu-water", "note": "register records 404; re-verify" },
+  { "sourceId": 46, "role": "author-owned-repo", "url": "https://api.github.com/users/dgreenheck/repos?per_page=100", "note": "enumerate author repos for any public water source" },
+
+  { "sourceId": 47, "role": "owner-shared-post", "url": "https://x.com/mattshumer_/status/2095187868746383758", "note": "original owner-shared X post" },
+  { "sourceId": 47, "role": "method-article", "url": "https://somethingbig.ai/gauntlet-loop", "note": "the only linked method article in this author's orbit" },
+
+  { "sourceId": 48, "role": "owner-shared-post", "url": "https://x.com/bijanbowen/status/2094931925513261273", "note": "original owner-shared X post" },
+  { "sourceId": 48, "role": "recorded-mirror", "url": "https://api.fxtwitter.com/bijanbowen/status/2094931925513261273", "note": "the exact mirror URL recorded in the packet for this row" },
+
+  { "sourceId": 49, "role": "owner-shared-post", "url": "https://x.com/jichiep/status/2095157236658315288", "note": "original owner-shared X post" },
+  { "sourceId": 49, "role": "author-owned-repo", "url": "https://github.com/localai-org/motion-bricks.cpp", "note": "linked GitHub source" },
+  { "sourceId": 49, "role": "licence-file", "url": "https://raw.githubusercontent.com/localai-org/motion-bricks.cpp/6fdb75e15ddb7f97dd1a4abb8017a57b936bc7a3/LICENSE", "note": "Apache-2.0 claimed; read the file at pin" },
+  { "sourceId": 49, "role": "pinned-source-file", "url": "https://raw.githubusercontent.com/localai-org/motion-bricks.cpp/6fdb75e15ddb7f97dd1a4abb8017a57b936bc7a3/docs/IMPLEMENTATION.md", "note": "planner contract and the explicit WebAssembly deferral" },
+  { "sourceId": 49, "role": "pinned-source-file", "url": "https://raw.githubusercontent.com/localai-org/motion-bricks.cpp/6fdb75e15ddb7f97dd1a4abb8017a57b936bc7a3/docs/DEMO.md", "note": "G1-only skeleton statement" },
+
+  { "sourceId": 50, "role": "owner-shared-repo", "url": "https://github.com/PhiloLabs/fable51-worlds", "note": "owner-shared GitHub source" },
+  { "sourceId": 50, "role": "licence-file", "url": "https://raw.githubusercontent.com/PhiloLabs/fable51-worlds/1dcc255adc5600cfec8a7e3e38c896074668dd1e/LICENSE", "note": "MIT claimed; read the file at pin" },
+  { "sourceId": 50, "role": "pinned-source-file", "url": "https://raw.githubusercontent.com/PhiloLabs/fable51-worlds/1dcc255adc5600cfec8a7e3e38c896074668dd1e/kyoto-higashiyama/tools/passability.mjs", "note": "the passability sweep implementation itself" },
+  { "sourceId": 50, "role": "pinned-source-file", "url": "https://raw.githubusercontent.com/PhiloLabs/fable51-worlds/1dcc255adc5600cfec8a7e3e38c896074668dd1e/kyoto-higashiyama/tools/perf.mjs", "note": "draw-calls-before-milliseconds ordering" },
+  { "sourceId": 50, "role": "pinned-source-file", "url": "https://raw.githubusercontent.com/PhiloLabs/fable51-worlds/1dcc255adc5600cfec8a7e3e38c896074668dd1e/README.md", "note": "layered licence terms the SPDX field hides" }
+]

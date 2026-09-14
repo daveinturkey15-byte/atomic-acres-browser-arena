@@ -1,0 +1,773 @@
+{
+  "label": "before-base-quiet",
+  "arena": "test1",
+  "capturedAt": "2026-09-02T17:34:42.223Z",
+  "weapon": "carbine",
+  "droppedAtMs": 621.5,
+  "roseAtMs": 1323,
+  "stanceAtDrop": "prone",
+  "finalStance": "stand",
+  "fireBlock": {
+    "total": 98,
+    "byReason": {
+      "rate-of-fire": 65,
+      "stance-or-sprint-recovery": 33
+    },
+    "last": "rate-of-fire",
+    "lastAtMs": 43370,
+    "lastFiredAtMs": 43314
+  },
+  "shotCount": 14,
+  "medianSteadyShotGapMs": 101.6,
+  "worstShotGapAcrossDropMs": 383.7,
+  "worstShotGapAcrossRiseMs": 319.5,
+  "shotsInFirst400msOfDrop": 2,
+  "fireInterruptedByDrop": true,
+  "cameraTransition": {
+    "totalFallMeters": 1.09,
+    "fivePercentAtMs": 643.9,
+    "ninetyFivePercentAtMs": 643.9,
+    "durationMs": 0,
+    "biggestSingleFrameFallMeters": 1.09,
+    "singleFrameFractionOfFall": 1
+  },
+  "pageErrors": [],
+  "shots": [
+    {
+      "t": 104.7,
+      "spent": 1
+    },
+    {
+      "t": 203.9,
+      "spent": 1
+    },
+    {
+      "t": 305.5,
+      "spent": 1
+    },
+    {
+      "t": 406.6,
+      "spent": 1
+    },
+    {
+      "t": 509,
+      "spent": 1
+    },
+    {
+      "t": 892.7,
+      "spent": 1
+    },
+    {
+      "t": 995.2,
+      "spent": 1
+    },
+    {
+      "t": 1095.9,
+      "spent": 1
+    },
+    {
+      "t": 1200,
+      "spent": 1
+    },
+    {
+      "t": 1297.7,
+      "spent": 1
+    },
+    {
+      "t": 1617.2,
+      "spent": 1
+    },
+    {
+      "t": 1712.1,
+      "spent": 1
+    },
+    {
+      "t": 1820.2,
+      "spent": 1
+    },
+    {
+      "t": 1926.3,
+      "spent": 1
+    }
+  ],
+  "samples": [
+    {
+      "t": 0,
+      "ammo": 29,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 28.9,
+      "ammo": 29,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 44.4,
+      "ammo": 29,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 56.9,
+      "ammo": 29,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 71.9,
+      "ammo": 29,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 88.2,
+      "ammo": 29,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 104.7,
+      "ammo": 28,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 123.7,
+      "ammo": 28,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 139.7,
+      "ammo": 28,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 154.9,
+      "ammo": 28,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 170.7,
+      "ammo": 28,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 186.6,
+      "ammo": 28,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 203.9,
+      "ammo": 27,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 223.8,
+      "ammo": 27,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 239.2,
+      "ammo": 27,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 253.4,
+      "ammo": 27,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 269.8,
+      "ammo": 27,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 285.8,
+      "ammo": 27,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 305.5,
+      "ammo": 26,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 324.6,
+      "ammo": 26,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 341.5,
+      "ammo": 26,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 357.6,
+      "ammo": 26,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 374.8,
+      "ammo": 26,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 390.3,
+      "ammo": 26,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 406.6,
+      "ammo": 25,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 425.7,
+      "ammo": 25,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 441.5,
+      "ammo": 25,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 457.8,
+      "ammo": 25,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 474.6,
+      "ammo": 25,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 490.1,
+      "ammo": 25,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 509,
+      "ammo": 24,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 529.9,
+      "ammo": 24,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 560.5,
+      "ammo": 24,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 599.9,
+      "ammo": 24,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 621.5,
+      "ammo": 24,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 259.9
+    },
+    {
+      "t": 643.9,
+      "ammo": 24,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 237.9
+    },
+    {
+      "t": 659.2,
+      "ammo": 24,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 222.5
+    },
+    {
+      "t": 675,
+      "ammo": 24,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 206.8
+    },
+    {
+      "t": 689.9,
+      "ammo": 24,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 191.9
+    },
+    {
+      "t": 704.8,
+      "ammo": 24,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 176.9
+    },
+    {
+      "t": 721.8,
+      "ammo": 24,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 160
+    },
+    {
+      "t": 741.2,
+      "ammo": 24,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 140.6
+    },
+    {
+      "t": 757.6,
+      "ammo": 24,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 124.2
+    },
+    {
+      "t": 776.4,
+      "ammo": 24,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 105.4
+    },
+    {
+      "t": 794.1,
+      "ammo": 24,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 87.7
+    },
+    {
+      "t": 811.7,
+      "ammo": 24,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 70.1
+    },
+    {
+      "t": 835.8,
+      "ammo": 24,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 46
+    },
+    {
+      "t": 854.5,
+      "ammo": 24,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 27.3
+    },
+    {
+      "t": 873.8,
+      "ammo": 24,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 8
+    },
+    {
+      "t": 892.7,
+      "ammo": 23,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 908.8,
+      "ammo": 23,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 923.1,
+      "ammo": 23,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 939.2,
+      "ammo": 23,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 955,
+      "ammo": 23,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 968.1,
+      "ammo": 23,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 984.1,
+      "ammo": 23,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 995.2,
+      "ammo": 22,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1014.9,
+      "ammo": 22,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1030,
+      "ammo": 22,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1046.3,
+      "ammo": 22,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1065.7,
+      "ammo": 22,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1081,
+      "ammo": 22,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1095.9,
+      "ammo": 21,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1115.4,
+      "ammo": 21,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1132.1,
+      "ammo": 21,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1147.4,
+      "ammo": 21,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1163.7,
+      "ammo": 21,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1183.3,
+      "ammo": 21,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1200,
+      "ammo": 20,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1223.4,
+      "ammo": 20,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1239.6,
+      "ammo": 20,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1256,
+      "ammo": 20,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1276.7,
+      "ammo": 20,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1297.7,
+      "ammo": 19,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1323,
+      "ammo": 19,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 290
+    },
+    {
+      "t": 1342,
+      "ammo": 19,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 271.6
+    },
+    {
+      "t": 1360.3,
+      "ammo": 19,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 253.3
+    },
+    {
+      "t": 1377,
+      "ammo": 19,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 236.6
+    },
+    {
+      "t": 1397.7,
+      "ammo": 19,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 215.9
+    },
+    {
+      "t": 1415,
+      "ammo": 19,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 198.6
+    },
+    {
+      "t": 1433,
+      "ammo": 19,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 180.6
+    },
+    {
+      "t": 1451.3,
+      "ammo": 19,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 162.2
+    },
+    {
+      "t": 1465,
+      "ammo": 19,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 148.6
+    },
+    {
+      "t": 1482.8,
+      "ammo": 19,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 130.8
+    },
+    {
+      "t": 1499.4,
+      "ammo": 19,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 114.1
+    },
+    {
+      "t": 1515.3,
+      "ammo": 19,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 98.3
+    },
+    {
+      "t": 1530.3,
+      "ammo": 19,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 83.3
+    },
+    {
+      "t": 1543.2,
+      "ammo": 19,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 70.4
+    },
+    {
+      "t": 1557.1,
+      "ammo": 19,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 56.5
+    },
+    {
+      "t": 1571.1,
+      "ammo": 19,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 42.5
+    },
+    {
+      "t": 1587.8,
+      "ammo": 19,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 25.8
+    },
+    {
+      "t": 1603.8,
+      "ammo": 19,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 9.8
+    },
+    {
+      "t": 1617.2,
+      "ammo": 18,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1634.2,
+      "ammo": 18,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1649.5,
+      "ammo": 18,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1661.7,
+      "ammo": 18,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1676.6,
+      "ammo": 18,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1692.9,
+      "ammo": 18,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1712.1,
+      "ammo": 17,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1735.2,
+      "ammo": 17,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1754.9,
+      "ammo": 17,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1772.9,
+      "ammo": 17,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1796.2,
+      "ammo": 17,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1820.2,
+      "ammo": 16,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1844.2,
+      "ammo": 16,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1861.7,
+      "ammo": 16,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1878.7,
+      "ammo": 16,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1895.2,
+      "ammo": 16,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1912.3,
+      "ammo": 16,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1926.3,
+      "ammo": 15,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1946.7,
+      "ammo": 15,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1963.2,
+      "ammo": 15,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1981.7,
+      "ammo": 15,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    }
+  ]
+}

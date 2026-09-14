@@ -1,0 +1,125 @@
+{
+  "bounds": {
+    "minX": -29,
+    "maxX": 29,
+    "minZ": -26,
+    "maxZ": 26
+  },
+  "width": 58,
+  "depth": 52,
+  "playableArea": 3016,
+  "sprintSpeed": 8.7,
+  "walkSpeed": 6.15,
+  "diagonalM": 77.89736837660178,
+  "diagonalSprintS": 8.953720503057676,
+  "diagonalWalkS": 12.666238760423052,
+  "lapS": 25.287356321839084,
+  "colliders": 187,
+  "physicsColliders": 187,
+  "shotSurfaces": 187,
+  "meshes": 230,
+  "physicalCover": [
+    "nuketown2-central-bus",
+    "nuketown2-cul-de-sac-truck-west",
+    "nuketown2-cul-de-sac-truck-east"
+  ],
+  "section": {
+    "streetHalfWidth": 4.5,
+    "houseDepth": 10,
+    "houseWidth": 16,
+    "yardDepth": 7.5,
+    "sidePathDepth": 4,
+    "garageWidth": 8,
+    "houseOffsetAlongStreet": 8
+  },
+  "bus": {
+    "length": 11,
+    "width": 2.5,
+    "floorY": 0.05,
+    "roofY": 3.15
+  },
+  "spawns": [
+    [
+      [
+        -14,
+        -19
+      ],
+      [
+        -7,
+        -20
+      ],
+      [
+        0,
+        -19
+      ],
+      [
+        7,
+        -20
+      ],
+      [
+        14,
+        -19
+      ]
+    ],
+    [
+      [
+        14,
+        19
+      ],
+      [
+        7,
+        20
+      ],
+      [
+        0,
+        19
+      ],
+      [
+        -7,
+        20
+      ],
+      [
+        -14,
+        19
+      ]
+    ]
+  ],
+  "spawnToCentreS": [
+    2.7127410853347,
+    2.4355885172893212,
+    2.1839080459770117,
+    2.4355885172893212,
+    2.7127410853347,
+    2.7127410853347,
+    2.4355885172893212,
+    2.1839080459770117,
+    2.4355885172893212,
+    2.7127410853347
+  ],
+  "longestEye165": {
+    "metres": 56.568542494923804,
+    "from": [
+      28,
+      -23
+    ],
+    "to": [
+      -28,
+      -15
+    ]
+  },
+  "longestEye110": {
+    "metres": 56.568542494923804,
+    "from": [
+      28,
+      -23
+    ],
+    "to": [
+      -28,
+      -15
+    ]
+  },
+  "streetCentreRun165": {
+    "best": 15,
+    "seg": "-20.5 -> -5.5"
+  }
+}

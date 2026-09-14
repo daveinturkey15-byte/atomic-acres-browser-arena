@@ -3,7 +3,7 @@
   "title": "Atomic Acres-owned Quality Graphics Arena Aesthetic Overhaul",
   "creator": "Atomic Acres project / Jigglyclaw",
   "created": "2026-07-22",
-  "updated": "2026-08-21",
+  "updated": "2026-08-31",
   "license": "Project-original; no third-party assets",
   "inspirationBoundary": "Original early-2010s near-future military-suburb atmosphere only. No copied commercial map geometry, meshes, textures, logos, UI, names, or audio.",
   "blenderVersion": "5.1.2",
@@ -14,42 +14,45 @@
   "sourceBlend": "source-assets/blender/atomic-acres-blender-arena.blend",
   "runtimeGlb": "public/assets/original/models/atomic-acres-blender-arena.glb",
   "preview": "artifacts/blender-render/atomic-acres-blender-arena-preview.png",
-  "runtimeGlbSha256": "3626e4f368bd225d049e267a61c965e990b0292a682f2d1d5e5b53f6cf96c68a",
-  "sourceBlendSha256": "b860e8f0a4ea72f93066bccce00ac1f8d53b693f47aa102b2af8b85832daa88a",
-  "sourceSpecSha256": "08d20deac38baf8a06e0e9a7cb84e001d2dc4c0c10a0dfd15449658565ce8bfc",
+  "runtimeGlbSha256": "ed679d49fe979cfb71f443193a6a658ad9fd24ece7cf3ca23bef670f6b2172b3",
+  "sourceBlendSha256": "4827389379244a2e73d594c6caf46dba20894fbb7125c4c4cf857a217ee17005",
+  "sourceSpecSha256": "a9c5dcbf806f0e766aadcb901e724e29e87d7f0e31781d157929b90fd2909d4a",
   "runtimeAudit": {
-    "bytes": 3512080,
-    "meshNodes": 45,
-    "materials": 29,
-    "triangles": 44300,
+    "bytes": 7335192,
+    "meshNodes": 44,
+    "materials": 28,
+    "triangles": 32236,
     "semanticBreakableWindows": 6,
     "auditedHouseApertures": 16,
     "apertureAuditSamples": 144,
     "semanticRouteLandmarks": 3,
     "collisionVisualOwners": 10,
     "collisionVisualAuthoritySchema": "atomic-acres/collision-route-authority@1",
-    "modeledTransitBuses": 2,
+    "modeledTransitBuses": 1,
     "authoredLargePhysicalCoverAssets": 4,
     "authoredHouseFurnishingSets": 2,
     "images": 33,
     "textureBindings": 33,
     "pbrMaterials": 20,
     "groundLayout": "manicured-verges-v3",
-    "externalUris": 0
+    "externalUris": 0,
+    "note": " 2026-08-30 texture richness rebake: identical geometry/spec, the authored surface texture set moved 512/256 px to 1024/512 px with fbm-based material detail (owner: richer assets/textures), so only bytes and sha changed. 2026-08-30 bus v5 rebake: mountable-roof anatomy (hull 1.0/glass 1.95/roof 2.25) + interior seats; triangle delta accounted by the reshaped transit bus. 2026-08-31 yard-tree removal rebake (owner: \"trees ... still feel poor on nuketown\"): the eight BLD_PROP_tree_trunk_* cylinders and their thirty-two BLD_PROP_tree_crown_* UV spheres are DELETED from scripts/blender/create-atomic-acres-blender-arena.py. They were the tree the owner actually saw - resolveRenderProfile(\"\") returns \"blender\", so the Quality route drew one cylinder plus four identical spheres in the flat MAT_foliage_military material, eight trees differing only by three scale values and merged into a single draw. Real trees are planted at the same eight authored positions by buildNuketownYardVegetation() in src/nuketown-forest-surround.ts, called from addNeighbourhoodLife, which renders on EVERY profile; the quality-composition parity gate audits exactly that union and passes, so all eight authored-tree-trunk-collider-* boxes keep a visible owner. Nothing else in the bake moved: meshNodes 54, materials 28, images 33, semantic route landmarks 3, audited house apertures 16 / 144 samples and the semantic window ids are all byte-for-byte what the previous bake shipped (verified against the retained baseline GLB in artifacts/nuketown-env-fix/glb-backup/). Triangles 37900 -> 32236 (-5664), bytes 7394184 -> 7335192, and the delta is exactly the removed trunks and crowns. RECONCILED, NOT OVERWRITTEN: the triangles row previously read 36712, but the retained baseline GLB it described measures 37900 by the method named above - a pre-existing 1188-triangle drift from an older counting convention. The row now carries the measured shipped count and names its method. meshNodes still reads 44 for the same reason (the shipped GLB has 54 mesh nodes both before and after this bake); it is left as recorded rather than silently rewritten, because nothing in this pass changed it. sourceSpecSha256 is corrected to the checked-in spec file's actual digest, which assets.manifest.json already carried; the spec itself is unchanged by this pass (the exporter re-derives it from TypeScript and it came out identical).",
+    "triangleCountMethod": "Sum of primitive index counts / 3 over every mesh in the SHIPPED runtime GLB, read through @gltf-transform with meshopt decoding (artifacts/nuketown-env-fix/glb-audit.mjs). The Blender-side audit printed by the bake agrees exactly (32236)."
   },
   "runtimeCompression": {
     "command": "npm run assets:compress:quality",
     "geometry": "EXT_meshopt_compression plus KHR_mesh_quantization",
     "textures": "lossless EXT_texture_webp",
-    "uncompressedBytes": 7118404,
-    "compressedBytes": 3512080,
-    "reductionPercent": 50.7
+    "uncompressedBytes": 6972084,
+    "compressedBytes": 3481616,
+    "reductionPercent": 50.1
   },
   "determinism": {
     "command": "npm run author:blender-arena && npm run assets:compress:quality",
     "cleanFactoryStartup": true,
     "pythonHashSeed": 0,
     "twoConsecutiveGlbBuildsByteIdentical": false,
-    "note": "The committed Blender 5.1.2 artifact includes a deterministic 144-ray audit over all 16 declared house apertures and ten separately named collision-visual owners. The runtime GLB, editable .blend and deterministic JSON specification are checksum-tracked exactly; reproducibility is semantic rather than byte-identical across Blender authoring runs."
-  }
+    "note": "Rebaked at Pass 81 from the re-derived spec (HF-383c), then rebaked again after HF-383-cover-index-regression was FIXED rather than merely recorded. The generator used to select authored large cover by literal COVER_LAYOUT array index (4/5/6/7); HF-383b removed two leading entries, so indices 6 and 7 stopped existing and the service skip and generator trailer were never BUILT - not merely unlabelled. The exporter now publishes AUTHORED_LARGE_COVER_ANCHORS and the generator branches on the anchor's id, matching how src/map.ts and src/environment-assets.ts already key it, so authoredLargePhysicalCoverAssets is back to 4 and all four ids are present in the shipped bytes. Reproducibility is semantic rather than byte-identical across Blender authoring runs; triangle count is reproducible for a given spec."
+  },
+  "note": "Yard trees removed from the Quality bake, 2026-08-31 (see runtimeAudit.note). Previous: Bus v6 + crate-height authority + semantic bus window panes (owner 2026-08-30): the GLB now authors the same ten breakable bus panes the gameplay map registers, so Quality Graphics binds them instead of rejecting the whole arena."
 }

@@ -1,0 +1,118 @@
+import * as THREE from 'three';
+import { describe, expect, it } from 'vitest';
+import type { Box2 } from './collision';
+import { buildArena } from './map';
+
+// Nuke Town fidelity contract (BO2 homage brief): very short sightlines.
+//
+// The reference map's character is broken lanes: no standing eye-line may run
+// unobstructed across the whole map. A deterministic collider ray audit
+// measured 60.3 m (street-canyon sliver, fixed by the Pass 79 fin extension)
+// and then 56.0 m (back-fence corridor) on this layout; this test pins the
+// worst standing eye-line well below those values. Proven RED at 56.0 m
+// before the rear-hedge cross-runs landed.
+
+const EYE_HEIGHT = 1.65;
+/** Worst allowed clear standing eye-line, in metres.
+ *
+ * Pass 81 / HF-383d: re-measured with THIS test's own estimator (the 1 m
+ * interior lattice below) against HEAD's built colliders: 41.7732 m, on the
+ * lane [-29, -21.5] -> [12, -29.5]. Left at 42 ON PURPOSE. Unlike its sibling
+ * ceiling in src/nuketown-fidelity.test.ts - which was ratcheted 40 -> 26
+ * because it sat 16 m above its own measurement - this one already has only
+ * 0.23 m of headroom, so it catches any creep above half a percent. Tightening
+ * it further would not buy coverage, it would only make the gate flake on
+ * sub-decimetre layout nudges.
+ *
+ * Note for whoever grows this arena next: 0.23 m is all the room there is. The
+ * HF-383 Z deepening spent most of the original margin, and the next change
+ * that lengthens a back-fence lane will trip this gate rather than slip past
+ * it. That is the intended behaviour - re-measure and justify, do not raise. */
+// REDESIGN 2026-08-29 re-derivation. Measured on the redesigned arena with
+// this file's own 1 m lattice estimator: 54.59 m, the down-street lane from
+// one end garden through the spawn-fence trail slit to the far verge - the
+// reference map's SIGNATURE sightline, held by whoever controls the street.
+// Ceiling pins measurement + margin. The old 42 encoded the cross-flow
+// design; it was already 17.8 m apart from the sibling estimator's ceiling
+// because the two sample different populations - both now carry their own
+// measured values with the same rationale.
+// DECLUTTER 2026-08-29 re-derivation: deleting the service channel wall
+// (campus clutter) unclipped the last 2 m of the signature trail-mouth ->
+// far-garden diagonal; measured 56.44 m. The reference's own down-street
+// lanes run the full block, so the ceiling re-pins just above the measured
+// lane - not loosened beyond what the layout implies.
+// v3 (owner HITL): fences and hedges deliberately removed - measured
+// longest clear eye-line 79.8 m ([34,-27]->[-35,13]). Re-pinned to the open
+// interim geometry; tighten when yard furniture returns.
+const MAXIMUM_CLEAR_EYE_LINE = 81;
+
+function blocksSight(collider: Box2): boolean {
+  return collider.maxY === undefined || collider.maxY >= EYE_HEIGHT;
+}
+
+/** Segment vs AABB slab test over XZ; endpoints strictly outside are clear. */
+function segmentClearOfBox(ax: number, az: number, bx: number, bz: number, box: Box2): boolean {
+  const dx = bx - ax;
+  const dz = bz - az;
+  let t0 = 0;
+  let t1 = 1;
+  if (Math.abs(dx) < 1e-9) {
+    if (ax < box.minX || ax > box.maxX) return true;
+  } else {
+    let ta = (box.minX - ax) / dx;
+    let tb = (box.maxX - ax) / dx;
+    if (ta > tb) [ta, tb] = [tb, ta];
+    t0 = Math.max(t0, ta);
+    t1 = Math.min(t1, tb);
+  }
+  if (Math.abs(dz) < 1e-9) {
+    if (az < box.minZ || az > box.maxZ) return true;
+  } else {
+    let ta = (box.minZ - az) / dz;
+    let tb = (box.maxZ - az) / dz;
+    if (ta > tb) [ta, tb] = [tb, ta];
+    t0 = Math.max(t0, ta);
+    t1 = Math.min(t1, tb);
+  }
+  return !(t0 <= t1 && t1 > 0 && t0 < 1);
+}
+
+describe('Nuke Town sightline fidelity', () => {
+  it('keeps every standing eye-line shorter than a cross-map killing lane', () => {
+    const map = buildArena(new THREE.Scene());
+    const bounds = map.bounds;
+    const colliders = (map.physicsColliders as Box2[]).filter(blocksSight);
+
+    // Deterministic low-discrepancy sample pairing over open space. Points sit
+    // on a 1 m lattice inside the playable bounds, offset from the walls.
+    const points: Array<[number, number]> = [];
+    for (let x = bounds.minX + 2; x <= bounds.maxX - 2; x += 1) {
+      for (let z = bounds.minZ + 2; z <= bounds.maxZ - 2; z += 1) {
+        const insideCollider = colliders.some(
+          (c) => x > c.minX && x < c.maxX && z > c.minZ && z < c.maxZ,
+        );
+        if (!insideCollider) points.push([x, z]);
+      }
+    }
+
+    let longest = 0;
+    let longestPair: number[] = [];
+    for (let t = 0; t < points.length * 40; t++) {
+      const ia = Math.floor((((t + 0.5) * 0.618033988749895) % 1) * points.length);
+      const ib = Math.floor((((t + 0.5) * 0.7548776662466927) % 1) * points.length);
+      const a = points[ia];
+      const b = points[ib];
+      const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (length <= longest) continue;
+      const clear = colliders.every((c) => segmentClearOfBox(a[0], a[1], b[0], b[1], c));
+      if (clear) {
+        longest = length;
+        longestPair = [a[0], a[1], b[0], b[1]];
+      }
+    }
+    expect(
+      longest,
+      `longest clear eye-line ${longest.toFixed(1)} m via ${JSON.stringify(longestPair)}`,
+    ).toBeLessThanOrEqual(MAXIMUM_CLEAR_EYE_LINE);
+  }, 120_000);
+});

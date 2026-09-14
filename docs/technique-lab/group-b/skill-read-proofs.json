@@ -1,0 +1,177 @@
+{
+  "note": "Hashes were recomputed from the canonical shared skill store in this lane and every one matched the sha256 recorded in the source packet, so the carrier skills are unchanged since the packet was cut. Skills whose rows were not implemented here were deliberately NOT read, and no claim is made about them. MAX continuation 2026-09-12 (omp): six more bodies read in full and hash-verified from cache; hashes recomputed from fetched bytes at read time.",
+  "skillsReadInFull": [
+    {
+      "skill": "game-hud-menu-overhaul",
+      "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\game-hud-menu-overhaul\\SKILL.md",
+      "sha256": "8b590d9fd7848070e46155ee8a61feaf6539cfe28c2b1ee0bdf1162665878c0a",
+      "bytes": 7298,
+      "lines": 91,
+      "readInFull": true,
+      "coversSourceIds": [
+        26
+      ],
+      "whatItGoverned": "Read in full (91 lines). Lines 30-77 'Pre-match and game-select shells' carry row 26's eleven restated principles and the explicit all-rights-reserved warning."
+    },
+    {
+      "skill": "webgpu-tsl-arena-forging",
+      "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\webgpu-tsl-arena-forging\\SKILL.md",
+      "sha256": "0ba350ae25b818af70beea5da5493de0cebe9a68e96842808017ba5dcc8509bc",
+      "bytes": 4140,
+      "lines": 39,
+      "readInFull": true,
+      "coversSourceIds": [
+        28,
+        33
+      ],
+      "whatItGoverned": "Read in full (39 lines). Step 7 forbids ShaderMaterial/RawShaderMaterial/GLSL on the WebGPU path, which is why rows 18, 19, 23 and 26 are reimplemented without shaders."
+    },
+    {
+      "skill": "threejs-game-development",
+      "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\software-development\\threejs-game-development\\SKILL.md",
+      "sha256": "707888880f11fe498e5233417ba0b2a808f943c27954881fa19ca239798e2ce9",
+      "bytes": 8463,
+      "lines": 131,
+      "readInFull": true,
+      "coversSourceIds": [
+        18,
+        20,
+        27,
+        29,
+        33,
+        34
+      ],
+      "whatItGoverned": "Read in full (131 lines). Lines 95-122 carry row 34's subsystem-contract pattern; the safety boundary at line 92 forbids importing source from repositories lacking a compatible licence, which governs rows 23, 28, 29 and 33."
+    },
+    {
+      "skill": "atomic-acres-procedural-art-authoring",
+      "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\atomic-acres-procedural-art-authoring\\SKILL.md",
+      "sha256": "19f93b23bdcef5832c246772600c7740631cb3a43b6d424324a58eecfdab9508",
+      "bytes": 10377,
+      "lines": 152,
+      "readInFull": true,
+      "coversSourceIds": [
+        23,
+        24,
+        33
+      ],
+      "whatItGoverned": "Read in full (152 lines). Section 1 hard rules (determinism, no Math.random, frozen budgets, commit-pinned licence-reviewed intake) shaped every demo in this group."
+    },
+    {
+      "skill": "game-animation-asset-pipeline",
+      "path": "C:/Users/david/Documents/desky-bootstrap-clone/Skills/game-development/game-animation-asset-pipeline/SKILL.md",
+      "sha256": "f6dafcfe8063b2c85c8cf82a0664a7998ac62a7a30a11bbbd029f54a5fbb902d",
+      "bytes": 31855,
+      "lines": 361,
+      "readInFull": true,
+      "coversSourceIds": [
+        31
+      ],
+      "whatItGoverned": "Read in full (361 lines). Intake contract, lane/artifact separation (skeletal clip vs atlas vs mesh) and provenance gates govern row 31: the CC0 mesh is not vendored; the rig METHOD is reimplemented."
+    },
+    {
+      "skill": "threejs-gameplay-systems (source-27 body)",
+      "path": "C:/Users/david/Documents/Codex/2026-09-11/p-le/work/technique-lab-20260912/cache-max/raw.githubusercontent.com-majidmanzarpour-threejs-game-skills-7221c1f4a6d2ae189a4d85d058d24f3228499d46-skills.6f71c17df271",
+      "sha256": "b907ece2e2f37f5a8c4ba4f8586c104a000522952f6e5737c3ffca5ea2c194f9",
+      "bytes": 5970,
+      "lines": 78,
+      "readInFull": true,
+      "coversSourceIds": [
+        27
+      ],
+      "whatItGoverned": "Read in full. Workflow steps 7-8 (feel tuning: hitstop/shake/impact feedback; explicit update order) are the method source-27.ts demonstrates."
+    },
+    {
+      "skill": "threejs-game-director (source-27 body)",
+      "path": "C:/Users/david/Documents/Codex/2026-09-11/p-le/work/technique-lab-20260912/cache-max/raw.githubusercontent.com-majidmanzarpour-threejs-game-skills-7221c1f4a6d2ae189a4d85d058d24f3228499d46-skills.d1189b78c641",
+      "sha256": "3f6fa121bb38be935c585de5e8fb7754304171b6969d89e47f4ecb32baaec894",
+      "bytes": 11280,
+      "lines": 124,
+      "readInFull": true,
+      "coversSourceIds": [
+        27
+      ],
+      "whatItGoverned": "Read in full. Phase routing, ledgers, reference gates and premium completion rule feed the coverage comparison artifact."
+    },
+    {
+      "skill": "webgpu-threejs-tsl SKILL (source-28 body)",
+      "path": "C:/Users/david/Documents/Codex/2026-09-11/p-le/work/technique-lab-20260912/cache-max/raw.githubusercontent.com-dgreenheck-webgpu-claude-skill-af2319bd01bb7cc881267a9ef42cafdaf5e9029d-skills-webgp.057eae5d14e9",
+      "sha256": "734ac9724c9dae2a2c9ad1e59f96d37498a87871eaddb6e8a7fd903d36b2cb90",
+      "bytes": 3202,
+      "lines": 93,
+      "readInFull": true,
+      "coversSourceIds": [
+        28
+      ],
+      "whatItGoverned": "Read in full. Import pattern, node-material property route and example catalogue; no-licence source, concepts restated only."
+    },
+    {
+      "skill": "webgpu-threejs-tsl materials (source-28 body)",
+      "path": "C:/Users/david/Documents/Codex/2026-09-11/p-le/work/technique-lab-20260912/cache-max/raw.githubusercontent.com-dgreenheck-webgpu-claude-skill-af2319bd01bb7cc881267a9ef42cafdaf5e9029d-skills-webgp.eab5679ddf12",
+      "sha256": "3e9073bf4360577babe0d69650401aa3aa9b308444a1a830bb6996942bcd943c",
+      "bytes": 8786,
+      "lines": 353,
+      "readInFull": true,
+      "coversSourceIds": [
+        28
+      ],
+      "whatItGoverned": "Read in full (353 lines). Property catalogue and worked examples incl. the threshold-dissolve-with-edge-glow graph shape the source-28 scene evaluates on CPU."
+    },
+    {
+      "skill": "threejs-geometry (source-29 body)",
+      "path": "C:/Users/david/Documents/Codex/2026-09-11/p-le/work/technique-lab-20260912/cache-max/raw.githubusercontent.com-CloudAI-X-threejs-skills-b1c623076c661fc9b03dac19292e825a5d106823-skills-threejs-geo.8fe8b33a2754",
+      "sha256": "8337bcf86621411f54ef39727b338c84890815e4b3612ce635d593dd9c321a3e",
+      "bytes": 13829,
+      "lines": 548,
+      "readInFull": true,
+      "coversSourceIds": [
+        29
+      ],
+      "whatItGoverned": "Read in full (548 lines). Instancing section (InstancedMesh, per-instance transforms/colors) is the method source-29.ts demonstrates."
+    }
+  ],
+  "skillsNotRead": [
+    {
+      "skill": "threejs-rtx-runtime-route",
+      "rows": [
+        19,
+        21
+      ],
+      "why": "Row 19 was implemented from the PRIMARY source (the CC0 repository and its Whitted shader), not from the carrier skill. The skill body was not read in this lane and is not cited as evidence."
+    },
+    {
+      "skill": "atomic-acres-asset-authoring",
+      "rows": [
+        22
+      ],
+      "why": "Row 22 is blocked with no source to implement."
+    },
+    {
+      "skill": "threejs-webgpu-water",
+      "rows": [
+        25
+      ],
+      "why": "Row 25 is blocked."
+    },
+    {
+      "skill": "game-animation-asset-pipeline",
+      "rows": [
+        30,
+        31,
+        32
+      ],
+      "why": "Rows 30 and 32 are blocked; row 31 was not delivered."
+    },
+    {
+      "skill": "local-video-generation",
+      "rows": [
+        32
+      ],
+      "why": "Row 32 is blocked."
+    },
+    {
+      "skill": "threejs-materials (source-29 sibling)",
+      "reason": "Fetched at the pinned revision (13,418 B) but not read this session; row 29 cites only the geometry body it actually read."
+    }
+  ]
+}

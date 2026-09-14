@@ -30,7 +30,7 @@ const { execSync } = require('child_process');
   const browser = await chromium.launch({
     channel: process.env.QA_EDGE_CHANNEL || 'msedge',
     headless: true,
-    args: ['--enable-unsafe-swiftshader', '--enable-webgpu-developer-features', '--disable-gpu-sandbox'],
+    args: ['--mute-audio', '--enable-unsafe-swiftshader', '--enable-webgpu-developer-features', '--disable-gpu-sandbox'],
   });
   try {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1, serviceWorkers: 'block' });

@@ -1,0 +1,158 @@
+
+Running 21 tests using 1 worker
+
+
+(node:58396) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:55:7 › Pass 64 command HUD and menu contract › uses one ordered arena registry with new labels and stable machine ids
+[2/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:106:7 › Pass 64 command HUD and menu contract › supports keyboard tabs and traps/restores dialog focus
+[3/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:136:7 › Pass 64 command HUD and menu contract › keeps the simple graphics choice separate from collapsed advanced WebGPU controls
+[4/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:203:7 › Pass 64 command HUD and menu contract › exposes every independent audio bus, applies it live, and persists it
+[5/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:243:7 › Pass 64 command HUD and menu contract › batches Advanced Graphics edits and commits Custom once when Options closes
+  1) [chromium] › tests\e2e\pass64-hud-menu.spec.ts:243:7 › Pass 64 command HUD and menu contract › batches Advanced Graphics edits and commits Custom once when Options closes 
+
+    TimeoutError: page.waitForURL: Timeout 30000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      264 |
+      265 |     await Promise.all([
+    > 266 |       page.waitForURL((url) => !url.searchParams.has('render'), { timeout: 30_000 }),
+          |            ^
+      267 |       page.locator('#menu-tab-deploy').click(),
+      268 |     ]);
+      269 |     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
+        at C:\Users\david\projects\aa-claude-residuals\tests\e2e\pass64-hud-menu.spec.ts:266:12
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass64-hud-menu-Pass-64-co-b75e0-om-once-when-Options-closes-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass64-hud-menu-Pass-64-co-b75e0-om-once-when-Options-closes-chromium\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass64-hud-menu-Pass-64-co-b75e0-om-once-when-Options-closes-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace artifacts\pass25a\playwright-results\pass64-hud-menu-Pass-64-co-b75e0-om-once-when-Options-closes-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+
+(node:36256) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[6/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:279:7 › Pass 64 command HUD and menu contract › keeps leaderboard sharing default-off, disclosed, persistent, and revocable
+[7/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:314:7 › Pass 64 command HUD and menu contract › shares one player profile across same-origin Live and Stable query routes
+[8/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:367:7 › Pass 64 command HUD and menu contract › plays prerecorded media without moving or submitting the gameplay renderer
+[9/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:396:9 › Pass 64 command HUD and menu contract › keeps the deployment shell bounded at laptop 1280x720
+[10/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:396:9 › Pass 64 command HUD and menu contract › keeps the deployment shell bounded at review 1600x900
+[11/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:396:9 › Pass 64 command HUD and menu contract › keeps the deployment shell bounded at desktop 1920x1080
+[12/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:396:9 › Pass 64 command HUD and menu contract › keeps the deployment shell bounded at owner 2560x1440
+[13/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:396:9 › Pass 64 command HUD and menu contract › keeps the deployment shell bounded at ultrawide 3440x1440
+[14/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:396:9 › Pass 64 command HUD and menu contract › keeps the deployment shell bounded at narrow 390x844
+[15/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:461:7 › Pass 64 command HUD and menu contract › keeps the deployment shell bounded at real high DPI
+[16/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:496:7 › Pass 64 command HUD and menu contract › honours reduced motion without hiding controls or status
+[17/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:523:7 › Pass 64 command HUD and menu contract › preserves the critical live-match HUD across the review viewport matrix
+  2) [chromium] › tests\e2e\pass64-hud-menu.spec.ts:523:7 › Pass 64 command HUD and menu contract › preserves the critical live-match HUD across the review viewport matrix 
+
+    TimeoutError: page.waitForFunction: Timeout 60000ms exceeded.
+
+      37 |     window.__ATOMIC_ACRES_DEBUG__.startSolo();
+      38 |   });
+    > 39 |   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
+         |              ^
+      40 |   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
+      41 |   await page.waitForTimeout(2_500);
+      42 |   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
+        at startDeterministicSolo (C:\Users\david\projects\aa-claude-residuals\tests\e2e\pass64-hud-menu.spec.ts:39:14)
+        at C:\Users\david\projects\aa-claude-residuals\tests\e2e\pass64-hud-menu.spec.ts:527:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass64-hud-menu-Pass-64-co-4b5c6--the-review-viewport-matrix-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass64-hud-menu-Pass-64-co-4b5c6--the-review-viewport-matrix-chromium\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass64-hud-menu-Pass-64-co-4b5c6--the-review-viewport-matrix-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace artifacts\pass25a\playwright-results\pass64-hud-menu-Pass-64-co-4b5c6--the-review-viewport-matrix-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+
+(node:24512) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[18/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:610:7 › Pass 64 command HUD and menu contract › presents an accessible animated 3-2-1 with bounded mixer telemetry and cleanup
+[19/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:674:7 › Pass 64 command HUD and menu contract › renders real dead and respawning HUD states
+  3) [chromium] › tests\e2e\pass64-hud-menu.spec.ts:674:7 › Pass 64 command HUD and menu contract › renders real dead and respawning HUD states 
+
+    Test timeout of 60000ms exceeded.
+
+    TimeoutError: page.waitForFunction: Timeout 60000ms exceeded.
+
+      37 |     window.__ATOMIC_ACRES_DEBUG__.startSolo();
+      38 |   });
+    > 39 |   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
+         |              ^
+      40 |   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
+      41 |   await page.waitForTimeout(2_500);
+      42 |   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
+        at startDeterministicSolo (C:\Users\david\projects\aa-claude-residuals\tests\e2e\pass64-hud-menu.spec.ts:39:14)
+        at C:\Users\david\projects\aa-claude-residuals\tests\e2e\pass64-hud-menu.spec.ts:676:5
+
+    Tearing down "context" exceeded the test timeout of 60000ms.
+
+    Error: browserContext.close: Target page, context or browser has been closed
+
+    Test timeout of 60000ms exceeded.
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass64-hud-menu-Pass-64-co-0732a-d-and-respawning-HUD-states-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass64-hud-menu-Pass-64-co-0732a-d-and-respawning-HUD-states-chromium\error-context.md
+
+
+
+(node:54500) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[20/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:694:7 › Pass 64 command HUD and menu contract › renders a full returned-lobby command room at every review viewport
+[21/21] [chromium] › tests\e2e\pass64-hud-menu.spec.ts:729:7 › Pass 64 command HUD and menu contract › renders the after-action match-end composition at every review viewport
+  4) [chromium] › tests\e2e\pass64-hud-menu.spec.ts:729:7 › Pass 64 command HUD and menu contract › renders the after-action match-end composition at every review viewport 
+
+    TimeoutError: page.waitForFunction: Timeout 60000ms exceeded.
+
+      37 |     window.__ATOMIC_ACRES_DEBUG__.startSolo();
+      38 |   });
+    > 39 |   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
+         |              ^
+      40 |   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
+      41 |   await page.waitForTimeout(2_500);
+      42 |   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
+        at startDeterministicSolo (C:\Users\david\projects\aa-claude-residuals\tests\e2e\pass64-hud-menu.spec.ts:39:14)
+        at C:\Users\david\projects\aa-claude-residuals\tests\e2e\pass64-hud-menu.spec.ts:733:5
+
+    Test timeout of 60000ms exceeded.
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass64-hud-menu-Pass-64-co-e9fcc-on-at-every-review-viewport-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass64-hud-menu-Pass-64-co-e9fcc-on-at-every-review-viewport-chromium\error-context.md
+
+
+  4 failed
+    [chromium] › tests\e2e\pass64-hud-menu.spec.ts:243:7 › Pass 64 command HUD and menu contract › batches Advanced Graphics edits and commits Custom once when Options closes 
+    [chromium] › tests\e2e\pass64-hud-menu.spec.ts:523:7 › Pass 64 command HUD and menu contract › preserves the critical live-match HUD across the review viewport matrix 
+    [chromium] › tests\e2e\pass64-hud-menu.spec.ts:674:7 › Pass 64 command HUD and menu contract › renders real dead and respawning HUD states 
+    [chromium] › tests\e2e\pass64-hud-menu.spec.ts:729:7 › Pass 64 command HUD and menu contract › renders the after-action match-end composition at every review viewport 
+  17 passed (16.1m)

@@ -1,0 +1,240 @@
+{
+  "method": "world matrixWorld translation + basis of every mesh under every map3-lane-* group, read at t and t+5 s from one fixed pose, HUD irrelevant",
+  "meshesCompared": 103,
+  "movedCount": 43,
+  "movedLanes": [
+    "map3-lane-godrays",
+    "map3-lane-shoreline",
+    "map3-lane-vegetation"
+  ],
+  "stillLanes": [
+    "map3-lane-colosseum",
+    "map3-lane-grammar",
+    "map3-lane-raymarch",
+    "map3-lane-seasons"
+  ],
+  "moved": [
+    {
+      "key": "map3-lane-vegetation/map3-forest-rover-tyre#86",
+      "metres": 28.1117,
+      "rotationDelta": 0
+    },
+    {
+      "key": "map3-lane-vegetation/map3-forest-rover-rim#87",
+      "metres": 28.1117,
+      "rotationDelta": 0.042
+    },
+    {
+      "key": "map3-lane-vegetation/map3-forest-rover-tyre#82",
+      "metres": 28.0841,
+      "rotationDelta": 0
+    },
+    {
+      "key": "map3-lane-vegetation/map3-forest-rover-rim#83",
+      "metres": 28.0841,
+      "rotationDelta": 0.04336
+    },
+    {
+      "key": "map3-lane-vegetation/map3-forest-rover-body#78",
+      "metres": 27.9389,
+      "rotationDelta": 0.042
+    },
+    {
+      "key": "map3-lane-vegetation/map3-forest-rover-frame#79",
+      "metres": 27.9389,
+      "rotationDelta": 0.042
+    },
+    {
+      "key": "map3-lane-vegetation/map3-forest-rover-tray#80",
+      "metres": 27.9389,
+      "rotationDelta": 0.042
+    },
+    {
+      "key": "map3-lane-vegetation/map3-forest-rover-lamps#81",
+      "metres": 27.9389,
+      "rotationDelta": 0.042
+    },
+    {
+      "key": "map3-lane-vegetation/map3-forest-rover-tyre#88",
+      "metres": 27.7655,
+      "rotationDelta": 0
+    },
+    {
+      "key": "map3-lane-vegetation/map3-forest-rover-rim#89",
+      "metres": 27.7655,
+      "rotationDelta": 0.042
+    },
+    {
+      "key": "map3-lane-vegetation/map3-forest-rover-tyre#84",
+      "metres": 27.7373,
+      "rotationDelta": 0
+    },
+    {
+      "key": "map3-lane-vegetation/map3-forest-rover-rim#85",
+      "metres": 27.7373,
+      "rotationDelta": 0.04336
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-rover-tyre#33",
+      "metres": 9.859,
+      "rotationDelta": 0
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-rover-rim#34",
+      "metres": 9.859,
+      "rotationDelta": 1.66877
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-rover-tyre#31",
+      "metres": 7.8201,
+      "rotationDelta": 0
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-rover-rim#32",
+      "metres": 7.8201,
+      "rotationDelta": 1.66877
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-rover-tyre#29",
+      "metres": 7.3767,
+      "rotationDelta": 0
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-rover-rim#30",
+      "metres": 7.3767,
+      "rotationDelta": 1.66877
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-rover-body#26",
+      "metres": 7.0718,
+      "rotationDelta": 1.66877
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-rover-tyre#27",
+      "metres": 4.3758,
+      "rotationDelta": 0
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-rover-rim#28",
+      "metres": 4.3758,
+      "rotationDelta": 1.66877
+    },
+    {
+      "key": "map3-lane-godrays/map3-godrays-rolling-body#92",
+      "metres": 3.5775,
+      "rotationDelta": 0.39104
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-buoy#20",
+      "metres": 0.8004,
+      "rotationDelta": 0.22369
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-buoy-ring#21",
+      "metres": 0.8004,
+      "rotationDelta": 0.22369
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-buoy-mast#22",
+      "metres": 0.8004,
+      "rotationDelta": 0.22369
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-barrel#5",
+      "metres": 0.6816,
+      "rotationDelta": 0.02031
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-barrel-hoop#6",
+      "metres": 0.6816,
+      "rotationDelta": 0.02031
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-barrel-hoop#7",
+      "metres": 0.6816,
+      "rotationDelta": 0.02031
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-driftwood#24",
+      "metres": 0.6504,
+      "rotationDelta": 0.06309
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-barrel#8",
+      "metres": 0.4186,
+      "rotationDelta": 0.0686
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-barrel-hoop#9",
+      "metres": 0.4186,
+      "rotationDelta": 0.0686
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-barrel-hoop#10",
+      "metres": 0.4186,
+      "rotationDelta": 0.0686
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-crate#15",
+      "metres": 0.3449,
+      "rotationDelta": 0.05491
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-crate#14",
+      "metres": 0.1848,
+      "rotationDelta": 0.04345
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-crate#16",
+      "metres": 0.1717,
+      "rotationDelta": 0.13788
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-buoy#17",
+      "metres": 0.1182,
+      "rotationDelta": 0.11186
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-buoy-ring#18",
+      "metres": 0.1182,
+      "rotationDelta": 0.11186
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-buoy-mast#19",
+      "metres": 0.1182,
+      "rotationDelta": 0.11186
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-driftwood#23",
+      "metres": 0.0471,
+      "rotationDelta": 0.0903
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-barrel#11",
+      "metres": 0.0375,
+      "rotationDelta": 0.00403
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-barrel-hoop#12",
+      "metres": 0.0375,
+      "rotationDelta": 0.00403
+    },
+    {
+      "key": "map3-lane-shoreline/map3-shoreline-floating-barrel-hoop#13",
+      "metres": 0.0375,
+      "rotationDelta": 0.00403
+    },
+    {
+      "key": "map3-lane-godrays/map3-godrays-rolling-body#93",
+      "metres": 0.0295,
+      "rotationDelta": 0.04319
+    }
+  ],
+  "frameBytes": {
+    "t0": 805786,
+    "t5": 796675,
+    "identical": false
+  },
+  "pageErrors": [],
+  "consoleErrors": []
+}

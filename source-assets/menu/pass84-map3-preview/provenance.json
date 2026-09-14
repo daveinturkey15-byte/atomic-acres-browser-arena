@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "familyId": "pass84-map3-menu-preview",
+  "cacheKey": "pass84-map3-preview-v1",
+  "generatedAt": "2026-09-02",
+  "inheritsMotionContract": "pass66-authoritative-runtime-menu-preview-v2",
+  "note": "Additive family for Map 3 (HF-405), the arena registered on 2026-09-02. Replaces the labelled PREVIEW STANDBY card it shipped with for one commit - never a byte-copy of another arena, which is the placeholder defect the pass79 family had to undo. The retained pass66-runtime-preview-v15 media, its cache-family lock, and the pass77 and pass79 families are untouched by this finalizer.",
+  "finalMediaSet": {
+    "algorithm": "sha256-ordered-name-size-bytes-v1",
+    "fileCount": 3,
+    "totalBytes": 14086627,
+    "sha256": "8143a212b019a5ade2e9612c8e2c93fe205696dc12a461354e5b967b43577525"
+  },
+  "finalizer": {
+    "path": "scripts/assets/finalize-pass84-map3-menu-preview.mjs",
+    "sha256": "5cd6bfbd6132562bc95aff654930a2880f803951e0596b94e9e2639b53dbb4e3"
+  },
+  "generator": {
+    "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+    "sha256": "89fffa1c039894029619367042227b4165038ed1ece308d62852b180bddf4509"
+  },
+  "arenas": [
+    {
+      "arenaId": "map3",
+      "recipeId": "pass84-map3-menu-preview-v1",
+      "presentationId": "menu-video-runtime-helo-map3-v1",
+      "kind": "helicopter",
+      "posterFrame": 60,
+      "capture": {
+        "source": "authoritative-runtime-arena",
+        "backendRequired": "webgpu",
+        "backendUsed": "webgpu",
+        "softwareAdapter": false,
+        "compatReason": null,
+        "receiptPath": "artifacts/pass65/menu-preview-rotor-review/runtime-capture-receipt.json",
+        "inputsStable": true,
+        "driftedInputPaths": [],
+        "capturedFrames": 240,
+        "frameSetSha256": "614a50d65384eeb404da9e1716987a2471dc5c8ead63504786803ff771b6d8c1",
+        "frameSetBytes": 358177125
+      },
+      "runtimeFiles": [
+        {
+          "path": "public/assets/original/menu-previews/map3.mp4",
+          "sha256": "74c3ca982640c38b0cf23a1f1f514f574eacfe108b5efcb302180da3faa75464"
+        },
+        {
+          "path": "public/assets/original/menu-previews/map3.webm",
+          "sha256": "77846e8b6a4b4f47c37b9c790eb79e7711a9d88d6f846228cac5b466207cad28"
+        },
+        {
+          "path": "public/assets/original/menu-previews/map3.webp",
+          "sha256": "3c77b3f08f1517d4b9f9af4c7724e00cea9d01720515a00327001b99bb450ec9"
+        }
+      ],
+      "reviewSheet": {
+        "path": "docs/assets/pass84-menu-previews/map3-review-frames.webp",
+        "sha256": "3237856dcd589494ba1df0bb52b2e156bcc6bc9511adccb5fb2a3d02a713ecf2"
+      }
+    }
+  ]
+}

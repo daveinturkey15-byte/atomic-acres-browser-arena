@@ -1,0 +1,72 @@
+{
+  "station": "nuketown2-north-yard",
+  "assignment": {
+    "left": "B",
+    "right": "A"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "right",
+  "winner": "A",
+  "confidence": 0.96,
+  "probes": {
+    "left": {
+      "expected": "CKAW",
+      "answered": "CKAW"
+    },
+    "right": {
+      "expected": "CRCK",
+      "answered": "CRCK"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-north-yard.png",
+      "sourceSha256": "4d262e8c4b176975045d05c2a3b32d1c4bd106001a579455a1d7ad8c5b034705",
+      "shownSha256": "4bed9cb9e9542f43df6a53d889a353707ae53376c7561946efcba3ba1e424d27",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-north-yard.png",
+      "sourceSha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb",
+      "shownSha256": "838c98c6e3e0eaaefd1f04a22df8ffaa02fc5a5fb3f8ffc71fcc55f1ca208335",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "Structure and layout are identical in LEFT and RIGHT, but value and lighting relationships against reference-1 decide it: reference-1 shows very dark shadowed grass across r2c0-r2c2, near-black side faces on the foreground platform in r1c1-r2c1, and a deep dark-red upper house in r0c1-r1c1 with deep contact shadow under the house in r1c0-r2c0; RIGHT reproduces all of those dark values while LEFT renders lime-bright grass, green platform sides, and orange upper walls.",
+  "leftCloser": [],
+  "rightCloser": [
+    "dark shadowed grass value in r2c0-r2c2 matches reference-1 versus LEFT bright lime grass",
+    "near-black side faces of foreground platform in r1c1-r2c1 match reference-1 versus LEFT green sides",
+    "deep dark-red upper cladding in r0c1-r1c1 matches reference-1 versus LEFT orange",
+    "deep contact shadow under house and in r1c0 matches reference-1 versus LEFT lifted bright wash"
+  ],
+  "largestDifference": {
+    "region": "r2c1",
+    "what": "ground-plane and foreground-block value: LEFT bright lime grass and green block sides versus RIGHT near-black shadowed grass and black block sides"
+  },
+  "elapsedMs": 30556,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

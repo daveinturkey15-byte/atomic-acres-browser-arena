@@ -1,0 +1,171 @@
+{
+  "contract": "pipeline-compile-stall-probe-v1",
+  "measuredAt": "2026-09-03T04:44:23.255Z",
+  "label": "laneab-baseline-raid2",
+  "arena": "raid2",
+  "idle": false,
+  "dist": "C:\\Users\\david\\projects\\aa-claude-lighting\\dist-lane-ab",
+  "seconds": 75,
+  "tod": null,
+  "hooked": true,
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "window": {
+    "windowS": 75.012,
+    "rafCallbacks": 5069,
+    "stallCount": 3,
+    "stallsPerMinute": 2.4,
+    "frozenFractionPercent": 0.46,
+    "medianStallMs": 116.7,
+    "maxStallMs": 122.1
+  },
+  "pipelines": {
+    "beforeWindow": 189,
+    "inWindow": 1,
+    "perMinuteInWindow": 0.8,
+    "inStall": 0,
+    "inStallSharePercent": 0,
+    "expectedIfUnrelatedPercent": 0.46,
+    "enrichment": 0
+  },
+  "shaderModules": {
+    "beforeWindow": 212,
+    "inWindow": 0,
+    "perMinuteInWindow": 0,
+    "inStall": 0,
+    "inStallSharePercent": null,
+    "expectedIfUnrelatedPercent": 0.46,
+    "enrichment": null
+  },
+  "stateTransitions": [
+    {
+      "atMs": 53838,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 83372,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 85100,
+      "alive": true,
+      "weapon": "carbine"
+    }
+  ],
+  "cacheKeyDiffs": [
+    {
+      "atMs": 83157,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [
+        "MAT_Pass65_carbine_Gunmetal:0:2",
+        "MAT_Pass65_carbine_Gunmetal:0:2",
+        "MAT_Pass65_carbine_Gunmetal:0:2",
+        "MAT_Pass65_carbine_Lens:0:2",
+        "MAT_Pass65_carbine_Polymer_PBR:0:2",
+        "MAT_Pass65_carbine_Primary_PBR:0:2",
+        "MAT_Pass65_carbine_Rubber:0:2"
+      ],
+      "materialsLost": []
+    },
+    {
+      "atMs": 113167,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": [
+        "MAT_Pass65_carbine_Gunmetal:0:2",
+        "MAT_Pass65_carbine_Gunmetal:0:2",
+        "MAT_Pass65_carbine_Gunmetal:0:2",
+        "MAT_Pass65_carbine_Lens:0:2",
+        "MAT_Pass65_carbine_Polymer_PBR:0:2",
+        "MAT_Pass65_carbine_Primary_PBR:0:2",
+        "MAT_Pass65_carbine_Rubber:0:2"
+      ]
+    }
+  ],
+  "cacheKeyDiffCount": 2,
+  "determinantFlips": [
+    {
+      "atMs": 53591,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:9.28e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 83157,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Glove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:1.16e-14",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 113202,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:4.57e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:4.57e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:4.57e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:4.57e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    }
+  ],
+  "determinantFlipCount": 3,
+  "samplePipelineLabels": [
+    {
+      "atMs": 85048,
+      "syncMs": 0.1,
+      "label": "renderPipeline_MeshBasicMaterial_774",
+      "stack": "at GPUDevice.patched [as createRenderPipeline] (<anonymous>:31:50) <- at iG.createRenderPipeline (http://127.0.0.1:4193/assets/vendor-three-CwPXx5A7.js:4644:12500) <- at wG.createRenderPipeline (http://127.0.0.1:4193/assets/vendor-three-CwPXx5A7.js:4645:29414) <- at sN._getRenderPipeline (http://127.0.0.1:4193/assets/vendor-three-CwPXx5A7.js:4130:96560) <- at sN.getForRender (http://127.0.0.1:4193/assets/vendor-three-CwPXx5A7.js:4130:95356) <- at sN.updateForRender (http://127.0.0.1:4193/assets/vendor-three-CwPXx5A7.js:4130:96185) <- at OG._renderObjectDirect (http://127.0.0.1:4193/assets/vendor-three-CwPXx5A7.js:4136:70133) <- at OG.renderObject (http://127.0.0.1:4193/assets/vendor-three-CwPXx5A7.js:4136:68962) <- at OG._renderObjects (http://127.0.0.1:4193/assets/vendor-three-CwPXx5A7.js:4136:66141) <- at OG._renderTransparents (http://127.0.0.1:4193/assets/vendor-three-CwPXx5A7.js:4136:65982)"
+    }
+  ],
+  "stalls": [
+    {
+      "startMs": 66048.9,
+      "endMs": 66171,
+      "durationMs": 122.1
+    },
+    {
+      "startMs": 105548.5,
+      "endMs": 105654,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 120543.3,
+      "endMs": 120660,
+      "durationMs": 116.7
+    }
+  ]
+}

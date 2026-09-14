@@ -5,9 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#071218" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23081524'/%3E%3Cpath d='M13 48 32 10l19 38h-9l-4-9H26l-4 9Z' fill='%2300d4ff'/%3E%3C/svg%3E" />
-    <meta name="description" content="Choose Pass 73, exact retained Pass 72, Pass 70, or Pass 69." />
+    <meta name="description" content="Choose any published Nuke Town build - the newest pass or any retained earlier pass." />
     <title>Choose build — Nuke Town</title>
+    <!--
+      Asset URLs and the channel list below are rewritten by scripts/orchestration/publish_pass81.py.
+      The stylesheet and script get a content-addressed filename per publish, and the channel
+      list is INLINED into this document rather than loaded from a second URL.
+
+      Both of those are the fix for a measured defect, not tidying. GitHub Pages serves every
+      root file with a fixed Cache-Control: max-age=600 that cannot be overridden, and this page
+      used to pull its shell and its channel list from two separately cached URLs with nothing
+      tying a generation of one to a generation of the other. A browser could hold index.html
+      from one publish, release-shell.js from a second and release-channel-config.js from a
+      third and draw a build list that had never been published in that combination - which is
+      how two people opening the same link were offered different builds. One document, one
+      generation, one content-addressed script: the mixture is now impossible to assemble.
+    -->
     <link rel="stylesheet" href="./release-shell.css" />
+    <script>/*__RELEASE_GENERATION__*/window.__ATOMIC_ACRES_RELEASE_GENERATION__="unpublished";window.__ATOMIC_ACRES_RELEASE_CHANNELS__=null;</script>
+    <!--
+      The line below is DELETED by publish_pass81.py, which inlines the channel list above
+      instead. It stays in the template because scripts/release/stage-release-topology.mjs
+      is a second publisher of this same file: it copies this document verbatim and writes
+      release-channel-config.js beside it. Removing the tag from the template would ship
+      that path a chooser with a null channel list, which throws before it draws - the exact
+      blank-page failure this whole change exists to stop. Deferred scripts run in document
+      order after parsing, so on that path this overwrites the inline null; on the publish
+      path the tag is gone and the inlined list is the only source.
+    -->
     <script defer src="./release-channel-config.js"></script>
     <script defer src="./release-shell.js"></script>
   </head>
@@ -16,14 +41,14 @@
       <section class="release-channel-card">
         <div class="eyebrow">NUKE TOWN · BUILD SELECT</div>
         <h1 id="release-channel-title">CHOOSE YOUR <span>DEPLOYMENT</span></h1>
-        <p>Choose <strong>Pass 73</strong>, the exact previous live <strong>Pass 72</strong>, retained <strong>Pass 70</strong>, or retained <strong>Pass 69</strong>.</p>
+        <p>Choose the <strong>newest build</strong>, or any earlier pass retained below. Every published pass stays playable.</p>
         <div id="release-channel-options" class="release-channel-options" aria-live="polite"></div>
         <section class="release-refresh" aria-label="Refresh this version chooser">
-          <div><strong>VERSION NOT UPDATED?</strong><span>Press Ctrl+Shift+R, or use the same hard game refresh available in Options.</span></div>
+          <div><strong>VERSION NOT UPDATED?</strong><span>This page re-checks the published build list every time it opens and updates itself, so you should never need this. It is here as a last resort.</span></div>
           <button id="release-hard-refresh" type="button">HARD RESET / REFRESH</button>
         </section>
         <p id="release-status" class="release-status" aria-live="polite"></p>
-        <footer>Room links and legacy latest links use Pass 73. Pass 72, Pass 70 and Pass 69 remain separately available for browser testing, comparison and rollback.</footer>
+        <footer>Room links and legacy latest links stay on the established live pass, so multiplayer invites keep working. Every other published pass remains separately available for browser testing, comparison and rollback.</footer>
       </section>
     </main>
   </body>

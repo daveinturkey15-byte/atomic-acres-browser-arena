@@ -1,0 +1,32 @@
+{
+  "capturedAt": "2026-09-04T13:53:21.912Z",
+  "adapter": "software (swiftshader) - NOT GPU evidence",
+  "scale": "0.7",
+  "sheets": [
+    {
+      "name": "gaits-procedural",
+      "url": "http://127.0.0.1:4316/pass94-operator-looks.html?mode=gaits&looks=procedural&scale=0.7",
+      "status": "READY mode=gaits looks=procedural registry=[vanguard-woodland, vanguard-urban, marauder-arid, marauder-nightfall]",
+      "path": "C:\\Users\\david\\projects\\aa-claude-anim\\docs\\evidence\\pass94\\animation-skins\\captures\\gaits-procedural.png"
+    },
+    {
+      "name": "gaits-tinted",
+      "url": "http://127.0.0.1:4316/pass94-operator-looks.html?mode=gaits&looks=tinted&scale=0.7",
+      "status": "READY mode=gaits looks=tinted registry=[vanguard-woodland, vanguard-urban, marauder-arid, marauder-nightfall]",
+      "path": "C:\\Users\\david\\projects\\aa-claude-anim\\docs\\evidence\\pass94\\animation-skins\\captures\\gaits-tinted.png"
+    },
+    {
+      "name": "skins-procedural",
+      "url": "http://127.0.0.1:4316/pass94-operator-looks.html?mode=skins&looks=procedural&scale=0.7",
+      "status": "READY mode=skins looks=procedural registry=[vanguard-woodland, vanguard-urban, marauder-arid, marauder-nightfall]",
+      "path": "C:\\Users\\david\\projects\\aa-claude-anim\\docs\\evidence\\pass94\\animation-skins\\captures\\skins-procedural.png"
+    },
+    {
+      "name": "skins-tinted",
+      "url": "http://127.0.0.1:4316/pass94-operator-looks.html?mode=skins&looks=tinted&scale=0.7",
+      "status": "READY mode=skins looks=tinted registry=[vanguard-woodland, vanguard-urban, marauder-arid, marauder-nightfall]",
+      "path": "C:\\Users\\david\\projects\\aa-claude-anim\\docs\\evidence\\pass94\\animation-skins\\captures\\skins-tinted.png"
+    }
+  ],
+  "consoleErrors": []
+}

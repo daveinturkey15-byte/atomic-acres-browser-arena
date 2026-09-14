@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "projectId": "atomic-acres-browser-arena",
+  "repository": "daveinturkey15-byte/atomic-acres-browser-arena",
+  "machine": "dave-gaming-pc",
+  "installedAt": "2026-09-11T00:00:00.000Z",
+  "installedBy": "root integrator (example values; run `node scripts/release/project-routing.mjs init` to write a real record)",
+  "enforcement": {
+    "legacyContribute": "warn",
+    "_comment": "warn: a `contribute` call without --project/--lane is accepted and stamped routing.mode=legacy with a visible warning. refuse: such a call fails. Root flips this to refuse at cutover; ATOMIC_ACRES_ROUTING_REQUIRED=1 in the environment has the same effect without a registry."
+  },
+  "gitCommonDir": "C:/Users/david/Documents/Codex/2026-09-09/atomic-acres-weekly-audit/work/integration-full/.git",
+  "integration": {
+    "ref": "refs/remotes/origin/main",
+    "expectedSha": "0dd95943e5eb4ac9cc0dd7c3a47baa2b338c7a88",
+    "destination": "pull request into main; contributors never push main",
+    "_comment": "expectedSha is the origin/main this record was written against. The guard refuses when fetched origin/main differs: re-run init/readback after every integration rather than trusting a stale record."
+  },
+  "inspectedPreview": {
+    "sha": "79161fd5343e9cf82b2b1ec28ca2dca2138788de",
+    "worktree": "C:/Users/david/Documents/Codex/2026-09-09/atomic-acres-weekly-audit/work/nuketown-clean-candidate-20260910",
+    "branch": "contrib/dave-gaming-pc/codex/nuketown-clean-candidate-20260910",
+    "status": "inspected-owner-rejected",
+    "_comment": "Which exact SHA a human last inspected and what they said. This field is a record, never an approval; the guard never writes it."
+  },
+  "production": {
+    "pass": "PASS 95",
+    "sourceSha": null,
+    "pagesSha": "6fede5fdd262b8783d58d5226f87463f129962e0",
+    "verification": "fetched gh-pages manifest only; no cache-busted live smoke recorded",
+    "_comment": "The publisher is python scripts/orchestration/publish_pass<N>.py from the canonical checkout. This record describes production; it never publishes."
+  },
+  "rollback": {
+    "pass": "PASS 94",
+    "sourceSha": null,
+    "_comment": "The pinned safe backup (HF-400). --rollback re-points the default without deleting a tree."
+  },
+  "protectedCheckouts": [
+    {
+      "path": "C:/Users/david/projects/atomic-acres-production-27e0858",
+      "reason": "Owner's designated Pass 62 netcode benchmark checkout; must stay byte-exact. Refused as a contribution worktree even if a lane names it."
+    }
+  ],
+  "lanes": {
+    "routing-repair-20260911": {
+      "worktree": "C:/Users/david/projects/aa-routing-repair-20260911",
+      "branch": "contrib/dave-gaming-pc/claude/routing-repair-20260911",
+      "owner": { "machine": "dave-gaming-pc", "harness": "claude" },
+      "baseSha": "79161fd5343e9cf82b2b1ec28ca2dca2138788de",
+      "dispatchHeadSha": "79161fd5343e9cf82b2b1ec28ca2dca2138788de",
+      "allowedPaths": [
+        "scripts/release/**",
+        "docs/PROJECT_ROUTING*",
+        "docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md",
+        "docs/MULTI_AGENT_REPO_DISCIPLINE.md",
+        "AGENTS.md",
+        ".gitignore",
+        "package.json",
+        ".github/project-identity.json"
+      ],
+      "status": "open",
+      "expiresAt": "2026-09-12T08:00:00.000Z",
+      "closure": null
+    },
+    "example-closed-integrated": {
+      "worktree": "C:/Users/david/projects/aa-example-integrated",
+      "branch": "contrib/dave-gaming-pc/codex/example-integrated",
+      "owner": { "machine": "dave-gaming-pc", "harness": "codex" },
+      "baseSha": "0dd95943e5eb4ac9cc0dd7c3a47baa2b338c7a88",
+      "dispatchHeadSha": "0dd95943e5eb4ac9cc0dd7c3a47baa2b338c7a88",
+      "allowedPaths": ["docs/**"],
+      "status": "closed",
+      "expiresAt": "2026-09-10T00:00:00.000Z",
+      "closure": {
+        "outcome": "integrated",
+        "laneHeadSha": "0dd95943e5eb4ac9cc0dd7c3a47baa2b338c7a88",
+        "integratedIntoSha": "0dd95943e5eb4ac9cc0dd7c3a47baa2b338c7a88",
+        "pullRequest": "https://github.com/daveinturkey15-byte/atomic-acres-browser-arena/pull/65",
+        "closedAt": "2026-09-06T00:00:00.000Z",
+        "_comment": "integrated: laneHeadSha must be an ancestor of integratedIntoSha, which must be an ancestor of the integration ref. Retirement of the worktree is a separate manual step after `lane-close` passes; the guard removes nothing."
+      }
+    },
+    "example-closed-rejected": {
+      "worktree": "C:/Users/david/projects/aa-example-rejected",
+      "branch": "contrib/dave-gaming-pc/hermes/example-rejected",
+      "owner": { "machine": "dave-gaming-pc", "harness": "hermes" },
+      "baseSha": "0dd95943e5eb4ac9cc0dd7c3a47baa2b338c7a88",
+      "dispatchHeadSha": "0dd95943e5eb4ac9cc0dd7c3a47baa2b338c7a88",
+      "allowedPaths": ["src/**"],
+      "status": "closed",
+      "expiresAt": "2026-09-10T00:00:00.000Z",
+      "closure": {
+        "outcome": "rejected",
+        "laneHeadSha": "0dd95943e5eb4ac9cc0dd7c3a47baa2b338c7a88",
+        "reason": "Owner rejected the visual result; unique commits preserved for later reference.",
+        "preservation": {
+          "ref": "refs/preserved/aa-example-rejected",
+          "bundlePath": "C:/Users/david/Documents/Codex/preserved/aa-example-rejected.bundle"
+        },
+        "closedAt": "2026-09-10T00:00:00.000Z",
+        "_comment": "rejected: at least one preservation proof is required and is verified (ref resolves to laneHeadSha, or bundle verifies and lists laneHeadSha). A dirty worktree is never closable."
+      }
+    }
+  }
+}

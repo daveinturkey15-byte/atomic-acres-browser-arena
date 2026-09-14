@@ -1,0 +1,7 @@
+[pipeline] match active; warming up
+[pipeline] hooked=true 317 stalls, 59.75% frozen over 75.5s
+[pipeline] render pipelines: 326 before window, 0 during (0/min)
+[pipeline]   0 of them inside a stall = null% (chance alone would give 59.75%) -> enrichment nullx
+[pipeline] shader modules: 329 before window, 0 during; 0 inside a stall -> enrichment nullx
+Wrote C:\Users\david\projects\aa-farcrysis-load\artifacts\qa\farcrysis-load\pipeline-stalls-farcrysis-after.json
+PROBE EXIT 0

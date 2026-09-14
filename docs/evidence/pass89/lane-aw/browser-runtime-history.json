@@ -1,0 +1,28 @@
+{
+  "provenance": {
+    "claimState": "OBSERVED_NOT_REPRODUCIBLE",
+    "note": "Captured by the Lane AW worker (Gemini 3.8 Flash) from ArenaAudio.debugMusicState().history in a live headless browser session on 2026-09-03. The producer script was NOT retained in the tree, so this receipt cannot be regenerated. It is kept because it is the only capture from a REAL AudioContext rather than an instrumented one, and because its arithmetic is self-consistent (see check below). It arrived as an uncommitted overwrite of 5-minute-music-run.{json,log.txt}; that overwrite was reverted - the simulation receipt it replaced is reproducible via scripts/qa/run-lane-aw-5min-music.mjs and is richer.",
+    "supersededBy": "runtime-music-rotation.json, which drives the same shipped ArenaAudio path deterministically and IS reproducible (LANE_AW_EVIDENCE=1 vitest run src/audio-music-rotation-runtime.test.ts)"
+  },
+  "capturedAt": "2026-09-03T06:02:12.227Z",
+  "durationSeconds": 300.2028999999762,
+  "sampleCount": 295,
+  "history": [
+    { "track": "cobalt-circuit", "atSeconds": 17.5 },
+    { "track": "bunker-lullaby", "atSeconds": 107.5 },
+    { "track": "fallout-drift", "atSeconds": 197.5 },
+    { "track": "static-vault", "atSeconds": 287.5 }
+  ],
+  "check": {
+    "swapIntervalsSeconds": [90.0, 90.0, 90.0],
+    "authoredDurationsSeconds": {
+      "cobalt-circuit": 90.0,
+      "bunker-lullaby": 90.0,
+      "fallout-drift": 90.0
+    },
+    "intervalsMatchAuthoredDurations": true,
+    "distinctTracks": 4,
+    "immediateRepeats": 0,
+    "unseededOrderDiffersFromSeededRun": true
+  }
+}

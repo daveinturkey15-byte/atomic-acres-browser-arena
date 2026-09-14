@@ -1,0 +1,351 @@
+{
+  "schemaVersion": 1,
+  "lane": "interiors-night-20260912",
+  "generatedBy": "scripts/blender/world-studio/interiors/build_interiors.py",
+  "blender": "5.1.2",
+  "seed": 20260912,
+  "assets": [
+    {
+      "id": "interior-hero-teal-living-kitchen",
+      "title": "Mid-century living room and kitchen hero set (teal house)",
+      "assetUrl": "assets/world-studio/blender/interiors/interior-hero-teal-living-kitchen.glb",
+      "thumbnailUrl": "assets/world-studio/blender/interiors/thumb-interior-hero-teal.png",
+      "category": "interior",
+      "kind": "composition",
+      "authoredBy": {
+        "harness": "claude",
+        "model": "claude-opus-5",
+        "effort": "xhigh"
+      },
+      "license": "Original project artwork, authored from code in this repository",
+      "method": "Deterministic Blender Python (bevelled hard-surface geometry, dominant-axis world UVs) with procedurally synthesised albedo/roughness maps; no downloaded mesh, texture or scan.",
+      "sourceUrls": [],
+      "revision": 2,
+      "status": "exported",
+      "metrics": {
+        "objects": 182,
+        "vertices": 16956,
+        "triangles": 33184,
+        "materials": [
+          "IntApplianceEnamel",
+          "IntAreaRug",
+          "IntBacksplashTile",
+          "IntBerberCarpet",
+          "IntBrass",
+          "IntCabinetOchre",
+          "IntCeramicCream",
+          "IntChrome",
+          "IntDarkCast",
+          "IntFoliage",
+          "IntLaminateCounter",
+          "IntLampShade",
+          "IntPaperStack",
+          "IntSageUpholstery",
+          "IntScreenGlass",
+          "IntTeakLight",
+          "IntVinylAvocado",
+          "IntVinylRust",
+          "IntWalnut"
+        ],
+        "bytes": 4603156
+      },
+      "sha256": "ded7d8cd183276805cff23f221d653269a4606564c2882189c4a261788c5132e",
+      "presentationOnly": true
+    },
+    {
+      "id": "interior-prop-sofa",
+      "title": "Sage three-seat sofa on a walnut plinth",
+      "assetUrl": "assets/world-studio/blender/interiors/interior-prop-sofa.glb",
+      "thumbnailUrl": null,
+      "category": "interior",
+      "kind": "prop",
+      "authoredBy": {
+        "harness": "claude",
+        "model": "claude-opus-5",
+        "effort": "xhigh"
+      },
+      "license": "Original project artwork, authored from code in this repository",
+      "method": "Deterministic Blender Python (bevelled hard-surface geometry, dominant-axis world UVs) with procedurally synthesised albedo/roughness maps; no downloaded mesh, texture or scan.",
+      "sourceUrls": [],
+      "revision": 2,
+      "status": "exported",
+      "metrics": {
+        "objects": 16,
+        "vertices": 1888,
+        "triangles": 3712,
+        "materials": [
+          "IntSageUpholstery",
+          "IntWalnut"
+        ],
+        "bytes": 1185944
+      },
+      "sha256": "8e3eb48e5913d37915f3baa40fab3d2393082c289eb371091925fa08472575c7",
+      "presentationOnly": true
+    },
+    {
+      "id": "interior-prop-coffee-table",
+      "title": "Walnut surfboard coffee table with brass bowl and books",
+      "assetUrl": "assets/world-studio/blender/interiors/interior-prop-coffee-table.glb",
+      "thumbnailUrl": null,
+      "category": "interior",
+      "kind": "prop",
+      "authoredBy": {
+        "harness": "claude",
+        "model": "claude-opus-5",
+        "effort": "xhigh"
+      },
+      "license": "Original project artwork, authored from code in this repository",
+      "method": "Deterministic Blender Python (bevelled hard-surface geometry, dominant-axis world UVs) with procedurally synthesised albedo/roughness maps; no downloaded mesh, texture or scan.",
+      "sourceUrls": [],
+      "revision": 2,
+      "status": "exported",
+      "metrics": {
+        "objects": 10,
+        "vertices": 1006,
+        "triangles": 1972,
+        "materials": [
+          "IntBrass",
+          "IntPaperStack",
+          "IntVinylRust",
+          "IntWalnut"
+        ],
+        "bytes": 590796
+      },
+      "sha256": "3840a2733a24830f69d1acbd20e2259a16196e53f6d00bc58c4e9bebc07526e8",
+      "presentationOnly": true
+    },
+    {
+      "id": "interior-prop-credenza",
+      "title": "Walnut credenza with period wood-cased television",
+      "assetUrl": "assets/world-studio/blender/interiors/interior-prop-credenza.glb",
+      "thumbnailUrl": null,
+      "category": "interior",
+      "kind": "prop",
+      "authoredBy": {
+        "harness": "claude",
+        "model": "claude-opus-5",
+        "effort": "xhigh"
+      },
+      "license": "Original project artwork, authored from code in this repository",
+      "method": "Deterministic Blender Python (bevelled hard-surface geometry, dominant-axis world UVs) with procedurally synthesised albedo/roughness maps; no downloaded mesh, texture or scan.",
+      "sourceUrls": [],
+      "revision": 2,
+      "status": "exported",
+      "metrics": {
+        "objects": 14,
+        "vertices": 1240,
+        "triangles": 2424,
+        "materials": [
+          "IntBrass",
+          "IntDarkCast",
+          "IntScreenGlass",
+          "IntTeakLight",
+          "IntWalnut"
+        ],
+        "bytes": 627744
+      },
+      "sha256": "f2440a734dd5fb0049730f9f581ddd6c78cffdf17f627fb701798130a1069cd8",
+      "presentationOnly": true
+    },
+    {
+      "id": "interior-prop-armchair",
+      "title": "Rust vinyl lounge chair on an exposed walnut frame",
+      "assetUrl": "assets/world-studio/blender/interiors/interior-prop-armchair.glb",
+      "thumbnailUrl": null,
+      "category": "interior",
+      "kind": "prop",
+      "authoredBy": {
+        "harness": "claude",
+        "model": "claude-opus-5",
+        "effort": "xhigh"
+      },
+      "license": "Original project artwork, authored from code in this repository",
+      "method": "Deterministic Blender Python (bevelled hard-surface geometry, dominant-axis world UVs) with procedurally synthesised albedo/roughness maps; no downloaded mesh, texture or scan.",
+      "sourceUrls": [],
+      "revision": 2,
+      "status": "exported",
+      "metrics": {
+        "objects": 12,
+        "vertices": 1168,
+        "triangles": 2288,
+        "materials": [
+          "IntVinylRust",
+          "IntWalnut"
+        ],
+        "bytes": 624944
+      },
+      "sha256": "08cae114c71283d2bd50704a2a980a2db1614618ebc5744b7a59c22dcab78369",
+      "presentationOnly": true
+    },
+    {
+      "id": "interior-prop-kitchen-run",
+      "title": "Ochre enamel kitchen run with sink, hob and tiled splashback",
+      "assetUrl": "assets/world-studio/blender/interiors/interior-prop-kitchen-run.glb",
+      "thumbnailUrl": null,
+      "category": "interior",
+      "kind": "prop",
+      "authoredBy": {
+        "harness": "claude",
+        "model": "claude-opus-5",
+        "effort": "xhigh"
+      },
+      "license": "Original project artwork, authored from code in this repository",
+      "method": "Deterministic Blender Python (bevelled hard-surface geometry, dominant-axis world UVs) with procedurally synthesised albedo/roughness maps; no downloaded mesh, texture or scan.",
+      "sourceUrls": [],
+      "revision": 2,
+      "status": "exported",
+      "metrics": {
+        "objects": 35,
+        "vertices": 3044,
+        "triangles": 5948,
+        "materials": [
+          "IntBacksplashTile",
+          "IntCabinetOchre",
+          "IntChrome",
+          "IntDarkCast",
+          "IntLaminateCounter"
+        ],
+        "bytes": 966432
+      },
+      "sha256": "3749ea5f4ef1a27485729a7e0b7f9bca1b8de42c2ad9e950874485feb46624c9",
+      "presentationOnly": true
+    },
+    {
+      "id": "interior-prop-fridge",
+      "title": "White enamel refrigerator with chrome latch",
+      "assetUrl": "assets/world-studio/blender/interiors/interior-prop-fridge.glb",
+      "thumbnailUrl": null,
+      "category": "interior",
+      "kind": "prop",
+      "authoredBy": {
+        "harness": "claude",
+        "model": "claude-opus-5",
+        "effort": "xhigh"
+      },
+      "license": "Original project artwork, authored from code in this repository",
+      "method": "Deterministic Blender Python (bevelled hard-surface geometry, dominant-axis world UVs) with procedurally synthesised albedo/roughness maps; no downloaded mesh, texture or scan.",
+      "sourceUrls": [],
+      "revision": 2,
+      "status": "exported",
+      "metrics": {
+        "objects": 5,
+        "vertices": 600,
+        "triangles": 1180,
+        "materials": [
+          "IntApplianceEnamel",
+          "IntBrass",
+          "IntChrome",
+          "IntDarkCast"
+        ],
+        "bytes": 85824
+      },
+      "sha256": "ccecbce36d9c890d394a7be6637392988127722cfd064b9b4386d12d09e2eba0",
+      "presentationOnly": true
+    },
+    {
+      "id": "interior-prop-dinette",
+      "title": "Chrome-and-laminate dinette with four avocado vinyl chairs",
+      "assetUrl": "assets/world-studio/blender/interiors/interior-prop-dinette.glb",
+      "thumbnailUrl": null,
+      "category": "interior",
+      "kind": "prop",
+      "authoredBy": {
+        "harness": "claude",
+        "model": "claude-opus-5",
+        "effort": "xhigh"
+      },
+      "license": "Original project artwork, authored from code in this repository",
+      "method": "Deterministic Blender Python (bevelled hard-surface geometry, dominant-axis world UVs) with procedurally synthesised albedo/roughness maps; no downloaded mesh, texture or scan.",
+      "sourceUrls": [],
+      "revision": 2,
+      "status": "exported",
+      "metrics": {
+        "objects": 48,
+        "vertices": 4198,
+        "triangles": 8204,
+        "materials": [
+          "IntBrass",
+          "IntCeramicCream",
+          "IntChrome",
+          "IntLaminateCounter",
+          "IntVinylAvocado"
+        ],
+        "bytes": 910816
+      },
+      "sha256": "af18cb87a90e1c6d33efe70592e8de09bcbd66c62dd2b14439a98dffa145038b",
+      "presentationOnly": true
+    },
+    {
+      "id": "interior-prop-area-rug",
+      "title": "Banded geometric area rug over the berber field",
+      "assetUrl": "assets/world-studio/blender/interiors/interior-prop-area-rug.glb",
+      "thumbnailUrl": null,
+      "category": "interior",
+      "kind": "prop",
+      "authoredBy": {
+        "harness": "claude",
+        "model": "claude-opus-5",
+        "effort": "xhigh"
+      },
+      "license": "Original project artwork, authored from code in this repository",
+      "method": "Deterministic Blender Python (bevelled hard-surface geometry, dominant-axis world UVs) with procedurally synthesised albedo/roughness maps; no downloaded mesh, texture or scan.",
+      "sourceUrls": [],
+      "revision": 2,
+      "status": "exported",
+      "metrics": {
+        "objects": 2,
+        "vertices": 152,
+        "triangles": 296,
+        "materials": [
+          "IntAreaRug",
+          "IntBerberCarpet"
+        ],
+        "bytes": 1036024
+      },
+      "sha256": "45e60576c5d46fdb785a1d0b27dca0f2070abb9ccbef62bbc9770c6f6f447f5b",
+      "presentationOnly": true
+    },
+    {
+      "id": "interior-prop-accents",
+      "title": "Accent set: table lamp, starburst clock, snake plant, wall art",
+      "assetUrl": "assets/world-studio/blender/interiors/interior-prop-accents.glb",
+      "thumbnailUrl": null,
+      "category": "interior",
+      "kind": "prop",
+      "authoredBy": {
+        "harness": "claude",
+        "model": "claude-opus-5",
+        "effort": "xhigh"
+      },
+      "license": "Original project artwork, authored from code in this repository",
+      "method": "Deterministic Blender Python (bevelled hard-surface geometry, dominant-axis world UVs) with procedurally synthesised albedo/roughness maps; no downloaded mesh, texture or scan.",
+      "sourceUrls": [],
+      "revision": 2,
+      "status": "exported",
+      "metrics": {
+        "objects": 40,
+        "vertices": 3660,
+        "triangles": 7160,
+        "materials": [
+          "IntBrass",
+          "IntCeramicCream",
+          "IntDarkCast",
+          "IntFoliage",
+          "IntLampShade",
+          "IntPaperStack",
+          "IntVinylAvocado",
+          "IntVinylRust",
+          "IntWalnut"
+        ],
+        "bytes": 940140
+      },
+      "sha256": "16a5fae4f1119ac40bc08b7943325ac4476c4c9c3b7206b86563ff1f63fa7cc5",
+      "presentationOnly": true
+    }
+  ],
+  "limitations": [
+    "Presentation only: no collider, spawn, patrol point or shot authority is implied by any row here. The runtime keeps gameplay authority.",
+    "Thumbnails are Blender Cycles CPU stills of the exported set lit by a preview-only rig (camera, lights, floor/walls/ceiling) that is NOT part of any GLB. They are not a runtime capture and are not visual acceptance.",
+    "Not yet loaded by the runtime: no row here has been fetched by three.js in a browser. `src/world-studio/interior-assets/index.ts` is typechecked but unexercised."
+  ]
+}

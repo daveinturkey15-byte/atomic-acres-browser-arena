@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { WEAPON_CATALOG } from './combat/weapon-catalog';
 import {
   PASS65_AUTHORED_FIREARM_IDS,
+  WEAPON_LIVERY_ALIASES,
   PASS65_AUTHORED_WEAPON_URLS,
   PASS65_FIELD_KNIFE_URLS,
   PASS65_WEAPON_CACHE_BUDGET,
@@ -32,7 +33,11 @@ const production = JSON.parse(readFileSync('source-assets/blender/pass65-weapon-
 
 describe('Pass 65 authored firearm runtime selection', () => {
   it('keeps the runtime, Blender specification, catalog and production sets exactly equal', () => {
-    const expected = WEAPON_CATALOG.map((weapon) => weapon.id).filter((id) => id !== 'explosive-crossbow').sort();
+    // Livery variants (HF-334) reuse another weapon's authored delivery by
+    // design, so they carry no authored asset of their own - the alias
+    // registry is the single source of that exemption.
+    const expected = WEAPON_CATALOG.map((weapon) => weapon.id)
+      .filter((id) => id !== 'explosive-crossbow' && !(id in WEAPON_LIVERY_ALIASES)).sort();
     expect([...PASS65_AUTHORED_FIREARM_IDS].sort()).toEqual(expected);
     expect(familySpec.weapons.map((weapon) => weapon.id).sort()).toEqual(expected);
     expect(production.weapons.filter((weapon) => weapon.id !== 'explosive-crossbow').map((weapon) => weapon.id).sort()).toEqual(expected);

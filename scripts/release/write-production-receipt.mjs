@@ -1,5 +1,17 @@
 #!/usr/bin/env node
-
+//
+// INTENTIONALLY DORMANT (Lane AD, PASS 87). Nothing invokes this module any more: the
+// production workflow became verification-only and writes a `published: false` receipt
+// through scripts/release/write-verification-receipt.mjs, and the only publisher -
+// scripts/orchestration/publish_pass<N>.py - asserts its own post-state and writes no
+// receipt at all. This file is kept, and pinned by src/release-pipeline.test.ts and
+// src/production-receipt.test.ts, because it is the schema-3 PUBLISHED receipt: it is what
+// a caller must produce when publication is again performed by a machine that can observe a
+// Pages build and a post-Pages live smoke (it requires both, plus the acceptance receipt,
+// and refuses to write anything if their identities disagree). Whoever wires publication
+// back into CI calls it there; until then, a receipt this writes would name a publication
+// nobody performed. Do not call it from the verification workflow.
+//
 import { readFileSync, writeFileSync } from 'node:fs';
 
 function readJson(path) {

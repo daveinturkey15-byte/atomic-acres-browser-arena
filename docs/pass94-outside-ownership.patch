@@ -1,0 +1,47 @@
+diff --git a/src/bootstrap.ts b/src/bootstrap.ts
+index 7565e199..16808077 100644
+--- a/src/bootstrap.ts
++++ b/src/bootstrap.ts
+@@ -31,15 +31,15 @@ const releaseChannels: ReleaseChannelConfig = releaseChannelsJson;
+ // second card was a dead link.
+ //
+ // HF-400, owner 2026-09-02: "pin this version and remove all past versions, this
+-// can be the safe backup". After the pass93 publish the ONLY trees on gh-pages
+-// are channels/pass93 and channels/pass92, so the second card must be the PASS 92
++// can be the safe backup". After the pass94 publish the ONLY trees on gh-pages
++// are channels/pass94 and channels/pass93, so the second card must be the PASS 93
+ // safe backup; `stable` (recent-stable) is retired by that publish and stays here
+ // only as a last resort the publish guard will refuse. `rollback` is deliberately
+ // not consulted; it stays in release-channels.json because project-map.ts
+ // documents it, but it must not be offered to a player until its tree exists.
+-// scripts/orchestration/publish_pass93.py parses this line and refuses to publish
+-// unless it resolves to channels/pass92.
+-const stableFallback = releaseChannels.pass92Backup ?? releaseChannels.stable;
++// scripts/orchestration/publish_pass94.py parses this line and refuses to publish
++// unless it resolves to channels/pass93.
++const stableFallback = releaseChannels.pass93Backup ?? releaseChannels.stable;
+ const newestBuildIsPublished = CHANGELOG[0]?.releasedAt !== PENDING_PRODUCTION_RELEASE;
+ // The pass name used to be hand-written into both of these strings, and had been stale for
+ // ten passes: the shipped chooser introduced PASS 80 as "the local Pass 70 HITL candidate"
+diff --git a/src/release-channel.ts b/src/release-channel.ts
+index 92285f15..4644c85a 100644
+--- a/src/release-channel.ts
++++ b/src/release-channel.ts
+@@ -28,14 +28,14 @@ export type ReleaseChannelConfig = {
+   historical: PinnedReleaseChannel;
+   stable: PinnedReleaseChannel;
+   /**
+-   * PASS 92, the single pinned safe backup at channels/pass92 (HF-400, owner
++   * PASS 93, the single pinned safe backup at channels/pass93 (HF-400, owner
+    * 2026-09-02: "pin this version and remove all past versions, this can be the
+    * safe backup"). Optional because the key post-dates schemaVersion 5 consumers,
+-   * but it IS on gh-pages and it is the only predecessor the pass93 publish
++   * but it IS on gh-pages and it is the only predecessor the pass94 publish
+    * keeps - which is why the direct-link chooser in bootstrap.ts prefers it over
+    * `rollback`, whose tree 404s.
+    */
+-  pass92Backup?: Readonly<{ label: string; description: string; pass: string; path: string }>;
++  pass93Backup?: Readonly<{ label: string; description: string; pass: string; path: string }>;
+   rollback?: PinnedReleaseChannel & {
+     rebuiltFromSource: boolean;
+   };

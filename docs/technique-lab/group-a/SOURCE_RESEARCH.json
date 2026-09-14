@@ -1,0 +1,258 @@
+{
+  "generatedAt": "2026-09-12",
+  "group": "A",
+  "scope": [1, 17],
+  "lane": "technique-a-20260912",
+  "baseSha": "e33f3dfe6c99da722cd06cded0c3d6dc6f4990f4",
+  "perUrlAttemptLedger": "docs/technique-lab/group-a/fetch-attempts.json (86 attempts, each with timestamp, HTTP status, byte length, sha256 of the exact body, and the out-of-repository cache path)",
+  "reader": "scripts/technique-lab/group-a/source_reader.py (stdlib urllib, 25 s timeout, no credentials, no auth, nothing executed)",
+  "separationOfClaims": "Source equality, runtime execution and rendered quality are separate claims throughout. Every demo instantiates, advances and disposes under a CPU check; NONE has been pixel-validated, because this lane runs no GPU or browser job. Pixel validation is OPEN for all 16 non-blocked IDs.",
+  "untrustedContentPolicy": "All fetched page and repository content was treated as data. No instruction found in any fetched source was followed, no downloaded code was executed, and no source dependency was installed.",
+  "records": [
+    {
+      "sourceId": 1, "title": "Mocap to in-game animation", "adaptation": "adapted",
+      "urls": [
+        {"url": "https://x.com/Graalitoo/status/2089469774602633431", "outcome": "ok", "status": 200, "readDepth": "og:title and og:description served by x.com; author text recovered verbatim, video not retrievable"},
+        {"url": "https://github.com/squall01337/mixamo-llm-mocap", "outcome": "ok", "status": 200, "readDepth": "repository page, then API commit + recursive tree at the pin, then three file bodies"}
+      ],
+      "pin": "00dfd5385506022d533c84f6737a09f5f4392623 (resolves; committed 2026-08-18T13:22:54Z)",
+      "licence": "LICENSE fetched (2,045 bytes). Register records the file text reads MIT while GitHub reports NOASSERTION because extra terms are appended. Blender, GVHMR checkpoints, SMPL-X data and Mixamo characters carry separate terms; Mixamo character redistribution is NOT granted.",
+      "filesRead": ["docs/RIG.md (3,810 B, full)", "action_specs/spin.json (2,865 B)", "pipeline/apply_mixamo_fk.py (28,604 B, fetched)"],
+      "methodExtracted": "FK-only pose evaluation from a declarative action spec; ground contact resolved by searching hip height until the support foot reaches the measured ankle-contact height, with Z-only foot flattening. RIG.md:52-54 states 'No Blender IK, ever' because constraint IK historically put feet at -81 m. Only Hips translates; every other bone is quaternion-only and keyed at zero so stale channels cannot leak. 30 fps integer frames.",
+      "compatibilityDifferences": "Upstream is Blender/Python against a 65-bone mixamorig skeleton in centimetres with a +Z-up import wrapper. Our demo is browser Three.js, metres, Y-up, and a 9-joint stand-in proportioned from RIG.md's measured chain lengths.",
+      "dependencies": "Blender 5.x, GVHMR checkpoints, SMPL-X, Mixamo characters, GPU. None installed or run.",
+      "consumer": "src/map3/technique-lab/demos/group-a/source-01.ts",
+      "cpuCheck": "instantiate/advance/dispose + determinism + finite geometry (group-a-demos.test.ts)",
+      "pixelValidation": "OPEN"
+    },
+    {
+      "sourceId": 2, "title": "Spectral FFT ocean", "adaptation": "adapted",
+      "urls": [
+        {"url": "https://x.com/Graalitoo/status/2089656660981862487", "outcome": "ok", "status": 200, "readDepth": "author text verbatim from og:description"},
+        {"url": "https://github.com/squall01337/abyssal-ocean", "outcome": "ok", "status": 200, "readDepth": "rendered README on the repository page read for the technique list, plus API commit and tree at the pin, plus the whole implementation file"}
+      ],
+      "pin": "142265f5013b6f27bea4f4f819b832dec75c7bad (resolves; committed 2026-08-18T19:31:55Z)",
+      "licence": "MIT, LICENSE fetched (1,077 bytes).",
+      "filesRead": ["index.html (83,466 B) — lines 239-241, 424, 513-528, 532-567, 573-579, 581-699 inspected"],
+      "methodExtracted": "3 cascades at 768/121/19 m partitioning k-space without overlap; 512^2 inverse FFT per cascade per frame as a Cooley-Tukey butterfly with a precomputed twiddle/index texture, two MRT slots carrying four complex fields through one butterfly; JONSWAP with TMA shallow-water correction and Donelan-Banner spreading, driven by real wind speed, fetch and depth; Tessendorf h0 = (xi_r + i*xi_i)*sqrt(P); h(k,t) from h0(k) and conj(h0(-k)); foam injected where the Jacobian of the Tessendorf displacement goes negative, then accumulated temporally.",
+      "compatibilityDifferences": "Ours is one cascade at N=32 on the CPU in JavaScript, a plain iterative radix-2 transform instead of a butterfly texture and MRT, cos^2s spreading instead of Donelan-Banner, and a per-frame Jacobian foam test with no temporal accumulation. Upstream is WebGL2 + GLSL; this repository forbids ShaderMaterial/GLSL, so the surface is core materials with vertex colours.",
+      "dependencies": "None beyond three.",
+      "consumer": "src/map3/technique-lab/demos/group-a/source-02.ts",
+      "cpuCheck": "as above, plus an explicit assertion that the displacement Jacobian drops below 1 (a summed-sine surface never folds) and that gridN is 32",
+      "pixelValidation": "OPEN"
+    },
+    {
+      "sourceId": 3, "title": "Stylized water composition", "adaptation": "adapted",
+      "urls": [{"url": "https://x.com/Graalitoo/status/2077373937449648518", "outcome": "ok", "status": 200, "readDepth": "author text verbatim from og:description; the video itself is not retrievable"}],
+      "pin": "none — no repository exists", "licence": "none identified",
+      "filesRead": [],
+      "methodExtracted": "Not an implementation: the recoverable content is a stylised fishing/water composition with harpoon fishing. The reusable object is the comparator list the register names — shallow-water colour layers, shore foam, readable caustic depth, reflection, wake.",
+      "compatibilityDifferences": "n/a — nothing to port.",
+      "dependencies": "none",
+      "consumer": "src/map3/technique-lab/demos/group-a/source-03.ts",
+      "cpuCheck": "instantiate/advance/dispose + determinism + finite geometry",
+      "pixelValidation": "OPEN",
+      "limitation": "Comparator-only. Attractive imagery is not proof of a WebGPU implementation and the demo does not claim to match the target."
+    },
+    {
+      "sourceId": 4, "title": "Underwater volume and waterline cutting", "adaptation": "adapted",
+      "urls": [{"url": "https://x.com/gruberbuilds/status/2090235767922512234", "outcome": "ok", "status": 200, "readDepth": "author text verbatim from og:description"}],
+      "pin": "none", "licence": "none identified", "filesRead": [],
+      "methodExtracted": "An underwater mesh distorts the ocean surface with domes and laminar flow around the front. The author states explicitly that the CUTTING of the surface still needs to be better — the source has not solved it.",
+      "compatibilityDifferences": "n/a — nothing to port; the dome and laminar terms here are our own formulation.",
+      "dependencies": "none",
+      "consumer": "src/map3/technique-lab/demos/group-a/source-04.ts",
+      "cpuCheck": "instantiate/advance/dispose + determinism + finite geometry; tornVertices counter reports the size of the deliberately unsolved cut artefact",
+      "pixelValidation": "OPEN",
+      "limitation": "The waterline cut is shown FAILING on purpose. Do not read the right-hand half as a solved cut."
+    },
+    {
+      "sourceId": 5, "title": "Local H3 video to sprite animation", "adaptation": "adapted",
+      "urls": [
+        {"url": "https://x.com/victormustar/status/2089310616854892818", "outcome": "ok", "status": 200, "readDepth": "four-step workflow recovered verbatim from og:description"},
+        {"url": "https://www.minimax.io/blog/minimax-h3", "outcome": "ok", "status": 200, "readDepth": "page body cached; read for licence position only"},
+        {"url": "https://huggingface.co/MiniMaxAI/MiniMax-H3", "outcome": "ok", "status": 200, "readDepth": "model page cached; read for licence position only"}
+      ],
+      "pin": "n/a", "licence": "MiniMax Community License EXCLUDES use of the model and its output in the UK, EU, US and Korea without separate written authorization. This machine is in the UK. Position re-verified in the register 2026-08-26 and STANDS.",
+      "filesRead": [],
+      "methodExtracted": "1 character design still on flat magenta; one 5 s clip per move; cut each clip to its pose extremes; key out the magenta and pack into a sprite atlas.",
+      "compatibilityDifferences": "Only the provider-neutral half is portable. No H3 model, weights or output were fetched or used; input frames are drawn locally in code. Output is a 2D sprite/billboard, never a 3D skinned rig.",
+      "dependencies": "H3 model — REJECTED on licence. Prefer source 16 for text-driven character motion (NVIDIA Open Model License, no country exclusion).",
+      "consumer": "src/map3/technique-lab/demos/group-a/source-05.ts",
+      "cpuCheck": "instantiate/advance/dispose + determinism; keyedTexels and poseExtremes counters",
+      "pixelValidation": "OPEN"
+    },
+    {
+      "sourceId": 6, "title": "Image to procedural Three.js model", "adaptation": "adapted",
+      "urls": [{"url": "https://github.com/img2threejs/img2threejs", "outcome": "ok", "status": 200, "readDepth": "repository page, API commit and recursive tree at the pin, then two file bodies"}],
+      "pin": "d6673386f89673a58736f8d398dd16ece67874f5 (resolves; committed 2026-08-06T05:23:34Z, 156 files)",
+      "licence": "Apache-2.0, LICENSE fetched (11,337 bytes).",
+      "filesRead": ["docs/ARCHITECTURE.md (9,487 B) — lines 7-17, 32-53, 63-89, 97-134", "SKILL.md (48,766 B, fetched)"],
+      "methodExtracted": "Reference image -> probe and suitability gate -> author an ObjectSculptSpec (components, materials, sockets) -> pass-gated code generation, where the generator emits only the currently unlocked build pass. Gates include a blocking material gate and an Action-ready gate: the model must expose pivots, sockets, colliders and destruction groups via root.userData.sculptRuntime. Output is the spec JSON plus a createObjectNameModel(spec, options) factory returning a THREE.Group.",
+      "compatibilityDifferences": "Upstream stages 1-3 need the installed skill, Python gate scripts and an agent with vision. Ours authors the spec by hand to the documented shape and runs only the action-ready gate.",
+      "dependencies": "Python gate scripts, vision model. None installed or run.",
+      "consumer": "src/map3/technique-lab/demos/group-a/source-06.ts",
+      "cpuCheck": "the gate is asserted to REFUSE the runtime-less half and to refuse an empty Group, and to pass the specified half",
+      "pixelValidation": "OPEN"
+    },
+    {
+      "sourceId": 7, "title": "Code-only procedural scene authoring", "adaptation": "adapted",
+      "urls": [
+        {"url": "https://x.com/prasenx/status/2087604022849184080", "outcome": "ok", "status": 200, "readDepth": "author text verbatim"},
+        {"url": "https://github.com/StarKnightt/night-street", "outcome": "ok", "status": 200, "readDepth": "repository page, API commit and tree at the pin, three file bodies"}
+      ],
+      "pin": "333f064778105640588a95d2c2d150780044e7bf (resolves; committed 2026-08-13T05:59:28Z)",
+      "licence": "MIT, LICENSE fetched (1,080 bytes).",
+      "filesRead": ["docs/TECHNIQUE.md (58,960 B) — full section index read; 3.1-3.9, 4.1-4.5, 5.1-5.8 headings", "PROMPTS.md (14,956 B)", "src/scene/softShadow.ts (16,800 B, fetched)"],
+      "methodExtracted": "Code-only procedural authoring with zero external assets, and a lighting method that is a MEASURED BUDGET: measure what the removed rig cost, derive the level of an artificial source, and prefer emissive geometry over a real light except where the light must do work. TECHNIQUE.md also WITHDRAWS its own display-transform section, which is why no constant is quoted from it.",
+      "compatibilityDifferences": "Upstream is React Three Fiber with a full post chain (bloom, LUT-free grade, god rays, DoF, grain, vignette). The lab host owns tone mapping and post here, so only the authoring and light-budget half is portable.",
+      "dependencies": "None beyond three.",
+      "consumer": "src/map3/technique-lab/demos/group-a/source-07.ts",
+      "cpuCheck": "beforeLights vs afterLights counters; the test asserts no ambient or directional light is added and that local lights are declared",
+      "pixelValidation": "OPEN"
+    },
+    {
+      "sourceId": 8, "title": "Fully procedural jungle", "adaptation": "adapted",
+      "urls": [{"url": "https://github.com/StarKnightt/jungle-trail", "outcome": "ok", "status": 200, "readDepth": "repository page, API commit and tree at the pin, three file bodies"}],
+      "pin": "c15640d3a2b6f08ca68e4df98fdfc953ea8a070a (resolves; committed 2026-08-08T06:48:53Z)",
+      "licence": "MIT, LICENSE fetched (1,080 bytes).",
+      "filesRead": ["PROMPT.md (3,328 B, full)", "src/gfx/glsl.js (11,330 B)", "src/render/grade.js (65,101 B)"],
+      "methodExtracted": "Sequential system-by-system build with a blind critic that sees only rendered output. PROMPT.md records the defects that loop caught, two of which are generation bugs any procedural vegetation pass reproduces: dark outlines on every leaf from a premultiplied-alpha bug in the texture baker, and black tree trunks from inverted quad winding compounded by a moss layer. Honest scores are recorded: vegetation 5/10 after six rounds.",
+      "compatibilityDifferences": "Upstream generates terrain, plants, ruins, water, audio and grade. Ours implements the texture-bake correctness half and layered instanced leaf cards only.",
+      "dependencies": "None beyond three.",
+      "consumer": "src/map3/technique-lab/demos/group-a/source-08.ts",
+      "cpuCheck": "beforeDarkEdgeTexels vs afterDarkEdgeTexels counters make the premultiplied-alpha defect measurable",
+      "pixelValidation": "OPEN"
+    },
+    {
+      "sourceId": 9, "title": "Three.js frame-loop and visual audit", "adaptation": "adapted",
+      "urls": [
+        {"url": "https://x.com/aidenybai/status/2089400082550620636", "outcome": "ok", "status": 200, "readDepth": "announcement text verbatim"},
+        {"url": "https://github.com/millionco/react-doctor", "outcome": "ok", "status": 200, "readDepth": "repository page, API commit, 2.2 MB recursive tree, and the skill body in full"}
+      ],
+      "pin": "e183c3519010599d929ed14d99a18bf1f8f8a44c (resolves; committed 2026-08-22T05:03:20Z), path skills/improve-threejs/SKILL.md",
+      "licence": "Modified MIT, LICENSE fetched (1,732 bytes): MIT plus two carve-outs requiring prior written permission from Million Software, Inc. — (a) use as training/fine-tuning/evaluation data or input to an automated ML-training pipeline, (b) sale as a paid hosted product.",
+      "filesRead": ["skills/improve-threejs/SKILL.md (9,128 B, all 103 lines)"],
+      "methodExtracted": "Severity follows the render loop. HIGH: allocation inside useFrame/RAF, setState inside useFrame, missing disposal of imperatively created GPU resources, object reconstruction in render. MEDIUM: unstable scene-graph props, missing instancing, frameloop=always on a static scene, uncached asset loading. A 10-row visual rubric with an explicit fail condition per row, and a list of checks the scanner always misses.",
+      "compatibilityDifferences": "Upstream is R3F-centric and uses React Doctor as the scanning engine. Our restated scanner is plain-Three aware, has no dependency, and covers the static half only.",
+      "dependencies": "react-doctor via npx — NOT installed and NOT executed.",
+      "consumer": "src/map3/technique-lab/demos/group-a/source-09.ts + scripts/technique-lab/group-a/frame_loop_audit.mjs",
+      "cpuCheck": "perFrameAllocations > 0 on the leaky half; registeredForDisposal > 0 on the clean half",
+      "pixelValidation": "OPEN — every rubric row that needs rendered evidence is unverified here"
+    },
+    {
+      "sourceId": 10, "title": "Vibe3D asset registry", "adaptation": "adapted",
+      "urls": [
+        {"url": "https://x.com/DerekBrenner/status/2089780687708856412", "outcome": "ok", "status": 200, "readDepth": "text verbatim"},
+        {"url": "https://x.com/alightinastorm/status/2088712139364041161", "outcome": "ok", "status": 200, "readDepth": "announcement text verbatim"},
+        {"url": "https://x.com/alightinastorm/status/2097598580546470197", "outcome": "ok", "status": 200, "readDepth": "text verbatim"},
+        {"url": "https://github.com/vibe-stack/vibe3d", "outcome": "ok", "status": 200, "readDepth": "repository page, API commit, 955 KB tree, models.json and the architecture doc"},
+        {"url": "https://github.com/keysforthewin/thaikit", "outcome": "ok", "status": 200, "readDepth": "repository page, API commit, 560 KB tree, package README and manifest"}
+      ],
+      "pin": "vibe3d fb3ba78a5a21dd69db86018e74d279895501df33 (2026-08-22); thaikit 92095c48ae8792132b60dfb4052c9d7b2ad795f2 (2026-09-10). Both resolve.",
+      "licence": "MIT in both; both LICENSE files fetched (1,076 and 1,077 bytes).",
+      "filesRead": ["vibe3d models.json (394 B, full)", "vibe3d docs/vibe3d-architecture.md (26,731 B)", "thaikit packages/props/README.md (2,324 B, full)", "thaikit packages/props/package.json (885 B)"],
+      "methodExtracted": "A shadcn-style registry: models.json declares engine, install paths, aliases and named registries; each prop installs as EDITABLE SOURCE (createObjectModel.ts, model.ts, thaikit.json, colliders.json) rather than as a runtime dependency. three >= 0.185.0 is a PEER dependency and there must be exactly one copy — a second instance means the factory's Mesh is not the renderer's Mesh and nothing draws. Sidecars carry declared and measured metres, pivots, sockets, destruction groups, mass and budgets.",
+      "compatibilityDifferences": "We inject the host THREE namespace into each factory instead of relying on peer resolution, which makes the single-instance requirement structural. No package was installed and no upstream source was vendored.",
+      "dependencies": "npm @thai-kit/props, vibe3d CLI — NOT installed.",
+      "consumer": "src/map3/technique-lab/demos/group-a/source-10.ts",
+      "cpuCheck": "preview lights present on the raw side and zero on the gated side, asserted",
+      "pixelValidation": "OPEN",
+      "limitation": "180+ model count, whole-pack city import and token savings remain author claims. Catalogue availability is not adoption."
+    },
+    {
+      "sourceId": 11, "title": "Scaffold in code, generate the hero asset", "adaptation": "adapted",
+      "urls": [{"url": "https://x.com/filiksyos/status/2089297181026951425", "outcome": "ok", "status": 200, "readDepth": "full post text verbatim from og:description"}],
+      "pin": "none — opinion post, no repository", "licence": "none", "filesRead": [],
+      "methodExtracted": "Scaffold the project in Three.js first (environment and game actions), then AI-generate a .glb of a hero object, then mix them together.",
+      "compatibilityDifferences": "n/a. The register's caveat is carried: the hard part is harmonising assets, animation, gameplay and difficulty, not producing a GLB. Our demo implements the harmonisation step the post omits.",
+      "dependencies": "none; no generator invoked",
+      "consumer": "src/map3/technique-lab/demos/group-a/source-11.ts",
+      "cpuCheck": "appliedScale and pivotDropMetres counters; determinism and finite geometry",
+      "pixelValidation": "OPEN"
+    },
+    {
+      "sourceId": 12, "title": "Closed-loop asset generation with browser self-verification", "adaptation": "adapted",
+      "urls": [{"url": "https://x.com/anshuc/status/2065598069790716294", "outcome": "ok", "status": 200, "readDepth": "post text verbatim; the threaded workflow detail is recorded in the register"}],
+      "pin": "none — no repository; the playable result is hosted", "licence": "none", "filesRead": [],
+      "methodExtracted": "Connect an image-generation API, an image-to-3D API and a browser self-verification loop so the agent can generate assets AND verify them visually, closing the loop.",
+      "compatibilityDifferences": "fal.ai and Gemini are paid external APIs and were never invoked. The browser leg is not run in this lane, so only CPU-inspectable acceptance criteria are enforced.",
+      "dependencies": "fal.ai, Gemini, agent-browser CLI — none invoked.",
+      "consumer": "src/map3/technique-lab/demos/group-a/source-12.ts",
+      "cpuCheck": "the harness is asserted to log at least one rejection and one acceptance against declared criteria",
+      "pixelValidation": "OPEN — this is the half of the source's own loop that is missing here"
+    },
+    {
+      "sourceId": 13, "title": "Gauntlet loop", "adaptation": "adapted",
+      "urls": [
+        {"url": "https://somethingbig.ai/gauntlet-loop", "outcome": "ok", "status": 200, "readDepth": "page body 73,735 B; the five HowTo steps read verbatim from the page's own structured data"},
+        {"url": "https://github.com/mshumer/Claude-of-Duty", "outcome": "ok", "status": 200, "readDepth": "repository page, API commit and tree at the pin, two file bodies"}
+      ],
+      "pin": "d9b237b75c9304ab8d9ef4cfa0c3568c7c11a853 (resolves; committed 2026-07-25T19:38:53Z)",
+      "licence": "MIT for the example repository, LICENSE fetched (1,064 bytes). The article text is marketing, not code authority.",
+      "filesRead": ["prompt.md (941 B, full — the entire prompt that produced the repository)", "ARCHITECTURE.md (9,369 B)"],
+      "methodExtracted": "Five steps: give the goal not the implementation; give it a real, concrete, inspectable bar; let the agent split the work into separately judgeable pieces; never let the builder grade itself — spawn a fresh critic with no access to the builder's history; do not fix rounds in advance, stop on result, diminishing returns or spend.",
+      "compatibilityDifferences": "Ours adds what the article leaves implicit and the register requires: a frozen regression list that may only grow, and hard round plus wall-clock budgets. Builder and critic are pure functions; no model is called.",
+      "dependencies": "none",
+      "consumer": "src/map3/technique-lab/demos/group-a/source-13.ts",
+      "cpuCheck": "an adversarial builder that drops a frozen feature is asserted never to be accepted",
+      "pixelValidation": "OPEN",
+      "limitation": "The example's own notes expose low gameplay FPS and lazy-shader stalls; reported visual iteration does not prove gameplay."
+    },
+    {
+      "sourceId": 14, "title": "Modern Claudefare", "adaptation": "adapted",
+      "urls": [{"url": "https://www.modernclaudefare.com/", "outcome": "ok", "status": 200, "readDepth": "138,790 B client-rendered application shell; no technique content served to a fetcher"}],
+      "pin": "none", "licence": "none — fan-made, non-commercial; no source or reusable asset licence found", "filesRead": [],
+      "methodExtracted": "Not determined from the site. The reusable object is the comparator rubric the register names: offscreen-connected weapon and arm silhouette, weapon material contrast, map-specific light and grade, readable HUD.",
+      "compatibilityDifferences": "n/a. No code, map, asset or brand is copied.",
+      "dependencies": "none",
+      "consumer": "src/map3/technique-lab/demos/group-a/source-14.ts",
+      "cpuCheck": "instantiate/advance/dispose + determinism; the local muzzle light is declared in metadata and asserted",
+      "pixelValidation": "OPEN"
+    },
+    {
+      "sourceId": 15, "title": "Native RTX runtime for Three.js (ThreeRuntime)", "adaptation": "blocked",
+      "urls": [
+        {"url": "https://x.com/samgcoder/status/2091775237646114921", "outcome": "ok", "status": 200, "readDepth": "author text recovered from the page served by x.com"},
+        {"url": "https://github.com/SamG-Coder/threepp", "outcome": "ok", "status": 200, "readDepth": "repository page, API commit, 789 KB recursive tree, LICENSE, and the RTX sample entry point"}
+      ],
+      "pin": "367ec39da837224f076711b5d24d68be8280cc5a (resolves; committed 2026-08-24T15:37:20Z, 12 files, message 'Added Canvas 2d')",
+      "licence": "MIT, LICENSE fetched (1,103 bytes). Caveat carried: threepp is Lars Ivar Hatledal's C++ Three.js port and the ThreeBrowserRuntime RTX work sits on that MIT base; the grant is not a warranty about the Vulkan/RTX sample's own unexamined third-party dependencies.",
+      "filesRead": ["ThreeBrowserRuntime/samples/webgpu_rtx_light_transport_observatory/src/main.mjs (19,212 B, fetched)", "recursive tree: samples include native-reflections.mjs and a compiled observatory_reflections.spv Vulkan shader"],
+      "methodExtracted": "Three.js/WebGPU -> native WebGPU layer -> C++ -> Vulkan + RTX, with NO browser rendering. Scene, materials, lighting and simulation stay in JS; the sample tests dynamic RTX instances and multi-bounce ray-traced reflections.",
+      "blockedReason": "There is no honest in-browser demo of this technique. No browser exposes a hardware ray-tracing pipeline in WebGPU today, and the method is defined by replacing the browser with a native desktop runtime — a product decision for the owner, never an agent's assumption. Building the C++/Vulkan sample is outside this lane (no third-party build, no GPU job). Substituting the unrelated in-browser hybrid RT library that a search surfaces would repeat exactly the row-15 substitution error the register already recorded.",
+      "consumer": "manifest entry only — no createDemo, by design",
+      "cpuCheck": "the manifest test asserts a blocked entry ships no createDemo and carries a stated limitation",
+      "pixelValidation": "n/a"
+    },
+    {
+      "sourceId": 16, "title": "Text to character animation, locally (kimodo.cpp)", "adaptation": "adapted",
+      "urls": [
+        {"url": "https://x.com/stefan_3d_ai/status/2091531702183350276", "outcome": "ok", "status": 200, "readDepth": "author text verbatim"},
+        {"url": "https://x.com/jichiep/status/2091277918521417834", "outcome": "ok", "status": 200, "readDepth": "author text verbatim"},
+        {"url": "https://github.com/localai-org/kimodo.cpp", "outcome": "ok", "status": 200, "readDepth": "repository page, API commit, recursive tree, LICENSE, and two source files"}
+      ],
+      "pin": "92341f31940d54d4f0a44aa5975e470b78b2ab5c (resolves; committed 2026-08-26T14:59:58Z, 35 files, 'Add SOMA and G1 model support'). This is the RE-PINNED revision; the earlier pin predates the licence grant.",
+      "licence": "Apache-2.0, LICENSE fetched (11,357 bytes) — read as a file body, not trusted from the API SPDX field. Weights are separate: SOMA/G1 GGUF are NVIDIA Open Model License with NO country exclusion; the SMPL-X RP checkpoint is internal-R&D and must not be used; the converted Llama 3 text bundle retains its own terms.",
+      "filesRead": ["src/skeleton.hpp (6,872 B) — lines 10-22, 26-31, 45-51, 79, 90", "src/sequence.cpp (7,700 B)"],
+      "methodExtracted": "skeleton.hpp declares three layouts side by side — smplx22 (22 joints), soma30 (30) and g1skel34 (34) — each with parent graph and rest offsets, wrapped in a skeleton_spec whose frame width is motion_dim() = 9 + 12 * joints(). So joint COUNT is the import-time discriminator and the frame stride follows from it. The README's 'gives you SMPL-X' sentence is true only of the checkpoint that may NOT be used. sequence.cpp is the --sequence mode: multiple prompts stitched with an explicit transition, the native answer to the author-stated 10-second generation cap.",
+      "compatibilityDifferences": "Upstream is native C++/GGML loading GGUF. Ours implements only the portable contract in TypeScript: layout selection by joint count, stride derivation, index retarget onto our own chain, and smoothstep transition stitching.",
+      "dependencies": "kimodo.cpp build (CMake/MSVC), GGUF weights. NOT built, NOT downloaded.",
+      "consumer": "src/map3/technique-lab/demos/group-a/source-16.ts",
+      "cpuCheck": "selectLayout maps 22/30/34 and returns null for an unknown count; motionDim(30) === 369; transition stitching is asserted to lower the worst seam velocity discontinuity versus hard concatenation",
+      "pixelValidation": "OPEN"
+    },
+    {
+      "sourceId": 17, "title": "Environment-art quality bar (Cadle)", "adaptation": "adapted",
+      "urls": [{"url": "https://cadle.gg/", "outcome": "error", "status": null, "error": "transport error, no HTTP status returned — see fetch-attempts.json for the exact recorded error", "readDepth": "none — nothing was retrieved"}],
+      "pin": "none", "licence": "none — no repository, no published technique", "filesRead": [],
+      "methodExtracted": "NOT DETERMINED. The site is a client-rendered application and this fetch failed outright, consistent with the register's own finding. What is recorded is the OWNER'S JUDGEMENT of the result — polish, smoothness, grass, trees, mountains — not an inspected implementation.",
+      "compatibilityDifferences": "n/a — nothing to port.",
+      "dependencies": "none",
+      "consumer": "src/map3/technique-lab/demos/group-a/source-17.ts",
+      "cpuCheck": "instantiate/advance/dispose + determinism; denseBlades/sparseBlades and triangle/drawable budget counters",
+      "pixelValidation": "OPEN — frame-rate stability, the owner's actual criterion, is entirely unverified here",
+      "limitation": "ANTI-CONFLATION: the MIT procedural-grass and procedural-landscape projects a search surfaces are a different row; there is no evidence Cadle uses them and nothing from them is used here. This scene is ours and is not Cadle's."
+    }
+  ]
+}
