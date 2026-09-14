@@ -219,6 +219,7 @@ import { buildNuketown2 } from './nuketown2-arena';
 import { buildRaid2 } from './raid2-arena';
 // PASS 97: New World Prime Day-1 standby blockout assembler (presentation-only).
 import { buildNewworldPrime } from './newworld-prime-arena';
+import { attachNewworldPrimeAssets } from './newworld-prime-assets';
 import { collectPresentationObstructionBoxes } from './presentation-obstruction';
 import {
   DOMINATION_TIME_LIMIT_MS,
@@ -3530,8 +3531,14 @@ const arenaFactories = createArenaFactoryRegistry<ArenaMap, THREE.Scene, ArenaId
   // synchronous builder, no wasm prepare step. Registered so the id resolves
   // in every decoded path and stage/perform/boot now admit it; the
   // STANDBY_ONLY_ARENAS mechanism above stays for future standby rows.
+  // Batch-1 GLB dressing attaches async after the sync build (fire-and-forget;
+  // per-asset failures keep blockout visible, never throw).
   // See src/newworld-prime-arena.ts.
-  'newworld-prime': eagerArena(buildNewworldPrime),
+  'newworld-prime': eagerArena((target) => {
+    const built = buildNewworldPrime(target);
+    void attachNewworldPrimeAssets(built.root);
+    return built;
+  }),
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const ARENA_CACHE_BOUND = 2;
