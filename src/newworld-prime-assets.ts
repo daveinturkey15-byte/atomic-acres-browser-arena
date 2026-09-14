@@ -1,7 +1,7 @@
 /**
  * newworld-prime Blender GLB dressing (presentation-only).
  *
- * Attaches twelve Blender-built GLBs over the Day-1 blockout massing emitted by
+ * Attaches fifteen Blender-built GLBs over the Day-1 blockout massing emitted by
  * buildNewworldPrime (src/newworld-prime-arena.ts). Authority
  * (colliders, ballistic surfaces, spawns, nav) is untouched — the authority
  * boxes already match these dims by construction, and every dressed mesh is
@@ -48,6 +48,15 @@
  * - jeep (2180 tris): atomic-acres-catalog/assets-batch1/jeep/out.glb —
  *   south-exit reservation spot (x 13.5, z -21.0, yaw -0.5) — non-solid
  *   dressing, reservation footprint, authority untouched.
+ * - clothesline: atomic-acres-catalog/assets-batch1/yard/clothesline.glb —
+ *   Fact-8 backyard spots (x -15, z -11) + (x 15, z 12) over the line +
+ *   laundry massing — non-solid dressing, authority untouched.
+ * - sandbags: atomic-acres-catalog/assets-batch1/yard/sandbags.glb —
+ *   south-exit reservation spot (x 0, z 8.5, yaw 0) — non-solid dressing,
+ *   reservation footprint, authority untouched.
+ * - furniture: atomic-acres-catalog/assets-batch1/yard/furniture.glb —
+ *   east back-patio spot (x 13.5, z -7.5) over the umbrella/BBQ massing —
+ *   non-solid dressing, authority untouched.
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -63,6 +72,7 @@ import {
   NEWWORLD_PRIME_HEDGE_RUNS,
   NEWWORLD_PRIME_PRIVACY_FENCE_RUNS,
   NEWWORLD_PRIME_JEEP_RESERVATION,
+  NEWWORLD_PRIME_SANDBAG_RESERVATION,
   NEWWORLD_PRIME_RUSTY_CAR_PLACEMENT,
   NEWWORLD_PRIME_SCHOOL_BUS_PLACEMENT,
   NEWWORLD_PRIME_SEMI_TRUCK_PLACEMENT,
@@ -117,6 +127,16 @@ const NEWWORLD_PRIME_GLB_VERSION_WAVE5 = 'wave5-20260914';
 /** Public asset URL for the wave-5 jeep GLB copy. */
 export const NEWWORLD_PRIME_JEEP_GLB =
   `./assets/newworld-prime/jeep.glb?v=${NEWWORLD_PRIME_GLB_VERSION_WAVE5}`;
+/** Cache-busting lane for the wave-6 yard-set GLB copies. */
+const NEWWORLD_PRIME_GLB_VERSION_WAVE6 = 'wave6-20260914';
+
+/** Public asset URLs for the three wave-6 yard-set GLB copies. */
+export const NEWWORLD_PRIME_CLOTHESLINE_GLB =
+  `./assets/newworld-prime/clothesline.glb?v=${NEWWORLD_PRIME_GLB_VERSION_WAVE6}`;
+export const NEWWORLD_PRIME_SANDBAGS_GLB =
+  `./assets/newworld-prime/sandbags.glb?v=${NEWWORLD_PRIME_GLB_VERSION_WAVE6}`;
+export const NEWWORLD_PRIME_FURNITURE_GLB =
+  `./assets/newworld-prime/furniture.glb?v=${NEWWORLD_PRIME_GLB_VERSION_WAVE6}`;
 
 /**
  * Fallback flags for the GLB/blockout swap. Every group defaults ON (new
@@ -136,6 +156,9 @@ export type NewworldPrimeGlbDressingFlags = Readonly<{
   semi: boolean;
   rustyCar: boolean;
   jeep: boolean;
+  clothesline: boolean;
+  sandbags: boolean;
+  furniture: boolean;
 }>;
 
 export const NEWWORLD_PRIME_GLB_DRESSING_DEFAULT: NewworldPrimeGlbDressingFlags = Object.freeze({
@@ -150,6 +173,9 @@ export const NEWWORLD_PRIME_GLB_DRESSING_DEFAULT: NewworldPrimeGlbDressingFlags 
   semi: true,
   rustyCar: true,
   jeep: true,
+  clothesline: true,
+  sandbags: true,
+  furniture: true,
 });
 
 export type NewworldPrimeGlbAssetId =
@@ -164,7 +190,10 @@ export type NewworldPrimeGlbAssetId =
   | 'pad'
   | 'semi'
   | 'rusty-car'
-  | 'jeep';
+  | 'jeep'
+  | 'clothesline'
+  | 'sandbags'
+  | 'furniture';
 
 /** Per-asset outcome: blockout stays visible whenever error is non-null. */
 export type NewworldPrimeGlbAttachment = Readonly<{
@@ -336,6 +365,51 @@ function dressingPlan(flags: NewworldPrimeGlbDressingFlags): readonly DressingPl
       // yet, so nothing hides until the reservation is built — the GLB is
       // pure addition and any load failure leaves the arena unchanged.
       coversBlockout: (meshName: string) => meshName.includes(NEWWORLD_PRIME_JEEP_RESERVATION.id),
+    });
+  }
+  if (flags.clothesline) {
+    plans.push({
+      asset: 'clothesline',
+      url: NEWWORLD_PRIME_CLOTHESLINE_GLB,
+      // Fact 8 backyards — northwest (x -15, z -11) + southeast (x 15, z 12),
+      // mirroring buildClotheslines: the line runs along local X, yaw 0.
+      spots: [
+        { x: -15, z: -11, rotationY: 0 },
+        { x: 15, z: 12, rotationY: 0 },
+      ],
+      // Blockout names backyard massing `newworld-prime-clothesline-*` and
+      // `newworld-prime-laundry-*`; both hide once the GLB lands, and any
+      // load failure leaves them visible.
+      coversBlockout: (meshName: string) =>
+        meshName.includes('newworld-prime-clothesline') || meshName.includes('newworld-prime-laundry'),
+    });
+  }
+  if (flags.sandbags) {
+    plans.push({
+      asset: 'sandbags',
+      url: NEWWORLD_PRIME_SANDBAGS_GLB,
+      spots: [{
+        x: NEWWORLD_PRIME_SANDBAG_RESERVATION.x,
+        z: NEWWORLD_PRIME_SANDBAG_RESERVATION.z,
+        rotationY: NEWWORLD_PRIME_SANDBAG_RESERVATION.rotationY,
+      }],
+      // South-exit reservation: no blockout meshes carry the reservation id
+      // yet, so nothing hides until the reservation is built — the GLB is
+      // pure addition and any load failure leaves the arena unchanged.
+      coversBlockout: (meshName: string) => meshName.includes(NEWWORLD_PRIME_SANDBAG_RESERVATION.id),
+    });
+  }
+  if (flags.furniture) {
+    plans.push({
+      asset: 'furniture',
+      url: NEWWORLD_PRIME_FURNITURE_GLB,
+      // East back patio over the umbrella/BBQ massing (Fact 2 dressing).
+      spots: [{ x: 13.5, z: -7.5, rotationY: 0 }],
+      // Blockout names patio massing `newworld-prime-umbrella-*` and
+      // `newworld-prime-bbq`; both hide once the GLB lands, and any load
+      // failure leaves them visible.
+      coversBlockout: (meshName: string) =>
+        meshName.includes('newworld-prime-umbrella') || meshName.includes('newworld-prime-bbq'),
     });
   }
   if (flags.fences) {
