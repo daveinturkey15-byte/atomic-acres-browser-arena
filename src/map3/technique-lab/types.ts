@@ -113,4 +113,16 @@ export interface LabHostOptions {
    * real-shape fixtures. Absent records keep the research stages open.
    */
   researchLoaders?: Record<string, () => Promise<unknown>>;
+  /**
+   * Sources-lane catalog loader (public/assets/skills-lab/source-catalog.json).
+   * Defaults to a runtime fetch that tolerates 404; tests inject fixtures.
+   */
+  sourceCatalogLoader?: () => Promise<unknown>;
+  /**
+   * Per-lane Blender catalog loaders keyed by glob path. Defaults to the
+   * host's vite glob over public/assets/world-studio/blender/star/catalog.json.
+   */
+  blenderCatalogLoaders?: Record<string, () => Promise<unknown>>;
+  /** GLB loader seam for the Blender gallery; defaults to the installed GLTFLoader. */
+  modelLoader?: { loadAsync(url: string): Promise<{ scene: THREE.Object3D }> };
 }

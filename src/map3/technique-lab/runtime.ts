@@ -24,6 +24,22 @@ import * as THREE from 'three';
 import { WebGPURenderer } from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PUBLIC_RECORDS } from './manifest';
+import {
+  blockerPlan,
+  classifyUrl,
+  mappingState,
+  parseSourceCatalog,
+  routeToShowcase,
+  type SourceCatalog,
+} from './gallery/sources';
+import {
+  BUILTIN_BLENDER_ASSETS,
+  laneFromCatalogKey,
+  mergeAssets,
+  parseBlenderCatalog,
+  type BlenderAsset,
+} from './gallery/blender-catalog';
+import { createBlenderViewer, type BlenderViewerHandle } from './gallery/blender-viewer';
 import type {
   Adaptation,
   DemoComparison,
@@ -64,11 +80,16 @@ export async function mountTechniqueLab(
       mountSelection(state, state.selectedId);
     }
   });
-  void refreshGroups(state, gen, options);
+  void refreshGroups(state, gen, options).then(() => {
+    if (state.disposed || gen !== state.generation) return;
+    renderUrlTab(state);
+  });
   void loadResearch(state, gen, options).then(() => {
     if (state.disposed || gen !== state.generation) return;
     renderDetail(state, state.records[state.selectedId - 1]);
   });
+  void loadSourceCatalog(state, gen, options);
+  void loadBlenderCatalogs(state, gen, options);
 
   return {
     dispose: () => disposeLab(state),
@@ -130,6 +151,28 @@ interface LabState {
   research: Map<number, ResearchEvidence>;
   researchSummary: string;
   researchIgnored: string[];
+  // Skills Lab tabs, sources catalog and Blender gallery.
+  tab: TabId;
+  sourceCatalog: SourceCatalog | null;
+  sourceCatalogNote: string;
+  blenderAssets: BlenderAsset[];
+  blenderNotes: string[];
+  blenderSelected: string | null;
+  /** Identity of the newest GLB request; a settled load may only write status/stage when it still matches. */
+  blenderRequest: number;
+  blenderStatus: string;
+  viewer: BlenderViewerHandle | null;
+  modelLoader: LabHostOptions['modelLoader'];
+  tabButtons: HTMLButtonElement[];
+  panels: Record<TabId, HTMLElement>;
+  stage: HTMLElement;
+  stageSlotSkills: HTMLElement;
+  stageSlotBlender: HTMLElement;
+  urlBody: HTMLElement;
+  urlSearch: HTMLInputElement;
+  urlQuery: string;
+  blenderGrid: HTMLElement;
+  blenderDetail: HTMLElement;
   // DOM refs.
   root: HTMLElement;
   list: HTMLOListElement;
@@ -193,6 +236,30 @@ function createState(container: HTMLElement): LabState {
     research: new Map(),
     researchSummary: 'Research records: not loaded yet.',
     researchIgnored: [],
+    tab: 'skills',
+    sourceCatalog: null,
+    sourceCatalogNote: 'Sources-lane catalog: not loaded yet.',
+    blenderAssets: [],
+    blenderNotes: [],
+    blenderSelected: null,
+    blenderRequest: 0,
+    blenderStatus: 'Click a card to load its GLB into the stage.',
+    viewer: null,
+    modelLoader: undefined,
+    tabButtons: [],
+    panels: {
+      skills: document.createElement('section'),
+      urls: document.createElement('section'),
+      blender: document.createElement('section'),
+    },
+    stage: document.createElement('section'),
+    stageSlotSkills: document.createElement('div'),
+    stageSlotBlender: document.createElement('div'),
+    urlBody: document.createElement('div'),
+    urlSearch: document.createElement('input'),
+    urlQuery: '',
+    blenderGrid: document.createElement('div'),
+    blenderDetail: document.createElement('aside'),
     root: document.createElement('div'),
     list: document.createElement('ol'),
     count: document.createElement('p'),
@@ -228,24 +295,67 @@ function text<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+type TabId = 'skills' | 'urls' | 'blender';
+
+const TABS: Array<{ id: TabId; label: string }> = [
+  { id: 'skills', label: 'Skills & demos' },
+  { id: 'urls', label: 'URL provided' },
+  { id: 'blender', label: 'Blender gallery' },
+];
+
 function buildDom(state: LabState): void {
   const s = state;
   s.root.className = 'tl-root';
 
   const header = document.createElement('header');
   header.className = 'tl-header';
-  header.append(
-    text('h1', 'tl-title', 'Map 3 · Technique Lab'),
+  const titles = document.createElement('div');
+  titles.className = 'tl-titles';
+  titles.append(
+    text('h1', 'tl-title', 'Skills Lab'),
     text(
       'p',
       'tl-sub',
-      'Host gallery for 50 public sources. Demos arrive separately; ' +
-        'missing work stays missing — nothing here is a placeholder render.',
+      '50 numbered public sources, their demos, the URLs behind them and the Blender asset gallery. ' +
+        'Missing work stays missing; nothing here is a placeholder render.',
     ),
   );
+  const tablist = document.createElement('div');
+  tablist.className = 'tl-tabs';
+  tablist.setAttribute('role', 'tablist');
+  tablist.setAttribute('aria-label', 'Skills Lab sections');
+  for (const tab of TABS) {
+    const button = text('button', 'tl-tab', tab.label);
+    button.type = 'button';
+    button.setAttribute('role', 'tab');
+    button.dataset.tab = tab.id;
+    button.id = `tl-tab-${tab.id}`;
+    button.setAttribute('aria-controls', `tl-panel-${tab.id}`);
+    button.addEventListener('click', () => selectTab(s, tab.id));
+    button.addEventListener('keydown', (event) => {
+      const index = TABS.findIndex((t) => t.id === tab.id);
+      if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+        const next = TABS[(index + (event.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length];
+        selectTab(s, next.id);
+        s.tabButtons[TABS.indexOf(next)]?.focus();
+        event.preventDefault();
+      }
+    });
+    s.tabButtons.push(button);
+    tablist.append(button);
+  }
+  header.append(titles, tablist);
 
-  const layout = document.createElement('div');
-  layout.className = 'tl-layout';
+  for (const tab of TABS) {
+    const panel = s.panels[tab.id];
+    panel.className = `tl-panel tl-panel-${tab.id}`;
+    panel.id = `tl-panel-${tab.id}`;
+    panel.setAttribute('role', 'tabpanel');
+    panel.setAttribute('aria-labelledby', `tl-tab-${tab.id}`);
+  }
+
+  const layout = s.panels.skills;
+  layout.classList.add('tl-layout');
 
   // Gallery.
   const gallery = document.createElement('nav');
@@ -290,11 +400,14 @@ function buildDom(state: LabState): void {
   }
   gallery.append(s.search, filters, s.count, s.list);
 
-  // Stage.
-  const stage = document.createElement('section');
+  // Stage: ONE canvas/renderer, re-parented between the Skills and Blender
+  // panels through two slots so both tabs share the same WebGPU stage.
+  const stage = s.stage;
   stage.className = 'tl-stage';
   stage.setAttribute('aria-label', 'Demo stage');
   stage.append(text('h2', 'tl-section-title', 'Stage'));
+  s.stageSlotSkills.className = 'tl-stage-slot';
+  s.stageSlotBlender.className = 'tl-stage-slot';
   s.wrap.className = 'tl-canvas-wrap';
   s.wrap.append(s.canvas);
   s.empty.className = 'tl-empty';
@@ -334,9 +447,113 @@ function buildDom(state: LabState): void {
   );
   legend.append(legendTitle, legendBody);
 
-  layout.append(gallery, stage, s.detail);
-  s.root.append(header, layout, legend);
+  s.stageSlotSkills.append(stage);
+  layout.append(gallery, s.stageSlotSkills, s.detail);
+
+  // URL provided tab.
+  const urls = s.panels.urls;
+  const urlHead = document.createElement('div');
+  urlHead.className = 'tl-url-head';
+  urlHead.append(
+    text('h2', 'tl-section-title', 'Every recorded source URL'),
+    text(
+      'p',
+      'tl-muted',
+      'Original links open externally; the host never fetches them. Mapping state comes from the sources-lane ' +
+        'catalog when loaded; otherwise a row says ingestion is needed. Embeds appear only for allowlisted public ' +
+        'players/images, always with the original link as fallback.',
+    ),
+  );
+  s.urlSearch.className = 'tl-search';
+  s.urlSearch.type = 'search';
+  s.urlSearch.placeholder = 'Filter by id, title, host or URL…';
+  s.urlSearch.setAttribute('aria-label', 'Filter source URLs');
+  urlHead.append(s.urlSearch);
+  s.urlBody.className = 'tl-url-body';
+  urls.append(urlHead, s.urlBody);
+
+  // Blender gallery tab.
+  const blender = s.panels.blender;
+  blender.classList.add('tl-blender-layout');
+  const gal = document.createElement('nav');
+  gal.className = 'tl-gallery tl-blender-gallery';
+  gal.setAttribute('aria-label', 'Blender asset gallery');
+  gal.append(
+    text('h2', 'tl-section-title', 'Blender assets · curated order'),
+    text(
+      'p',
+      'tl-muted',
+      'Ordered by curator qualityRank from each lane catalog, not by any measured quality. Click a card to load ' +
+        'the real GLB into the stage. Cards without a render thumbnail show text only; nothing is invented.',
+    ),
+  );
+  s.blenderGrid.className = 'tl-blender-grid';
+  gal.append(s.blenderGrid);
+  s.blenderDetail.className = 'tl-detail';
+  s.blenderDetail.setAttribute('aria-label', 'Blender asset detail');
+  blender.append(gal, s.stageSlotBlender, s.blenderDetail);
+
+  s.root.append(header, s.panels.skills, s.panels.urls, s.panels.blender, legend);
   s.container.append(s.root);
+  renderUrlTab(s);
+  renderBlenderTab(s);
+  selectTab(s, readUrlTab());
+}
+
+function readUrlTab(): TabId {
+  try {
+    const param = new URLSearchParams(window.location.search).get('tab');
+    if (param === 'urls' || param === 'blender') return param;
+  } catch {
+    // default tab
+  }
+  return 'skills';
+}
+
+function selectTab(state: LabState, tab: TabId): void {
+  if (state.disposed) return;
+  const previous = state.tab;
+  state.tab = tab;
+  for (const button of state.tabButtons) {
+    const active = button.dataset.tab === tab;
+    button.setAttribute('aria-selected', active ? 'true' : 'false');
+    button.tabIndex = active ? 0 : -1;
+    button.classList.toggle('is-active', active);
+  }
+  for (const id of Object.keys(state.panels) as TabId[]) {
+    state.panels[id].hidden = id !== tab;
+  }
+  // Move the single stage to the visible tab; only one content root at a time.
+  if (tab === 'blender') {
+    if (state.stage.parentNode !== state.stageSlotBlender) state.stageSlotBlender.append(state.stage);
+    if (previous !== 'blender') {
+      teardownActive(state);
+      showEmpty(state, state.viewer?.current() ? '' : state.blenderStatus);
+      if (state.viewer?.current()) hideEmpty(state);
+      if (state.blenderSelected) void loadBlenderAsset(state, state.blenderSelected);
+    }
+  } else if (tab === 'skills') {
+    if (state.stage.parentNode !== state.stageSlotSkills) state.stageSlotSkills.append(state.stage);
+    if (previous === 'blender') {
+      // Leaving the gallery invalidates in-flight GLB requests at both levels:
+      // the viewer drops any pending attachment (public clear advances its
+      // generation) and the host stops treating their completion as current,
+      // so a late resolve/reject can never touch the Skills stage or status.
+      state.blenderRequest += 1;
+      state.viewer?.clear();
+      mountSelection(state, state.selectedId);
+    }
+  }
+  if (state.renderer) sizeToWrap(state, state.renderer);
+  if (state.renderer && state.active) frameSelection(state);
+  try {
+    const url = new URL(window.location.href);
+    if (tab === 'skills') url.searchParams.delete('tab');
+    else url.searchParams.set('tab', tab);
+    window.history.replaceState(null, '', url.toString());
+  } catch {
+    // URL sync is a nicety.
+  }
 }
 
 function fillSelect(select: HTMLSelectElement, values: string[]): void {
@@ -465,15 +682,44 @@ function statusText(record: ResolvedRecord): string {
 }
 
 function renderDetail(state: LabState, record: ResolvedRecord): void {
-  const d = state.detail;
+  let d = state.detail;
   d.replaceChildren();
   d.append(text('h2', '', `${record.id}. ${record.title}`));
   state.statusLine.textContent = statusText(record);
+  state.statusLine.className = `tl-status ${badgeFor(record).cls}`.trim();
   d.append(state.statusLine);
 
   const method = record.entry?.method ?? 'Pending / Not yet delivered — no method recorded.';
   const methodP = text('p', 'tl-method', method);
   d.append(methodP);
+
+  // Latest example / revision / evidence, one line each, never inferred.
+  const catalogRow = state.sourceCatalog?.sources.get(record.id);
+  const evidenceRow = state.research.get(record.id);
+  const latest = document.createElement('dl');
+  latest.className = 'tl-meta';
+  latest.append(
+    metaRow('Latest example', record.entry?.createDemo ? `demo factory in ${record.group ?? 'group'} (mounts in the stage)` : 'none delivered'),
+    metaRow('Latest revision', catalogRow?.demo?.revision ?? evidenceRow?.inspectedDetail.find((l) => l.startsWith('git sha:'))?.slice(8).trim() ?? 'not recorded'),
+    metaRow('Latest evidence', catalogRow?.evidence[0] ? `${catalogRow.evidence[0].url}${catalogRow.evidence[0].inspectedAt ? ` (${catalogRow.evidence[0].inspectedAt})` : ''}` : evidenceRow ? `${evidenceRow.inspectedDetail.length} recorded inspection line(s), see receipts` : 'none recorded'),
+  );
+  d.append(latest);
+
+  if (record.entry?.adaptation === 'blocked') {
+    const plan = blockerPlan(record.id, record.entry.limitation, catalogRow);
+    const card = document.createElement('dl');
+    card.className = 'tl-meta tl-blocker';
+    card.append(
+      metaRow('Why blocked', plan.reason),
+      metaRow('Unblock action', plan.unblockAction),
+      metaRow('Experiment', plan.experiment),
+      metaRow('Required pass/fail test', plan.test),
+      metaRow('Resources', plan.resources),
+      metaRow('Route to showcase', routeToShowcase(record.id)),
+      metaRow('Plan origin', plan.origin === 'host default plan' ? 'host default plan (proposal, not lane research)' : plan.origin),
+    );
+    d.append(card);
+  }
 
   const meta = document.createElement('dl');
   meta.className = 'tl-meta';
@@ -537,9 +783,15 @@ function renderDetail(state: LabState, record: ResolvedRecord): void {
   }
   d.append(stages);
 
-  d.append(text('h2', 'tl-section-title', 'Research records'));
+  // Long technical receipts stay collapsed by default.
+  const receipts = document.createElement('details');
+  receipts.className = 'tl-receipts';
+  receipts.append(text('summary', '', 'Research records and technical receipts'));
+  d.append(receipts);
+  d = receipts; // everything below is a collapsed technical receipt
   d.append(text('p', 'tl-research-note', 'Research stages below report group-authored read and extraction records; they are not independent attestations or owner approval.'));
   d.append(text('p', 'tl-research-summary', state.researchSummary));
+  d.append(text('p', 'tl-research-summary', state.sourceCatalogNote));
   for (const line of state.researchIgnored) {
     d.append(text('p', 'tl-research-ignored', line));
   }
@@ -812,6 +1064,7 @@ async function initRenderer(
   }
   state.renderer = renderer;
   state.backend = readBackend(renderer);
+  state.viewer = createBlenderViewer(state.scene, options.modelLoader);
   state.scene.add(hemi, dir, ambient);
   state.controls = new OrbitControls(state.camera, state.canvas);
   state.controls.enableDamping = true;
@@ -896,8 +1149,8 @@ function startLoop(state: LabState): void {
  */
 function frameSelection(state: LabState): void {
   if (!state.controls) return;
-  const active = state.active;
-  const box = active ? visibleGeometryBox(active.demo.root) : null;
+  const root = state.active?.demo.root ?? state.viewer?.current()?.root ?? null;
+  const box = root ? visibleGeometryBox(root) : null;
   const fit = box ? computeFrameFit(box, state.camera.fov, state.camera.aspect) : null;
   if (!fit) {
     homeCamera(state);
@@ -1455,6 +1708,254 @@ async function loadResearch(
 }
 
 /* ------------------------------------------------------------------ */
+/* URL provided tab                                                    */
+/* ------------------------------------------------------------------ */
+
+function renderUrlTab(state: LabState): void {
+  const body = state.urlBody;
+  body.replaceChildren();
+  const q = state.urlQuery.trim().toLowerCase();
+  let rows = 0;
+  let urls = 0;
+  for (const record of state.records) {
+    const catalogRow = state.sourceCatalog?.sources.get(record.id);
+    const all = [...record.sources];
+    for (const u of catalogRow?.urls ?? []) if (!all.includes(u.url)) all.push(u.url);
+    const hay = `${record.id} ${record.title} ${all.join(' ')}`.toLowerCase();
+    if (q && !hay.includes(q)) continue;
+    rows += 1;
+    const row = document.createElement('article');
+    row.className = 'tl-url-row';
+    row.dataset.sourceId = String(record.id);
+    row.append(text('span', 'tl-num', String(record.id).padStart(2, '0')), text('h3', '', record.title));
+    const mapping = mappingState(catalogRow, record.entry?.createDemo != null, record.entry?.adaptation === 'blocked');
+    const mapP = document.createElement('p');
+    mapP.className = 'tl-url-mapping';
+    const badge = text('span', `tl-badge ${mapping.label === 'mapped to skill' ? 'is-loaded' : mapping.label === 'blocked' ? 'is-blocked' : ''}`.trim(), mapping.label);
+    mapP.append(badge, document.createTextNode(mapping.detail));
+    if (record.aliasOf !== null) mapP.append(document.createTextNode(` · alias of row ${record.aliasOf}`));
+    row.append(mapP);
+    const list = document.createElement('ul');
+    list.className = 'tl-url-list';
+    if (all.length === 0) list.append(text('li', 'tl-muted', 'No source URL recorded for this row.'));
+    for (const raw of all) {
+      urls += 1;
+      const li = document.createElement('li');
+      const c = classifyUrl(raw);
+      li.append(text('span', 'tl-url-kind', c.kind));
+      if (c.kind === 'non-http') {
+        li.append(text('span', '', `${raw} — text only (not an http(s) URL)`));
+      } else {
+        const a = document.createElement('a');
+        a.href = c.url;
+        a.textContent = c.url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        li.append(a);
+        const catalogEmbed = catalogRow?.urls.find((u) => u.url === raw)?.embedUrl ?? null;
+        const embed = c.embed ?? (catalogEmbed ? { type: 'iframe' as const, src: catalogEmbed } : null);
+        if (embed) {
+          const show = text('button', 'tl-btn', embed.type === 'img' ? 'Show image' : 'Show embed');
+          show.type = 'button';
+          show.addEventListener('click', () => {
+            show.remove();
+            if (embed.type === 'img') {
+              const img = document.createElement('img');
+              img.className = 'tl-embed-img';
+              img.src = embed.src;
+              img.alt = `Image from ${c.host}`;
+              img.loading = 'lazy';
+              li.append(img);
+            } else {
+              const frame = document.createElement('iframe');
+              frame.className = 'tl-embed';
+              frame.src = embed.src;
+              frame.title = `Embedded player from ${new URL(embed.src).hostname}`;
+              frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups');
+              frame.setAttribute('allow', 'fullscreen');
+              frame.referrerPolicy = 'no-referrer';
+              li.append(frame);
+            }
+          }, { once: true });
+          li.append(show);
+        } else {
+          li.append(text('span', 'tl-muted', 'no supported embed; open the original link'));
+        }
+      }
+      list.append(li);
+    }
+    row.append(list);
+    body.append(row);
+  }
+  // Count line first, rows after. replaceChildren over a snapshot keeps to
+  // the DOM subset the bounded host fake supports (no prepend/insertBefore).
+  const count = text('p', 'tl-count', `${rows} of ${state.records.length} rows · ${urls} URL(s) shown · ${state.sourceCatalogNote}`);
+  body.replaceChildren(count, ...Array.from(body.children));
+}
+
+async function loadSourceCatalog(state: LabState, gen: number, options: LabHostOptions): Promise<void> {
+  const loader =
+    options.sourceCatalogLoader ??
+    (async () => {
+      const response = await fetch('assets/skills-lab/source-catalog.json', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return (await response.json()) as unknown;
+    });
+  try {
+    const data = await loader();
+    if (state.disposed || gen !== state.generation) return;
+    const parsed = parseSourceCatalog(data);
+    state.sourceCatalog = parsed;
+    state.sourceCatalogNote =
+      `Sources-lane catalog: ${parsed.sources.size} row(s)` +
+      `${parsed.updatedAt ? `, updated ${parsed.updatedAt}` : ''}` +
+      `${parsed.ignored.length ? `, ${parsed.ignored.length} row(s) ignored` : ''}.`;
+  } catch (err) {
+    if (state.disposed || gen !== state.generation) return;
+    state.sourceCatalog = null;
+    state.sourceCatalogNote = `Sources-lane catalog not loaded (${toMessage(err)}); mappings show as ingestion needed.`;
+  }
+  renderUrlTab(state);
+  renderDetail(state, state.records[state.selectedId - 1]);
+}
+
+/* ------------------------------------------------------------------ */
+/* Blender gallery tab                                                 */
+/* ------------------------------------------------------------------ */
+
+async function loadBlenderCatalogs(state: LabState, gen: number, options: LabHostOptions): Promise<void> {
+  const loaders =
+    options.blenderCatalogLoaders ??
+    import.meta.glob<unknown>('/public/assets/world-studio/blender/*/catalog.json');
+  const groups: BlenderAsset[][] = [BUILTIN_BLENDER_ASSETS];
+  const notes: string[] = [];
+  const keys = Object.keys(loaders).sort();
+  if (keys.length === 0) notes.push('No per-lane catalog.json discovered yet; only the shipped bus and truck are listed.');
+  for (const key of keys) {
+    if (state.disposed || gen !== state.generation) return;
+    const lane = laneFromCatalogKey(key);
+    try {
+      const result = parseBlenderCatalog(lane, await loaders[key]());
+      groups.push(result.assets);
+      notes.push(`${lane}: ${result.assets.length} asset(s)`);
+      notes.push(...result.ignored);
+    } catch (err) {
+      notes.push(`${lane}: catalog failed to load (${toMessage(err)})`);
+    }
+  }
+  if (state.disposed || gen !== state.generation) return;
+  const merged = mergeAssets(groups);
+  state.blenderAssets = merged.assets;
+  state.blenderNotes = [...notes, ...merged.ignored];
+  renderBlenderTab(state);
+}
+
+function renderBlenderTab(state: LabState): void {
+  const grid = state.blenderGrid;
+  grid.replaceChildren();
+  for (const asset of state.blenderAssets) {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'tl-card';
+    card.dataset.assetKey = asset.key;
+    card.classList.toggle('is-selected', asset.key === state.blenderSelected);
+    if (asset.thumbnailUrl) {
+      const img = document.createElement('img');
+      img.className = 'tl-thumb';
+      img.src = asset.thumbnailUrl;
+      img.alt = `Render thumbnail of ${asset.title}`;
+      img.loading = 'lazy';
+      card.append(img);
+    } else {
+      card.append(text('div', 'tl-thumb tl-thumb-missing', 'No render thumbnail yet — click to load the GLB'));
+    }
+    card.append(
+      text('span', 'tl-card-title', asset.title),
+      text('span', 'tl-card-meta', `${asset.lane} · rank ${asset.qualityRank ?? 'unranked'} (curated)`),
+    );
+    card.addEventListener('click', () => void loadBlenderAsset(state, asset.key));
+    grid.append(card);
+  }
+  renderBlenderDetail(state);
+}
+
+function renderBlenderDetail(state: LabState): void {
+  const d = state.blenderDetail;
+  d.replaceChildren();
+  const asset = state.blenderAssets.find((a) => a.key === state.blenderSelected) ?? null;
+  d.append(text('h2', '', asset ? asset.title : 'No asset selected'));
+  d.append(text('p', 'tl-status', state.blenderStatus));
+  if (asset) {
+    const meta = document.createElement('dl');
+    meta.className = 'tl-meta';
+    meta.append(
+      metaRow('Asset', asset.assetUrl),
+      metaRow('Lane / id', `${asset.lane} / ${asset.id}`),
+      metaRow('Curated rank', `${asset.qualityRank ?? 'unranked'} — ${asset.qualityReason ?? 'no curator reason recorded'} (curator assessment, not measured quality)`),
+      metaRow('Revision', asset.revision ?? 'not recorded'),
+      metaRow('Authored by', asset.authoredBy ? [asset.authoredBy.harness, asset.authoredBy.model, asset.authoredBy.effort].filter(Boolean).join(' / ') || 'not recorded' : 'not recorded'),
+      metaRow('License', asset.license ?? 'not recorded'),
+      metaRow('Method', asset.method ?? 'not recorded'),
+      metaRow('SHA-256', asset.sha256 ?? 'not recorded'),
+    );
+    if (asset.metrics) {
+      meta.append(metaRow('Metrics (catalog)', `triangles ${asset.metrics.triangles ?? '?'} · materials ${asset.metrics.materials ?? '?'} · texture bytes ${asset.metrics.textureBytes ?? '?'}`));
+    }
+    for (const l of asset.limitations) meta.append(metaRow('Limitation', l));
+    for (const u of asset.sourceUrls) meta.append(metaRow('Source', u));
+    d.append(meta);
+  }
+  const receipts = document.createElement('details');
+  receipts.className = 'tl-receipts';
+  receipts.append(text('summary', '', `Catalog discovery notes (${state.blenderNotes.length})`));
+  for (const note of state.blenderNotes) receipts.append(text('p', 'tl-research-summary', note));
+  d.append(receipts);
+}
+
+async function loadBlenderAsset(state: LabState, key: string): Promise<void> {
+  const asset = state.blenderAssets.find((a) => a.key === key);
+  if (!asset || state.disposed) return;
+  state.blenderSelected = key;
+  if (!state.viewer || !state.renderer) {
+    state.blenderStatus = state.rendererError ? `Renderer failed: ${state.rendererError}` : 'Renderer starting…';
+    renderBlenderTab(state);
+    return;
+  }
+  teardownActive(state);
+  // Request identity: only the newest request may write the status line or
+  // touch the shared stage once its load settles. A->B then reject(A) leaves
+  // B's status intact; leaving the tab bumps the counter too (selectTab).
+  const request = ++state.blenderRequest;
+  const isCurrent = (): boolean => !state.disposed && request === state.blenderRequest;
+  state.blenderStatus = `Loading ${asset.assetUrl}…`;
+  renderBlenderTab(state);
+  showEmpty(state, state.blenderStatus);
+  try {
+    const loaded = await state.viewer.load(asset.assetUrl, (u) => new URL(u, document.baseURI).href);
+    if (!isCurrent()) return; // superseded or invalidated: the viewer already freed the model
+    if (!loaded) {
+      // Cleared underneath a still-current request: nothing attached and the
+      // viewer released the model exactly once. Say so instead of "Loading…".
+      state.blenderStatus = `Load of ${asset.assetUrl} was cancelled before it attached — click the card to load it again.`;
+      renderBlenderTab(state);
+      return;
+    }
+    state.blenderStatus = `Loaded ${asset.assetUrl} — orbit: drag, zoom: wheel, Recenter: toolbar.`;
+    hideEmpty(state);
+    frameSelection(state);
+  } catch (err) {
+    if (state.disposed) return;
+    const message = `Load failed for ${asset.assetUrl}: ${toMessage(err)}`;
+    reportError(state, message);
+    if (!isCurrent()) return; // stale rejection: logged, never clobbers the newer asset's status or stage
+    state.blenderStatus = message;
+    showEmpty(state, state.blenderStatus);
+  }
+  renderBlenderTab(state);
+  refreshMetrics(state);
+}
+
+/* ------------------------------------------------------------------ */
 /* Wiring, errors, teardown                                            */
 /* ------------------------------------------------------------------ */
 
@@ -1462,6 +1963,22 @@ function wireControls(state: LabState): void {
   state.search.addEventListener('input', () => {
     state.query = state.search.value;
     refreshGallery(state);
+  });
+  state.urlSearch.addEventListener('input', () => {
+    state.urlQuery = state.urlSearch.value;
+    renderUrlTab(state);
+  });
+  // Keyboard navigation inside the 50-row gallery list.
+  state.list.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    const buttons = Array.from(state.list.querySelectorAll<HTMLButtonElement>('button.tl-item')).filter(
+      (b) => !(b.parentElement as HTMLElement | null)?.hidden,
+    );
+    const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    if (index < 0) return;
+    const next = buttons[(index + (event.key === 'ArrowDown' ? 1 : buttons.length - 1)) % buttons.length];
+    next?.focus();
+    event.preventDefault();
   });
   state.statusSelect.addEventListener('change', () => {
     state.statusFilter = state.statusSelect.value;
@@ -1534,6 +2051,8 @@ function disposeLab(state: LabState): void {
   window.removeEventListener('error', state.onWindowError);
   window.removeEventListener('unhandledrejection', state.onWindowRejection);
   teardownActive(state);
+  state.viewer?.dispose();
+  state.viewer = null;
   state.controls?.dispose();
   state.controls = null;
   for (const light of state.lights) {
