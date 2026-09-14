@@ -1,7 +1,7 @@
 /**
  * newworld-prime Blender GLB dressing (presentation-only).
  *
- * Attaches ten Blender-built GLBs over the Day-1 blockout massing emitted by
+ * Attaches eleven Blender-built GLBs over the Day-1 blockout massing emitted by
  * buildNewworldPrime (src/newworld-prime-arena.ts). Authority
  * (colliders, ballistic surfaces, spawns, nav) is untouched — the authority
  * boxes already match these dims by construction, and every dressed mesh is
@@ -42,6 +42,9 @@
  * - fence bay (198 tris, 2.4 m repeat), hedge (200 tris), pad (48 tris):
  *   atomic-acres-catalog/assets-batch1/fences/ — privacy-fence runs, hedge
  *   runs, and all 9 concrete-pad placements from newworld-prime-props.
+ * - rusty car (1232 tris): atomic-acres-catalog/assets-batch1/rusty-car/out.glb —
+ *   LAYOUT_CONTRACT fact 9 (rusty-car showcase spot at the north entrance,
+ *   box ~4.4 x 1.8 x 1.45 m — presentation-only, untouched).
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -56,6 +59,7 @@ import {
   NEWWORLD_PRIME_FENCE_BAY_LENGTH_METRES,
   NEWWORLD_PRIME_HEDGE_RUNS,
   NEWWORLD_PRIME_PRIVACY_FENCE_RUNS,
+  NEWWORLD_PRIME_RUSTY_CAR_PLACEMENT,
   NEWWORLD_PRIME_SCHOOL_BUS_PLACEMENT,
   NEWWORLD_PRIME_SEMI_TRUCK_PLACEMENT,
   NEWWORLD_PRIME_SHED_PLACEMENTS,
@@ -97,6 +101,12 @@ const NEWWORLD_PRIME_GLB_VERSION_BATCH3 = 'batch3-20260914';
 /** Public asset URL for the wave-3 semi GLB copy. */
 export const NEWWORLD_PRIME_SEMI_GLB =
   `./assets/newworld-prime/semi.glb?v=${NEWWORLD_PRIME_GLB_VERSION_BATCH3}`;
+/** Cache-busting lane for the wave-4 rusty-car GLB copy. */
+const NEWWORLD_PRIME_GLB_VERSION_BATCH4 = 'batch4-20260914';
+
+/** Public asset URL for the wave-4 rusty-car GLB copy. */
+export const NEWWORLD_PRIME_RUSTY_CAR_GLB =
+  `./assets/newworld-prime/rusty-car.glb?v=${NEWWORLD_PRIME_GLB_VERSION_BATCH4}`;
 
 /**
  * Fallback flags for the GLB/blockout swap. Every group defaults ON (new
@@ -114,6 +124,7 @@ export type NewworldPrimeGlbDressingFlags = Readonly<{
   hedges: boolean;
   pads: boolean;
   semi: boolean;
+  rustyCar: boolean;
 }>;
 
 export const NEWWORLD_PRIME_GLB_DRESSING_DEFAULT: NewworldPrimeGlbDressingFlags = Object.freeze({
@@ -126,6 +137,7 @@ export const NEWWORLD_PRIME_GLB_DRESSING_DEFAULT: NewworldPrimeGlbDressingFlags 
   hedges: true,
   pads: true,
   semi: true,
+  rustyCar: true,
 });
 
 export type NewworldPrimeGlbAssetId =
@@ -138,7 +150,8 @@ export type NewworldPrimeGlbAssetId =
   | 'fence-bay'
   | 'hedge'
   | 'pad'
-  | 'semi';
+  | 'semi'
+  | 'rusty-car';
 
 /** Per-asset outcome: blockout stays visible whenever error is non-null. */
 export type NewworldPrimeGlbAttachment = Readonly<{
@@ -285,6 +298,16 @@ function dressingPlan(flags: NewworldPrimeGlbDressingFlags): readonly DressingPl
       // emitPropPart names semi blockout meshes
       // `newworld-prime-<placement.id>-<part.id>`.
       coversBlockout: (meshName: string) => meshName.includes(NEWWORLD_PRIME_SEMI_TRUCK_PLACEMENT.id),
+    });
+  }
+  if (flags.rustyCar) {
+    plans.push({
+      asset: 'rusty-car',
+      url: NEWWORLD_PRIME_RUSTY_CAR_GLB,
+      spots: placementSpots([NEWWORLD_PRIME_RUSTY_CAR_PLACEMENT]),
+      // emitPropSet names rusty-car blockout meshes
+      // `newworld-prime-<placement.id>-<part.id>`.
+      coversBlockout: (meshName: string) => meshName.includes(NEWWORLD_PRIME_RUSTY_CAR_PLACEMENT.id),
     });
   }
   if (flags.fences) {
