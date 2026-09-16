@@ -511,7 +511,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     const stripX = (frontInner + runEdge) / 2;
     const furnish: ReadonlyArray<readonly [string, string, number, number, number, number]> = [
       ['sofa', './assets/rebuild/furniture/sofa.glb', stripX * S, (living.z0 + 1.2) * S, 0, Math.PI / 2],
-      ['kitchen-counter', './assets/rebuild/furniture/kitchen-counter.glb', stripX * S, (living.z1 - 1.55) * S, 0, Math.PI / 2],
+      ['kitchen-counter', './assets/rebuild/furniture/kitchen-counter-v2.glb', stripX * S, (living.z1 - 1.55) * S, 0, Math.PI / 2],
       ['bed-double', './assets/rebuild/furniture/bed-double.glb', ((rearBed.x0 + rearBed.x1) / 2) * S, ((rearBed.z0 + rearBed.z1) / 2) * S, 3, 0],
       ['bath-set', './assets/rebuild/furniture/bath-set.glb', ((bathUp.x0 + bathUp.x1) / 2) * S, ((bathUp.z0 + bathUp.z1) / 2) * S, 3, 0],
     ] as const;
@@ -594,7 +594,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   const islandSpots: ReadonlyArray<readonly [number, number, number]> = [[-0.8, 2.2, 0], [0.8, 2.2, 0], [-0.8, 3.8, 0], [0.8, 3.8, 0], [0, 3, 0.6]] as const;
   for (const [dx, dz, dy] of islandSpots) {
     const box = centred(builder, `aarr-island-crate-${dx}-${dz}`, [dx, 0.62, dz], [1, 1, 1], crate);
-    kitbash('./assets/rebuild/spread/crate-06.glb', [dx * 1.6, dy, dz * 1.6], (dx + dz) * 0.4, [box], undefined, true);
+    kitbash('./assets/rebuild/crates-worn/crate-06-worn.glb', [dx * 1.6, dy, dz * 1.6], (dx + dz) * 0.4, [box], undefined, true);
   }
   pair(builder, 'aarr-hedge-loop', 12.2, 0.6, -4.3, [1.2, 1.2, 2.0], hedge);
   // Yard clusters near fences/pads (topdown plate scatter).
@@ -605,7 +605,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     const spots: ReadonlyArray<readonly [number, number, number]> = [[cx, cz, 0], [cx + 1, cz, 0], [cx + 0.5, cz, 0.6], [cx + 0.5, cz + 1, 0]] as const;
     for (const [sx, sz, sy] of spots) {
       const box = centred(builder, `aarr-yard-crate-${side}-${end}-${sx}-${sz}`, [sx, 0.5 + sy, sz], [1, 1, 1], crate);
-      kitbash('./assets/rebuild/spread/crate-06.glb', [sx * 1.6, sy, sz * 1.6], (sx + sz) * 0.7, [box], undefined, true);
+      kitbash('./assets/rebuild/crates-worn/crate-06-worn.glb', [sx * 1.6, sy, sz * 1.6], (sx + sz) * 0.7, [box], undefined, true);
     }
   }
 

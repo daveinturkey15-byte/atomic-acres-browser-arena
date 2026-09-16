@@ -1993,6 +1993,36 @@
         }
       ],
       "provenanceState": "ORIGINAL_AGENT_AUTHORED"
+    },
+    {
+      "id": "atomic-acres-rebuild-crates-worn-counter-v2-20260916",
+      "kind": "project-authored-model",
+      "creator": "aa-swarm-20260915 lane-crates (centered worn crates, notch-fixed counter)",
+      "source": "aa-swarm-20260915/lane-crates/DROP.md",
+      "license": "ORIGINAL: rebuilt from project catalog sources, no third-party source",
+      "files": [
+        {
+          "path": "public/assets/rebuild/crates-worn/crate-06-worn.glb",
+          "sha256": "ef6211f730d2f0b811a695da2642569f5a0db2e3344c381afaffa053b4400902",
+          "bytes": 11779924
+        },
+        {
+          "path": "public/assets/rebuild/crates-worn/crate-09-worn.glb",
+          "sha256": "d7dbaee6b7445f4724cb4737cb7c06640864a190ef8e69a1d32df0cd1187fe70",
+          "bytes": 10666392
+        },
+        {
+          "path": "public/assets/rebuild/crates-worn/crate-12-worn.glb",
+          "sha256": "b32f8a775c11721ddb058e9f5a3879b36c26c7a16174ac494ab9ddb8f033abb3",
+          "bytes": 11445956
+        },
+        {
+          "path": "public/assets/rebuild/furniture/kitchen-counter-v2.glb",
+          "sha256": "ba18bdb6f3453dc39001b41d71d997569483bf62fce98daa34f329a6cd81ee1f",
+          "bytes": 2692452
+        }
+      ],
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
     }
   ],
   "rejectedCandidates": [
