@@ -717,7 +717,6 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
       density: 0.62,
     },
   }),
-  // MAP3 (PREVIEW): the only COOL arena in the catalog. Every other outdoor
   // map is warm-led - suburban sunset, sodium night, airport dawn, jungle and
   // estate golden hour, khaki range - so the grade that makes a stone gallery
   // read as a different place is the one that goes the other way: blue-led
@@ -896,6 +895,115 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
       smokeNear: 0x3c3a34, smokeFar: 0x9c988c,
       dustNear: 0xe2dcc8, dustFar: 0xfaf6ea,
       density: 0.75,
+    },
+  }),
+  // Graybox wave 2026-09-14 (ShellGray): high-desert suburb rebuild at clear
+  // late morning (LAYOUT_CONTRACT style: warm late-morning desert light).
+  // Same compositional family as raid2's bleached-midday row — lifted,
+  // low-contrast, thin haze — because the map is the same kind of open,
+  // sun-beaten ground. The CDL gain below is SEARCHED, not felt: 2,197 gain
+  // triples over the legal box ([0.82, 1.18]^3, step 0.03) enumerated against
+  // this test file's own probe set and metric
+  // (src/rendering/art-direction.test.ts `gradeThroughArena`, quality
+  // profile). Winner [1.18, 0.82, 1.18]: weakest pair 0.03091 vs raid2 —
+  // 43% of headroom over the 5.5/255 (0.02157) floor AS THAT SEARCH LEFT IT.
+  // Both that number and the catalog claim that used to follow it are
+  // restated, with the measurement, under GREEN GAMMA below. ZERO warm-key
+  // (r >= g >= b) triples clear even 1.2x the floor —
+  // the same full-warm-quadrant finding raid2's row records — so the warmth
+  // stays in the arena's own light (rendering/arenas/atomic-acres-rebuild.ts
+  // authors a warm key) and the grade carries the separation on magenta,
+  // exactly as far from raid2's cool bleach as the legal box allows. A later
+  // art pass may re-search this axis; the instrument to beat is recorded here.
+  //
+  // GREEN GAMMA 1.08 -> 0.96 (interior look pass, 2026-09-15). The search
+  // above optimised ONE objective, distinctiveness, over eight generic probe
+  // colours. Its sample contained no interior surface and no hue-neutrality
+  // term at all, and this arena has since grown walkable ground floors. What
+  // the magenta costs in them was measured, not guessed:
+  //   * an ACHROMATIC-AXIS probe - pixels with |r-b| <= 0.03 in the readable
+  //     value band, so a magenta grade moves r and b together and cannot
+  //     select its way out of the sample - reads green deviation -0.001 to
+  //     -0.017 on all four batch-4 photoreal plates AND on both concept
+  //     cutaways, against -0.061 to -0.126 on every repo-state/rb7-rebuild-*
+  //     capture. Interiors are the worst at -0.126: neutral plaster goes
+  //     lavender and warm wood goes red, which is the sunset-red living room
+  //     the review calls out.
+  //   * ablating each hue term at CONSTANT Rec.709 luminance puts 83-90% of
+  //     that deficit on THIS ROW'S CDL. Take the hue out of it and interior
+  //     green deviation moves -0.112 / -0.161 / -0.143 -> -0.019 / -0.037 /
+  //     -0.014 on the ceiling, floor and plaster wall; the GAIN alone owns
+  //     -0.028 / -0.047 / -0.021 of that. Doing the same to
+  //     blender-lighting.ts hemisphereSky moves it by at most 0.020 and to
+  //     this arena's own ambientColor by 0.003. So the magenta is NOT the
+  //     shared rig's, and the shared-file lighting edit an earlier pass
+  //     proposed would have spent a world-studio and map3 risk surface on
+  //     the wrong term.
+  //   * the arena's own visual definition cannot reach it either: sweeping
+  //     ambientColor over the whole hue circle at constant luminance, capped
+  //     at the most saturated ambient in the roster (raid2's 0x93b6dd), buys
+  //     back at most +0.032 to +0.062 and only by authoring a mint-green
+  //     AmbientLight on a desert map.
+  // THE CAUSE IS THE GAIN; THE CHEAPEST CORRECTION IS THE GAMMA. The authored
+  // gamma is nearly uniform and owns only 0.004-0.008 of the deficit on its
+  // own - it is not the culprit. It is the lever because the gate's own
+  // instrument prices it about three times cheaper per unit of green
+  // recovered. Re-walking that instrument over gain[1] and gamma[1] - green
+  // only, and only upward (gain up / gamma down), so red and blue keep their
+  // authored slope and power EXACTLY - gain[1] 0.94 costs weakest 0.02365 to
+  // reach interior -0.093, while gamma[1] 0.96 holds weakest 0.02569 and
+  // reaches -0.062. 0.96 is two thirds of the way to the 0.92 safety bound
+  // and is deliberately not at it; nuketown2 already ships a sub-1 green
+  // gamma (0.98), so this is not a novel shape. The remaining half of the
+  // deficit needs this arena's hue identity re-searched out of the magenta
+  // quadrant entirely, which is an owner call and a full re-enumeration, not
+  // a trim.
+  // HEADROOM, RESTATED. This row's weakest pair falls 0.03091 -> 0.02569:
+  // from 2.39 to 1.05 eight-bit steps over the 5.5/255 floor, still four
+  // times the "quarter of a step" the ratchet's own comment calls too thin.
+  // The retired claim that this arena "is not the closest pair in the game"
+  // stopped being true before this change: world-studio joined the catalog
+  // and world-studio vs rustworks-1v1 measures 0.01937, below the floor.
+  // That failure is world-studio's, it is pre-existing, and nothing here
+  // touches it.
+  // LUMINANCE. gamma[1] < 1 raises green wherever the pre-tone-map value is
+  // below 1 and lowers it only above, so nothing readable can darken - and it
+  // was checked per pixel rather than argued. Pushing all five rb7 captures
+  // backwards through this chain and forwards again under 0.96: p1 rises on
+  // every one of them (interior 0.062 -> 0.083, street 0.321 -> 0.369), mean
+  // linear luminance rises, frac > 0.9 is unchanged on all five, and the only
+  // pixels that lose any luminance are the 12 brightest in -street and the 7
+  // brightest in -yard, already at display value >= 0.912, losing at most
+  // 0.61 of one eight-bit step.
+  'atomic-acres-rebuild': frozen({
+    id: 'atomic-acres-rebuild',
+    brief: 'High-desert suburb rebuild at clear late morning - bleached asphalt and siding, blue shade, dust in the air.',
+    cdl: {
+      gain: [1.18, 0.82, 1.18],
+      lift: [0.002, 0.003, 0.006],
+      // green 1.08 -> 0.96: the interior trim derived above. Red and blue
+      // are untouched, so the magenta AXIS is unchanged and only its depth
+      // on the green channel moves.
+      gamma: [1.1, 0.96, 1.04],
+    },
+    saturationScale: 1.12,
+    contrastScale: 1.02,
+    crosstalkDelta: -0.06,
+    splitTone: {
+      shadowTint: 0x2f6f86,
+      highlightTint: 0xfff4e2,
+      strengthScale: 1.45,
+      shadowBalance: 0.52,
+      highlightBalance: 0.42,
+    },
+    midtoneContrastDelta: 0.03,
+    vignette: { base: 0.06, settingScale: 1 },
+    bloom: { intensityScale: 1.08, thresholdScale: 1 },
+    atmosphere: {
+      mistNear: 0xc8d8e0, mistFar: 0xeaf4fa,
+      smokeNear: 0x38414a, smokeFar: 0x8fa0ad,
+      dustNear: 0xe4dcc4, dustFar: 0xf8f2e2,
+      density: 0.62,
     },
   }),
 });

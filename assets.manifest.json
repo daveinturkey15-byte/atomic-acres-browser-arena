@@ -1628,6 +1628,371 @@
       "openQuestions": [
         "Catalog content is a project research catalog; its rows must not be treated as provenance for unrelated runtime assets. Integrator should confirm whether this document belongs in the public asset manifest."
       ]
+    },
+    {
+      "id": "atomic-acres-rebuild-interior-pbr-20260915",
+      "kind": "project-authored-texture-set",
+      "creator": "aa-swarm-20260915 lane-pbr (procedural PNG pairs, swarm agent)",
+      "source": "aa-swarm-20260915/lane-pbr/DROP.md",
+      "license": "ORIGINAL: agent-authored procedural textures for this project, no third-party source",
+      "files": [
+        {
+          "path": "public/assets/rebuild/interiors/BathTile_BAKE_DIFFUSE.png",
+          "sha256": "af7afe637af827bf5292fa4c16d2ac193c772d5e6ca71c2c04e53ca46337fb1e",
+          "bytes": 441274
+        },
+        {
+          "path": "public/assets/rebuild/interiors/BathTile_BAKE_ROUGH.png",
+          "sha256": "576fb236cd4b2a223a57f62dc4cb0ea58494e84d33424a4f55e28db28c3e3e0d",
+          "bytes": 632991
+        },
+        {
+          "path": "public/assets/rebuild/interiors/GarageConcrete_BAKE_DIFFUSE.png",
+          "sha256": "5a4179b9d674a5fd01140e898f64b9f6b6117b25045b8fa3a0b2d5d6d6f1fab3",
+          "bytes": 1141997
+        },
+        {
+          "path": "public/assets/rebuild/interiors/GarageConcrete_BAKE_ROUGH.png",
+          "sha256": "c799fdd4794b8017e9f2eb7c2b84e69bdc77f2944be23a8eaf5daf69c106fb20",
+          "bytes": 724741
+        },
+        {
+          "path": "public/assets/rebuild/interiors/InteriorCeiling_BAKE_DIFFUSE.png",
+          "sha256": "aa9db6ef2445a7b9e34f19ccd61882d218d67d5410b5343c458c8257cf033efc",
+          "bytes": 322261
+        },
+        {
+          "path": "public/assets/rebuild/interiors/InteriorCeiling_BAKE_ROUGH.png",
+          "sha256": "a2b2dd294e90ef29a546896d49c553823f2d4cfa98a6b42589b36b85ec22272b",
+          "bytes": 524008
+        },
+        {
+          "path": "public/assets/rebuild/interiors/InteriorPlaster_BAKE_DIFFUSE.png",
+          "sha256": "1aacafbd8a8a508f8cfec0ff1ad35241a016dbf8ca2d22f5d116ca8ed6c7af4d",
+          "bytes": 975539
+        },
+        {
+          "path": "public/assets/rebuild/interiors/InteriorPlaster_BAKE_ROUGH.png",
+          "sha256": "92c5acd6e4f5df13591707594530241d9061617f415d539ffd4fd3754b4ca312",
+          "bytes": 680283
+        },
+        {
+          "path": "public/assets/rebuild/interiors/StairTimber_BAKE_DIFFUSE.png",
+          "sha256": "ea7cdb5c331523ee453c972089d2f353cda100c0532461cb3ac6016db58b1726",
+          "bytes": 572926
+        },
+        {
+          "path": "public/assets/rebuild/interiors/StairTimber_BAKE_ROUGH.png",
+          "sha256": "1c97c54dd9827a066ad366f51ff69a842549c100f54693282f94300ea9c909b8",
+          "bytes": 669619
+        },
+        {
+          "path": "public/assets/rebuild/interiors/WoodFloor_BAKE_DIFFUSE.png",
+          "sha256": "4a64d6885a3cd38cdc911dd1679092100ca2d30c5d894caa531194bf7a400a71",
+          "bytes": 1387143
+        },
+        {
+          "path": "public/assets/rebuild/interiors/WoodFloor_BAKE_ROUGH.png",
+          "sha256": "7fd0fbb3cfff09fab63981455fead2b9c1fe1f4bf17ab7b2c2a778e53289f5c8",
+          "bytes": 742573
+        }
+      ],
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
+    },
+    {
+      "id": "atomic-acres-rebuild-yard-trees-20260915",
+      "kind": "project-authored-model",
+      "creator": "aa-swarm-20260915 lane-trees (TRELLIS image-large synthesis + opt-baked textures, swarm agent)",
+      "source": "aa-swarm-20260915/lane-trees/DROP.md",
+      "license": "ORIGINAL: images synthesized for this project, mesh/textures generated locally, no third-party source",
+      "files": [
+        {
+          "path": "public/assets/rebuild/trees/joshua.glb",
+          "sha256": "b6748b4ca28896cc70bdd9191e932ca05094a713acddabad7a1039107cd3f858",
+          "bytes": 7442656
+        },
+        {
+          "path": "public/assets/rebuild/trees/street-leafy.glb",
+          "sha256": "71ee55f4ff0ef88236ba616c7cd6a4159d2bfd7924affefd2f75aebcdaff1215",
+          "bytes": 9124524
+        }
+      ],
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
+    },
+    {
+      "id": "atomic-acres-rebuild-bus-20260915",
+      "kind": "project-authored-model",
+      "creator": "atomic-acres-catalog assets-batch1 bus (Blender procedural + baked PBR, prior lane)",
+      "source": "atomic-acres-catalog/assets-batch1/bus/manifest.json",
+      "license": "ORIGINAL: project-authored procedural model, no third-party source",
+      "files": [
+        {
+          "path": "public/assets/rebuild/vehicles/bus.glb",
+          "sha256": "5ee885ca0d9a19e5272775bf61c0b1d670a82f8cccc6323f8aaa56996bf7c885",
+          "bytes": 991696
+        }
+      ],
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
+    },
+    {
+      "id": "atomic-acres-rebuild-furniture-20260915",
+      "kind": "project-authored-model",
+      "creator": "aa-swarm-20260915 lane-furniture (TRELLIS synthesis + opt-baked textures, swarm agent)",
+      "source": "aa-swarm-20260915/lane-furniture/DROP.md",
+      "license": "ORIGINAL: images synthesized for this project, meshes generated locally, no third-party source",
+      "files": [
+        {
+          "path": "public/assets/rebuild/furniture/bath-set.glb",
+          "sha256": "4e5dfe1c99d91d05b73abb2fc92f79f08d61c5ac624918b4229a7c4aec688316",
+          "bytes": 1621816
+        },
+        {
+          "path": "public/assets/rebuild/furniture/bed-double.glb",
+          "sha256": "3d84e9f98765803a427980a9114726586310da32607ba1a2589cf2cc2fb926de",
+          "bytes": 2998964
+        },
+        {
+          "path": "public/assets/rebuild/furniture/kitchen-counter.glb",
+          "sha256": "3f4a6cb2982bb89517e6c24324338a12cc9bda955c340b781033735c5b24a9e6",
+          "bytes": 2684428
+        },
+        {
+          "path": "public/assets/rebuild/furniture/sofa.glb",
+          "sha256": "6ab6ed1dacb382a6a5129de3d327b5cc965b5a08b26f1a67cf27b964a709d5f6",
+          "bytes": 2194424
+        }
+      ],
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
+    },
+    {
+      "id": "atomic-acres-rebuild-vehicles-props-20260915",
+      "kind": "project-authored-model",
+      "creator": "atomic-acres-catalog assets-batch1 (Blender procedural + baked PBR, prior lanes)",
+      "source": "atomic-acres-catalog/assets-batch1/*/manifest.json",
+      "license": "ORIGINAL: project-authored procedural models, no third-party source",
+      "files": [
+        {
+          "path": "public/assets/rebuild/vehicles/jeep.glb",
+          "sha256": "72ab32f5ca4a03aa2424b37826eeb78e41f13047dc36ac5f89d7d3690dd96cb6",
+          "bytes": 1325888
+        },
+        {
+          "path": "public/assets/rebuild/vehicles/rusty-car.glb",
+          "sha256": "56228dedbd3d03a49fabd6b4b4f329e91fa9c4089a51479ace0d786a0de1c425",
+          "bytes": 888908
+        },
+        {
+          "path": "public/assets/rebuild/vehicles/semi.glb",
+          "sha256": "e95b043be406941c9f238b73b7e8f862fb1c7508e9fe508fd76bcdffa9c1a485",
+          "bytes": 1390460
+        },
+        {
+          "path": "public/assets/rebuild/props/lamp.glb",
+          "sha256": "70103ef3aef4267799dd75c6be05d2d836a6c35fe0cf273f92ae0dff26e48b25",
+          "bytes": 1114588
+        },
+        {
+          "path": "public/assets/rebuild/props/shed.glb",
+          "sha256": "87434cd82ec829eef54f9e3382c12864f8a4d42558004df701123c201f4f1bdf",
+          "bytes": 1124192
+        },
+        {
+          "path": "public/assets/rebuild/props/sign.glb",
+          "sha256": "8139bc436f8a92305dc498a9c956c98d0ab9ec71ffafc690766446e12d04c390",
+          "bytes": 586228
+        }
+      ],
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
+    },
+    {
+      "id": "atomic-acres-rebuild-ground-plants-20260915",
+      "kind": "project-authored-texture-set",
+      "creator": "aa-swarm-20260915 lane-ground (procedural) + lane-plants (TRELLIS synthesis)",
+      "source": "aa-swarm-20260915/lane-ground/DROP.md + lane-plants/DROP.md",
+      "license": "ORIGINAL: agent-authored/generated for this project, no third-party source",
+      "files": [
+        {
+          "path": "public/assets/rebuild/ground/AsphaltLoop_BAKE_DIFFUSE.png",
+          "sha256": "0d0e6e59ed2346f930f2130e25ad8d299567f2e26fe331654a7bb7c7af279983",
+          "bytes": 1421498
+        },
+        {
+          "path": "public/assets/rebuild/ground/AsphaltLoop_BAKE_ROUGH.png",
+          "sha256": "80a55a2b73c4144d7a0de24f6b60831886281a73cd62dcc8dae6f2ad306eb76d",
+          "bytes": 724647
+        },
+        {
+          "path": "public/assets/rebuild/ground/DesertSand_BAKE_DIFFUSE.png",
+          "sha256": "7da44fca7119b8cb28f795b367623bd4a8d7304346a8b5c1a23306810a27b086",
+          "bytes": 1317402
+        },
+        {
+          "path": "public/assets/rebuild/ground/DesertSand_BAKE_ROUGH.png",
+          "sha256": "476649e69929032af638ff547c3887646ccb746a6438cad9abc44861521fcf35",
+          "bytes": 688714
+        },
+        {
+          "path": "public/assets/rebuild/ground/LawnPatchy_BAKE_DIFFUSE.png",
+          "sha256": "d13a9dd86530dc48262d81c0d30b14597244d94086c0b9f1f83180095a6eab05",
+          "bytes": 1173290
+        },
+        {
+          "path": "public/assets/rebuild/ground/LawnPatchy_BAKE_ROUGH.png",
+          "sha256": "db79aa8c1f4a20854dc19ab9a9a720aef88ae84fd929305028da09089e35c2c0",
+          "bytes": 376784
+        },
+        {
+          "path": "public/assets/rebuild/ground/SidewalkConcrete_BAKE_DIFFUSE.png",
+          "sha256": "5034bfa9574c1eb623cdc62382c5766db07bb81b70d0c0241467781179fc32e2",
+          "bytes": 1380091
+        },
+        {
+          "path": "public/assets/rebuild/ground/SidewalkConcrete_BAKE_ROUGH.png",
+          "sha256": "df1fb27fb69535a0bb91d45e20e75b9c915309dd15b5904c56e5734c1047a89e",
+          "bytes": 781524
+        },
+        {
+          "path": "public/assets/rebuild/plants/prickly-pear.glb",
+          "sha256": "94a5e5e13889e28e9caaecfc245d0a4e54472b393f684830d2c0376d82c216b1",
+          "bytes": 3478420
+        },
+        {
+          "path": "public/assets/rebuild/plants/rock-cluster.glb",
+          "sha256": "efd6fce3c9fb8a52dae2cc202ce70d4c91341dbd88e32e65ff409fedeac018ce",
+          "bytes": 1942396
+        }
+      ],
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
+    },
+    {
+      "id": "atomic-acres-rebuild-houses-v2-20260915",
+      "kind": "project-authored-model",
+      "creator": "aa-swarm-20260915 lane-houses2 (Blender rebuild with walk-through openings, swarm agent)",
+      "source": "aa-swarm-20260915/lane-houses2/DROP.md",
+      "license": "ORIGINAL: rebuilt from project catalog sources, no third-party source",
+      "files": [
+        {
+          "path": "public/assets/rebuild/houses/house-east-yellow.glb",
+          "sha256": "b9b4ec9904497c40471a72b41e59ad822bdf2dd7f40d357dc0c7a856c57a88f0",
+          "bytes": 730040
+        },
+        {
+          "path": "public/assets/rebuild/houses/house-west-teal.glb",
+          "sha256": "f9b9a4c12e6a794173c20e97a1e3e22962d56ea344716d1f272d45c5d6649fef",
+          "bytes": 1706380
+        }
+      ],
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
+    },
+    {
+      "id": "atomic-acres-rebuild-spread-props-20260916",
+      "kind": "project-authored-model",
+      "creator": "aa-swarm-20260915 lane-props (Blender rebuilds at true spread dims)",
+      "source": "aa-swarm-20260915/lane-props/DROP.md",
+      "license": "ORIGINAL: rebuilt from project catalog sources, no third-party source",
+      "files": [
+        {
+          "path": "public/assets/rebuild/spread/crate-06.glb",
+          "sha256": "7b0cf1b1575c473dabc02e40c10ba083764c6bc473f06a168c968951b193c91a",
+          "bytes": 418872
+        },
+        {
+          "path": "public/assets/rebuild/spread/crate-09.glb",
+          "sha256": "5f1099abc413e260521e85cb42f3dd56d4977e6f474c5728041eb3c69d326a1b",
+          "bytes": 423956
+        },
+        {
+          "path": "public/assets/rebuild/spread/crate-12.glb",
+          "sha256": "f20c52172e5d1276d38a4a9580358e2b9dfcfb18811b80a91efc2d683cf2bb3a",
+          "bytes": 433196
+        },
+        {
+          "path": "public/assets/rebuild/spread/fence-bay.glb",
+          "sha256": "63e4b13d34b59e867ef50d131dfad5621edc15dd3bdc6abbc114b8ec7dff8230",
+          "bytes": 358524
+        },
+        {
+          "path": "public/assets/rebuild/spread/lamp.glb",
+          "sha256": "f1f95188c6e3c81500bf17b4ef6a024f059d08943ef673d2e5995dadc1366687",
+          "bytes": 1293756
+        },
+        {
+          "path": "public/assets/rebuild/spread/pallet.glb",
+          "sha256": "a8e0435cf98fb1bf27b4224b73eb2573538e9b493a9ebe1906f8de627bea8b80",
+          "bytes": 95908
+        },
+        {
+          "path": "public/assets/rebuild/spread/shed.glb",
+          "sha256": "a7be21cbca83931c1d29103527e72280092f0126d03827ea7abe9c45991cdea8",
+          "bytes": 1216060
+        },
+        {
+          "path": "public/assets/rebuild/spread/sign.glb",
+          "sha256": "55f996eac965abefe11ec53beca31ea7443b88685217d67d6a73ee43e1db616e",
+          "bytes": 630088
+        },
+        {
+          "path": "public/assets/rebuild/spread/wall-bay.glb",
+          "sha256": "44837125de98d6efa5ce013638035d910559d655713440f45d9cc74d3dfb8101",
+          "bytes": 78156
+        }
+      ],
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
+    },
+    {
+      "id": "atomic-acres-rebuild-wear-20260916",
+      "kind": "project-authored-model",
+      "creator": "aa-swarm-20260915 lane-wear (Blender wear-gated rebuilds, WEAR_CHECK PASS)",
+      "source": "aa-swarm-20260915/lane-wear/DROP.md",
+      "license": "ORIGINAL: rebuilt from project catalog sources, no third-party source",
+      "files": [
+        {
+          "path": "public/assets/rebuild/wear/bed_sleeper.glb",
+          "sha256": "6e106cf6be5cd015a88fec58abe58cafe76c5d9c99afd62f6a7f2e299cd93d3d",
+          "bytes": 5761080
+        },
+        {
+          "path": "public/assets/rebuild/wear/chair_folding.glb",
+          "sha256": "9940f8c574a21afd14beaea0b79dbe5dfe1460a9e6294a64b6ad24db0ff8986d",
+          "bytes": 6014112
+        },
+        {
+          "path": "public/assets/rebuild/wear/chair_slat.glb",
+          "sha256": "cc3bf8ada405ce378f123bde48cc29850d15904abe64eb531cc873c29a695634",
+          "bytes": 4331648
+        },
+        {
+          "path": "public/assets/rebuild/wear/edging_run.glb",
+          "sha256": "4394a46e3ca790af7fa410121e08cf99620ed38f478000ebda71454a0c72d3aa",
+          "bytes": 3999188
+        },
+        {
+          "path": "public/assets/rebuild/wear/litter_atlas.glb",
+          "sha256": "d8f3b40562919e358b77a2f6dfe8e7b142faaf376230f1cd9e345bcdc1135308",
+          "bytes": 3380880
+        },
+        {
+          "path": "public/assets/rebuild/wear/planter_conc.glb",
+          "sha256": "3c2b64c3897d1a8d2eb907b30165734613d5f1749d91e02cd209aa33367eadc4",
+          "bytes": 8369444
+        },
+        {
+          "path": "public/assets/rebuild/wear/table_side.glb",
+          "sha256": "6207d8082b7d4ee226210804053989a31c95d1de38e01223cbf33cf50ad9c5f8",
+          "bytes": 6174952
+        },
+        {
+          "path": "public/assets/rebuild/wear/window_shuttered.glb",
+          "sha256": "4ddc1a58a32afd5621fbc50a483bf3ff19da3dae499398d48f628f39ebda2335",
+          "bytes": 8472384
+        },
+        {
+          "path": "public/assets/rebuild/wear/window_wide.glb",
+          "sha256": "1f4bc8297d91b79e52e71c78fa34922aa73bc000431bc5d5cf31ce58959e5cec",
+          "bytes": 5258532
+        }
+      ],
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
     }
   ],
   "rejectedCandidates": [
