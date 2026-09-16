@@ -82,6 +82,12 @@ const SPAWN_LAYOUT_FLOORS: Readonly<Record<ArenaId, Readonly<{
   'world-studio': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 7 },
   'nuketown2': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 7 },
   'raid2': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 7 },
+  // Graybox wave 2026-09-14 (ShellGray): count 6 is AuthorityGray's authored
+  // 6-per-team minimum (their slice builds to it); spread/NN match the sibling
+  // rebuilds on the same neighbourhood scale. NOTE for integration: LayoutGray's
+  // builder currently returns empty spawn tables, so this gate goes red until
+  // the authority tables land in the builder — that wiring is not this slice.
+  'atomic-acres-rebuild': { minPointsPerTeam: 6, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 7 },
 });
 
 function distance(a: SpawnPoint, b: SpawnPoint): number {

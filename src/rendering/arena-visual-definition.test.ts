@@ -15,7 +15,10 @@ import { FIRST_PERSON_CAMERA_NEAR_METERS, FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_
 // entries for them land separately with the arena visual modules.
 // owner 2026-09-02 (HF-405): Map 3 added.
 // owner 2026-09-03 (HF-408): Raid Rebuild added.
-const ARENA_IDS: readonly ArenaId[] = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal', 'farcrysis', 'high-seas', 'test1', 'test2', 'map3', 'nuketown2', 'raid2'];
+// Graybox wave 2026-09-14 (ShellGray): world-studio (registry order, first)
+// and atomic-acres-rebuild (appended) added. Order matches
+// ARENA_VISUAL_REGISTRY key order exactly — toEqual is order-sensitive.
+const ARENA_IDS: readonly ArenaId[] = ['world-studio', 'atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal', 'farcrysis', 'high-seas', 'test1', 'test2', 'map3', 'nuketown2', 'raid2', 'atomic-acres-rebuild'];
 
 describe('Pass 64 arena visual definitions', () => {
   it('defines exactly one dynamically imported contract for every stable arena ID', async () => {

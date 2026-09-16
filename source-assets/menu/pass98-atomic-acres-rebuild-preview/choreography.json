@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "recipeId": "pass98-atomic-acres-rebuild-menu-preview-v1",
+  "generatedAt": "2026-09-14",
+  "inheritsMotionContract": "pass66-authoritative-runtime-menu-preview-v2",
+  "note": "Graybox wave 2026-09-14 (ShellGray). Additive family, same reason as pass79/pass84/pass85/pass87: the Pass 66 masters choreography is digest-pinned by the retained production gate, so a new arena rides beside it rather than rewriting accepted history. The camera recipe is authored here BEFORE any capture exists, for the Map 3 reason: a card cannot leave standby without one, and authoring it now makes the capture a mechanical step rather than a design step. The orbit is fitted to ATOMIC_ACRES_REBUILD_BOUNDS (56 x 64 m): radius 26 x 30 is inside the half-extents, and the 30 m altitude clears the map's tallest authored mass (the ~7 m two-storey house shells, LAYOUT_CONTRACT fact 2) by the same margin Map 3's 34 m clears its 5.2 m gantries. The pass opens over the loop centre - the bus + semi nose-to-nose pair (fact 4) and the whole point of the rebuild - rather than over a back yard.",
+  "arenas": {
+    "atomic-acres-rebuild": {
+      "kind": "helicopter",
+      "label": "HELO FLYOVER // ATOMIC ACRES",
+      "presentationId": "menu-video-runtime-helo-atomic-acres-rebuild-v1",
+      "cockpitAssetId": "pass66-compact-cockpit-overlay-v1",
+      "seed": 98091401,
+      "fovDegrees": 68,
+      "posterFrame": 60,
+      "centre": [
+        0,
+        2.6,
+        0
+      ],
+      "radius": [
+        26,
+        30
+      ],
+      "altitudeM": 30,
+      "lookAt": [
+        0,
+        2.0,
+        0
+      ],
+      "phaseRadians": 0.9,
+      "safeVolume": {
+        "x": [
+          -27.5,
+          27.5
+        ],
+        "y": [
+          29,
+          31
+        ],
+        "z": [
+          -31.5,
+          31.5
+        ]
+      },
+      "reviewLabel": "Atomic Acres rebuild loop-road cockpit flyover"
+    }
+  }
+}

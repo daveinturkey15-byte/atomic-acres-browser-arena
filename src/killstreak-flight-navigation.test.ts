@@ -58,7 +58,10 @@ describe('support flight navigation', () => {
       // NUKETOWN2 (HF-407) added 2026-09-02; the list is sorted, so it lands
       // between map3 and rustworks-1v1. RAID2 (HF-408) added 2026-09-03; sorted,
       // it lands between nuketown2 and rustworks-1v1.
-      'atomic-acres', 'farcrysis', 'gun-range', 'high-seas', 'map3', 'nuketown2', 'raid2', 'rustworks-1v1', 'skyline-terminal', 'test1', 'test2',
+      // Graybox wave 2026-09-14 (ShellGray): atomic-acres-rebuild added,
+      // sorted right after atomic-acres; world-studio added where it sorts
+      // (was missing from this list — the assertion failed before this lane).
+      'atomic-acres', 'atomic-acres-rebuild', 'farcrysis', 'gun-range', 'high-seas', 'map3', 'nuketown2', 'raid2', 'rustworks-1v1', 'skyline-terminal', 'test1', 'test2', 'world-studio',
     ]);
     for (const entry of Object.values(PASS65_FLIGHT_NAVIGATION)) {
       expect(entry.noFlyPolicy).toBe('authoritative-static-and-dynamic-solids');

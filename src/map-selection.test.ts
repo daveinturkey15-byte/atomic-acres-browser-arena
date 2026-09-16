@@ -35,20 +35,24 @@ describe('opening arena selection', () => {
       'test1',
       'test2',
       'map3',
+      // Graybox wave 2026-09-14 (ShellGray): appended, never reordered.
+      'atomic-acres-rebuild',
     ]);
     // HF-405: Map 3 registered as a PREVIEW arena (2026-09-02); Test1/Test2 carry their owner names.
     // HF-407: Nuke Town Rebuild added. Its display name must NOT collide with
     // 'Nuke Town'; HF-495 now puts the rebuild first while keeping the names
     // unambiguous when both are resolved from the catalog.
     // HF-408: Raid Rebuild added, on the same rule against 'Raid'.
-    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town · New World', 'Nuketown', 'Raid Rebuild', 'Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3']);
+    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town · New World', 'Nuketown', 'Raid Rebuild', 'Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3', 'Atomic Acres']);
     // HF-495 (owner, 2026-09-04): selectability derives the menu order from
     // this catalog; the retired original Raid is absent without a second list.
+    // Owner 2026-09-15: rebuild-only preview menu — world-studio stays
+    // registered and decodable, but the menu offers the rebuild alone.
     expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toEqual([
-      'world-studio',
+      'atomic-acres-rebuild',
     ]);
-    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(12);
-    expect(ARENA_SELECTIONS.length).toBe(12);
+    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(13);
+    expect(ARENA_SELECTIONS.length).toBe(13);
     for (const entry of ARENA_SELECTIONS) {
       expect(entry.selectorLabel.length).toBeGreaterThan(3);
       expect(entry.summary.length).toBeGreaterThan(12);
@@ -168,6 +172,8 @@ describe('opening arena selection', () => {
       // is the ONE imported arena in the game; its rebuild is code.
       nuketown2: 'code',
       raid2: 'code',
+      // Graybox wave 2026-09-14 (ShellGray): layout-validation rebuild, code-built.
+      'atomic-acres-rebuild': 'code',
     });
     // Exactly one imported arena today; a second one appearing without this
     // gate being revisited is the drift worth catching.
@@ -201,7 +207,8 @@ describe('opening arena selection', () => {
       // HF-408 (Lane AQ): raid2 is an eleventh entry on MATCH_DURATION_MS, like test2.
       // HF-495: catalog order is Nuke Town Rebuild, Raid Rebuild, then the
       // retained rows; the duration values remain bound to each row.
-      .toEqual([300_000, 300_000, 300_000, 300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000]);
+      // Graybox wave 2026-09-14 (ShellGray): the rebuild is the thirteenth.
+      .toEqual([300_000, 300_000, 300_000, 300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000, 300_000]);
     expect(ARENA_SELECTIONS.map((selection) => arenaCanvasLabel(selection))).toEqual([
       'Nuke Town · New World multiplayer arena',
       'Nuketown multiplayer arena',
@@ -216,6 +223,8 @@ describe('opening arena selection', () => {
       'Raid multiplayer arena',
       // MAP3: an explore arena is not a multiplayer arena.
       'Map 3 explore arena',
+      // Graybox wave 2026-09-14 (ShellGray): appended team arena.
+      'Atomic Acres multiplayer arena',
     ]);
   });
 
@@ -246,6 +255,9 @@ describe('opening arena selection', () => {
       // registers `multiplayer: true` - so turning support OFF here would be
       // inconsistent with the row it actually ships.
       'raid2': true,
+      // Graybox wave 2026-09-14 (ShellGray): field support ON (brief), same
+      // argument as raid2 — selectable team arena on the same netcode.
+      'atomic-acres-rebuild': true,
     });
   });
 
@@ -348,7 +360,9 @@ describe('opening arena selection', () => {
       // the Gun Range was the only bot-less arena and the wrong words for the
       // second one.
       'START EXPLORING',
-      // The remaining rows retain their catalog order and declared bot counts.
+      // Graybox wave 2026-09-14 (ShellGray): one bot to open, max six —
+      // the same '1 BOT SKIRMISH' the sibling 1-to-open team arenas carry.
+      '1 BOT SKIRMISH',
     ]);
   });
 
@@ -445,6 +459,32 @@ describe('opening arena selection', () => {
     expect(isArenaId('nuketown2')).toBe(true);
     expect(ARENA_IDS).toContain('nuketown2');
   });
+  // Graybox wave 2026-09-14 (ShellGray). The layout-validation rebuild ships
+  // selectable from day one with the hosted feature set, because the thing
+  // under test is the LAYOUT. What this pins is the brief: team kind, 1 bot
+  // to open with max six, multiplayer + field support, code authoring, a
+  // unique display name, and a route that does not steal the shipped id.
+  it('offers the Atomic Acres rebuild as a selectable hosted team arena', () => {
+    const rebuild = arenaSelection('atomic-acres-rebuild');
+    expect(rebuild.id).toBe('atomic-acres-rebuild');
+    expect(rebuild.selectable).toBe(true);
+    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toContain('atomic-acres-rebuild');
+    expect(rebuild.kind).toBe('team');
+    expect(rebuild.multiplayer).toBe(true);
+    expect(rebuild.fieldSupport).toBe(true);
+    expect(rebuild.overdrive).toBe(true);
+    expect(rebuild.soloBotCount).toBe(1);
+    expect(rebuild.maximumSoloBots).toBe(6);
+    expect(rebuild.authoring).toBe('code');
+    expect(rebuild.displayName).toBe('Atomic Acres');
+    expect(rebuild.displayName).not.toBe(arenaSelection('atomic-acres').displayName);
+    expect(rebuild.routeId).toBe('atomic-acres-rebuild');
+    expect(rebuild.routeId).not.toBe(arenaSelection('atomic-acres').routeId);
+    expect(decodeArenaId('atomic-acres-rebuild')).toBe('atomic-acres-rebuild');
+    expect(decodeArenaId('atomic-acres')).toBe('atomic-acres');
+    expect(isArenaId('atomic-acres-rebuild')).toBe(true);
+    expect(ARENA_IDS).toContain('atomic-acres-rebuild');
+  });
 
   it('decodes current route labels and preserves stable URL/storage/protocol ids', () => {
     expect(decodeArenaId('nuke-town')).toBe('atomic-acres');
@@ -462,6 +502,10 @@ describe('opening arena selection', () => {
     // owner 2026-08-30: Test1/Test2 arenas added — route id equals stable id.
     expect(decodeArenaId('test1')).toBe('test1');
     expect(decodeArenaId('test2')).toBe('test2');
+    // Graybox wave 2026-09-14 (ShellGray): the rebuild's own descriptive
+    // route. The shipped id still decodes to the shipped map (line above) —
+    // the route deliberately does NOT reuse `atomic-acres`.
+    expect(decodeArenaId('atomic-acres-rebuild')).toBe('atomic-acres-rebuild');
   });
 
   it('distinguishes strict current IDs from compatibility routes and aliases', () => {

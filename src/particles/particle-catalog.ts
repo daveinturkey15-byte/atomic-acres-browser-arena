@@ -326,6 +326,17 @@ export const ARENA_PARTICLE_PROFILES: Readonly<Record<ArenaId, ArenaParticleProf
     { density: 0.5, kind: 'seed', colorWarm: 0xf2e8c0, colorCool: 0xc0c4a8, radiusM: 0.044, fallMps: 0.25, windPull: 0.75, flutterMps: 0.56, spinRadiansPerSecond: 1.45, opacity: 0.11 },
     0.7, 24, 14, 4,
   ),
+  // Graybox wave 2026-09-14 (ShellGray): high-desert air — wind-blown dust
+  // plus scrub seed off the surround (LAYOUT_CONTRACT fact 1). Same
+  // readability contract as the nuketown2 row: motes at the 0.11 family
+  // ceiling, drift under its 0.16, radii sized to subtend real pixels at the
+  // 1280x720 review viewport (see the nuketown2 comment above).
+  'atomic-acres-rebuild': arena(
+    'atomic-acres-rebuild', 'desert-dust-and-scrub-seed',
+    { density: 0.72, colorWarm: 0xe8d4a8, colorCool: 0xc4c0b0, radiusM: 0.026, riseMps: 0.055, swirlMps: 0.22, windPull: 0.72, opacity: 0.11 },
+    { density: 0.42, kind: 'seed', colorWarm: 0xd8c890, colorCool: 0xa8a488, radiusM: 0.055, fallMps: 0.29, windPull: 0.82, flutterMps: 0.56, spinRadiansPerSecond: 1.45, opacity: 0.15 },
+    0.55, 21, 12, 4,
+  ),
 });
 
 export function arenaParticleProfile(arenaId: ArenaId): ArenaParticleProfile {

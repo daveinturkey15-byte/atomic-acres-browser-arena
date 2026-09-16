@@ -25,6 +25,9 @@ export const ARENA_VISUAL_REGISTRY: ArenaVisualRegistry = Object.freeze({
   'nuketown2': () => import('./arenas/nuketown2'),
   // RAID2 (PREVIEW), owner 2026-09-02 via HF-408.
   'raid2': () => import('./arenas/raid2'),
+  // Graybox wave 2026-09-14 (ShellGray): layout-validation rebuild, selectable
+  // from day one. Module below is the lighting rig + fixed 5-camera judgeset.
+  'atomic-acres-rebuild': () => import('./arenas/atomic-acres-rebuild'),
 });
 
 /**

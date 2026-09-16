@@ -269,6 +269,25 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     width: 2560,
     height: 1440,
   }),
+  // Graybox wave 2026-09-14 (ShellGray): no flyover has been captured for the
+  // rebuild. Standby with empty media — never another arena's bytes — until
+  // its own capture lands through the sanctioned generator with its own
+  // cache family, the way raid2's row above did.
+  'atomic-acres-rebuild': Object.freeze({
+    arenaId: 'atomic-acres-rebuild',
+    frame: 'helicopter',
+    label: 'PREVIEW STANDBY // ATOMIC ACRES',
+    motionLabel: 'REBUILD PREVIEW PENDING',
+    reducedMotionLabel: 'PREVIEW STANDBY',
+    presentationId: 'menu-video-runtime-helo-atomic-acres-rebuild-v1',
+    mediaAvailable: false,
+    webm: '',
+    mp4: '',
+    poster: '',
+    durationSeconds: 8,
+    width: 2560,
+    height: 1440,
+  }),
 } satisfies Record<ArenaId, MenuPreviewVideoDefinition>);
 
 export function menuPreviewVideoDefinition(arenaId: ArenaId): MenuPreviewVideoDefinition {

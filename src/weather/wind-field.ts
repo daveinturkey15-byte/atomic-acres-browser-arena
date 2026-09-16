@@ -237,6 +237,12 @@ export const WIND_PROFILES: Readonly<Record<ArenaId, WindProfile>> = Object.free
   // gust scale (26 m against 18 m) because what breaks the wind here is a
   // colonnade on 4 m gaps at the end of a 52 m lane, not a hedge line.
   'raid2': profile('raid2', 'hillside-terrace-lane-breeze', -1.18, 2.5, 2.1, 26, 1.05, false),
+  // Graybox wave 2026-09-14 (ShellGray): wind runs ALONG the loop's long axis
+  // (bearing pi/2 = +z, the south-entry-to-loop axis, North = -Z), the one
+  // direction a 64 m walled corridor lets it run. Gust scale 22 m is the
+  // spacing of the bodies that break it up: house, garage, bus + semi pair,
+  // garage, house (LAYOUT_CONTRACT facts 2-4 + batch-4 garages).
+  'atomic-acres-rebuild': profile('atomic-acres-rebuild', 'desert-loop-channelled-draught', 1.57, 3.0, 2.6, 22, 0.7, false),
 });
 
 export function windProfile(arenaId: ArenaId): WindProfile {

@@ -130,6 +130,10 @@ export const ARENA_ACOUSTIC_SPACES: Readonly<Record<ArenaId, AcousticSpace>> = O
   // RAID2 (PREVIEW, HF-408): a walled estate of paved outdoor rooms, the same
   // reverb family as test2 even though the rebuild is the more open of the two.
   'raid2': 'urban-yard',
+  // Graybox wave 2026-09-14 (ShellGray): perimeter walls + twin house
+  // facades flanking the loop (batch-4 BRIEF) — the nuketown2 yard argument,
+  // not the shipped map's open field.
+  'atomic-acres-rebuild': 'urban-yard',
 });
 
 export const DEFAULT_ACOUSTIC_SPACE: AcousticSpace = 'open-field';

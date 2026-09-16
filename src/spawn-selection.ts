@@ -154,6 +154,9 @@ export const MAP_TRAP_RADIUS: Readonly<Record<ArenaId, number>> = Object.freeze(
   'map3': 8,
   'nuketown2': 7,
   'raid2': 7,
+  // Graybox wave 2026-09-14 (ShellGray): same neighbourhood scale as the
+  // nuketown2/raid2 rebuilds, so the same 7 m radius.
+  'atomic-acres-rebuild': 7,
 });
 
 export function stableSpawnTieBreakSeed(id: string): number {

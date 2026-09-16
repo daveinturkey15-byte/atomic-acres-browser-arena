@@ -216,6 +216,21 @@ export const ARENA_AMBIENT_PROFILES: Readonly<Record<ArenaId, ArenaAmbientProfil
     event('r2.shutter-knock', 'clank', 2, [1_500, 1_180], 0.13, 0.012, 0, 29),
     event('r2.hillside-call', 'call', 2, [540, 415], 0.38, 0.016, 0, 54),
   ]),
+  // Graybox wave 2026-09-14 (ShellGray): the rebuild's read is the same as
+  // nuketown2's — houses are props, the loop road is the fight — with the
+  // LAYOUT_CONTRACT desert surround (fact 1) instead of test-town lawns:
+  // scrub rustle and a desert bird replace the lawn voices; the bus + semi
+  // nose-to-nose in the loop (fact 4) keep the cooling-shell tick and add a
+  // trailer creak; crates, fences, poles and lamps supply the knocks and hum.
+  'atomic-acres-rebuild': profile('atomic-acres-rebuild', 'desert-loop-street-and-parked-rigs', [8, 17], [
+    event('aa.bus-shell-tick', 'clank', 5, [780, 610], 0.20, 0.017, 0, 22),
+    event('aa.trailer-creak', 'creak', 4, [300, 210], 0.55, 0.016, 0, 26),
+    event('aa.crate-knock', 'clank', 4, [1_500, 1_180], 0.13, 0.014, 0, 24),
+    event('aa.loop-gust', 'whoosh', 6, [330, 160], 1.60, 0.018, 0.8, 16),
+    event('aa.scrub-rustle', 'rustle', 4, [2_300, 1_450], 0.50, 0.013, 1.3, 12),
+    event('aa.pole-hum-swell', 'call', 3, [120, 240], 1.20, 0.012, 0, 34),
+    event('aa.desert-bird', 'chirp', 2, [2_600, 3_100], 0.10, 0.019, 0, 47),
+  ]),
 });
 
 /** Total weight of an arena's events; 0 when the arena has none. */

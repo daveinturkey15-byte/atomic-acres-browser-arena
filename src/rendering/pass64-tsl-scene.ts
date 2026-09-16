@@ -333,6 +333,14 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaVisualDefinition['id'], Atmospher
     [[-24, 20, 2.3, 3.9], [24, 20, 2.3, 3.9]],
     { count: 52, minX: -36, maxX: 36, minZ: -32, maxZ: 30 },
   ),
+  // Graybox wave 2026-09-14 (ShellGray): mirrors ATMOSPHERE_LAYOUTS in
+  // atmosphere-system.ts card for card; the dust box is the 56 x 64
+  // playfield, which is where the players are.
+  'atomic-acres-rebuild': atmosphereLayout(
+    [[-14, -23, 11, 3.4], [14, -23, 11, 3.4], [-21, -2, 9, 3.0], [21, 2, 9, 3.0]],
+    [[-18, -25, 2.2, 3.8], [18, -25, 2.2, 3.8]],
+    { count: 56, minX: -28, maxX: 28, minZ: -32, maxZ: 32 },
+  ),
 });
 const MAX_MIST_LAYERS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
 

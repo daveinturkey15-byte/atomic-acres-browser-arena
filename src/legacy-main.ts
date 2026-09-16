@@ -217,6 +217,9 @@ import {
 import { buildNuketown2 } from './nuketown2-arena';
 // RAID2: the Raid layout rethink (PREVIEW), owner 2026-09-02 via HF-408.
 import { buildRaid2 } from './raid2-arena';
+// Graybox wave 2026-09-14 (ShellGray): layout-validation rebuild, selectable
+// from day one — eager like raid2, synchronous builder, no wasm prepare step.
+import { buildAtomicAcresRebuild } from './atomic-acres-rebuild-arena';
 import { collectPresentationObstructionBoxes } from './presentation-obstruction';
 import {
   DOMINATION_TIME_LIMIT_MS,
@@ -1926,6 +1929,10 @@ const killstreakLoadoutController = new KillstreakLoadoutController(null, {
 if (!pass65Settings.privacy.shareGlobalLeaderboard) forgetLeaderboardInstallId(localStorage);
 const explicitRenderQuery = new URLSearchParams(window.location.search).get('render');
 const offlineMenuPreviewCapture = new URLSearchParams(window.location.search).get('menuPreviewCapture') === '1';
+// WALKTHROUGH (owner map-preview aid): ?walkthrough=1 deploys solo with zero
+// bots and flies with no collision or gravity (Space up / C down, Shift fast).
+// Preview only — never linked from the menu, never a shipped mode.
+const walkthroughPreview = new URLSearchParams(window.location.search).get('walkthrough') === '1';
 const queryRenderProfile = explicitRenderQuery ? resolveRenderProfile(window.location.search, null) : null;
 let graphicsRuntime = resolveGraphicsRuntime(pass65Settings.graphics, queryRenderProfile === 'compat');
 const reducedTransparencyMedia = window.matchMedia('(prefers-reduced-transparency: reduce)');
@@ -3507,6 +3514,10 @@ const arenaFactories = createArenaFactoryRegistry<ArenaMap, THREE.Scene, ArenaId
   // original is never broken mid-pass. Eager: its builder is synchronous and
   // needs no wasm prepare step. See src/raid2-arena.ts.
   raid2: eagerArena(buildRaid2),
+  // Graybox wave 2026-09-14 (ShellGray): layout-validation rebuild, selectable
+  // from day one so no guards — same eager shape as raid2. See
+  // src/atomic-acres-rebuild-arena.ts (LayoutGray) for geometry.
+  'atomic-acres-rebuild': eagerArena(buildAtomicAcresRebuild),
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const ARENA_CACHE_BOUND = 2;
@@ -18994,6 +19005,8 @@ function acceptRailgunShotResult(message: RailgunShotResultMessage): void {
 }
 
 function tryFireRailgun(now: number): void {
+  // WALKTHROUGH (owner map-preview): inspection only, weapons never fire.
+  if (walkthroughPreview) return;
   if (!localHoldsRailgun() || player.weapon !== 'railgun' || railgunState.roundsRemaining <= 0) {
     audio.empty();
     return;
@@ -19459,6 +19472,8 @@ function refuseFire(reason: string): void {
 }
 
 function tryFire(now: number): void {
+  // WALKTHROUGH (owner map-preview): inspection only, weapons never fire.
+  if (walkthroughPreview) return;
   const touchFireActive = mobileTouchFireBypassesPointerLock(
     mobilePresentationActive,
     mobileTouchControls?.state.firing === true,
@@ -20437,7 +20452,7 @@ function activateDormantBot(index: number): boolean {
 
 async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
   clearBots();
-  const activeCount = hostedCount ?? initialSoloBotCount(selectedArena);
+  const activeCount = walkthroughPreview && hostedCount === undefined ? 0 : (hostedCount ?? initialSoloBotCount(selectedArena));
   resetBotArsenalCycles();
   botGrenadeThrows = 0;
   botGrenadeMaxActive = 0;
@@ -20461,7 +20476,9 @@ async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
     return;
   }
   const activeSpawnHistory = new Map(lastBotSpawnIndices);
-  for (let index = activeCount; index < selectedArena.maximumSoloBots; index += 1) {
+  // WALKTHROUGH: no bots will ever activate (reinforcements gated), so skip
+  // the dormant prewarm entirely — it buys staging seconds for nothing.
+  for (let index = activeCount; index < (walkthroughPreview ? 0 : selectedArena.maximumSoloBots); index += 1) {
     spawnBot(index, false, true);
     const bot = bots.get(`bot-${index}`)!;
     await prewarmRiggedOperatorActions(bot.root);
@@ -20479,7 +20496,7 @@ async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
 }
 
 function spawnEarnedBotReinforcement(): void {
-  if (gameMode !== 'solo') return;
+  if (gameMode !== 'solo' || walkthroughPreview) return;
   const target = activeSoloBotTarget(selectedArena, soloBotDeaths);
   if (bots.size >= target) return;
   const index = bots.size;
@@ -27123,6 +27140,22 @@ function updatePhysics(dt: number): void {
     equippedMovementMultiplier: WEAPONS[player.weapon].movementMultiplier,
   });
   const movementBoost = killstreakActorModifiers(player.id, now).movement;
+  // WALKTHROUGH (owner map-preview): fly with no collision or gravity.
+  // Space ascends, C descends, Shift is fast. Preview only.
+  if (walkthroughPreview && characterPhysics) {
+    const flySpeed = actionHeld('sprint', keys, keyProfile) ? 24 : 12;
+    const lift = Number(actionHeld('jump', keys, keyProfile)) - Number(actionHeld('crouch', keys, keyProfile));
+    const fly = input.clone().multiplyScalar(flySpeed * dt);
+    fly.y = lift * flySpeed * dt;
+    player.position.add(fly);
+    player.velocity.set(0, 0, 0);
+    playerGrounded = false;
+    characterPhysics.teleportEye(player.position);
+    camera.position.copy(player.position);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    return;
+  }
 
   // Sample the water the player is standing in BEFORE integrating movement, so
   // the swim state that scales this frame's speed is the state they are
@@ -27764,7 +27797,8 @@ function updateMatchState(now: number): void {
     matchState,
     now,
     lastMatchCountdownCue,
-    gameMode === 'solo' && countdownCueAllowed,
+    // WALKTHROUGH: no countdown hold — preview deploys into a ~3 s warmup.
+    gameMode === 'solo' && countdownCueAllowed && !walkthroughPreview,
   );
   const preAdvanceState = matchState;
   const advancedState = ffa

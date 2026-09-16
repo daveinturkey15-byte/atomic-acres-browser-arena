@@ -52,6 +52,15 @@ const BRIEFINGS: Readonly<Record<ArenaId, ArenaDeploymentBriefing>> = Object.fre
     briefing: 'Three big rooms ring an open-to-sky courtyard, and the pool terrace holds one unbroken 52 m lane that punishes a slow crossing.',
     approach: 'HELO INBOUND · POOL TERRACE, HIGH SIDE FIRST',
   }),
+  // Graybox wave 2026-09-14 (ShellGray): layout-validation rebuild. Copy
+  // written from its own menuLede like the rebuild rows above; cites the
+  // LAYOUT_CONTRACT loop spine (fact 3) and center-loop cover (fact 4).
+  'atomic-acres-rebuild': Object.freeze({
+    arenaId: 'atomic-acres-rebuild',
+    kicker: 'DESERT SUBURB REBUILD',
+    briefing: 'Twin two-storey houses face each other over a loop road, and the bus and semi nose-to-nose in the middle are the only thing between them.',
+    approach: 'HELO INBOUND · LOOP RUN, BACK YARD TO BACK YARD',
+  }),
   test1: Object.freeze({
     arenaId: 'test1',
     kicker: 'RANGE TRAINING GROUND',

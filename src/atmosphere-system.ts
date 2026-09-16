@@ -160,6 +160,21 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.f
       [-20, -21, 2.2, 3.8, 1.1], [20, 21, 2.2, 3.8, 3.6],
     ] as SmokeCard[]),
   }),
+  // Graybox wave 2026-09-14 (ShellGray): mist sits in the two back yards, the
+  // two driveways and the south-entry flanks — the low, still, fenced-in
+  // corners — and never on the loop. The loop is the lane whose full length
+  // has to read from either end, and haze across it would soften exactly the
+  // sightline the bus + semi pair (LAYOUT_CONTRACT fact 4) exists to break.
+  // Smoke hangs off the back-corner sheds (fact 8 / BRIEF). North = -Z.
+  'atomic-acres-rebuild': Object.freeze({
+    mist: Object.freeze([
+      [-14, -23, 11, 3.4], [14, -23, 11, 3.4], [-21, -2, 9, 3.0],
+      [21, 2, 9, 3.0], [-8, 25, 8, 2.8], [8, 25, 8, 2.8],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-18, -25, 2.2, 3.8, 1.1], [18, -25, 2.2, 3.8, 3.6],
+    ] as SmokeCard[]),
+  }),
 });
 /**
  * DAY-VISUAL-A (HF-535): Nuke Town golden-hour haze palette. Warm amber

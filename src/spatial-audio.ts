@@ -319,6 +319,16 @@ export const ARENA_AUDIO_DEFINITIONS: Readonly<Record<ArenaId, ArenaAudioDefinit
     modulationHz: 0.079, modulationDepth: 0.1,
     bedPosition: Object.freeze({ x: -24, y: 3, z: -2 }), airPosition: Object.freeze({ x: 18, y: 5, z: 21 }),
   }),
+  // Graybox wave 2026-09-14 (ShellGray): the bed is the low road hum at the
+  // south entry, the air layer is desert wind over the north shed line
+  // (LAYOUT_CONTRACT facts 3/5). Opposite ends of the loop axis so the pair
+  // gives the player a bearing along the line the whole map is organised on.
+  'atomic-acres-rebuild': Object.freeze({
+    arenaId: 'atomic-acres-rebuild', identity: 'desert-loop-street-hum-and-shed-wind', source: 'repository-procedural-original',
+    continuousVoices: 2, bedFrequencyHz: 54, airFrequencyHz: 186, airLowpassHz: 700, airQ: 1.75, airGain: 0.0063,
+    modulationHz: 0.08, modulationDepth: 0.095,
+    bedPosition: Object.freeze({ x: 0, y: 3, z: 20 }), airPosition: Object.freeze({ x: -12, y: 5, z: -24 }),
+  }),
 });
 
 export function validateArenaAudioDefinitions(): readonly string[] {

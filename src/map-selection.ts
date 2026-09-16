@@ -6,9 +6,14 @@ import { DEFAULT_ARENA_ID, type ArenaId } from './arena-identity';
 export { ARENA_IDS, isArenaId, type ArenaId } from './arena-identity';
 
 export type ArenaRouteId = 'world-studio' | 'nuke-town' | 'terminal' | 'rustrig' | 'gun-range' | 'farcrysis' | 'high-seas' | 'test1' | 'test2' | 'map3' | 'nuke-town-rebuild'
-  // RAID2 (HF-408): a descriptive route, not `raid2`, so a shared link says
-  // what it opens. `test2` keeps `test2`; nothing about the shipped Raid moves.
-  | 'raid-rebuild';
+  // Graybox wave 2026-09-14 (ShellGray): the rebuild ships alongside the
+  // shipped map under its own descriptive route, same pattern as raid2's
+  // `raid-rebuild` (a shared link says what it opens). Deliberately NOT
+  // `atomic-acres`: that string is the SHIPPED arena's stable id, and the
+  // compatibility decoder is last-write-wins — a route of that name on the
+  // last row would steal decodeArenaId('atomic-acres') from the shipped map.
+  | 'raid-rebuild'
+  | 'atomic-acres-rebuild';
 
 export type ArenaSelection = Readonly<{
   id: ArenaId;
@@ -136,11 +141,12 @@ export const NUKETOWN_DISPLAY_NAME = 'Nuketown' as const;
  * replay, storage and asset boundary; route IDs and labels may evolve.
  */
 export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
-  // Owner 2026-09-12: one fresh arena is offered; every older ID stays registered.
+  // Owner 2026-09-15: one fresh arena is offered; every older ID stays registered.
+  // Preview lane: rebuild-only menu (world-studio hidden, still decodable).
   Object.freeze({
     id: 'world-studio' as const,
     routeId: 'world-studio' as const,
-    selectable: true,
+    selectable: false,
     kind: 'team' as const,
     legacyAliases: Object.freeze([]),
     selectorLabel: 'NUKE TOWN · NEW WORLD · PREVIEW',
@@ -535,6 +541,36 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     //     real roster), and `docs/eye-clearance/ledger.json` carries a MEASURED
     //     map3 ceiling from the headless sweep, not the unmeasured sentinel.
     // HF-405: Map 3 is entirely procedural (no imported mesh, image, font or LUT).
+    authoring: 'code' as const,
+    authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
+    matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
+  }),
+  // Graybox wave 2026-09-14 (ShellGray): layout-validation rebuild of Atomic
+  // Acres. Appended, never reordered; the 12 rows above are byte-identical.
+  // Selectable from day one: this IS the layout-validation build, not a
+  // preview. LAYOUT_CONTRACT facts (atomic-acres-catalog/LAYOUT_CONTRACT.md):
+  // high-desert surround with lawns only inside the lots (fact 1), twin
+  // two-storey houses teal-west / yellow-east (fact 2), loop road spine with
+  // south entry (fact 3 + batch-4 BRIEF mirror note), bus + semi
+  // nose-to-nose center-loop cover (fact 4), crate clusters as cover.
+  Object.freeze({
+    id: 'atomic-acres-rebuild' as const,
+    selectable: true,
+    routeId: 'atomic-acres-rebuild' as const,
+    kind: 'team' as const,
+    legacyAliases: Object.freeze([]),
+    selectorLabel: 'ATOMIC ACRES',
+    displayName: 'Atomic Acres',
+    titleLead: 'ATOMIC',
+    titleAccent: 'ACRES',
+    menuLede: 'Validate the rebuild: twin two-storey houses face each other over a loop road with a bus and semi nose-to-nose in the middle, garages onto the driveways, sheds in the back corners, and both teams spawning in their own yards. Layout-validation build.',
+    summary: 'Rebuilt suburb · loop-road cover · layout validation',
+    rulesLabel: '5 MIN · HOST UP TO 6 · 1 BOT SOLO',
+    soloBotCount: SOLO_BOT_COUNT,
+    maximumSoloBots: MAX_SOLO_BOTS,
+    multiplayer: true,
+    fieldSupport: true,
+    overdrive: true,
     authoring: 'code' as const,
     authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),

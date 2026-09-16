@@ -23,12 +23,16 @@ export const ARENA_IDS = Object.freeze([
   // id is the network, replay and storage boundary from the first commit:
   // promoting it later must never require moving it.
   'map3',
+  // Graybox wave 2026-09-14 (ShellGray): layout-validation rebuild of Atomic
+  // Acres. Appended, never reordered: stable ids are the network/replay/
+  // storage boundary. Selectable from day one (layout-validation build).
+  'atomic-acres-rebuild',
 ] as const);
 
 export type ArenaId = typeof ARENA_IDS[number];
 
 /** Current menu default; retained IDs remain valid wire identities. */
-export const DEFAULT_ARENA_ID: ArenaId = 'world-studio';
+export const DEFAULT_ARENA_ID: ArenaId = 'atomic-acres-rebuild';
 
 const CURRENT_ARENA_IDS: ReadonlySet<string> = new Set(ARENA_IDS);
 

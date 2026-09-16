@@ -106,6 +106,16 @@ export const PASS65_FLIGHT_NAVIGATION: Readonly<Record<ArenaId, ArenaFlightNavig
   'raid2': definition('raid2', 63, [
     { id: 'raid2-courtyard-overflight', xQ: 0, zQ: 0, altitudeM: 22 },
   ]),
+  // Graybox wave 2026-09-14 (ShellGray): same scale/kind as nuketown2 — two
+  // two-storey houses (6–7 m roof decks, LAYOUT_CONTRACT fact 2) flanking a
+  // road with the 2x core over the center-loop bus + semi pair (fact 4) — so
+  // the same 42 m ceiling and the same three-portal shape: the loop either
+  // side of the rigs, plus one center overflight well above the core.
+  'atomic-acres-rebuild': definition('atomic-acres-rebuild', 42, [
+    { id: 'atomic-acres-rebuild-west-loop-air-gap', xQ: -0.62, zQ: 0, altitudeM: 7.5 },
+    { id: 'atomic-acres-rebuild-east-loop-air-gap', xQ: 0.62, zQ: 0, altitudeM: 7.5 },
+    { id: 'atomic-acres-rebuild-central-overflight', xQ: 0, zQ: 0, altitudeM: 18 },
+  ]),
 });
 
 export type SupportFlightStepInput = Readonly<{

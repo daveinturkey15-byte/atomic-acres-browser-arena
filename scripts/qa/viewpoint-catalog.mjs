@@ -181,6 +181,20 @@ export const VIEWPOINT_CATALOG = Object.freeze({
     'raid2-drive-balcony',
     'raid2-drive-approach',
   ]),
+  // Graybox wave 2026-09-14 (ShellGray): the layout-validation rebuild's
+  // five-camera judgeset, landed in the SAME commit as the arena module per
+  // the note at the top of this file. Derived from
+  // src/rendering/arenas/atomic-acres-rebuild.ts, in authored order.
+  'atomic-acres-rebuild': Object.freeze([
+    'atomic-acres-rebuild-overview',
+    'atomic-acres-rebuild-topdown',
+    'atomic-acres-rebuild-street-north',
+    'atomic-acres-rebuild-street-south',
+    'atomic-acres-rebuild-yard-geometry',
+    'atomic-acres-rebuild-interior-west',
+    'atomic-acres-rebuild-upper-landing',
+    'atomic-acres-rebuild-bus-closeup',
+  ]),
 });
 
 export const CATALOG_ARENAS = Object.keys(VIEWPOINT_CATALOG);

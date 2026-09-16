@@ -64,6 +64,12 @@ const SHADOW_VOLUMES: Readonly<Record<ArenaId, ArenaShadowVolume>> = Object.free
   // plus the 4 m margin. The tallest authored mass here is the 5.3 m upper
   // wall, below test2's parapet, so `far` needs no more depth than test2's.
   'raid2': Object.freeze({ halfWidth: 54, halfHeight: 42, near: 4, far: 196 }),
+  // Graybox wave 2026-09-14 (ShellGray): ATOMIC_ACRES_REBUILD_BOUNDS is
+  // 56 x 64 m; 32 x 36 half-extents cover 64 x 72, the bounds plus the same
+  // 4 m margin. `far` follows the standing rule: the volume's own diagonal
+  // (hypot(64, 72) = 96.3 m) plus the shared non-Atomic sun standoff
+  // (|[-62, 25, 38]| = 76.9 m) = 173.2 m, rounded up to 176.
+  'atomic-acres-rebuild': Object.freeze({ halfWidth: 32, halfHeight: 36, near: 4, far: 176 }),
 });
 
 // RoomEnvironment is deliberately only a reflection/indirect-light accent.
@@ -108,6 +114,12 @@ const ARENA_ENVIRONMENT_SCALES: Readonly<Record<ArenaId, number>> = Object.freez
   // RAID2 (PREVIEW, HF-408): same volume and same map size as test2, so the
   // texel footprint is the same and the bias that works there works here.
   'raid2': 0.22,
+  // Graybox wave 2026-09-14 (ShellGray): matte board siding, asphalt, painted
+  // vehicle panels (bus + semi + cars, LAYOUT_CONTRACT facts 2/4) — the same
+  // surface mix the shipped Nuke Town was fitted at, so the same 0.24.
+  // nuketown2's 0.32 is NOT carried: that bump was measured for its own damp
+  // asphalt + night-lighting lane, not for this map.
+  'atomic-acres-rebuild': 0.24,
 });
 
 export function arenaEnvironmentScale(arenaId: ArenaId): number {

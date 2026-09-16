@@ -216,6 +216,8 @@ beforeAll(async () => {
     // NUKETOWN2 (owner 2026-09-02, HF-407): the Nuke Town Rebuild joins it too.
     { buildNuketown2 },
     { buildRaid2 },
+    // PASS 98: Atomic Acres rebuild joins the sweep from its first commit.
+    { buildAtomicAcresRebuild },
     { addNeighbourhoodLife, loadArenaArt },
     { ARENA_VISUAL_REGISTRY },
     { createPass64TslSceneSystems },
@@ -228,6 +230,7 @@ beforeAll(async () => {
     import('../../map3-arena'),
     import('../../nuketown2-arena'),
     import('../../raid2-arena'),
+    import('../../atomic-acres-rebuild-arena'),
     import('../../environment-assets'),
     import('../arena-visual-stream'),
     import('../pass64-tsl-scene'),
@@ -256,6 +259,8 @@ beforeAll(async () => {
     nuketown2: buildNuketown2,
     // RAID2 (owner 2026-09-02, HF-408).
     raid2: buildRaid2,
+    // PASS 98: Atomic Acres graybox rebuild.
+    'atomic-acres-rebuild': buildAtomicAcresRebuild,
   };
 
   for (const id of ALL_ARENA_IDS) {

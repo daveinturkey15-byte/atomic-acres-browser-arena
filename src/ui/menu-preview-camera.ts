@@ -6,6 +6,7 @@ import map3ChoreographyJson from '../../source-assets/menu/pass84-map3-preview/c
 import nuketown2ChoreographyJson from '../../source-assets/menu/pass85-nuketown2-preview/choreography.json';
 import raid2ChoreographyJson from '../../source-assets/menu/pass87-raid2-preview/choreography.json';
 import worldStudioChoreographyJson from '../../source-assets/menu/world-studio-preview/choreography.json';
+import atomicAcresRebuildChoreographyJson from '../../source-assets/menu/pass98-atomic-acres-rebuild-preview/choreography.json';
 import type { ArenaId } from '../map-selection';
 
 // Deterministic evaluator for authoring/tests only. The menu runtime consumes
@@ -179,6 +180,14 @@ const RAID2_CHOREOGRAPHY = raid2ChoreographyJson as unknown as Readonly<{
 const WORLD_STUDIO_CHOREOGRAPHY = worldStudioChoreographyJson as unknown as Readonly<{
   arenas: Readonly<{ 'world-studio': HelicopterRecipe }>;
 }>;
+// Graybox wave 2026-09-14 (ShellGray): same extension pattern once more. The
+// camera recipe is authored before any capture exists, for the Map 3 reason.
+// The orbit is fitted to ATOMIC_ACRES_REBUILD_BOUNDS (56 x 64 m), not
+// inherited — see the note in the JSON.
+const ATOMIC_ACRES_REBUILD_CHOREOGRAPHY = atomicAcresRebuildChoreographyJson as unknown as Readonly<{
+  recipeId: string;
+  arenas: Readonly<{ 'atomic-acres-rebuild': HelicopterRecipe }>;
+}>;
 const CHOREOGRAPHY: ChoreographyRecipe = Object.freeze({
   ...RETAINED_CHOREOGRAPHY,
   arenas: Object.freeze({
@@ -193,6 +202,7 @@ const CHOREOGRAPHY: ChoreographyRecipe = Object.freeze({
     ...NUKETOWN2_CHOREOGRAPHY.arenas,
     ...RAID2_CHOREOGRAPHY.arenas,
     ...WORLD_STUDIO_CHOREOGRAPHY.arenas,
+    ...ATOMIC_ACRES_REBUILD_CHOREOGRAPHY.arenas,
   }),
 });
 const DURATION_MS = CHOREOGRAPHY.durationSeconds * 1_000;

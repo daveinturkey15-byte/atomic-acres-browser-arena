@@ -78,6 +78,10 @@ const EXPECTED_CACHE_KEYS: Readonly<Record<string, string>> = Object.freeze({
 // should stay empty.
 const MEDIA_PENDING_ARENAS: ReadonlySet<string> = new Set<string>([
   'world-studio', // Owner-authorized fresh arena; capture has not happened.
+  // Graybox wave 2026-09-14 (ShellGray): layout-validation rebuild; the card
+  // ships standby (empty URLs, mediaAvailable false) until its own flyover is
+  // captured through the sanctioned generator — the nuketown2 one-commit rule.
+  'atomic-acres-rebuild',
   // RAID2 (HF-408) sat here for one pass and has been REMOVED by capturing the
   // flyover, exactly as map3 was before it. That is the mechanism working: a
   // newly registered arena gets an honest place to stand, and it leaves by

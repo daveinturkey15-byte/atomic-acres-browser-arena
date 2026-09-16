@@ -265,6 +265,12 @@ export const ARENA_WEATHER_PROFILES: Readonly<Record<ArenaId, ArenaWeatherProfil
   // lit for a bleached high sun, exactly as the shipped Raid is graded for
   // golden hour, and an overcast state was never authored or looked at.
   'raid2': arenaProfile('raid2', 'hillside-terrace-late-morning', false, ['clear']),
+  // Graybox wave 2026-09-14 (ShellGray): PINNED CLEAR, same posture as
+  // nuketown2/raid2. The graybox is authored for clear late-morning desert
+  // light (LAYOUT_CONTRACT style) — rain would fall out of a sky with nothing
+  // in it — and pinning clear sidesteps the id-seeded sequencer fragility
+  // both those rows record. A later lane opens the ladder if the look wants it.
+  'atomic-acres-rebuild': arenaProfile('atomic-acres-rebuild', 'desert-loop-clear-late-morning', false, ['clear']),
 });
 
 export function arenaWeatherProfile(arenaId: ArenaId): ArenaWeatherProfile {

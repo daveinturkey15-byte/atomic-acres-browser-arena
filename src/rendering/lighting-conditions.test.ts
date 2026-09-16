@@ -67,7 +67,7 @@ describe('arena daylight catalog', () => {
     // exactly so that promoting a preview out of PREVIEW cannot silently leave
     // it pinned, and so that adding a pin needs a reason written down.
     const pinned = ARENA_IDS.filter((id) => ARENA_DAYLIGHT_PROFILES[id].pinned);
-    expect([...pinned].sort()).toEqual(['gun-range', 'map3', 'nuketown2', 'raid2', 'world-studio']);
+    expect([...pinned].sort()).toEqual(['atomic-acres-rebuild', 'gun-range', 'map3', 'nuketown2', 'raid2', 'world-studio']);
   });
 
   it('gives rustworks-1v1 the narrowest outdoor band (its night is the safety datum)', () => {
@@ -426,6 +426,11 @@ describe('band ends are the measured safe interval, not a chosen one', () => {
     map3: null,
     nuketown2: null,
     raid2: null,
+    // Graybox wave 2026-09-14 (ShellGray): pinned (see lighting-conditions.ts),
+    // so the identity resolves at every hour — no band to measure until the
+    // lane that owns the look unpins it. `null` is deliberate; a missing key
+    // fails the coverage case below.
+    'atomic-acres-rebuild': null,
   };
 
   it('never plays an hour the scan measured as unsafe', () => {

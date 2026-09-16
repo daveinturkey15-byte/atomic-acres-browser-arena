@@ -263,6 +263,17 @@ export const ARENA_DAYLIGHT_PROFILES: Readonly<Record<ArenaId, ArenaDaylightProf
   // merge conflict rendered on screen. This row is the TEMPLATE that lane fills
   // in (see docs/DYNAMIC_LIGHTING_2026-09-03.md, "Preset template").
   map3: profile('map3', 'open-scrub-midmorning-preview-pinned', true, 10, [10, 10], [6, 19], [12, 66], 0, 6),
+  // Graybox wave 2026-09-14 (ShellGray). PINNED, same reason as the
+  // nuketown2/raid2 pinned rows above: the graybox lane owns this map's look
+  // while it is being built — a second lane moving its sun underneath it
+  // would be a merge conflict rendered on screen. Pinned means every choice
+  // resolves to the identity, so the layout build is untouched by lighting
+  // while it is being validated. Its authored hour is its own art direction's
+  // brief, 'clear late morning', a deliberately different time of day from
+  // the shipped Nuke Town's warm sunset. A later lane fills this row in with
+  // a measured band using the procedure in section 4 of
+  // docs/DYNAMIC_LIGHTING_2026-09-03.md.
+  'atomic-acres-rebuild': profile('atomic-acres-rebuild', 'desert-suburb-clear-late-morning-preview-pinned', true, 10.5, [10.5, 10.5], [6, 19], [10, 68], 30, 6),
 });
 
 export function arenaDaylightProfile(arenaId: ArenaId): ArenaDaylightProfile {
