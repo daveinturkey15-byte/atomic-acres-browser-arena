@@ -138,6 +138,16 @@ export const ATOMIC_ACRES_REBUILD_HORIZON_BANDS: readonly HorizonBand[] = Object
   // bright, which is the dominant error and the reason the ridges read as a
   // pale wash rather than as land.
   //
+  // THIRD ITERATION, and the first two were partly measuring the wrong pixels.
+  // Sampling a vertical profile rather than a guessed rectangle locates the
+  // ridge at y 264-336 in the street-south frame, where it renders
+  // rgb(170, 146, 121) - warm tan, so the HUE was right all along; the earlier
+  // samples at y~265 straddled the haze band above the ridge and read far
+  // bluer and lighter than the land itself. Against the plate's near range
+  // rgb(125, 106, 95) and far range rgb(144, 136, 139) the band is ~30% too
+  // bright, so one more x0.8. Lesson kept in place below: re-solve the scale
+  // from the measurement, and make sure the measurement is of the thing.
+  //
   // SECOND ITERATION, same day. The first scale (x0.62) moved the rendered band
   // 223 -> 197 against a 144 target, i.e. it recovered only a third of the
   // error. The authored value is not the rendered one here: these are
@@ -153,19 +163,19 @@ export const ATOMIC_ACRES_REBUILD_HORIZON_BANDS: readonly HorizonBand[] = Object
   // rgb(190, 202, 222) and is the one part that landed blind.
   Object.freeze({
     name: 'far-mesas', radius: 168, baseHeight: 15, amplitude: 19,
-    lattice: [5, 11, 23] as const, seed: 1, base: 0x676156, peak: 0x525256,
+    lattice: [5, 11, 23] as const, seed: 1, base: 0x524e45, peak: 0x424245,
   }),
   // Mid range: lower, slightly more contrast, offset lattice so no peak of
   // this band ever sits exactly under a peak of the one behind it.
   Object.freeze({
     name: 'mid-range', radius: 158, baseHeight: 8, amplitude: 14,
-    lattice: [7, 13, 29] as const, seed: 2, base: 0x635b4f, peak: 0x48484e,
+    lattice: [7, 13, 29] as const, seed: 2, base: 0x4f493f, peak: 0x3a3a3e,
   }),
   // Near scrub and butte foot: warm desert soil rather than blue, low enough
   // to read as the far side of the valley rather than as another range.
   Object.freeze({
     name: 'near-scrub', radius: 148, baseHeight: 2.5, amplitude: 4.5,
-    lattice: [11, 19, 37] as const, seed: 3, base: 0x5e5240, peak: 0x454235,
+    lattice: [11, 19, 37] as const, seed: 3, base: 0x4b4233, peak: 0x37352a,
   }),
 ] as const);
 

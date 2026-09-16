@@ -1332,6 +1332,12 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   const potTerracotta = gndPbr('SidewalkConcrete', 1, 1, 0xc98a5e);
   const plantLeaf = gndPbr('LawnPatchy', 2, 2, 0x8fc496);
   const brassTrim = inPbr('InteriorCeiling', 1, 1, 0xd9b877);
+  // Sanitaryware. InteriorCeiling (1,1) is already bound by `interiorTrim`, so
+  // this is a tint on a cached upload and costs no VRAM; the tint is a very
+  // slight cool DARKENING, which is the only direction `material.color` moves a
+  // bake, and it is what separates a porcelain fitting from the cream trim
+  // behind it.
+  const porcelain = inPbr('InteriorCeiling', 1, 1, 0xeef4f4);
   // Joshua-tree bark and desert blade. The bark tint is StairTimber pulled
   // toward the plates' bleached grey-brown; the blade is LawnPatchy pulled well
   // under the hedge so the desert never reads as lawn.
@@ -1680,6 +1686,90 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
       }
     }
 
+    // ---- LANE N: THE GROUND BATHROOM AND THE KITCHEN FLOOR --------------
+    //
+    // `_judge/refs/teal-ground-cutaway.png` and `yellow-ground-cutaway.png`
+    // show both plans: a kitchen with a table and chairs on the open floor
+    // beside its counter run, and a bathroom with a tub, a WC and a basin under
+    // a mirror. The last pass furnished both living rooms and the bedroom and
+    // reached neither of these, so the bath was a tiled empty box and the
+    // kitchen was a counter facing 2.9-3.2 m of bare tile.
+    //
+    // WHERE THE FITTINGS CAN GO IS DECIDED BY THE OPENINGS, NOT BY TASTE, and
+    // the obvious answer is wrong here. The bath rect is only 2.24 m deep and
+    // BOTH of its long walls are already pierced: the rear shell wall carries
+    // `rearLinkGap` (the garage link, cz +/-0.5 plan) and the partition carries
+    // `${id} living to bath`, centred on the same cz. Against a 1.4 plan room
+    // that leaves 0.32 m of solid wall at each end of each - too little for any
+    // fitting. The two z walls (`bath south`, and the `bath north` face the
+    // sage accent is on) are unpierced at every height and run the full 3.68 m
+    // (west) / 4.48 m (east) of the band, so the whole suite goes on those two:
+    // tub and WC on the low-z wall, basin and mirror on the high-z wall, with
+    // 1.1 m of clear floor between them.
+    //
+    // READABILITY. Nothing here reaches `builder`, so no collider, shot surface
+    // or spawn moves and no piece can become cover. Every fitting is against a
+    // wall the room already owns; the tallest free-standing point is the 0.90 m
+    // basin rim, well under a crouched player. The bath door's own plane
+    // (the partition, at cz) is 2.6-3.4 m from the nearest fitting in x, and
+    // both the tub and the WC stop short of the room's z midline, so the
+    // doorway and its swing stay completely clear. Same for the kitchen: the
+    // table sits 2.6 m back from the `living to kitchen` opening's plane and
+    // 1.4 m clear of the counter run, so the route through the room is intact.
+    const bx0 = Math.min(bath.x0, bath.x1) * S;
+    const bx1 = Math.max(bath.x0, bath.x1) * S;
+    const bz0 = Math.min(bath.z0, bath.z1) * S;
+    const bz1 = Math.max(bath.z0, bath.z1) * S;
+    const bathW = bx1 - bx0;
+    /** Distance measured from the bath's REAR-wall end, so both houses mirror. */
+    const bathAt = (u: number): number => (face === 1 ? bx0 : bx1) + face * u;
+    // Tub + tiled surround on the low-z wall, at the rear-wall end.
+    const tubX = bathAt(1.00);
+    dressBox(porcelain, [tubX, finishTop + 0.25, bz0 + 0.38], [1.55, 0.50, 0.70]);
+    dressBox(porcelain, [tubX, finishTop + 0.525, bz0 + 0.38], [1.63, 0.07, 0.78]);
+    dressBox(bathTile, [tubX, finishTop + 0.47, bz0 + 0.38], [1.39, 0.05, 0.54]);
+    dressBox(bathTile, [tubX, finishTop + 1.10, bz0 + 0.04], [1.63, 1.10, 0.06]);
+    dressTube(brassTrim, [tubX, finishTop + 0.64, bz0 + 0.14], 0.028, 0.034, 0.20, 8, undefined, false);
+    // WC on the same wall at the partition end, stopping short of the midline.
+    const wcX = bathAt(bathW - 0.45);
+    dressBox(porcelain, [wcX, finishTop + 0.70, bz0 + 0.12], [0.42, 0.52, 0.18]);
+    dressBox(porcelain, [wcX, finishTop + 0.28, bz0 + 0.44], [0.36, 0.32, 0.48]);
+    dressBox(porcelain, [wcX, finishTop + 0.465, bz0 + 0.44], [0.38, 0.05, 0.50]);
+    // Basin, mirror and a towel rail on the high-z wall.
+    const basinX = bathAt(0.80);
+    dressTube(porcelain, [basinX, finishTop + 0.37, bz1 - 0.28], 0.10, 0.13, 0.74, 10);
+    dressBox(porcelain, [basinX, finishTop + 0.82, bz1 - 0.26], [0.56, 0.17, 0.42]);
+    dressTube(brassTrim, [basinX, finishTop + 0.98, bz1 - 0.40], 0.024, 0.028, 0.16, 8, undefined, false);
+    dressBox(teakTrim, [basinX, finishTop + 1.55, bz1 - 0.04], [0.56, 0.68, 0.05], 0, false);
+    dressBox(interiorTrim, [basinX, finishTop + 1.55, bz1 - 0.08], [0.48, 0.60, 0.02], 0, false);
+    const towelX = bathAt(bathW - 1.15);
+    dressTube(brassTrim, [towelX, finishTop + 1.16, bz1 - 0.07], 0.018, 0.018, 0.62, 8, new THREE.Euler(0, 0, Math.PI / 2), false);
+    dressBox(curtainFabric, [towelX, finishTop + 0.90, bz1 - 0.13], [0.34, 0.50, 0.06], 0, false);
+
+    // Kitchen table + two chairs, on the open floor away from the counter run.
+    const kz1 = Math.max(kitchen.z0, kitchen.z1) * S;
+    const kitchenRearX = (face === 1 ? Math.min(kitchen.x0, kitchen.x1) : Math.max(kitchen.x0, kitchen.x1)) * S;
+    const tableX = kitchenRearX + face * 1.05;
+    const tableZ = kz1 - 0.80;
+    dressBox(teakTrim, [tableX, finishTop + 0.73, tableZ], [1.05, 0.05, 0.72]);
+    for (const lx of [-0.46, 0.46]) {
+      for (const lz of [-0.28, 0.28]) {
+        dressTube(teakTrim, [tableX + lx, finishTop + 0.355, tableZ + lz], 0.022, 0.028, 0.71, 6);
+      }
+    }
+    for (const cdz of [-0.62, 0.62]) {
+      dressBox(teakTrim, [tableX, finishTop + 0.44, tableZ + cdz], [0.40, 0.05, 0.40]);
+      dressBox(upholstery, [tableX, finishTop + 0.68, tableZ + cdz + Math.sign(cdz) * 0.18], [0.40, 0.44, 0.05]);
+      for (const lx of [-0.15, 0.15]) {
+        for (const lz of [-0.15, 0.15]) {
+          dressTube(teakTrim, [tableX + lx, finishTop + 0.22, tableZ + cdz + lz], 0.018, 0.024, 0.44, 6);
+        }
+      }
+    }
+    // A bowl and a stack of plates, so the table is used rather than staged.
+    dressTube(brassTrim, [tableX - 0.18, finishTop + 0.79, tableZ], 0.14, 0.09, 0.09, 12, undefined, false);
+    dressTube(porcelain, [tableX + 0.26, finishTop + 0.79, tableZ + 0.06], 0.11, 0.11, 0.07, 12, undefined, false);
+
     // ---- LANE M: THE UPPER STOREY WAS EMPTIER STILL ------------------------
     // `refs/bedroom-eye.png` carries a made bed, two side tables with lamps, a
     // dresser and pictures; `atomic-acres-rebuild-upper-landing.png` renders an
@@ -1933,7 +2023,32 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     // bedrooms have and it is exterior shingle. One board 20 mm under its
     // bottom face (6.10) gives the upper rooms the same pale ceiling the ground
     // floor now has, for one mesh per house.
-    centred(builder, `aarr-house-${house.id}-ceiling-upper`, [house.cx, 6.06, house.cz], [house.w - 2 * t, 0.04, house.d - 2 * t], interiorCeiling, { cast: false });
+    //
+    // LANE N, 2026-09-16: THE ROOF UNDERSIDE READ THROUGH IT. In
+    // `artifacts/viewpoint-regression/final/atomic-acres-rebuild/
+    // atomic-acres-rebuild-upper-landing.png` the top-right corner is a wedge
+    // of dark exterior shingle with a bright cyan hairline under it, and the
+    // cause is a GAP, not a z-fight and not a missing face. The board shipped
+    // at y 6.04-6.08 and the upper shell walls are `[house.cx, 4.5, ...]` x 3
+    // tall, i.e. they stop dead at y 6.00. The board therefore FLOATED 40 mm
+    // clear of every wall top, and its plan span (`house.w - 2 * t`) ended
+    // exactly ON the walls' inner faces rather than inside them. Any sight ray
+    // that crossed a wall's inner top edge going up and outward passed under
+    // the board entirely and landed on the roof slab's shingle bottom (6.10) -
+    // the dark wedge - while the 40 mm slot itself let a sliver of exterior
+    // light in, which is the cyan hairline.
+    //
+    // Two changes, both of which have to be there: the board now BOTTOMS OUT
+    // BELOW the wall tops (5.96 against 6.00, a 40 mm overlap) so there is no
+    // slot left to see through, and its plan span is `house.w - 1.5 * t`, so
+    // each edge buries 0.25t (0.075 plan, 0.12 m) INSIDE a 0.48 m wall instead
+    // of sitting coplanar with its inner face - which also removes the coplanar
+    // pair that would z-fight along the whole perimeter. The top face at 6.06
+    // still clears the roof slab's 6.10 underside by 40 mm, the bottom face
+    // only shades the upper 40 mm of the walls and the top 40 mm of the door
+    // lintels (both cream, both already hidden by it), and the upper rooms keep
+    // a 2.96 m ceiling. Presentation only: `centred()` pins solid/shots off.
+    centred(builder, `aarr-house-${house.id}-ceiling-upper`, [house.cx, 6.01, house.cz], [house.w - 1.5 * t, 0.10, house.d - 1.5 * t], interiorCeiling, { cast: false });
     centred(builder, `aarr-house-${house.id}-roof`, [house.cx, 6.35, house.cz], [house.w + 0.6, 0.5, house.d + 0.6], roof);
     centred(builder, `aarr-house-${house.id}-ridge`, [house.cx, 6.75, house.cz], [house.w * 0.35, 0.4, house.d + 0.6], roof);
     centred(builder, `aarr-house-${house.id}-chimney`, [house.cx - house.w * 0.28, 7.0, house.cz - 1], [0.9, 2.2, 0.9], massing);
@@ -2077,6 +2192,65 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     const [carX, carZ] = garage.car;
     centred(builder, `aarr-car-${garage.id}-body`, [carX, 0.55, carZ], [1.8, 0.7, 4.2], vehicleFor(4.2));
     centred(builder, `aarr-car-${garage.id}-cabin`, [carX, 1.15, carZ - 0.2], [1.6, 0.6, 2.2], vehicleFor(2.2));
+
+    // ---- LANE N: THE GARAGE WAS A BARE CONCRETE BOX ----------------------
+    //
+    // Both cutaway refs (`_judge/refs/teal-ground-cutaway.png`,
+    // `yellow-ground-cutaway.png`) fill the garage: a bench down one side,
+    // shelving over it, boxes, tyres and tins. The shell, floor, roof, door and
+    // driveway were all here and nothing was in the room.
+    //
+    // WHAT IS DELIBERATELY NOT HERE IS THE CAR. The refs park one inside, and
+    // this arena already parks one at `garage.car` on the driveway immediately
+    // outside this door. A second body inside would be 1.8 x 4.2 m of
+    // presentation-only mass in the middle of a 5.44 x 8.00 m room, i.e. an
+    // object a player reads as blocking and then walks straight through, in a
+    // room whose only route is the rear link from the bathroom. That is the
+    // readability failure this map cannot afford, so the interior gets the
+    // bench-and-clutter half of the ref and the car stays on the drive.
+    //
+    // Everything below hugs the FAR wall (the one opposite the house link) and
+    // the low-z end, leaving the link gap and the centre floor clear, and
+    // nothing free-standing passes 0.90 m - under a crouched player, so none of
+    // it can hide a body. All of it is merged dressing on materials this file
+    // already binds, so it adds no VRAM and no new draw beyond the buckets the
+    // interior fit-out opened. Nothing reaches `builder`.
+    const garageFace = houseSpec(garage.id).face;
+    const gx0 = (garageInner.cx - REBUILD_GARAGE_W / 2) * ATOMIC_ACRES_REBUILD_SPREAD;
+    const gx1 = (garageInner.cx + REBUILD_GARAGE_W / 2) * ATOMIC_ACRES_REBUILD_SPREAD;
+    const gz0 = (garageInner.cz - REBUILD_GARAGE_D / 2) * ATOMIC_ACRES_REBUILD_SPREAD;
+    const gz1 = (garageInner.cz + REBUILD_GARAGE_D / 2) * ATOMIC_ACRES_REBUILD_SPREAD;
+    const gFloorY = 0.12;
+    /** Distance in from the FAR wall (the link wall is at the other end). */
+    const garageAt = (u: number): number => (garageFace === 1 ? gx0 : gx1) + garageFace * u;
+    // Bench + pegboard + two shelves down the far wall, low-z half.
+    const benchX = garageAt(0.36);
+    const benchZ = gz0 + 1.45;
+    dressBox(teakTrim, [benchX, gFloorY + 0.86, benchZ], [0.62, 0.06, 2.20]);
+    for (const lx of [-0.24, 0.24]) {
+      for (const lz of [-0.98, 0.98]) {
+        dressTube(teakTrim, [benchX + lx, gFloorY + 0.415, benchZ + lz], 0.032, 0.038, 0.83, 6);
+      }
+    }
+    dressBox(stoneHearth, [garageAt(0.05), gFloorY + 1.20, benchZ], [0.06, 0.62, 2.20], 0, false);
+    for (const shelfY of [1.62, 1.98]) {
+      dressBox(teakTrim, [garageAt(0.21), gFloorY + shelfY, benchZ], [0.32, 0.05, 2.20], 0, false);
+    }
+    // Tins on the bench, boxes on the shelves.
+    for (const [tz, tr] of [[-0.72, 0.09], [-0.42, 0.075], [0.86, 0.085]] as Array<[number, number]>) {
+      dressTube(brassTrim, [benchX + 0.06, gFloorY + 1.00, benchZ + tz], tr, tr, 0.22, 10, undefined, false);
+    }
+    for (const [sy, sz, sw] of [[1.78, -0.70, 0.40], [1.78, 0.30, 0.52], [2.14, -0.10, 0.44]] as Array<[number, number, number]>) {
+      dressBox(upholstery, [garageAt(0.21), gFloorY + sy, benchZ + sz], [0.26, 0.26, sw], 0, false);
+    }
+    // Tyre stack and a box stack, both against the far wall, both under 0.90 m.
+    const tyreX = garageAt(0.52);
+    for (const [index, ty] of [0.10, 0.30, 0.50].entries()) {
+      dressTube(fireboxDark, [tyreX + index * 0.02, gFloorY + ty, gz0 + 3.75], 0.34, 0.34, 0.20, 14);
+    }
+    dressBox(teakTrim, [garageAt(0.48), gFloorY + 0.24, gz1 - 1.05], [0.72, 0.48, 0.60], 0.07);
+    dressBox(teakTrim, [garageAt(0.44), gFloorY + 0.66, gz1 - 1.00], [0.60, 0.36, 0.52], -0.12);
+    dressBox(interiorTrim, [garageAt(0.50), gFloorY + 0.22, gz1 - 1.85], [0.44, 0.44, 0.40], 0.19);
   }
 
   // ---- Sheds in back (north) corners + rear patio sets (fact 8; aerials) ----
@@ -2109,14 +2283,131 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   kitbash('./assets/rebuild/vehicles/semi.glb', [4.0, 0, -0.1], -0.22, [semiCab, semiTrailer]);
 
   // ---- Crate clusters: south choke + island + yards (fact 4/6; street plate) ----
+  //
+  // ---- LANE N, 2026-09-16: THE BARRICADE WAS STILL ONE SLAB ---------------
+  //
+  // WHAT THE CAPTURE SHOWS. In `artifacts/viewpoint-regression/final/
+  // atomic-acres-rebuild/atomic-acres-rebuild-street-south.png` - the first
+  // thing a player sees coming up the entry - the choke is a single block of
+  // flat orange panels. The last pass gave the fifteen boxes four deterministic
+  // `crateAges` on WoodFloor at a true 1 m slat pitch, which was the right
+  // diagnosis of the MATERIAL and did nothing about the FORM: fifteen 1.6 m
+  // cubes on an exact 1.6 m pitch at one z share a single continuous 6.4 m
+  // face plane and a single straight 4 m top line, so the only thing varying
+  // across the whole object is tint. That is why it still measures 3.70 luma
+  // stddev against road 12.71 and concrete 18.77-24.82 - the flattest large
+  // surface in the arena. A tint cannot break a plane.
+  //
+  // WHAT THE REFS HAVE THAT IT DID NOT (`_judge/refs/road-entrance.png`,
+  // `batch-4-nuketown-graybox/gray_street_01.png`): crates of different sizes,
+  // turned a few degrees off each other, resting on whatever is under them
+  // rather than on a grid line, with a shadow gap at every joint, a visible
+  // corner FRAME standing proud of each panel, and a top line that steps.
+  // Every one of those is geometry, so every one of them is done here.
+  //
+  //  1. SIZE + YAW VARIANCE. Each crate draws its own plan width, depth,
+  //     height and yaw from one seeded `mulberry32` stream, so the barricade is
+  //     byte-identical every run and every capture is comparable to the last.
+  //  2. IT STACKS ON ITSELF. Rows no longer sit at hard 1 m stations: each
+  //     column carries a running top and the next crate rests on it. With
+  //     heights 0.86-1.00 the three-high stack finishes anywhere in 2.58-3.00,
+  //     which is the stepped top line the refs have, and the top row rests on
+  //     the HIGHER of the two columns it bridges so nothing floats.
+  //  3. THE FRAME IS REAL GEOMETRY. The `centred()` body is emitted 35 mm
+  //     UNDERSIZE in plan and 30 mm undersize in height, and ten merged batten
+  //     members - four full-height corner stiles, a top and bottom rail on each
+  //     z face, two lid battens - are placed at the crate's true envelope. So
+  //     the frame stands 35 mm proud of the panel it frames, in a tone off the
+  //     panel's own, and the 30 mm body inset opens a genuine shadow reveal at
+  //     every stacked joint. That is the thing that was missing: a lit edge and
+  //     a dark line per crate instead of one 6.4 m plane.
+  //
+  // BOUNDED STRICTLY INSIDE THE COLLIDER, AND THE COLLIDER IS NOT TOUCHED.
+  // `src/atomic-acres-rebuild-authority.ts` owns this choke as two merged
+  // proxies - `aarr-choke-base` [0, 1.5, 14] x [4, 3, 1] and `aarr-choke-top`
+  // [0, 3.5, 14] x [3, 1, 1] - i.e. world x +/-3.2, y 0-3.0, z 21.6-23.2 with a
+  // x +/-2.4, y 3.0-4.0 cap. Nothing below goes near `builder`'s authority: the
+  // bodies are `centred()` (solid:false/shots:false pinned) and the battens are
+  // merged dressing parented straight to `root`. The envelopes are sized so the
+  // YAWED plan AABB still fits: worst case half-extent is
+  // (0.95*cos(0.055) + 0.84*sin(0.055))/2 = 0.4974 plan against the outer cell
+  // at 1.5, i.e. 1.9974 of an available 2.0, and in z 0.04 + 0.4455 = 0.4855 of
+  // 0.5. The tallest reachable stack is 3.00 + 1.00 = 4.00 exactly. So the
+  // barricade cannot grow past the box a player already collides with.
+  //
+  // READABILITY, on a combat choke. The silhouette is BOUNDED BY, not extended
+  // to, the collider - every added member is inside a volume the player already
+  // reads as solid, so the object cannot newly block a sightline, and the
+  // stepped top only ever REMOVES mass (0.86-1.00 heights) against the old flat
+  // 4.0 m line, which opens the over-the-top shot rather than closing it. The
+  // joint reveals are 30 mm and the plan gaps between neighbours are 50-100 mm
+  // at 1.6 m of depth: a shadow seam at entry distance, not a firing slot and
+  // not wide enough to hide or reveal a body. Nothing is added at ground level
+  // in front of the stack, so the approach lane and the two flanking shoulders
+  // (`choke-shoulder west/east`) keep the footprint they were tuned with.
+  //
+  // VRAM: ZERO. Both batten materials reuse tiling pairs this file already
+  // binds - WoodFloor (2,1) from `crateAges[1]`/`lumber` and StairTimber (1,1)
+  // from `fencePost` - and differ only by tint, which is a material uniform.
+  // DRAWS: two, one per batten material, because all 150 members merge.
+  const CHOKE_Z = 14;
+  const CHOKE_PROUD = 0.035;
+  const CHOKE_INSET = CHOKE_PROUD / ATOMIC_ACRES_REBUILD_SPREAD;
+  const chokeBattenLight = inPbr('WoodFloor', 2, 1, 0xe8dccc);
+  const chokeBattenDark = inPbr('StairTimber', 1, 1, 0x8f8377);
+  /**
+   * The ten merged batten members of one crate, placed at its TRUE envelope
+   * (the `centred()` body inside them is `CHOKE_PROUD` smaller on every face).
+   * `px`/`pz` are plan units like every other call in this section; `py` and
+   * `h` are true metres, which is the same split `centred()` itself uses.
+   */
+  const chokeFrame = (px: number, py: number, pz: number, wP: number, h: number, dP: number, yaw: number, batten: THREE.Material): void => {
+    const halfW = (wP * ATOMIC_ACRES_REBUILD_SPREAD) / 2;
+    const halfD = (dP * ATOMIC_ACRES_REBUILD_SPREAD) / 2;
+    const cx = px * ATOMIC_ACRES_REBUILD_SPREAD;
+    const cz = pz * ATOMIC_ACRES_REBUILD_SPREAD;
+    const cos = Math.cos(yaw);
+    const sin = Math.sin(yaw);
+    // `dressBox` yaws with `makeRotationY`, so a local offset maps to world as
+    // (ox*cos + oz*sin, -ox*sin + oz*cos); the member is yawed to match.
+    const at = (ox: number, oy: number, oz: number): Vec3 => [cx + ox * cos + oz * sin, py + oy, cz - ox * sin + oz * cos];
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        dressBox(batten, at(sx * (halfW - 0.05), 0, sz * (halfD - 0.05)), [0.10, h, 0.10], yaw);
+      }
+    }
+    for (const sz of [-1, 1]) {
+      for (const oy of [-(h / 2 - 0.10), h / 2 - 0.10]) {
+        dressBox(batten, at(0, oy, sz * (halfD - 0.035)), [2 * halfW - 0.20, 0.11, 0.07], yaw);
+      }
+    }
+    for (const oz of [-halfD / 2, halfD / 2]) {
+      dressBox(batten, at(0, h / 2 - 0.0225, oz), [2 * halfW, 0.045, 0.12], yaw);
+    }
+  };
+  const chokeRand = mulberry32(0x5ca1e5);
+  /** One barricade crate: body + frame, returning the stack height it leaves. */
+  const chokeCrate = (name: string, px: number, baseY: number, cell: number, row: number): number => {
+    const wP = 0.90 + chokeRand() * 0.05;
+    const dP = 0.78 + chokeRand() * 0.06;
+    const h = 0.86 + chokeRand() * 0.14;
+    const yaw = (chokeRand() - 0.5) * 0.11;
+    const pz = CHOKE_Z + (chokeRand() - 0.5) * 0.08;
+    const py = baseY + h / 2;
+    centred(builder, name, [px, py, pz], [wP - CHOKE_INSET, h - 0.06, dP - CHOKE_INSET], crateAge(cell, row), { rotation: [0, yaw, 0] });
+    chokeFrame(px, py, pz, wP, h, dP, yaw, (cell + row) % 2 === 0 ? chokeBattenLight : chokeBattenDark);
+    return baseY + h;
+  };
   // South choke barricade across the entry: 4-wide x 3-tall + 3-crate top row.
-  for (let ix = 0; ix < 4; ix += 1) {
-    for (let iy = 0; iy < 3; iy += 1) {
-      centred(builder, `aarr-choke-crate-${ix}-${iy}`, [-1.5 + ix, 0.5 + iy, 14], [1, 1, 1], crateAge(ix, iy));
+  const chokeColumnTop = [0, 0, 0, 0];
+  for (let iy = 0; iy < 3; iy += 1) {
+    for (let ix = 0; ix < 4; ix += 1) {
+      chokeColumnTop[ix] = chokeCrate(`aarr-choke-crate-${ix}-${iy}`, -1.5 + ix, chokeColumnTop[ix]!, ix, iy);
     }
   }
   for (let ix = 0; ix < 3; ix += 1) {
-    centred(builder, `aarr-choke-crate-top-${ix}`, [-1 + ix, 3.5, 14], [1, 1, 1], crateAge(ix, 4));
+    // Bridges columns ix and ix+1, so it rests on the higher of the two.
+    chokeCrate(`aarr-choke-crate-top-${ix}`, -1 + ix, Math.max(chokeColumnTop[ix]!, chokeColumnTop[ix + 1]!), ix, 4);
   }
   // Island cluster (street plate island): 2x2 + 1 top + planter pair.
   // Spread 06 crates (0.96 footprint inside the merged island collider).
