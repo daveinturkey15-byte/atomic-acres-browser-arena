@@ -783,14 +783,29 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   // arena's packed-shape budget on dressing. Transparency plus a low-key
   // emissive is what makes the opening read as glazing rather than as the
   // painted box the graybox shipped.
+  // VEIL REDUCED 2026-09-16 (integrator), measured. With the aperture split and
+  // the sun azimuth solved, the interior now takes a broad, correctly shaped sun
+  // pool - but the frame still caps at max 0.812 where `living-room-eye.png`
+  // reaches 1.000 with 4.4% of its pixels over 0.8. A large part of that plate's
+  // top end is BLOWN-OUT EXTERIOR SEEN THROUGH THE GLASS, and at opacity 0.42
+  // this pane replaced 42% of every window pixel with a blue-grey layer, then
+  // darkened it further with a 0x24333d emissive. The window could not be bright
+  // because it was 42% opaque paint.
+  //
+  // Real clean glass transmits ~90%. 0.14 keeps a visible pane - at grazing
+  // angles and against the dark interior it still reads as glazing rather than
+  // as a hole - while letting the exterior through. Emissive is kept but halved:
+  // it was there to stop the opening reading as a painted box, which the
+  // transmitted exterior now does on its own, and at 0.6 it was tinting the pane
+  // toward dark blue, i.e. working against the thing it was added for.
   const windowGlass = new THREE.MeshStandardMaterial({
-    color: 0x9fb8c8,
+    color: 0xcfe0ea,
     roughness: 0.35,
     metalness: 0.0,
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.14,
     emissive: 0x24333d,
-    emissiveIntensity: 0.6,
+    emissiveIntensity: 0.3,
   });
 
   const rugTexture = starburstRugTexture();
