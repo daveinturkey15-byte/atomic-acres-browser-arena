@@ -269,3 +269,37 @@
 - Captures: rebuild-rb11 (full), rebuild-rb12 (street+yard); published to
   repo-state/rb11-*, rb12-*. Scene-graph census: 21/21 worn crates resolved,
   21/21 fallbacks hidden, zero page errors.
+
+## Correction + asset-budget finding — 2026-09-16 (dave-gaming-pc, Claude Code)
+- Commit b80c05cb8 on contrib/dave-gaming-pc/omp/atomic-acres-rebuild-20260914.
+- CORRECTION to the day-set and midday-set entries above: both record the work as
+  "integrated ... (pushed)". The lane assets were committed, but the registration
+  layer underneath them was in no commit on any branch — 30 modified files plus
+  atomic-acres-rebuild-authority.ts (355 lines) and -interiors.ts (719 lines),
+  untracked. Without it there is no arena. Committed as b80c05cb8; byte copy of the
+  pre-commit tree kept at repo-state/rescue-20260916-0856/.
+- That commit also carries a DEFAULT_ARENA_ID flip (world-studio ->
+  atomic-acres-rebuild), isolated to one line so it can be reverted alone. It is
+  production-facing and is flagged as an owner decision, not shipped as settled.
+- CORRECTION to the gate count: 3 failures across 2 files, not 2. All pre-existing
+  world-studio gaps, proven against HEAD rather than assumed: world-studio is in
+  ARENA_IDS at HEAD but has zero presence in arena-proxy-coverage.test.ts, so
+  factories['world-studio'] was already undefined there. Not weakened, recorded.
+  tsc --noEmit exit 0; rebuild's own rows pass.
+- FINDING (root-causes the "island/yard crates read gray in captures" open item):
+  the rebuild asset set decodes to 1594.7 MB of VRAM from a 128.4 MB download across
+  272 textures, and 0 of 39 GLBs use any texture compression. crate-06-worn.glb is
+  580 triangles carrying 11.19 MB of uncompressed PNG (9x 1024 maps, 99.6% of the
+  file, ~50 MB VRAM). The scene-graph census reports 21/21 resolved because it checks
+  the graph, not texture upload; the 90s+ settle rule is a workaround for this.
+  Download size and VRAM are decoupled: vehicles/semi.glb is 1.33 MB on disk and
+  138.7 MB in VRAM, so a file-size-only pass would miss the worst set.
+- The repo already ships the fix and it was never applied to these assets:
+  npm run assets:compress:quality (scripts/assets/compress-quality-glbs.mjs,
+  lossless webp -> meshopt -> validate) is hardcoded to two public/assets/original/
+  models and rejects any other path. Measured on crate-06-worn.glb: that recipe at
+  1024 gives 11.23 -> 7.12 MB and no VRAM change (VRAM tracks resolution, not
+  encoding); at 512 it gives 1.72 MB / 12.6 MB VRAM; at 256, 0.42 MB / 3.1 MB.
+  Resolution target per asset class is an owner fidelity decision - measured, not taken.
+- The defect is in the lane authoring recipe, not only in assets on disk: lane-roofs
+  is baking 1024 *_BAKE_*.png right now, reproducing the same pattern.
