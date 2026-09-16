@@ -63,13 +63,21 @@ import {
   ATOMIC_ACRES_REBUILD_SPREAD,
   ATOMIC_ACRES_REBUILD_WALLS,
   frontDoorPortal,
+  garageSpec,
   garageWalls,
+  houseFrame,
+  houseSpec,
   rearLinkGap,
   REBUILD_DOOR_HEAD_Y,
+  REBUILD_GARAGE_D,
+  REBUILD_GARAGE_W,
+  REBUILD_INTERIOR_WALL_T,
   REBUILD_SHELL_WALL_T,
   REBUILD_STAIR_RISER,
   REBUILD_STAIR_STEPS,
   REBUILD_STAIR_TREAD,
+  REBUILD_UPPER_FLOOR_Y,
+  REBUILD_UPPER_SLAB_T,
   stairSpec,
   upperDoors,
   upperRooms,
@@ -154,6 +162,95 @@ function pair(
   ] as const;
 }
 
+/**
+ * True-dimension interior dressing: a raw mesh parented straight to the arena
+ * root, exactly like `aarr-loop-island` and every wear-lane GLB anchor.
+ * `centred()` cannot serve here because it multiplies plan sizes by SPREAD,
+ * and a rug, a coffee table and a dining table have to keep the same metre as
+ * the 2.2 m sofa and 3.0 m counter GLBs standing on and beside them. Nothing
+ * here reaches `builder`, so no collider, shot surface or spawn can move.
+ */
+function dressPiece(
+  root: THREE.Group,
+  name: string,
+  centre: Vec3,
+  size: Size3,
+  material: THREE.Material,
+  yaw = 0,
+): THREE.Mesh {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+  mesh.name = name;
+  mesh.position.set(...centre);
+  mesh.rotation.set(0, yaw, 0);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.presentationBatchCandidate = false;
+  root.add(mesh);
+  return mesh;
+}
+
+/**
+ * Atomic/starburst living-room rug, drawn in code.
+ *
+ * `living-room-eye.png` puts a patterned starburst rug under the coffee table
+ * and it is the single loudest piece of mid-century signal in the frame. Lane D
+ * owns `public/assets/**`, so this cannot be a new bake; a canvas is the only
+ * route a presentation lane has to a PATTERN rather than a flat tint, and the
+ * six interior bakes on disk have none. Colours are the ref's own: warm beige
+ * field with rust, charcoal and teak motif lines.
+ *
+ * Returns null in any environment without a drawable 2D context (the headless
+ * arena audits shim `document` with a no-op context proxy); the caller falls
+ * back to plain carpet, so a rug is never the reason a build or a gate breaks.
+ */
+function starburstRugTexture(): THREE.Texture | null {
+  if (typeof document === 'undefined') return null;
+  try {
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.fillStyle = '#c9bda4';
+    ctx.fillRect(0, 0, size, size);
+    ctx.strokeStyle = '#a8562f';
+    ctx.lineWidth = 10;
+    ctx.strokeRect(22, 22, size - 44, size - 44);
+    ctx.strokeStyle = '#6f5c46';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(40, 40, size - 80, size - 80);
+    // Two starbursts on the diagonal + a scatter of small ones, which is how
+    // the ref's rug reads: one dominant motif, the rest as texture.
+    const burst = (cx: number, cy: number, radius: number, spokes: number, width: number, colour: string): void => {
+      ctx.strokeStyle = colour;
+      ctx.lineWidth = width;
+      for (let i = 0; i < spokes; i += 1) {
+        const angle = (i / spokes) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.arc(cx, cy, Math.max(3, width * 1.6), 0, Math.PI * 2);
+      ctx.fillStyle = colour;
+      ctx.fill();
+    };
+    burst(176, 320, 118, 12, 5, '#3a3630');
+    burst(348, 168, 78, 8, 4, '#a8562f');
+    for (const [bx, by] of [[110, 120], [400, 400], [420, 120], [120, 430]] as Array<[number, number]>) {
+      burst(bx, by, 34, 6, 2.5, '#6f5c46');
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 4;
+    return texture;
+  } catch {
+    return null;
+  }
+}
+
 export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   const root = new THREE.Group();
   root.name = 'Atomic Acres Rebuild graybox';
@@ -229,18 +326,38 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   // Graybox palette: untextured massing gray + green blobs (plates are gray).
   // Wave-1 PBR (aa-swarm lane-pbr, manifest atomic-acres-rebuild-interior-pbr-20260915):
   // shared textured materials below; exterior shells stay gray for the art pass.
-  const pbr = (dir: string, name: string, repeatX: number, repeatY: number): THREE.Material =>
+  //
+  // TINT MATHS FOR EVERY `color` BELOW (lane-A interior look, 2026-09-16).
+  // `material.color` MULTIPLIES the diffuse map in linear space, so a tint can
+  // only darken: any channel needing a ratio above 1.0 is unreachable and is
+  // NOT authored here. Each tint is target_linear / bake_linear, converted back
+  // to sRGB for `setHex`. The bake means are measured off the shipped PNGs
+  // (128x128 box resample, sRGB->linear per texel, then averaged):
+  //   InteriorPlaster  0.8247 0.7475 0.6395   (#eae0d1 cream)
+  //   InteriorCeiling  0.9305 0.9135 0.8636   (#f7f5ef near-white)
+  //   BathTile         0.5341 0.5923 0.6536   (#c1cad3 cool tile)
+  //   StairTimber      0.2580 0.1119 0.0437   (#8a5d3a teak)
+  //   WoodFloor        0.3761 0.1853 0.0695   (#a4774a orange plank)
+  //   GarageConcrete   0.1992 0.1857 0.1589   (#7b776e bare concrete)
+  //   SidewalkConcrete 0.4870 0.4091 0.2978   (#b9ab94 warm concrete)
+  //   LawnPatchy       0.1723 0.2055 0.0603   (#737d45 grass)
+  // WoodFloor is the one bake that cannot serve a mid-century floor: reaching
+  // the beige/gold carpet of `bedroom-eye.png` needs green x2.9 and blue x6.6,
+  // both far above 1.0. Carpet is therefore tinted InteriorPlaster, not tinted
+  // WoodFloor, and WoodFloor is left to the surfaces that really are planks.
+  const pbr = (dir: string, name: string, repeatX: number, repeatY: number, color?: number): THREE.Material =>
     texturedMaterial(`./assets/rebuild/${dir}/${name}_BAKE_DIFFUSE.png`, {
       roughnessPath: `./assets/rebuild/${dir}/${name}_BAKE_ROUGH.png`,
       roughness: 1.0,
       metalness: 0.0,
       repeatX,
       repeatY,
+      color,
     });
-  const inPbr = (name: string, repeatX: number, repeatY: number): THREE.Material =>
-    pbr('interiors', name, repeatX, repeatY);
-  const gndPbr = (name: string, repeatX: number, repeatY: number): THREE.Material =>
-    pbr('ground', name, repeatX, repeatY);
+  const inPbr = (name: string, repeatX: number, repeatY: number, color?: number): THREE.Material =>
+    pbr('interiors', name, repeatX, repeatY, color);
+  const gndPbr = (name: string, repeatX: number, repeatY: number, color?: number): THREE.Material =>
+    pbr('ground', name, repeatX, repeatY, color);
   const plasterByLen = new Map<number, THREE.Material>();
   const plasterFor = (len: number): THREE.Material => {
     const r = Math.max(1, Math.min(6, Math.round(len / 3)));
@@ -253,23 +370,77 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   };
   const bathTile = inPbr('BathTile', 2, 1);
   const woodFloor = inPbr('WoodFloor', 3, 3);
-  const stairTimber = inPbr('StairTimber', 1, 1);
+  // The stair run's step boxes are solid from y=0 to each tread's top, so from
+  // the living-room camera their combined SIDE is one uninterrupted wedge that
+  // fills the left half of the frame. Carrying StairTimber there put #8a5d3a
+  // teak across all of it, and because that bake measures luma stddev 1.79 it
+  // reads as a flat saturated terracotta slab rather than as a stair - the
+  // single worst surface in the 11:08 capture. The references
+  // (teal-ground-cutaway.png, living-room-eye.png) do not show a timber flank
+  // at all: they show a CREAM CLOSED STRINGER with the timber confined to the
+  // tread edges. So the flank takes plaster and the tread nosings and rail keep
+  // teakTrim, which is what actually draws the stair's line. Tint is warm and
+  // near-white because material.color multiplies and cannot lighten a bake.
+  const stairTimber = inPbr('InteriorPlaster', 1, 1, 0xf0e6d8);
   const garageConcrete = inPbr('GarageConcrete', 2, 1);
-  const massing = standard(0xb9bcc0, 0.92, 0.02);
-  const roof = standard(0x9aa0a6, 0.9, 0.04);
-  const concrete = standard(0xc9c7c2, 0.96, 0.02);
+  // ---- Interior finishes (refs `living-room-eye.png`, `bedroom-eye.png`,
+  // `teal-ground-cutaway.png`, `yellow-ground-cutaway.png`).
+  // The ceiling bake shipped with wave-1 and was never bound to a mesh: every
+  // ground-floor ceiling in the capture is the UNDERSIDE of the upper floor
+  // slab, i.e. WoodFloor, which is why `rb11-rebuild-interior.png` and
+  // `artifacts/viewpoint-regression/pre-polish/.../interior-west.png` are both
+  // dominated by an orange plank lid. The refs show a pale ceiling with a slim
+  // white cornice, so the slab now gets a separate board under it.
+  const interiorCeiling = inPbr('InteriorCeiling', 3, 3);
+  const interiorTrim = inPbr('InteriorCeiling', 1, 1);
+  // CARPET RIDES DesertSand, NOT PLASTER (integrator capture 2026-09-16: the
+  // first attempt landed as "flat grey-beige with no material"). The zone split
+  // was reaching the floor; the BAKE had nothing to show. Measured texel spread
+  // over a 128x128 box resample, luma stddev: InteriorPlaster 0.69 and
+  // InteriorCeiling 0.22 are effectively solid colours, which is right for
+  // plaster and a ceiling and useless for a floor. Of the ten bakes on disk the
+  // detailed ones are LawnPatchy 16.13, DesertSand 12.37, AsphaltLoop 11.94,
+  // SidewalkConcrete 8.81, BathTile 6.99, WoodFloor 4.13. DesertSand is the
+  // only one whose grain reads as a fine wool pile AND whose unmodified mean
+  // (#c5ac8c) is already the refs' warm carpet beige, so the living band takes
+  // it untinted and the bedroom band tints it to `bedroom-eye`'s gold.
+  const livingCarpet = gndPbr('DesertSand', 6, 6);
+  const upperCarpet = gndPbr('DesertSand', 6, 6, 0xf8ffda);
+  const kitchenTile = inPbr('BathTile', 3, 3, 0xf3d9b2);
+  const sageAccent = inPbr('InteriorPlaster', 3, 1, 0xabccb5);
+  // WoodFloor keeps its bake but loses its job: nothing in the refs is a plank
+  // FLOOR, and it was only ever on screen as the underside of the upper slab.
+  // Its light teak grain is the right match for the mid-century case goods the
+  // dressing below builds, so that is where it goes.
+  const teakTrim = woodFloor;
+  const massing = inPbr('InteriorPlaster', 2, 1);
+  // Team colour blocking (LAYOUT_CONTRACT fact 2 + integrator measurement
+  // 2026-09-16: both shells render the same off-white, so the identity the
+  // header claims is absent from the frame). Teal west / yellow east, tinted
+  // off the plaster bake because that is the only light, detailed surface in
+  // the set; the flat `standard()` gray it replaces measured stddev ~1 against
+  // the bake's 0.69 texel spread plus real shading.
+  const houseSkin = { west: inPbr('InteriorPlaster', 2, 1, 0x79ccd4), east: inPbr('InteriorPlaster', 2, 1, 0xf7de83) } as const;
+  const roof = gndPbr('SidewalkConcrete', 3, 3, 0xc5dcff);
+  const concrete = gndPbr('SidewalkConcrete', 2, 2);
   const asphalt = gndPbr('AsphaltLoop', 5, 5);
   const sidewalk = gndPbr('SidewalkConcrete', 2, 2);
-  const timber = standard(0x8a6f4d, 0.9, 0.04);
+  const timber = inPbr('StairTimber', 2, 1);
   const lawn = gndPbr('LawnPatchy', 3, 3);
   const sand = gndPbr('DesertSand', 8, 8);
   const vehicle = standard(0xa8adb3, 0.6, 0.3);
   const rust = standard(0x8a5a3a, 0.9, 0.1);
-  const olive = standard(0x6b7043, 0.9, 0.05);
+  // Green mass + rock + crate, measured 2026-09-16 by the integrator on the
+  // yard capture: road stddev 19.3, house wall 10.4, fence 12.0, concrete 8.9,
+  // but every green mass 0.21-1.62. The LawnPatchy bake itself measures 16.13,
+  // so the flatness was the `standard()` colour, not the texture set. Each
+  // green now rides that bake; hedge and scrub are darker than it, so both
+  // tints stay under 1.0 per channel.
+  const olive = gndPbr('LawnPatchy', 2, 2, 0xeee6f7);
   const darkPole = standard(0x3a3d42, 0.7, 0.4);
-  const hedge = standard(0x5d8f3e, 0.98, 0.0);
-  const rock = standard(0x9d988c, 0.98, 0.02);
-  const crate = standard(0xa3a7ad, 0.9, 0.05);
+  const hedge = gndPbr('LawnPatchy', 2, 2, 0xb4f9cd);
+  const rock = gndPbr('SidewalkConcrete', 1, 1, 0xd9e3f1);
+  const crate = inPbr('StairTimber', 1, 1);
 
   // ---- Desert surround + side service roads (fact 1; topdown plate edges) ----
   centred(builder, 'aarr-desert-apron', [0, -0.06, 0], [140, 0.1, 150], sand, { cast: false });
@@ -362,15 +533,230 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
       : [plane, (DRESS_SILL_Y + DRESS_HEAD_Y) / 2, along + offset]);
     const span = (w: number, h: number, t: number): Size3 => (axis === 'z' ? [w, h, t] : [t, h, w]);
     const height = DRESS_HEAD_Y - DRESS_SILL_Y;
+    // NO GRAYBOX WINDOW MAY CAST (lane-B measurement 2026-09-16: on
+    // `rb11-rebuild-interior.png` the fraction of the frame above display 0.9
+    // is 0.000 and p99 is 0.841 - not one key-lit pixel anywhere inside). Every
+    // part of this dressing is a solid box sitting on the shell's OUTER plane
+    // with no aperture behind it, so each one was a shadow-map occluder pinned
+    // exactly where the refs want daylight. Dropping them out of the shadow map
+    // changes no collider, no shot surface and no authority rect; `centred()`
+    // already pins solid:false/shots:false on all of them.
+    // WHAT THIS DOES NOT FIX, stated rather than implied: the casing is not the
+    // only occluder in the light path. The shell walls themselves
+    // (`-north`/`-south`/`-front-*`/`-rear-*`) are single solid boxes with no
+    // window aperture cut in them and they DO cast. While they are the visible
+    // wall - i.e. whenever the catalog house GLB has not resolved - no
+    // presentation change in this function can put a sun pool on the floor,
+    // because the wall behind the casing still blocks the sun. Cutting that
+    // aperture is a geometry change the lane brief stops at, so it is reported,
+    // not done.
+    const glass = centred(builder, `${name}-reveal`, at(0), span(width - 2 * DRESS_REVEAL_INSET, height - 2 * DRESS_REVEAL_DROP, DRESS_REVEAL_T), windowGlass, { cast: false });
+    // Transparent panes must not join a merged presentation batch: the batcher
+    // groups by material and a sorted-transparent pane inside an opaque batch
+    // loses its own draw order.
+    glass.userData.presentationBatchCandidate = false;
     const out: THREE.Mesh[] = [
-      centred(builder, `${name}-casing`, at(0), span(width, height, DRESS_BOARD_T), massing),
-      centred(builder, `${name}-reveal`, at(0), span(width - 2 * DRESS_REVEAL_INSET, height - 2 * DRESS_REVEAL_DROP, DRESS_REVEAL_T), roof),
+      centred(builder, `${name}-casing`, at(0), span(width, height, DRESS_BOARD_T), interiorTrim, { cast: false }),
+      glass,
     ];
     if (!shutters) return out;
     for (const side of [-1, 1] as const) {
-      out.push(centred(builder, `${name}-shutter-${side < 0 ? 'a' : 'b'}`, at((side * (width + DRESS_SHUTTER_W)) / 2), span(DRESS_SHUTTER_W, height, DRESS_BOARD_T), timber));
+      out.push(centred(builder, `${name}-shutter-${side < 0 ? 'a' : 'b'}`, at((side * (width + DRESS_SHUTTER_W)) / 2), span(DRESS_SHUTTER_W, height, DRESS_BOARD_T), timber, { cast: false }));
     }
     return out;
+  };
+
+  /**
+   * MUSTARD CABINETRY, within what a multiply can reach.
+   *
+   * Both cutaways and `living-room-eye.png` put a mustard-yellow run under a
+   * pale counter; the wave-2 GLB is a modern flat-pack birch. Lane D owns the
+   * asset, so the only lever here is `material.color`, and it multiplies.
+   * Measured on the run's own embedded 512x512 base colour, bright subset
+   * (mean channel > 120, 39.7% of texels, i.e. the cabinet faces rather than
+   * the black worktop): linear 0.4782 0.3281 0.2194. A true #c9a227 mustard
+   * would need red x1.22 and green x1.10, both unreachable, so the tint is
+   * pinned at the largest multiply that clips nothing (red x1.00, green x0.86,
+   * blue x0.11) and lands the faces on #b9942d - an ochre mustard. The near-
+   * black worktop multiplies to near-black and stays a worktop.
+   */
+  const tintKitchenRun = (loaded: THREE.Object3D): void => {
+    loaded.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      for (const material of materials) {
+        if (material instanceof THREE.MeshStandardMaterial) material.color.setHex(0xffee58);
+      }
+    });
+  };
+
+  // Window pane. Roughness is deliberately 0.35 and not a glassy 0.08: the
+  // ray-traced proxy extractor admits anything at or below 0.22
+  // (REFLECTIVE_ROUGHNESS_CEILING) and sixteen new panes would spend the
+  // arena's packed-shape budget on dressing. Transparency plus a low-key
+  // emissive is what makes the opening read as glazing rather than as the
+  // painted box the graybox shipped.
+  const windowGlass = new THREE.MeshStandardMaterial({
+    color: 0x9fb8c8,
+    roughness: 0.35,
+    metalness: 0.0,
+    transparent: true,
+    opacity: 0.42,
+    emissive: 0x24333d,
+    emissiveIntensity: 0.6,
+  });
+
+  const rugTexture = starburstRugTexture();
+  const rugMaterial = rugTexture
+    ? new THREE.MeshStandardMaterial({ map: rugTexture, roughness: 1.0, metalness: 0.0 })
+    : livingCarpet;
+
+  /**
+   * INTERIOR FIT-OUT (lane-A, owner verdict 2026-09-16: the houses "are compact
+   * and messy and they don't match the original catalog image gen references").
+   *
+   * Presentation only. Every mesh here is either a `centred()` emission, which
+   * pins solid:false/shots:false, or a `dressPiece()` mesh that never reaches
+   * `builder` at all, so no collider, shot surface, spawn or authority rect
+   * moves. Structural walls, doorways and the stair run are read, never
+   * written.
+   *
+   * WHAT THE REFS PIN, AND WHERE EACH DECISION COMES FROM:
+   * - `teal-ground-cutaway.png` / `yellow-ground-cutaway.png`: the floor is not
+   *   one material. Tile runs through kitchen and dining, carpet fills the
+   *   living room, the garage is bare concrete. That split is the zone loop.
+   * - `living-room-eye.png`: pale ceiling with a slim white cornice and white
+   *   skirting; a green accent plane behind the seating; a patterned starburst
+   *   rug under a low teak table; mustard cabinetry behind a tiled splashback.
+   * - `bedroom-eye.png`: upper floor is gold carpet, not boards.
+   *
+   * WHAT IT CANNOT REACH, stated rather than faked: the four perimeter walls a
+   * player sees from inside belong to the house GLB once it resolves, and every
+   * one of its elevations carries ground-floor glazing (west sills at y 1.05,
+   * east at 1.15). A full-height cream liner over them would seal the windows
+   * and take the daylight with them, so the perimeter gets trim only and the
+   * green accent goes on the cross partition - the largest uninterrupted
+   * interior plane in the house - instead of the window wall the ref uses.
+   */
+  const buildInteriorFitOut = (
+    id: 'west' | 'east',
+    face: 1 | -1,
+    finishTop: number,
+    stripX: number,
+    living: { x0: number; x1: number; z0: number; z1: number },
+  ): void => {
+    const frame = houseFrame(houseSpec(id));
+    const tInt = REBUILD_INTERIOR_WALL_T;
+    const S = ATOMIC_ACRES_REBUILD_SPREAD;
+    const xLo = Math.min(frame.innerFront, frame.innerRear);
+    const xHi = Math.max(frame.innerFront, frame.innerRear);
+    const zone = (roomId: string): { x0: number; x1: number; z0: number; z1: number } => {
+      const found = ATOMIC_ACRES_REBUILD_ROOMS.find((entry) => entry.house === id && entry.id === roomId);
+      if (!found) throw new Error(`missing room ${id}/${roomId}`);
+      return found;
+    };
+    const kitchen = zone('kitchen');
+    const bath = zone('bath');
+    // The dining nook has no room record on purpose: `ATOMIC_ACRES_REBUILD_WALLS`
+    // opens the old den frontage to the living room with no wall and no lintel,
+    // so the rear band north of the bath is floor with no rect. It takes the
+    // kitchen's tile, which is what both cutaways show under the dining table.
+    const dining = { x0: kitchen.x0, x1: kitchen.x1, z0: bath.z1 + tInt, z1: frame.zHi };
+    const finishY = finishTop - 0.02;
+    const finish = (tag: string, rect: { x0: number; x1: number; z0: number; z1: number }, material: THREE.Material): void => {
+      if (rect.x1 - rect.x0 <= 0.05 || rect.z1 - rect.z0 <= 0.05) return;
+      centred(builder, `aarr-house-${id}-zonefloor-${tag}`, [(rect.x0 + rect.x1) / 2, finishY, (rect.z0 + rect.z1) / 2], [rect.x1 - rect.x0, 0.04, rect.z1 - rect.z0], material, { cast: false });
+    };
+    finish('living', living, livingCarpet);
+    finish('kitchen', kitchen, kitchenTile);
+    finish('dining', dining, kitchenTile);
+    finish('bath', bath, bathTile);
+
+    // ---- Trim. Skirting sits ON the finished floor, cornice tucks under the
+    // ceiling board. Both clear the GLB's ground glazing: heads measure 2.35
+    // (west) and 2.65 (east), and the cornice starts at 2.66.
+    //
+    // DEPTH IS NOT COSMETIC. Two wall planes disagree by 0.288 m here and the
+    // trim has to touch whichever one is present. This module rooms against
+    // REBUILD_SHELL_WALL_T (0.3 unscaled, 0.48 m), which is also where
+    // AuthorityGray stops the player; the catalog house GLB's own walls are
+    // 0.12 local (0.192 m), so its inner face sits 0.288 m OUTBOARD of the
+    // plane the player can reach. A 0.05 strip on the arena plane would hang in
+    // mid-air off the GLB wall. Each strip therefore runs 0.30 unscaled
+    // (0.48 m) from 0.08 m proud of the arena plane to 0.40 m behind it, which
+    // buries its far edge inside the GLB wall (0.192 m thick) without piercing
+    // the exterior, and inside the fallback shell wall as well.
+    const portal = frontDoorPortal(id);
+    const [linkZ0, linkZ1] = rearLinkGap(id);
+    const runsMinusGap = (from: number, to: number, gapFrom: number, gapTo: number): Array<[number, number]> =>
+      [[from, Math.min(gapFrom, to)] as [number, number], [Math.max(gapTo, from), to] as [number, number]]
+        .filter(([a, b]) => b - a > 0.05);
+    const faces: Array<{ axis: 'x' | 'z'; plane: number; inward: number; runs: Array<[number, number]> }> = [
+      { axis: 'x', plane: frame.innerFront, inward: -face, runs: runsMinusGap(frame.zLo, frame.zHi, portal.centreZ - portal.width / 2, portal.centreZ + portal.width / 2) },
+      { axis: 'x', plane: frame.innerRear, inward: face, runs: runsMinusGap(frame.zLo, frame.zHi, linkZ0, linkZ1) },
+      { axis: 'z', plane: frame.zLo, inward: 1, runs: [[xLo, xHi]] },
+      { axis: 'z', plane: frame.zHi, inward: -1, runs: [[xLo, xHi]] },
+    ];
+    for (const [index, wallFace] of faces.entries()) {
+      for (const [runIndex, [from, to]] of wallFace.runs.entries()) {
+        const mid = (from + to) / 2;
+        const len = to - from;
+        for (const [tag, y, height] of [['skirt', finishTop + 0.07, 0.14], ['cornice', 2.695, 0.07]] as Array<[string, number, number]>) {
+          const centre: Vec3 = wallFace.axis === 'x'
+            ? [wallFace.plane - wallFace.inward * 0.1, y, mid]
+            : [mid, y, wallFace.plane - wallFace.inward * 0.1];
+          const size: Size3 = wallFace.axis === 'x' ? [0.3, height, len] : [len, height, 0.3];
+          centred(builder, `aarr-house-${id}-inwall-${tag}-${index}-${runIndex}`, centre, size, interiorTrim, { cast: false });
+        }
+      }
+    }
+
+    // ---- Sage accent, on the bath box's dining-side face.
+    //
+    // WHY NOT THE WALL THE REF USES. `living-room-eye.png` paints the window
+    // wall green. That wall is the GLB's, and lining it seals its glazing (see
+    // the fit-out header). The next candidate, the cross partition, measures
+    // out at 0.16 m and 0.64 m of actual wall once its 2.4 m great-room
+    // opening, its 1.0 m bath door and the open den frontage are subtracted -
+    // two stripes, not an accent. The bath box's north face is arena-owned, has
+    // no opening in it at any height, runs the full 3.68 m of the rear band,
+    // and is the plane a player reads straight across the open plan from the
+    // sofa, because the den frontage beside it is deliberately wall-free. That
+    // is the substitution, and it is a substitution.
+    const accentTop = 2.66;
+    const accentBase = finishTop + 0.14;
+    for (const [index, wall] of ATOMIC_ACRES_REBUILD_WALLS.filter((entry) => entry.house === id && entry.id.includes('bath north')).entries()) {
+      centred(
+        builder,
+        `aarr-house-${id}-inwall-accent-${index}`,
+        [(wall.x0 + wall.x1) / 2, (accentBase + accentTop) / 2, wall.z1 + 0.015],
+        [wall.x1 - wall.x0, accentTop - accentBase, 0.03],
+        sageAccent,
+        { cast: false },
+      );
+    }
+
+    // ---- Dressing, true world metres (see `dressPiece`). Deliberately few:
+    // the owner's complaint was crowding, so the living room gets one rug and
+    // one low table on the open floor between sofa and window wall, and the
+    // dining nook one pedestal table. Rug width 2.2 m is the largest that
+    // clears the front wall in BOTH houses (east has 15.92 m against an inner
+    // face at 15.84 m).
+    const rugX = ((frame.innerFront + stripX) / 2) * S;
+    const rugZ = (living.z0 + 1.2) * S;
+    dressPiece(root, `aarr-house-${id}-dress-rug`, [rugX, finishTop + 0.012, rugZ], [2.2, 0.024, 2.6], rugMaterial);
+    dressPiece(root, `aarr-house-${id}-dress-table-top`, [rugX, finishTop + 0.41, rugZ], [1.15, 0.06, 0.55], teakTrim);
+    for (const [legX, legZ] of [[-0.5, -0.2], [0.5, -0.2], [-0.5, 0.2], [0.5, 0.2]] as Array<[number, number]>) {
+      dressPiece(root, `aarr-house-${id}-dress-table-leg-${legX < 0 ? 'a' : 'b'}${legZ < 0 ? 'a' : 'b'}`, [rugX + legX, finishTop + 0.19, rugZ + legZ], [0.05, 0.38, 0.05], teakTrim);
+    }
+    const diningX = ((dining.x0 + dining.x1) / 2) * S;
+    const diningZ = ((dining.z0 + dining.z1) / 2) * S;
+    dressPiece(root, `aarr-house-${id}-dress-dining-top`, [diningX, finishTop + 0.73, diningZ], [1.3, 0.06, 0.9], teakTrim);
+    dressPiece(root, `aarr-house-${id}-dress-dining-stem`, [diningX, finishTop + 0.36, diningZ], [0.16, 0.7, 0.16], teakTrim);
+    // Tiled splashback over the relocated counter run (ref: `living-room-eye`
+    // puts tile between worktop and wall cabinets). 0.9-1.5 m matches the run's
+    // own worktop height.
+    dressPiece(root, `aarr-house-${id}-dress-splashback`, [((kitchen.x0 + kitchen.x1) / 2) * S, finishTop + 1.2, Math.min(kitchen.z0, kitchen.z1) * S + 0.04], [3.0, 0.6, 0.06], bathTile);
   };
 
   const houseSpecs = [
@@ -379,6 +765,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   ] as const;
   for (const house of houseSpecs) {
     const face = house.id === 'west' ? 1 : -1; // loop-facing side
+    const skin = houseSkin[house.id];
     // Walkable ground floor, hollow shell; upper stays solid look-only massing
     // (no stairs yet — upper is look-only until the art pass).
     const t = REBUILD_SHELL_WALL_T;
@@ -391,26 +778,39 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     const rearX = face === 1 ? x0 : x1;
     const gap0 = portal.centreZ - portal.width / 2;
     const gap1 = portal.centreZ + portal.width / 2;
-    // Floor slab (presentation; movement floor is AuthorityGray's proxy).
-    centred(builder, `aarr-house-${house.id}-floor`, [house.cx, 0.06, house.cz], [house.w, 0.12, house.d], woodFloor, { cast: false });
+    // Floor slab (presentation; movement floor is AuthorityGray's proxy). This
+    // is the sub-floor the per-zone finishes below sit on, and it is what shows
+    // if the house GLB never resolves, so it carries the largest zone's finish
+    // (carpet) rather than the plank bake it used to.
+    centred(builder, `aarr-house-${house.id}-floor`, [house.cx, 0.06, house.cz], [house.w, 0.12, house.d], livingCarpet, { cast: false });
+    // FINISHED FLOOR LEVEL. The catalog house GLB brings its own foundation
+    // slab and it is HIGHER than this sub-floor, so the sub-floor is not what a
+    // player sees once the GLB resolves: measured on the shipped files (node
+    // transform x accessor bounds, y unscaled by the 1.6 plan spread),
+    // `house-west-teal.glb` Foundation tops out at 0.150 and
+    // `house-east-yellow.glb` at 0.300. Each zone finish below sits 20 mm above
+    // its own house's foundation - the same no-z-fight step the carriageway
+    // block uses against the desert apron - so the finish reads in both the
+    // GLB-resolved and the fallback case, and ground furniture stands on it.
+    const finishTop = house.id === 'west' ? 0.17 : 0.32;
     // Rear wall split at the garage personnel link + side walls, full storey.
     const [linkZ0, linkZ1] = rearLinkGap(house.id);
     const rearCX = rearX + (face === 1 ? t / 2 : -t / 2);
-    centred(builder, `aarr-house-${house.id}-rear-south`, [rearCX, 1.5, (z0 + linkZ0) / 2], [t, 3, Math.max(linkZ0 - z0, 0.05)], massing);
-    centred(builder, `aarr-house-${house.id}-rear-north`, [rearCX, 1.5, (linkZ1 + z1) / 2], [t, 3, Math.max(z1 - linkZ1, 0.05)], massing);
+    centred(builder, `aarr-house-${house.id}-rear-south`, [rearCX, 1.5, (z0 + linkZ0) / 2], [t, 3, Math.max(linkZ0 - z0, 0.05)], skin);
+    centred(builder, `aarr-house-${house.id}-rear-north`, [rearCX, 1.5, (linkZ1 + z1) / 2], [t, 3, Math.max(z1 - linkZ1, 0.05)], skin);
     centred(builder, `aarr-house-${house.id}-rear-link-lintel`, [rearCX, (REBUILD_DOOR_HEAD_Y + 3) / 2, (linkZ0 + linkZ1) / 2], [t, 3 - REBUILD_DOOR_HEAD_Y, linkZ1 - linkZ0], massing);
-    centred(builder, `aarr-house-${house.id}-north`, [house.cx, 1.5, z1 - t / 2], [house.w, 3, t], massing);
-    centred(builder, `aarr-house-${house.id}-south`, [house.cx, 1.5, z0 + t / 2], [house.w, 3, t], massing);
+    centred(builder, `aarr-house-${house.id}-north`, [house.cx, 1.5, z1 - t / 2], [house.w, 3, t], skin);
+    centred(builder, `aarr-house-${house.id}-south`, [house.cx, 1.5, z0 + t / 2], [house.w, 3, t], skin);
     // Loop-facing wall split around the door gap + lintel above.
     const frontCX = frontX + (face === 1 ? -t / 2 : t / 2);
-    centred(builder, `aarr-house-${house.id}-front-south`, [frontCX, 1.5, (z0 + gap0) / 2], [t, 3, Math.max(gap0 - z0, 0.05)], massing);
-    centred(builder, `aarr-house-${house.id}-front-north`, [frontCX, 1.5, (gap1 + z1) / 2], [t, 3, Math.max(z1 - gap1, 0.05)], massing);
+    centred(builder, `aarr-house-${house.id}-front-south`, [frontCX, 1.5, (z0 + gap0) / 2], [t, 3, Math.max(gap0 - z0, 0.05)], skin);
+    centred(builder, `aarr-house-${house.id}-front-north`, [frontCX, 1.5, (gap1 + z1) / 2], [t, 3, Math.max(z1 - gap1, 0.05)], skin);
     centred(builder, `aarr-house-${house.id}-front-lintel`, [frontCX, (REBUILD_DOOR_HEAD_Y + 3) / 2, portal.centreZ], [t, 3 - REBUILD_DOOR_HEAD_Y, portal.width], massing);
     // Upper storey hollow shell (walkable, concept cutaways).
-    centred(builder, `aarr-house-${house.id}-upper-rear`, [rearX + (face === 1 ? t / 2 : -t / 2), 4.5, house.cz], [t, 3, house.d], massing);
-    centred(builder, `aarr-house-${house.id}-upper-front`, [frontX + (face === 1 ? -t / 2 : t / 2), 4.5, house.cz], [t, 3, house.d], massing);
-    centred(builder, `aarr-house-${house.id}-upper-north`, [house.cx, 4.5, z1 - t / 2], [house.w, 3, t], massing);
-    centred(builder, `aarr-house-${house.id}-upper-south`, [house.cx, 4.5, z0 + t / 2], [house.w, 3, t], massing);
+    centred(builder, `aarr-house-${house.id}-upper-rear`, [rearX + (face === 1 ? t / 2 : -t / 2), 4.5, house.cz], [t, 3, house.d], skin);
+    centred(builder, `aarr-house-${house.id}-upper-front`, [frontX + (face === 1 ? -t / 2 : t / 2), 4.5, house.cz], [t, 3, house.d], skin);
+    centred(builder, `aarr-house-${house.id}-upper-north`, [house.cx, 4.5, z1 - t / 2], [house.w, 3, t], skin);
+    centred(builder, `aarr-house-${house.id}-upper-south`, [house.cx, 4.5, z0 + t / 2], [house.w, 3, t], skin);
     for (const wall of ATOMIC_ACRES_REBUILD_WALLS) {
       if (wall.house !== house.id) continue;
       const cx = (wall.x0 + wall.x1) / 2;
@@ -419,9 +819,14 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
       const bath = wall.id.includes('bath');
       centred(builder, `aarr-house-${house.id}-inwall-${wall.id}`, [cx, 1.5, cz], [wall.x1 - wall.x0, 3, wall.z1 - wall.z0], bath ? bathTile : plasterFor(len));
     }
-    // Upper floor slabs mirror upperSlabs (stairwell hole stays open).
+    // Upper floor slabs mirror upperSlabs (stairwell hole stays open). The slab
+    // now shows only its TOP face to a player — the ceiling boards below cover
+    // its underside — so it carries the upper storey's own finish, the gold
+    // carpet of `bedroom-eye.png`, not the plank bake that used to double as
+    // every ground-floor ceiling.
     for (const [index, slab] of upperSlabs(house.id).entries()) {
-      centred(builder, `aarr-house-${house.id}-upper-slab-${index}`, [(slab.x0 + slab.x1) / 2, 2.875, (slab.z0 + slab.z1) / 2], [slab.x1 - slab.x0, 0.25, slab.z1 - slab.z0], woodFloor, { cast: false });
+      centred(builder, `aarr-house-${house.id}-upper-slab-${index}`, [(slab.x0 + slab.x1) / 2, 2.875, (slab.z0 + slab.z1) / 2], [slab.x1 - slab.x0, 0.25, slab.z1 - slab.z0], upperCarpet, { cast: false });
+      centred(builder, `aarr-house-${house.id}-ceiling-board-${index}`, [(slab.x0 + slab.x1) / 2, REBUILD_UPPER_FLOOR_Y - REBUILD_UPPER_SLAB_T - 0.04, (slab.z0 + slab.z1) / 2], [slab.x1 - slab.x0, 0.04, slab.z1 - slab.z0], interiorCeiling, { cast: false });
     }
     for (const wall of upperWalls(house.id)) {
       const len = Math.max(wall.x1 - wall.x0, wall.z1 - wall.z0);
@@ -434,11 +839,49 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
       centred(builder, `aarr-house-${house.id}-uplintel-${door.id}`, [horizontal ? door.centre : door.at, 5.6, horizontal ? door.at : door.centre], [horizontal ? 1.0 : 0.2, 0.8, horizontal ? 0.2 : 1.0], massing);
     }
     // Stair treads + guard rail mirror stairSpec (climbable 0.2 risers).
+    //
+    // THE WEDGE (integrator capture 2026-09-16, `artifacts/viewpoint-regression/
+    // trial/.../interior-west.png`: the run "occupies the entire left half of
+    // the frame as one flat untextured terracotta wedge"). Each step is a box
+    // that starts at the FLOOR and rises to its own tread, so fifteen nested
+    // boxes share one continuous side plane 7.2 m long and 3 m tall - a solid
+    // triangle with no step in it from any angle but the front. That shape is
+    // the authority's, not a look choice: `rebuildParts()` needs the filled
+    // volume for climbable 0.2 m risers, and the authority copy stays exactly
+    // as it is.
+    //
+    // WHY THE MATERIAL ALONE CANNOT FIX IT. The run already rides
+    // `inPbr('StairTimber', ...)`. The bake is simply almost flat: luma stddev
+    // 1.79 over a 128x128 resample, against WoodFloor 4.13, BathTile 6.99 and
+    // DesertSand 12.37. Re-routing it changes nothing a camera can see, so what
+    // goes on instead is the detail a real stair has and this one did not: a
+    // proud tread nosing on every step, in the LIGHTER WoodFloor bake (#a4774a
+    // against StairTimber's #8a5d3a), overhanging 30 mm at the front and 20 mm
+    // each side. Fifteen light lines crossing a dark side plane is what makes a
+    // stair read as a stair from the side, which is the only view this camera
+    // has of it. Presentation only: `centred()` pins solid:false/shots:false,
+    // and the climbable volume underneath is untouched.
     const stair = stairSpec(house.id);
+    const stairW = stair.x1 - stair.x0;
     for (let i = 0; i < REBUILD_STAIR_STEPS; i += 1) {
-      centred(builder, `aarr-house-${house.id}-stair-${i}`, [(stair.x0 + stair.x1) / 2, (REBUILD_STAIR_RISER * (i + 1)) / 2, stair.zA + i * REBUILD_STAIR_TREAD + REBUILD_STAIR_TREAD / 2], [stair.x1 - stair.x0, REBUILD_STAIR_RISER * (i + 1), REBUILD_STAIR_TREAD], stairTimber);
+      const top = REBUILD_STAIR_RISER * (i + 1);
+      const treadCz = stair.zA + i * REBUILD_STAIR_TREAD + REBUILD_STAIR_TREAD / 2;
+      centred(builder, `aarr-house-${house.id}-stair-${i}`, [(stair.x0 + stair.x1) / 2, top / 2, treadCz], [stairW, top, REBUILD_STAIR_TREAD], stairTimber);
+      // z is pulled back 0.02 (0.032 m) and lengthened 0.02 (0.032 m) so the
+      // nosing overhangs the riser by 48 mm at the front and still stops 16 mm
+      // short of the next step's face: coplanar z faces between consecutive
+      // steps would z-fight along every tread line.
+      centred(builder, `aarr-house-${house.id}-stair-nosing-${i}`, [(stair.x0 + stair.x1) / 2, top - 0.02, treadCz - 0.02], [stairW + 0.04, 0.05, REBUILD_STAIR_TREAD + 0.02], teakTrim, { cast: false });
     }
-    centred(builder, `aarr-house-${house.id}-stair-rail`, [stair.x1 + face * 0.05, 3.5, (stair.zA + stair.zB) / 2], [0.1, 1.0, stair.zB - stair.zA], massing);
+    // Rail in walnut, not the cream structural trim: the ref's stair rail is a
+    // timber cap, and cream read as the white blocks the integrator flagged
+    // along the run's top edge.
+    centred(builder, `aarr-house-${house.id}-stair-rail`, [stair.x1 + face * 0.05, 3.5, (stair.zA + stair.zB) / 2], [0.1, 1.0, stair.zB - stair.zA], teakTrim);
+    // Upper-storey ceiling: the roof slab's underside is the only lid the
+    // bedrooms have and it is exterior shingle. One board 20 mm under its
+    // bottom face (6.10) gives the upper rooms the same pale ceiling the ground
+    // floor now has, for one mesh per house.
+    centred(builder, `aarr-house-${house.id}-ceiling-upper`, [house.cx, 6.06, house.cz], [house.w - 2 * t, 0.04, house.d - 2 * t], interiorCeiling, { cast: false });
     centred(builder, `aarr-house-${house.id}-roof`, [house.cx, 6.35, house.cz], [house.w + 0.6, 0.5, house.d + 0.6], roof);
     centred(builder, `aarr-house-${house.id}-ridge`, [house.cx, 6.75, house.cz], [house.w * 0.35, 0.4, house.d + 0.6], roof);
     centred(builder, `aarr-house-${house.id}-chimney`, [house.cx - house.w * 0.28, 7.0, house.cz - 1], [0.9, 2.2, 0.9], massing);
@@ -500,6 +943,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
       return found;
     };
     const living = groundRoom('living');
+    const kitchen = groundRoom('kitchen');
     const rearBed = upperRoom('rearBed');
     const bathUp = upperRoom('bathUp');
     // Sofa + island share the stair-side strip (long axes along Z, 0.95 and
@@ -509,9 +953,29 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     const frontInner = house.cx + face * (house.w / 2) - face * 0.3;
     const runEdge = face === 1 ? run.x1 : run.x0;
     const stripX = (frontInner + runEdge) / 2;
+    // THE KITCHEN WAS STANDING IN THE LIVING ROOM (owner 2026-09-16: "the
+    // inside of the houses are compact and messy"). Both wave-2 GLBs were
+    // pinned to the same `stripX` line inside the LIVING rect - sofa at its
+    // south end, a 3.0 x 2.2 m appliance run 1.55 m off its north end - so the
+    // single widest object in the house cut the great room in half and left the
+    // actual kitchen rect empty. Both cutaway refs put the run against the rear
+    // band's outer wall with the dining table in front of it, and the rect is
+    // there already: west 3.68 x 2.88 m, east 4.48 x 3.20 m in world metres,
+    // against a run that is 3.0 long and 0.7 deep. It now backs onto the
+    // kitchen's low-z wall at yaw 0 (long axis along world x, 0.68 m and 1.48 m
+    // of jamb clearance), which leaves >2.1 m of circulation in front of it and
+    // gives the living room back its whole floor.
+    // FACING, and how to falsify it: the run's front is its local +z. In the
+    // pre-polish capture it sits at yaw PI/2, where local +z maps to world +x,
+    // and the camera - which reads the sofa at world z 0.0 with the run at
+    // z 4.24, i.e. looking down -z with the run on its left - is therefore
+    // outboard of it in +x and sees that face. If a later capture shows a blank
+    // back panel here instead of doors, the run is 180 degrees out and the fix
+    // is yaw Math.PI with z mirrored to the kitchen's high-z wall.
+    const kitchenRunZ = Math.min(kitchen.z0, kitchen.z1) + 0.35 / S;
     const furnish: ReadonlyArray<readonly [string, string, number, number, number, number]> = [
-      ['sofa', './assets/rebuild/furniture/sofa.glb', stripX * S, (living.z0 + 1.2) * S, 0, Math.PI / 2],
-      ['kitchen-counter', './assets/rebuild/furniture/kitchen-counter-v2.glb', stripX * S, (living.z1 - 1.55) * S, 0, Math.PI / 2],
+      ['sofa', './assets/rebuild/furniture/sofa.glb', stripX * S, (living.z0 + 1.2) * S, finishTop, Math.PI / 2],
+      ['kitchen-counter', './assets/rebuild/furniture/kitchen-counter-v2.glb', ((kitchen.x0 + kitchen.x1) / 2) * S, kitchenRunZ * S, finishTop, 0],
       ['bed-double', './assets/rebuild/furniture/bed-double.glb', ((rearBed.x0 + rearBed.x1) / 2) * S, ((rearBed.z0 + rearBed.z1) / 2) * S, 3, 0],
       ['bath-set', './assets/rebuild/furniture/bath-set.glb', ((bathUp.x0 + bathUp.x1) / 2) * S, ((bathUp.z0 + bathUp.z1) / 2) * S, 3, 0],
     ] as const;
@@ -523,10 +987,12 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
       root.add(anchor);
       treeLoader.loadAsync(url).then((gltf) => {
         anchor.add(gltf.scene);
+        if (tag === 'kitchen-counter') tintKitchenRun(gltf.scene);
       }).catch(() => {
         // Bare room stays: a missing GLB never breaks the lane.
       });
     }
+    buildInteriorFitOut(house.id, face, finishTop, stripX, living);
   }
   // ---- Wave-4 houses: catalog v2 exteriors with real openings (Lane M).
   // Anchors/yaw per Lane K PLACEMENT (door centres on portals to 0.0 cm);
@@ -549,6 +1015,10 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     for (const wall of garageWalls(garage.id)) {
       centred(builder, `aarr-garage-${garage.id}-shell-${wall.id}`, [(wall.x0 + wall.x1) / 2, 1.4, (wall.z0 + wall.z1) / 2], [wall.x1 - wall.x0, 2.8, wall.z1 - wall.z0], garageConcrete);
     }
+    // Bare concrete garage floor (both cutaways; the garage was the one interior
+    // zone with no floor mesh at all, so the desert apron showed through it).
+    const garageInner = garageSpec(garage.id);
+    centred(builder, `aarr-garage-${garage.id}-floor`, [garageInner.cx, 0.06, garageInner.cz], [REBUILD_GARAGE_W, 0.12, REBUILD_GARAGE_D], garageConcrete, { cast: false });
     centred(builder, `aarr-garage-${garage.id}-roof`, [garage.cx, 2.925, garage.cz], [3.8, 0.25, 5.4], roof);
     centred(builder, `aarr-garage-${garage.id}-door`, [garage.cx, 1.1, garage.cz + 2.55], [2.6, 2.2, 0.12], roof);
     centred(builder, `aarr-garage-${garage.id}-driveway`, [garage.cx, 0.04, garage.cz + 5.5], [3.2, 0.08, 6.0], concrete, { cast: false });

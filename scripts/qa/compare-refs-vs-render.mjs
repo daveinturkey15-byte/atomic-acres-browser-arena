@@ -117,8 +117,8 @@ export const PAIRINGS = Object.freeze([
   Object.freeze({
     ref: 'bedroom-eye.png',
     viewpoint: 'atomic-acres-rebuild-upper-landing',
-    match: 'unbuilt',
-    note: 'Intended station is the upper landing toward the front-bedroom door. scripts/qa/viewpoint-catalog.mjs lists atomic-acres-rebuild-upper-landing, but src/rendering/arenas/atomic-acres-rebuild.ts no longer authors that camera (its comment 7 survives, the camera() call does not). Nothing can capture this reference until that camera is restored.',
+    match: 'indicative',
+    note: 'Upper landing toward the front-bedroom door. This station was MISSING when this instrument was first written - the catalog listed it but the arena no longer authored it - and was restored on 2026-09-16, so it now captures. Graded indicative rather than direct: the reference frames a furnished bedroom interior, while the restored camera was placed one storey above the known-good interior-west eye and its exact aim against the landing is not yet confirmed against the authored geometry.',
   }),
   Object.freeze({
     ref: 'teal-ground-cutaway.png',

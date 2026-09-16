@@ -506,7 +506,22 @@ export function rebuildReachableRooms(house: RebuildHouseId): RebuildRoomId[] {
  * Returns the emitted meshes.
  */
 export function buildAtomicAcresRebuildInteriors(builder: Builder): THREE.Mesh[] {
-  const gray = standard(0x8f9296);
+  // WARM CREAM, NOT COOL GREY (lane-B measurement 2026-09-16). The colour these
+  // parts carried, 0x8f9296, is blue-biased by construction: linear blue minus
+  // linear red is +0.030, so under any near-neutral key it lands on the cold
+  // lavender side, and the CDL gain this arena runs ([1.18, 0.82, 1.18], a pure
+  // green cut) turns any near-neutral into magenta. Warming a material to
+  // cancel someone else's blue would be masking and is not what this is: a
+  // 1960s interior partition is cream plaster, so the ALBEDO was simply wrong.
+  // 0xd8cfc0 is the InteriorPlaster bake's own measured mean (#eae0d1) taken
+  // down a stop, which keeps these parts reading as the same plaster the arena
+  // module textures the visible partitions with.
+  // AuthorityGray hides every mesh this function returns
+  // (`atomic-acres-rebuild-authority.ts`: `mesh.visible = false`), so on the
+  // normal path this colour is not what a camera sees - the arena module's own
+  // `plasterFor()` partitions are. It is fixed anyway because any path that
+  // does render these parts should not render them cold.
+  const gray = standard(0xd8cfc0);
   const S = ATOMIC_ACRES_REBUILD_SPREAD;
   return rebuildParts().map((part) =>
     box(
