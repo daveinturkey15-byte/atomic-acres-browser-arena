@@ -195,6 +195,7 @@
     "qa:asset-provenance": "node scripts/qa/verify-public-asset-provenance.mjs",
     "qa:glb-vram": "node scripts/qa/measure-glb-vram.mjs",
     "qa:compare-refs": "node scripts/qa/compare-refs-vs-render.mjs",
+    "qa:catalogue": "node scripts/qa/build-reference-catalogue.mjs",
     "audit:dependencies": "npm audit --omit=dev",
     "verify:release-tree": "node scripts/qa/verify-release-tree.mjs",
     "verify:provenance": "node scripts/qa/verify-asset-provenance.mjs",
