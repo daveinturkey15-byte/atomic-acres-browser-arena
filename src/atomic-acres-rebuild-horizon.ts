@@ -136,7 +136,16 @@ export const ATOMIC_ACRES_REBUILD_HORIZON_BANDS: readonly HorizonBand[] = Object
   // reference plate's rgb(144, 136, 139) far range and rgb(125, 106, 95) near
   // range (batch-4-nuketown-graybox/gray_topdown_01.png). That is 54% too
   // bright, which is the dominant error and the reason the ridges read as a
-  // pale wash rather than as land. Hue was the minor term: the render's ridge
+  // pale wash rather than as land.
+  //
+  // SECOND ITERATION, same day. The first scale (x0.62) moved the rendered band
+  // 223 -> 197 against a 144 target, i.e. it recovered only a third of the
+  // error. The authored value is not the rendered one here: these are
+  // `toneMapped: true`, so the ACES curve lifts mid-tones, and the band is
+  // additionally sitting behind the dome's haze stop. Rather than model that
+  // chain, the scale was re-solved from the measurement itself - 144/197 = 0.73
+  // applied on top of the first pass, for 0.45 against the blind original.
+  // Hue was the minor term throughout: the render's ridge
   // sat at r-b = -6 against the plate's +5, ~5% of range, so these values scale
   // the authored table by 0.62 and shift it ~4% warm rather than chasing the
   // arena CDL's green cut, which is not this file's to cancel. The dome itself
@@ -144,19 +153,19 @@ export const ATOMIC_ACRES_REBUILD_HORIZON_BANDS: readonly HorizonBand[] = Object
   // rgb(190, 202, 222) and is the one part that landed blind.
   Object.freeze({
     name: 'far-mesas', radius: 168, baseHeight: 15, amplitude: 19,
-    lattice: [5, 11, 23] as const, seed: 1, base: 0x8d8576, peak: 0x707076,
+    lattice: [5, 11, 23] as const, seed: 1, base: 0x676156, peak: 0x525256,
   }),
   // Mid range: lower, slightly more contrast, offset lattice so no peak of
   // this band ever sits exactly under a peak of the one behind it.
   Object.freeze({
     name: 'mid-range', radius: 158, baseHeight: 8, amplitude: 14,
-    lattice: [7, 13, 29] as const, seed: 2, base: 0x887d6c, peak: 0x63636b,
+    lattice: [7, 13, 29] as const, seed: 2, base: 0x635b4f, peak: 0x48484e,
   }),
   // Near scrub and butte foot: warm desert soil rather than blue, low enough
   // to read as the far side of the valley rather than as another range.
   Object.freeze({
     name: 'near-scrub', radius: 148, baseHeight: 2.5, amplitude: 4.5,
-    lattice: [11, 19, 37] as const, seed: 3, base: 0x817158, peak: 0x5f5a49,
+    lattice: [11, 19, 37] as const, seed: 3, base: 0x5e5240, peak: 0x454235,
   }),
 ] as const);
 

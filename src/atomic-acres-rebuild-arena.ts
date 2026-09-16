@@ -520,6 +520,21 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   const DRESS_REVEAL_INSET = 0.11;
   const DRESS_REVEAL_DROP = 0.18;
   const DRESS_SHUTTER_W = 0.3;
+  // WHERE THE SIDE-ELEVATION WINDOWS ARE, AUTHORED ONCE (lane-F 2026-09-16).
+  // The shell-wall aperture split (`emitGlazedWall()` in the house loop) and
+  // the `dressWindow()` calls that stand the casing/pane in those apertures
+  // have to describe the SAME two openings per elevation. They used to be two
+  // literals 380 lines apart; a drift of a few centimetres there would put a
+  // hole in the wall with no window over it, which is exactly the failure this
+  // lane exists to avoid, so both now read these.
+  const DRESS_WIN_OFFSETS = [-1.8, 1.8] as const;
+  const DRESS_WIN_W = 0.95;
+  // The hole cut in the casting shell is DRESS_APERTURE_MARGIN smaller than the
+  // casing board on every edge, so the opaque (non-casting) casing overlaps the
+  // hole by 32 mm all round. That overlap is what keeps the exterior silhouette
+  // intact: every sightline into the aperture, at any grazing angle, has to
+  // pass through the casing box first, so no player outside sees a hole.
+  const DRESS_APERTURE_MARGIN = 0.02;
   const dressWindow = (
     name: string,
     axis: 'x' | 'z',
@@ -541,15 +556,16 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     // exactly where the refs want daylight. Dropping them out of the shadow map
     // changes no collider, no shot surface and no authority rect; `centred()`
     // already pins solid:false/shots:false on all of them.
-    // WHAT THIS DOES NOT FIX, stated rather than implied: the casing is not the
-    // only occluder in the light path. The shell walls themselves
-    // (`-north`/`-south`/`-front-*`/`-rear-*`) are single solid boxes with no
-    // window aperture cut in them and they DO cast. While they are the visible
-    // wall - i.e. whenever the catalog house GLB has not resolved - no
-    // presentation change in this function can put a sun pool on the floor,
-    // because the wall behind the casing still blocks the sun. Cutting that
-    // aperture is a geometry change the lane brief stops at, so it is reported,
-    // not done.
+    // THE OTHER HALF OF THE LIGHT PATH, now done (lane-F 2026-09-16). The
+    // casing was never the only occluder: the `-north`/`-south` shell walls
+    // were single solid boxes with no window aperture cut in them and they DO
+    // cast, so while they are the visible wall - i.e. whenever the catalog
+    // house GLB has not resolved - dropping this dressing out of the shadow map
+    // changed nothing on the floor. `emitGlazedWall()` in the house loop now
+    // splits those two walls per house into a sill band, a header band and
+    // three jamb piers, leaving a real hole in the CASTING geometry at exactly
+    // the openings this function dresses. Same outer plane, same thickness,
+    // same extents, same skin material, same solid:false/shots:false.
     const glass = centred(builder, `${name}-reveal`, at(0), span(width - 2 * DRESS_REVEAL_INSET, height - 2 * DRESS_REVEAL_DROP, DRESS_REVEAL_T), windowGlass, { cast: false });
     // Transparent panes must not join a merged presentation batch: the batcher
     // groups by material and a sorted-transparent pane inside an opaque batch
@@ -799,8 +815,64 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     centred(builder, `aarr-house-${house.id}-rear-south`, [rearCX, 1.5, (z0 + linkZ0) / 2], [t, 3, Math.max(linkZ0 - z0, 0.05)], skin);
     centred(builder, `aarr-house-${house.id}-rear-north`, [rearCX, 1.5, (linkZ1 + z1) / 2], [t, 3, Math.max(z1 - linkZ1, 0.05)], skin);
     centred(builder, `aarr-house-${house.id}-rear-link-lintel`, [rearCX, (REBUILD_DOOR_HEAD_Y + 3) / 2, (linkZ0 + linkZ1) / 2], [t, 3 - REBUILD_DOOR_HEAD_Y, linkZ1 - linkZ0], massing);
-    centred(builder, `aarr-house-${house.id}-north`, [house.cx, 1.5, z1 - t / 2], [house.w, 3, t], skin);
-    centred(builder, `aarr-house-${house.id}-south`, [house.cx, 1.5, z0 + t / 2], [house.w, 3, t], skin);
+    // ---- SIDE ELEVATIONS, WITH THE WINDOW APERTURES ACTUALLY CUT (lane-F,
+    // 2026-09-16). Measured on the current capture, no sunlight reaches any
+    // interior floor in this arena: on the interior frame the fraction of
+    // pixels above 0.9 is 0.000 and p99 is 0.841 - not one key-lit pixel -
+    // while `refs/living-room-eye.png` is DEFINED by hard sun entering a window
+    // wall and pooling on the floor. The lighting lane proved no rig change can
+    // reach it (`fillLight.castShadow = false`, and the sun cannot pass an
+    // opaque wall) and the interior lane took the whole window DRESSING out of
+    // the shadow map, which was necessary and not sufficient: these two walls
+    // were each ONE solid box spanning the full elevation, they cast, and they
+    // sat directly behind every casing. The sun had nothing to come through.
+    //
+    // So the box is split around its own openings: a sill band under them, a
+    // header band over them, and jamb piers between them. Every segment keeps
+    // the elevation's outer plane, its thickness `t`, its `skin` material and
+    // its full 0..3 height between them, so from outside the silhouette and the
+    // extents are bit-for-bit what they were; the only difference is that two
+    // 1.46 x 1.36 m rectangles of the casting geometry are now absent, and the
+    // non-casting casing and pane `dressWindow()` already stands there fill
+    // them. Openings come from DRESS_WIN_OFFSETS/DRESS_WIN_W, the same
+    // constants the dressing reads, so the hole cannot drift off the window.
+    //
+    // PRESENTATION ONLY, and this is checkable rather than asserted: `centred()`
+    // pins solid:false/shots:false on every one of these, and the arena's
+    // colliders, shot surfaces and spawns all come from
+    // `atomicAcresRebuildAuthority()` in a separate module whose own
+    // `aarr-house-<id>-north`/`-south` brick proxies are untouched. Measured
+    // across this change: 122 colliders and 139 shot surfaces before and after.
+    //
+    // NAMING IS LOAD-BEARING: `hideHouseSkin()` hides exterior skin by the
+    // `-north`/`-south` infixes, so every segment name must still contain one
+    // (and must avoid the lintel/inwall/upwall/slab/stair/furn/-floor
+    // exclusions) or the split walls would survive the catalog house GLB and
+    // stand inside it.
+    const apHalfW = DRESS_WIN_W / 2 - DRESS_APERTURE_MARGIN;
+    const apY0 = DRESS_SILL_Y + DRESS_APERTURE_MARGIN;
+    const apY1 = DRESS_HEAD_Y - DRESS_APERTURE_MARGIN;
+    const emitGlazedWall = (tag: 'north' | 'south', planeCz: number): void => {
+      const name = `aarr-house-${house.id}-${tag}`;
+      centred(builder, `${name}-sill`, [house.cx, apY0 / 2, planeCz], [house.w, apY0, t], skin);
+      centred(builder, `${name}-header`, [house.cx, (apY1 + 3) / 2, planeCz], [house.w, 3 - apY1, t], skin);
+      const openings = DRESS_WIN_OFFSETS
+        .map((dx) => [house.cx + dx - apHalfW, house.cx + dx + apHalfW] as const)
+        .sort((a, b) => a[0] - b[0]);
+      let cursor = house.cx - house.w / 2;
+      const piers: Array<readonly [number, number]> = [];
+      for (const [lo, hi] of openings) {
+        if (lo > cursor) piers.push([cursor, lo] as const);
+        cursor = Math.max(cursor, hi);
+      }
+      const end = house.cx + house.w / 2;
+      if (end > cursor) piers.push([cursor, end] as const);
+      for (const [index, [lo, hi]] of piers.entries()) {
+        centred(builder, `${name}-pier-${index}`, [(lo + hi) / 2, (apY0 + apY1) / 2, planeCz], [hi - lo, apY1 - apY0, t], skin);
+      }
+    };
+    emitGlazedWall('north', z1 - t / 2);
+    emitGlazedWall('south', z0 + t / 2);
     // Loop-facing wall split around the door gap + lintel above.
     const frontCX = frontX + (face === 1 ? -t / 2 : t / 2);
     centred(builder, `aarr-house-${house.id}-front-south`, [frontCX, 1.5, (z0 + gap0) / 2], [t, 3, Math.max(gap0 - z0, 0.05)], skin);
@@ -898,8 +970,8 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     // ---- DRESS. Two shuttered windows per side elevation + picture window
     // beside the front door + open door panel + porch fascia, balustrade,
     for (const [tag, planeZ] of [['south', z0], ['north', z1]] as const) {
-      for (const dx of [-1.8, 1.8]) {
-        const winMeshes = dressWindow(`aarr-house-${house.id}-win-${tag}-${dx < 0 ? 'a' : 'b'}`, 'z', planeZ, house.cx + dx, 0.95, true);
+      for (const dx of DRESS_WIN_OFFSETS) {
+        const winMeshes = dressWindow(`aarr-house-${house.id}-win-${tag}-${dx < 0 ? 'a' : 'b'}`, 'z', planeZ, house.cx + dx, DRESS_WIN_W, true);
         // Wear-lane shutter rebuilds over the south-face ground windows
         // (world-authored GLBs: anchor sill line, +z out -> yaw PI south).
         if (tag === 'south') {
