@@ -243,8 +243,22 @@ function resolveRef(name) {
   }
   return primary;
 }
-const CAPTURES_DIR = resolve(arg('--captures', 'C:/Users/david/Desktop/stuff/repo-state'));
-const OUT_DIR = resolve(arg('--out', 'C:/Users/david/Desktop/stuff/repo-state'));
+// OUTPUT MOVED INSIDE THE REPO, 2026-09-16. These two defaults were an absolute
+// path to one directory on one desktop, OUTSIDE the worktree and therefore
+// outside version control. 147 files and 305 MB of review evidence accumulated
+// there - every composed side-by-side sheet this instrument has ever made -
+// and none of it was reachable from any commit, on any other machine, or by
+// anyone reviewing a PR. An audit found it by reading a path that returns
+// "No such file or directory" from inside the repo. Evidence nobody can reach
+// is not evidence.
+//
+// Sheets now land in docs/review/<arena>/ which IS tracked. Captures still
+// default to the artifacts/ sweep directory, which is gitignored on purpose -
+// raw stills are large and regenerable from a commit, whereas a composed sheet
+// carries the comparison and the provenance caption and is what a reviewer
+// actually reads.
+const CAPTURES_DIR = resolve(arg('--captures', 'artifacts/viewpoint-regression/latest/atomic-acres-rebuild'));
+const OUT_DIR = resolve(arg('--out', 'docs/review/atomic-acres-rebuild'));
 const PANEL_H = Number(arg('--panel-height', '720'));
 const SLUG_PREFIX = arg('--slug-prefix', 'cmp');
 const PREFIXES = (arg('--capture-prefix', '') || '')
