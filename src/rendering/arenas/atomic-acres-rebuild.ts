@@ -197,6 +197,19 @@ export const definition = createProceduralArenaVisualDefinition({
     camera('atomic-acres-rebuild-interior-west', [-17, 1.7, 5.5], [-19.7, 1.2, 2.0], 'geometry', 1.04),
     // 7. Above the stair run toward the landing + front-bedroom door: proves
     //    the stair arrives, the landing connects and the rail stands.
+    //    Restored 2026-09-16: this comment survived but its camera() call did
+    //    not, leaving 7 authored cameras against 8 catalogued. That is not a
+    //    cosmetic gap - arena-viewpoint-regression.test.mjs was RED on
+    //    "catalog entry 'atomic-acres-rebuild-upper-landing' no longer exists",
+    //    and the upper storey had zero camera coverage, so nothing could have
+    //    caught a regression up there. Placed one storey (REBUILD_UPPER_FLOOR_Y
+    //    = 3.0) directly above the known-good interior-west station rather than
+    //    derived from houseFrame(): the interiors module's frame for west is
+    //    x -16.8..-10.2, z -1.2..4.2, which does NOT contain the working
+    //    interior-west eye at x=-17, so the arena's placement frame and the
+    //    interiors frame do not share a convention and deriving from the latter
+    //    would have put this camera through a wall.
+    camera('atomic-acres-rebuild-upper-landing', [-17, 4.7, 5.5], [-19.7, 4.2, 2.0], 'geometry', 1.04),
     // 8. Bus closeup (kitbash proof): catalog GLB over massing placeholder.
     camera('atomic-acres-rebuild-bus-closeup', [3, 2.4, 1.5], [-5.5, 1.4, 0.8], 'geometry', 1.04),
   ],
