@@ -84,6 +84,7 @@ import {
   upperSlabs,
   upperWalls,
 } from './atomic-acres-rebuild-interiors';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { box, emptyTelemetry, standard, type Builder } from './additional-maps';
 import { texturedMaterial } from './art-kit';
 import { bindLateArenaReflectionSurfaces } from './rendering/arena-environment-ibl';
@@ -334,6 +335,110 @@ function starburstRugTexture(): THREE.Texture | null {
     for (const [bx, by] of [[110, 120], [400, 400], [420, 120], [120, 430]] as Array<[number, number]>) {
       burst(bx, by, 34, 6, 2.5, '#6f5c46');
     }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 4;
+    return texture;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Wall-art atlas, drawn in code — one 512x512 canvas, four quadrants.
+ *
+ * `living-room-eye.png` carries a brass STARBURST WALL CLOCK and a group of
+ * framed pictures, and `bedroom-eye.png` repeats the pictures over the bed.
+ * Neither is reachable from the ten baked PNGs on disk (they are plaster,
+ * ceiling, tile, plank, teak, concrete, asphalt, sand, lawn — no figurative
+ * content at all), and `public/assets/**` is another lane's. The canvas route
+ * that `starburstRugTexture()` opened for the rug is the only one a
+ * presentation lane has to a DRAWING, so the clock and the pictures take it.
+ *
+ * ONE canvas, not four, because `texture.clone()` shares `.source`: four
+ * quadrant clones at repeat (0.5, 0.5) are one GPU upload (512^2 RGBA plus
+ * mips, about 1.4 MB decoded) instead of four. Quadrants, in UV space with
+ * v measured from the BOTTOM: (0,1) clock, (1,1) abstract A, (0,0) abstract B,
+ * (1,0) spare/landscape.
+ *
+ * Returns null without a drawable 2D context, exactly like the rug: the
+ * callers fall back to plain trim, so wall art is never the reason a headless
+ * audit or a build breaks.
+ */
+function midCenturyWallArtTexture(): THREE.Texture | null {
+  if (typeof document === 'undefined') return null;
+  try {
+    const size = 512;
+    const half = size / 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    // --- top-left quadrant: brass starburst clock on cream.
+    ctx.fillStyle = '#efe7d8';
+    ctx.fillRect(0, 0, half, half);
+    const ccx = half / 2;
+    const ccy = half / 2;
+    ctx.strokeStyle = '#8a6a2f';
+    for (let i = 0; i < 16; i += 1) {
+      const angle = (i / 16) * Math.PI * 2;
+      const long = i % 2 === 0;
+      ctx.lineWidth = long ? 7 : 4;
+      ctx.beginPath();
+      ctx.moveTo(ccx + Math.cos(angle) * 34, ccy + Math.sin(angle) * 34);
+      ctx.lineTo(ccx + Math.cos(angle) * (long ? 118 : 92), ccy + Math.sin(angle) * (long ? 118 : 92));
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#3b3630';
+    ctx.beginPath();
+    ctx.arc(ccx, ccy, 34, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#d9cbae';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(ccx, ccy);
+    ctx.lineTo(ccx + 4, ccy - 24);
+    ctx.moveTo(ccx, ccy);
+    ctx.lineTo(ccx + 19, ccy + 9);
+    ctx.stroke();
+    // --- top-right quadrant: abstract A, teal/rust blocks on oatmeal.
+    ctx.fillStyle = '#e4dbc8';
+    ctx.fillRect(half, 0, half, half);
+    ctx.fillStyle = '#3f8c8c';
+    ctx.fillRect(half + 28, 34, 84, 132);
+    ctx.fillStyle = '#b0562c';
+    ctx.fillRect(half + 96, 92, 112, 96);
+    ctx.fillStyle = '#403a33';
+    ctx.fillRect(half + 40, 186, 172, 12);
+    ctx.fillStyle = '#d9b246';
+    ctx.beginPath();
+    ctx.arc(half + 176, 62, 30, 0, Math.PI * 2);
+    ctx.fill();
+    // --- bottom-left quadrant: abstract B, mustard/charcoal strokes.
+    ctx.fillStyle = '#ded6c4';
+    ctx.fillRect(0, half, half, half);
+    ctx.strokeStyle = '#4a443c';
+    ctx.lineWidth = 9;
+    for (let i = 0; i < 5; i += 1) {
+      ctx.beginPath();
+      ctx.moveTo(32 + i * 14, half + 40 + i * 8);
+      ctx.lineTo(196 - i * 18, half + 196 - i * 22);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#c8933a';
+    ctx.fillRect(40, half + 150, 130, 44);
+    // --- bottom-right quadrant: horizon band, stands in for a landscape print.
+    ctx.fillStyle = '#cfd9de';
+    ctx.fillRect(half, half, half, half);
+    ctx.fillStyle = '#9a8c74';
+    ctx.fillRect(half, half + 128, half, 40);
+    ctx.fillStyle = '#6f7a5e';
+    ctx.fillRect(half, half + 168, half, half - 168);
+    ctx.fillStyle = '#cf9a55';
+    ctx.beginPath();
+    ctx.arc(half + 168, half + 72, 26, 0, Math.PI * 2);
+    ctx.fill();
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = 4;
@@ -694,8 +799,51 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   // Lamp posts and the patio umbrella pole - the arena's only authored metal
   // trim (metalness 0.4). The umbrella pole is never kitbashed over.
   const darkPole = forgeRole(standard(0x3a3d42, 0.7, 0.4), 'chrome');
-  const hedge = gndPbr('LawnPatchy', 2, 2, 0xb4f9cd);
+  // HEDGE, RE-TINTED (lane M, 2026-09-16). The coordinator's read of
+  // `atomic-acres-rebuild-yard-geometry.png` is "raised green SLABS with
+  // visible vertical side faces", and the two candidates were the 0.06 m lawn
+  // slabs and these 1.0-1.2 m hedge boxes. MEASURED, not guessed: that station
+  // is `camera(... [-32, 5, 26], [22, 2, -16] ...)`, a 5 m eye looking down at
+  // ground 20-50 m away. The lawn slab's exposed lip is exactly 0.07 m (top
+  // 0.06 against the desert apron's -0.01) and at that eye it is nearly
+  // edge-on; it cannot subtend the band in the frame. `aarr-hedge-pad`
+  // (1.0 m tall, 7.2 m long, ~10 m from that eye) and `aarr-hedge-yard`
+  // (1.2 m) can and do. So the LAWNS ARE LEFT ALONE - sinking them would open
+  // a 0.04 m float under the concrete pads that stand on them - and the fix
+  // goes where the measurement points: at the hedges' machined top edge, and
+  // at a tint that was lighter than the lawn it is supposed to sit on.
+  // 0xb4f9cd was a bright mint; 0x93d9a8 is a planting green, and like every
+  // tint in this file it is a DARKENING, which is the only direction
+  // `material.color` can move a bake.
+  const hedge = gndPbr('LawnPatchy', 2, 2, 0x93d9a8);
   const rock = gndPbr('SidewalkConcrete', 1, 1, 0xd9e3f1);
+  /**
+   * One mirrored hedge run, recorded so the foliage pass can find it.
+   *
+   * A BOX IS THE RIGHT PRIMITIVE FOR A CLIPPED HEDGE and it stays. What the
+   * plates have and the render did not is a foliage SILHOUETTE where the box
+   * has a machined corner — in `gray_topdown_01.png`, `street-teal.png` and
+   * `teal-backyard.png` the hedges read as a separate, smaller, denser thing
+   * sitting on the lawn, with a broken top edge. So the mass is unchanged (it
+   * is what the layout contract's fact 9 authored) and the clumps that break
+   * its edges are generated from its own world AABB below, which is why this
+   * wrapper exists: it keeps the hedge's box and its foliage from ever
+   * drifting apart.
+   */
+  const hedgeRuns: Array<{ cx: number; cy: number; cz: number; w: number; h: number; d: number }> = [];
+  const hedgeRun = (name: string, x: number, y: number, z: number, size: Size3): void => {
+    pair(builder, name, x, y, z, size, hedge);
+    for (const side of [-1, 1]) {
+      hedgeRuns.push({
+        cx: side * Math.abs(x) * ATOMIC_ACRES_REBUILD_SPREAD,
+        cy: y,
+        cz: z * ATOMIC_ACRES_REBUILD_SPREAD,
+        w: size[0] * ATOMIC_ACRES_REBUILD_SPREAD,
+        h: size[1],
+        d: size[2] * ATOMIC_ACRES_REBUILD_SPREAD,
+      });
+    }
+  };
 
   // ---- LANE H / SYSTEM 5, 2026-09-16: SURFACE DETAIL AT TRUE SIZE ----------
   // Re-measured every shipped bake myself (128x128 box resample, luma stddev,
@@ -1029,6 +1177,167 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     ? new THREE.MeshStandardMaterial({ map: rugTexture, roughness: 1.0, metalness: 0.0 })
     : livingCarpet;
 
+  // ---- LANE M / DRESSING BATCH, 2026-09-16 ---------------------------------
+  //
+  // WHY A BATCH AND NOT MORE `dressPiece()` CALLS. The room needed a fireplace,
+  // a chimney breast, curtains, a credenza, a standard lamp, an armchair,
+  // pictures, a clock, plants, books and bowls; the bedrooms needed side
+  // tables, lamps, a dresser and pictures; the hedges needed a broken foliage
+  // silhouette and the desert needed Joshua trees. Every one of those is a
+  // handful of primitives, and `dressPiece()` emits ONE MESH PER PRIMITIVE with
+  // `presentationBatchCandidate = false` — i.e. one draw call each. Built that
+  // way this pass would have added roughly 900 draw calls to a competitive FPS
+  // map, which is not a trade worth making for dressing.
+  //
+  // So every piece below is a BufferGeometry baked into world space and merged
+  // into one mesh per (material, castShadow) pair. The whole interior fit-out
+  // of both houses plus all of the vegetation lands in a low double-digit
+  // number of draws, and the triangle cost of a merged box is identical to the
+  // triangle cost of a separate one.
+  //
+  // AUTHORITY IS UNTOUCHED BY CONSTRUCTION, and it is checkable rather than
+  // asserted: nothing here goes near `builder`. `colliders`, `physicsColliders`,
+  // `raycastMeshes`, `shotSurfaces` and `spawns` are only ever appended to by
+  // `box()`/`centred()`/`pair()`, and this code path calls none of them — it
+  // parents finished meshes straight to `root`, exactly as `aarr-loop-island`
+  // and every wear-lane GLB anchor already do.
+  //
+  // INDEXING IS LOAD-BEARING. `mergeGeometries` refuses a set that mixes
+  // indexed and non-indexed geometry, and it refuses one whose attribute sets
+  // differ (repo memory `gotcha-static-batcher-attribute-mismatch`). Box,
+  // Cylinder and Cone are all indexed with exactly position/normal/uv, so they
+  // merge; nothing else is ever handed to `dressAdd`. If a merge fails anyway
+  // the bucket falls back to individual meshes, so a dressing batch can never
+  // be the reason a frame or a gate breaks.
+  type DressBucket = { material: THREE.Material; cast: boolean; geometries: THREE.BufferGeometry[] };
+  const dressBuckets = new Map<string, DressBucket>();
+  const dressMaterialKey = new Map<THREE.Material, string>();
+  let dressStats = { meshes: 0, triangles: 0 };
+  const dressAdd = (material: THREE.Material, geometry: THREE.BufferGeometry, transform: THREE.Matrix4, cast = true): void => {
+    let materialKey = dressMaterialKey.get(material);
+    if (materialKey === undefined) {
+      materialKey = `m${dressMaterialKey.size}`;
+      dressMaterialKey.set(material, materialKey);
+    }
+    const key = `${materialKey}:${cast ? 'c' : 'n'}`;
+    let bucket = dressBuckets.get(key);
+    if (bucket === undefined) {
+      bucket = { material, cast, geometries: [] };
+      dressBuckets.set(key, bucket);
+    }
+    geometry.applyMatrix4(transform);
+    bucket.geometries.push(geometry);
+  };
+  /** One axis-aligned (or yawed) box of dressing, in TRUE world metres. */
+  const dressBox = (material: THREE.Material, centre: Vec3, size: Size3, yaw = 0, cast = true): void => {
+    const transform = new THREE.Matrix4().makeRotationY(yaw);
+    transform.setPosition(centre[0], centre[1], centre[2]);
+    dressAdd(material, new THREE.BoxGeometry(size[0], size[1], size[2]), transform, cast);
+  };
+  /** One upright cylinder/cone of dressing (legs, poles, pots, trunks). */
+  const dressTube = (
+    material: THREE.Material,
+    centre: Vec3,
+    radiusTop: number,
+    radiusBottom: number,
+    height: number,
+    radialSegments = 8,
+    rotation?: THREE.Euler,
+    cast = true,
+  ): void => {
+    const transform = new THREE.Matrix4();
+    if (rotation) transform.makeRotationFromEuler(rotation);
+    transform.setPosition(centre[0], centre[1], centre[2]);
+    dressAdd(material, new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radialSegments, 1), transform, cast);
+  };
+  /**
+   * One yucca/agave BLADE: a four-sided spike of `length`, rising from `base`,
+   * tilted `tilt` radians off vertical and swung to `azimuth` in plan. This is
+   * the single primitive that makes a Joshua tree read as a Joshua tree rather
+   * than as a green blob — the plates' rosettes are nine or ten of these.
+   */
+  const dressBlade = (
+    material: THREE.Material,
+    base: Vec3,
+    length: number,
+    width: number,
+    azimuth: number,
+    tilt: number,
+    cast = true,
+  ): void => {
+    const geometry = new THREE.ConeGeometry(width, length, 4, 1);
+    const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, azimuth, tilt, 'YZX'));
+    const offset = new THREE.Vector3(0, length / 2, 0).applyQuaternion(quaternion);
+    const transform = new THREE.Matrix4().makeRotationFromQuaternion(quaternion);
+    transform.setPosition(base[0] + offset.x, base[1] + offset.y, base[2] + offset.z);
+    dressAdd(material, geometry, transform, cast);
+  };
+  const flushDress = (): void => {
+    for (const [key, bucket] of dressBuckets) {
+      const merged = bucket.geometries.length === 1 ? bucket.geometries[0] : mergeGeometries(bucket.geometries, false);
+      const emit = merged === null ? bucket.geometries : [merged];
+      for (const [index, geometry] of emit.entries()) {
+        const mesh = new THREE.Mesh(geometry, bucket.material);
+        mesh.name = `aarr-dress-${key}-${index}`;
+        mesh.castShadow = bucket.cast;
+        mesh.receiveShadow = true;
+        mesh.userData.presentationBatchCandidate = false;
+        root.add(mesh);
+        dressStats = {
+          meshes: dressStats.meshes + 1,
+          triangles: dressStats.triangles + (geometry.index ? geometry.index.count : geometry.attributes.position.count) / 3,
+        };
+      }
+    }
+    dressBuckets.clear();
+  };
+
+  // ---- LANE M materials. EVERY ONE REUSES AN ALREADY-CACHED TILING PAIR.
+  // `texture()` caches on `path:repeatX:repeatY`, so a new pair is a fresh
+  // 1024^2 upload plus mips for BOTH the diffuse and the roughness bake, and
+  // the arena stands at 358.7 MB against a 500 MB gate. Each repeat below is
+  // one this file already binds — SidewalkConcrete (1,1) from `rock`,
+  // InteriorPlaster (1,1) from `stairTimber` and (2,1) from `massing`,
+  // InteriorCeiling (1,1) from `interiorTrim`, StairTimber (2,1) from `timber`,
+  // LawnPatchy (2,2) from `hedge` and `olive` — so this whole pass adds ZERO
+  // texture VRAM apart from the one 512^2 wall-art canvas. Every difference
+  // below is a TINT, which is a material uniform and free, and every tint is
+  // a DARKENING because `material.color` multiplies and cannot lighten a bake.
+  const stoneHearth = gndPbr('SidewalkConcrete', 1, 1, 0xbfae9a);
+  const fireboxDark = inPbr('InteriorPlaster', 1, 1, 0x4d443c);
+  const curtainFabric = inPbr('InteriorPlaster', 2, 1, 0x86c3c0);
+  const lampShade = inPbr('InteriorCeiling', 1, 1, 0xf2e2c4);
+  const upholstery = inPbr('InteriorPlaster', 2, 1, 0xd98a52);
+  const potTerracotta = gndPbr('SidewalkConcrete', 1, 1, 0xc98a5e);
+  const plantLeaf = gndPbr('LawnPatchy', 2, 2, 0x8fc496);
+  const brassTrim = inPbr('InteriorCeiling', 1, 1, 0xd9b877);
+  // Joshua-tree bark and desert blade. The bark tint is StairTimber pulled
+  // toward the plates' bleached grey-brown; the blade is LawnPatchy pulled well
+  // under the hedge so the desert never reads as lawn.
+  const joshuaBark = inPbr('StairTimber', 2, 1, 0xc4b2a0);
+  const desertBlade = gndPbr('LawnPatchy', 2, 2, 0x86b088);
+  const desertScrubGreen = gndPbr('LawnPatchy', 2, 2, 0x8aa87e);
+  const hedgeFoliage = gndPbr('LawnPatchy', 2, 2, 0xa2dcaf);
+  const shrubBloom = inPbr('InteriorPlaster', 2, 1, 0xe2a2b4);
+  const wallArtTexture = midCenturyWallArtTexture();
+  /**
+   * One quadrant of the wall-art atlas as its own material. Clones share the
+   * canvas's `.source`, so four quadrants are ONE upload; only the uv window
+   * differs. Falls back to the cream trim bake when there is no 2D context,
+   * which turns a picture into a blank mount rather than into an exception.
+   */
+  const wallArt = (u: 0 | 1, v: 0 | 1): THREE.Material => {
+    if (!wallArtTexture) return interiorTrim;
+    const clone = wallArtTexture.clone();
+    clone.repeat.set(0.5, 0.5);
+    clone.offset.set(u * 0.5, v * 0.5);
+    clone.needsUpdate = true;
+    return new THREE.MeshStandardMaterial({ map: clone, roughness: 0.82, metalness: 0.0 });
+  };
+  const clockFace = wallArt(0, 1);
+  const artPanelA = wallArt(1, 1);
+  const artPanelB = wallArt(0, 0);
+
   /**
    * INTERIOR FIT-OUT (lane-A, owner verdict 2026-09-16: the houses "are compact
    * and messy and they don't match the original catalog image gen references").
@@ -1175,6 +1484,254 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     // puts tile between worktop and wall cabinets). 0.9-1.5 m matches the run's
     // own worktop height.
     dressPiece(root, `aarr-house-${id}-dress-splashback`, [((kitchen.x0 + kitchen.x1) / 2) * S, finishTop + 1.2, Math.min(kitchen.z0, kitchen.z1) * S + 0.04], [3.0, 0.6, 0.06], bathTile);
+
+    // ---- LANE M: THE ROOM WAS STILL AN EMPTY BOX ---------------------------
+    //
+    // Against `refs/living-room-eye.png` the frame was carrying a rug, a
+    // coffee table, a sofa and a stair, and the plate carries a fireplace with
+    // a stone chimney breast, a teak sideboard, a standard lamp, framed
+    // pictures, a starburst wall clock, curtains at the window wall,
+    // houseplants, books and bowls on every surface and a dining set through
+    // the opening. Everything below is one of those, placed off the measured
+    // geometry rather than by feel, and built as merged dressing so the whole
+    // fit-out of both houses costs single-digit draw calls.
+    //
+    // HOW READABILITY IS BOUNDED, because this is a competitive FPS map and
+    // dressing is the easiest way to ruin one:
+    //  1. NOTHING IS SOLID. Not one primitive reaches `builder`, so no piece
+    //     can become cover, block a bullet, or change where a player may walk.
+    //     Colliders and shot surfaces are identical before and after.
+    //  2. NOTHING STANDS IN THE OPEN FLOOR. Every tall piece is flush against
+    //     a wall plane the room already owns (the chimney breast and credenza
+    //     on the zLo glazed wall, the pictures and console on the loop-facing
+    //     inner wall, the dresser and side tables on the bedroom's own walls).
+    //     The only pieces off a wall are the armchair and the plants, and both
+    //     sit under 0.95 m — below a crouched player's head — so neither can
+    //     hide a body from a defender who has the room.
+    //  3. NOTHING ENTERS A DOORWAY. The picture group is placed south of
+    //     `frontDoorPortal`'s z span in both houses, and the landing's centre
+    //     line and the stairwell void are left completely clear.
+    //  4. NOTHING TOUCHES THE SUN PATCH. Lane G's §4 solve puts the west
+    //     living room's sunlit floor between 1.17 m and 2.91 m out from the
+    //     zHi glazed wall, which is the band the `interior-west` camera was
+    //     moved to see. Every piece within reach of that band — both sets of
+    //     curtains, the pelmets, the lamp, the plants, the clock and every
+    //     picture — is emitted with `cast = false`, so the dressing physically
+    //     cannot take back the patch that lane bought. The drapes also stop
+    //     5 cm clear of the casting aperture's own edge (half-width
+    //     (DRESS_WIN_W/2 - DRESS_APERTURE_MARGIN) x SPREAD = 1.408 m against
+    //     the drape's inner edge at 1.46 m), so no glazing is ever covered.
+    //  5. PASS 82 IS NOT TOUCHED. The standard lamp and the two bedside lamps
+    //     are GEOMETRY — a pole and a shade. No `THREE.Light` is created,
+    //     removed, hidden, parented or toggled anywhere in this lane.
+    const spec = houseSpec(id);
+    const inward = -face; // from the loop-facing inner plane, into the room
+    const southInnerZ = (frame.zLo + REBUILD_SHELL_WALL_T) * S;
+    const northInnerZ = (frame.zHi - REBUILD_SHELL_WALL_T) * S;
+    const frontInnerX = frame.innerFront * S;
+    const livRearX = (face === 1 ? living.x0 : living.x1) * S;
+    const livXLo = Math.min(livRearX, frontInnerX);
+    const livXHi = Math.max(livRearX, frontInnerX);
+    // The glazed elevations carry two openings each and only ONE of them falls
+    // inside the living room in either house (west: plan -15.3 is over the
+    // kitchen band, -11.7 is over the living room; east mirrors it). Deriving
+    // the set rather than hardcoding it means a later change to
+    // DRESS_WIN_OFFSETS moves the curtains with the glazing.
+    const livingWindowXs = DRESS_WIN_OFFSETS
+      .map((dx) => (spec.cx + dx) * S)
+      .filter((wx) => wx > livXLo + 0.7 && wx < livXHi - 0.7);
+    const apertureHalf = (DRESS_WIN_W / 2 - DRESS_APERTURE_MARGIN) * S;
+
+    // --- Fireplace + stone chimney breast, on the zLo glazed wall at the
+    // room's rear end. That position is not decorative: the `interior-west`
+    // eye (-17, 1.7, 5.5) -> target (-19.7, 1.2, 2.0) puts this breast 7 deg
+    // off the view axis, i.e. dead centre of frame, and the sight ray clears
+    // the stair run (whose first steps are only 0.2 m tall where it passes) by
+    // over 0.8 m. It is the one surface in the room big enough to answer the
+    // plate's fireplace, and it is on the BACKLIT elevation — the sun enters
+    // through zHi, not zLo — so a 0.40 m proud breast cannot shadow anything.
+    const breastX = livRearX + face * 1.35;
+    const breastD = 0.40;
+    const breastZ = southInnerZ + breastD / 2;
+    const breastFace = breastZ + breastD / 2;
+    const breastTop = 2.62;
+    dressBox(stoneHearth, [breastX, (finishTop + breastTop) / 2, breastZ], [1.9, breastTop - finishTop, breastD]);
+    dressBox(stoneHearth, [breastX, finishTop + 0.06, breastFace + 0.28], [1.9, 0.12, 0.56], 0, false);
+    dressBox(fireboxDark, [breastX, finishTop + 0.52, breastFace - 0.06], [1.02, 0.80, 0.12], 0, false);
+    dressBox(teakTrim, [breastX, finishTop + 1.16, breastZ + 0.07], [2.12, 0.08, breastD + 0.14]);
+    // Starburst wall clock over the mantel (`living-room-eye.png` hangs one on
+    // the stair wall; this room's stair wall is the run's own flank, so it goes
+    // over the fire, which is the other place the plates put it).
+    dressBox(clockFace, [breastX, finishTop + 1.92, breastFace + 0.03], [0.66, 0.66, 0.04], 0, false);
+    dressTube(brassTrim, [breastX - 0.58, finishTop + 1.29, breastZ + 0.10], 0.07, 0.05, 0.18, 10, undefined, false);
+    dressBox(artPanelA, [breastX + 0.52, finishTop + 1.33, breastZ + 0.10], [0.28, 0.26, 0.03], 0, false);
+
+    for (const winX of livingWindowXs) {
+      // --- Teak credenza under the zLo window. 0.78 m tall against a 0.95 m
+      // sill, so it never crosses the glazing, and it is the plate's sideboard.
+      const credZ = southInnerZ + 0.26;
+      dressBox(teakTrim, [winX, finishTop + 0.45, credZ], [2.30, 0.66, 0.48]);
+      for (const lx of [-1.02, 1.02]) {
+        for (const lz of [-0.17, 0.17]) {
+          dressTube(teakTrim, [winX + lx, finishTop + 0.06, credZ + lz], 0.026, 0.032, 0.12, 6);
+        }
+      }
+      dressTube(brassTrim, [winX - 0.62, finishTop + 0.88, credZ], 0.10, 0.07, 0.20, 10, undefined, false);
+      dressBox(artPanelB, [winX + 0.46, finishTop + 0.94, credZ - 0.02], [0.30, 0.34, 0.03], 0, false);
+      dressBox(teakTrim, [winX + 0.86, finishTop + 0.82, credZ], [0.26, 0.16, 0.18], 0.2, false);
+      // --- Houseplant beside the credenza.
+      dressTube(potTerracotta, [winX + 1.56, finishTop + 0.18, southInnerZ + 0.45], 0.19, 0.14, 0.36, 10, undefined, false);
+      for (let i = 0; i < 7; i += 1) {
+        dressBlade(plantLeaf, [winX + 1.56, finishTop + 0.34, southInnerZ + 0.45], 0.76, 0.06, (i / 7) * Math.PI * 2 + 0.3, 0.28 + (i % 3) * 0.14, false);
+      }
+    }
+    // --- Curtains at BOTH glazed elevations' living-room windows. Drawn OPEN,
+    // at the jambs only, and non-casting (see bound 4 above).
+    for (const [planeZ, sign] of [[southInnerZ, 1], [northInnerZ, -1]] as Array<[number, number]>) {
+      for (const winX of livingWindowXs) {
+        const drapeZ = planeZ + sign * 0.12;
+        for (const side of [-1, 1]) {
+          dressBox(curtainFabric, [winX + side * (apertureHalf + 0.23), 1.53, drapeZ], [0.34, 1.86, 0.13], 0, false);
+        }
+        dressBox(interiorTrim, [winX, 2.55, drapeZ], [2 * apertureHalf + 0.92, 0.18, 0.17], 0, false);
+      }
+    }
+    // --- Standard lamp in the corner the plate puts one in (window wall meets
+    // the loop-facing wall). Geometry only; PASS 82 forbids a real light and
+    // this lane creates none.
+    const lampX = frontInnerX + inward * 0.55;
+    const lampZ = southInnerZ + 0.58;
+    dressTube(teakTrim, [lampX, finishTop + 0.03, lampZ], 0.17, 0.19, 0.06, 10, undefined, false);
+    dressTube(teakTrim, [lampX, finishTop + 0.72, lampZ], 0.028, 0.036, 1.32, 8, undefined, false);
+    dressTube(lampShade, [lampX, finishTop + 1.58, lampZ], 0.17, 0.27, 0.34, 12, undefined, false);
+    // --- Armchair, back to the stair run, facing the fire. Offset 2.55 m from
+    // the living room's rear boundary, which clears the stair's own footprint
+    // (west 20.56-22.32 m, east 20.56-22.32 m mirrored) by 0.16 m.
+    const chairX = livRearX + face * 2.55;
+    const chairZ = southInnerZ + 1.45;
+    const seatY = finishTop + 0.40;
+    dressBox(upholstery, [chairX, seatY, chairZ], [0.74, 0.14, 0.72]);
+    dressBox(upholstery, [chairX - face * 0.30, seatY + 0.33, chairZ], [0.14, 0.54, 0.72]);
+    for (const dz of [-0.36, 0.36]) dressBox(teakTrim, [chairX, seatY + 0.13, chairZ + dz], [0.70, 0.07, 0.07]);
+    for (const dx of [-0.30, 0.30]) {
+      for (const dz of [-0.28, 0.28]) {
+        dressTube(teakTrim, [chairX + dx, finishTop + 0.17, chairZ + dz], 0.022, 0.030, 0.34, 6);
+      }
+    }
+    // --- Houseplant beside the fire, on the open side away from the stair.
+    const plantX = breastX + face * 1.28;
+    dressTube(potTerracotta, [plantX, finishTop + 0.21, southInnerZ + 0.48], 0.22, 0.16, 0.42, 10, undefined, false);
+    for (let i = 0; i < 8; i += 1) {
+      dressBlade(plantLeaf, [plantX, finishTop + 0.40, southInnerZ + 0.48], 0.88, 0.065, (i / 8) * Math.PI * 2, 0.24 + (i % 4) * 0.12, false);
+    }
+    // --- Books and a brass bowl on the coffee table the last pass left bare.
+    dressBox(artPanelB, [rugX - 0.26, finishTop + 0.47, rugZ + 0.05], [0.26, 0.05, 0.19], 0.24, false);
+    dressBox(teakTrim, [rugX - 0.24, finishTop + 0.515, rugZ + 0.01], [0.24, 0.04, 0.17], -0.16, false);
+    dressTube(brassTrim, [rugX + 0.27, finishTop + 0.49, rugZ], 0.15, 0.09, 0.10, 12, undefined, false);
+    // --- Framed pictures on the loop-facing inner wall, south of the front
+    // door's z span in BOTH houses (west portal world z 1.6-3.2, east
+    // -3.2 to -1.6; the group sits at -0.09/1.21 and -5.21/-3.91).
+    const artX = frontInnerX + inward * 0.04;
+    for (const [dz, ay, aw, ah, panel] of [
+      [-0.55, 1.78, 0.62, 0.48, artPanelA],
+      [0.75, 1.94, 0.46, 0.60, artPanelB],
+    ] as Array<[number, number, number, number, THREE.Material]>) {
+      const az = southInnerZ + 1.9 + dz;
+      dressBox(teakTrim, [artX, ay, az], [0.05, ah + 0.09, aw + 0.09], 0, false);
+      dressBox(panel, [artX + inward * 0.031, ay, az], [0.02, ah, aw], 0, false);
+    }
+    // --- Dining chairs around the pedestal table the last pass left alone
+    // (`living-room-eye.png` shows a four-seat set through the opening).
+    for (const [cdx, cdz] of [[-0.95, 0], [0.95, 0], [0, -0.95], [0, 0.95]] as Array<[number, number]>) {
+      const cx2 = diningX + cdx;
+      const cz2 = diningZ + cdz;
+      const alongX = cdz !== 0;
+      dressBox(teakTrim, [cx2, finishTop + 0.44, cz2], [0.42, 0.05, 0.42]);
+      dressBox(upholstery, [
+        cx2 + (alongX ? 0 : Math.sign(cdx) * 0.19),
+        finishTop + 0.68,
+        cz2 + (alongX ? Math.sign(cdz) * 0.19 : 0),
+      ], alongX ? [0.42, 0.44, 0.05] : [0.05, 0.44, 0.42]);
+      for (const lx of [-0.16, 0.16]) {
+        for (const lz of [-0.16, 0.16]) {
+          dressTube(teakTrim, [cx2 + lx, finishTop + 0.22, cz2 + lz], 0.018, 0.024, 0.44, 6);
+        }
+      }
+    }
+
+    // ---- LANE M: THE UPPER STOREY WAS EMPTIER STILL ------------------------
+    // `refs/bedroom-eye.png` carries a made bed, two side tables with lamps, a
+    // dresser and pictures; `atomic-acres-rebuild-upper-landing.png` renders an
+    // empty box with a rail. The bed and the bathroom suite are already wave-2
+    // GLBs, so what is added here is everything AROUND them, all of it against
+    // a wall so the landing's traversal line and the stairwell void stay clear.
+    const UPPER_Y = REBUILD_UPPER_FLOOR_Y;
+    const bed = upperRooms(id).find((entry) => entry.id === 'rearBed');
+    const landing = upperRooms(id).find((entry) => entry.id === 'landing');
+    if (bed) {
+      const bedXLo = Math.min(bed.x0, bed.x1) * S;
+      const bedXHi = Math.max(bed.x0, bed.x1) * S;
+      const bedZLo = Math.min(bed.z0, bed.z1) * S;
+      const bedCx = (bedXLo + bedXHi) / 2;
+      // Side tables + lamps on the room's low-z wall, 1.25 m either side of the
+      // bed's own centre line. The bed GLB is centred in this rect and is 2 m
+      // long, so at 0.32 m off that wall the tables clear it by ~0.9 m
+      // whichever way round the GLB's long axis lands.
+      for (const side of [-1, 1]) {
+        const tx = bedCx + side * 1.25;
+        const tz = bedZLo + 0.34;
+        dressBox(teakTrim, [tx, UPPER_Y + 0.28, tz], [0.44, 0.05, 0.42]);
+        dressBox(teakTrim, [tx, UPPER_Y + 0.13, tz], [0.40, 0.24, 0.38]);
+        for (const lx of [-0.18, 0.18]) {
+          for (const lz of [-0.16, 0.16]) {
+            dressTube(teakTrim, [tx + lx, UPPER_Y + 0.14, tz + lz], 0.018, 0.022, 0.28, 6);
+          }
+        }
+        dressTube(teakTrim, [tx, UPPER_Y + 0.44, tz], 0.022, 0.030, 0.28, 6, undefined, false);
+        dressTube(lampShade, [tx, UPPER_Y + 0.70, tz], 0.11, 0.17, 0.24, 12, undefined, false);
+      }
+      // Dresser against the rear wall + a picture over the bed.
+      dressBox(teakTrim, [bedXLo + 0.3, UPPER_Y + 0.42, bedZLo + 2.6], [0.52, 0.84, 1.48]);
+      dressBox(teakTrim, [bedXLo + 0.3, UPPER_Y + 0.87, bedZLo + 2.6], [0.58, 0.05, 1.54], 0, false);
+      dressTube(brassTrim, [bedXLo + 0.34, UPPER_Y + 1.02, bedZLo + 2.2], 0.10, 0.07, 0.24, 10, undefined, false);
+      for (const [dx, ay, aw, ah, panel] of [
+        [-0.72, 1.64, 0.50, 0.40, artPanelB],
+        [0.72, 1.70, 0.40, 0.52, artPanelA],
+      ] as Array<[number, number, number, number, THREE.Material]>) {
+        const ax = bedCx + dx;
+        dressBox(teakTrim, [ax, UPPER_Y + ay, bedZLo + 0.05], [aw + 0.09, ah + 0.09, 0.05], 0, false);
+        dressBox(panel, [ax, UPPER_Y + ay, bedZLo + 0.081], [aw, ah, 0.02], 0, false);
+      }
+    }
+    if (landing) {
+      // Console + plant + pictures on the landing's loop-facing wall, and a
+      // runner down its length. The stairwell void and the centre line of the
+      // landing are deliberately left completely clear: this is the upper
+      // storey's only traversal route and the rail already narrows it.
+      const conX = frontInnerX + inward * 0.30;
+      const zLo = Math.min(landing.z0, landing.z1) * S;
+      const zHi = Math.max(landing.z0, landing.z1) * S;
+      const conZ = zLo + (zHi - zLo) * 0.74;
+      dressBox(teakTrim, [conX, UPPER_Y + 0.74, conZ], [0.40, 0.05, 1.30]);
+      for (const lz of [-0.55, 0.55]) {
+        dressBox(teakTrim, [conX, UPPER_Y + 0.37, conZ + lz], [0.34, 0.74, 0.06]);
+      }
+      dressTube(brassTrim, [conX, UPPER_Y + 0.87, conZ - 0.34], 0.12, 0.08, 0.22, 10, undefined, false);
+      dressBox(artPanelA, [conX - inward * 0.06, UPPER_Y + 0.94, conZ + 0.30], [0.26, 0.34, 0.03], 0, false);
+      for (const [dz, ay, aw, ah, panel] of [
+        [-0.35, 1.72, 0.54, 0.42, artPanelB],
+        [0.62, 1.80, 0.40, 0.54, artPanelA],
+      ] as Array<[number, number, number, number, THREE.Material]>) {
+        const ax = frontInnerX + inward * 0.04;
+        dressBox(teakTrim, [ax, UPPER_Y + ay, conZ + dz], [0.05, ah + 0.09, aw + 0.09], 0, false);
+        dressBox(panel, [ax + inward * 0.031, UPPER_Y + ay, conZ + dz], [0.02, ah, aw], 0, false);
+      }
+      dressTube(potTerracotta, [conX, UPPER_Y + 0.20, zHi - 0.55], 0.20, 0.15, 0.40, 10, undefined, false);
+      for (let i = 0; i < 7; i += 1) {
+        dressBlade(plantLeaf, [conX, UPPER_Y + 0.38, zHi - 0.55], 0.80, 0.06, (i / 7) * Math.PI * 2, 0.26 + (i % 3) * 0.13, false);
+      }
+      dressBox(rugMaterial, [frontInnerX + inward * 1.35, UPPER_Y + 0.012, (zLo + zHi) / 2], [1.30, 0.024, (zHi - zLo) * 0.62], 0, false);
+    }
   };
 
   const houseSpecs = [
@@ -1547,7 +2104,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     const box = centred(builder, `aarr-island-crate-${dx}-${dz}`, [dx, 0.62, dz], [1, 1, 1], crateAge(dx, dz));
     kitbash('./assets/rebuild/crates-worn/crate-06-worn.glb', [dx * 1.6, dy, dz * 1.6], (dx + dz) * 0.4, [box], undefined, true);
   }
-  pair(builder, 'aarr-hedge-loop', 12.2, 0.6, -4.3, [1.2, 1.2, 2.0], hedge);
+  hedgeRun('aarr-hedge-loop', 12.2, 0.6, -4.3, [1.2, 1.2, 2.0]);
   // Yard clusters near fences/pads (topdown plate scatter).
   const yardClusters: ReadonlyArray<readonly [number, number]> = [[-8, -12], [8, -13], [-6, 9], [6, 8]] as const;
   for (const [cx, cz] of yardClusters) {
@@ -1628,11 +2185,11 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   }
 
   // ---- Hedges: road edges + front yards + pad rows (facts 7/9; green blobs) ----
-  pair(builder, 'aarr-hedge-entry', 6.4, 0.6, 20, [1.2, 1.2, 8], hedge);
-  pair(builder, 'aarr-hedge-yard', 14, 0.6, 6.5, [7, 1.2, 1.2], hedge);
-  pair(builder, 'aarr-hedge-back', 12, 0.6, -13, [8, 1.2, 1.2], hedge);
-  pair(builder, 'aarr-hedge-wall', 18, 0.6, 21.5, [6, 1.2, 1.2], hedge);
-  pair(builder, 'aarr-hedge-pad', 14, 0.6, 14.6, [4.5, 1.0, 0.8], hedge);
+  hedgeRun('aarr-hedge-entry', 6.4, 0.6, 20, [1.2, 1.2, 8]);
+  hedgeRun('aarr-hedge-yard', 14, 0.6, 6.5, [7, 1.2, 1.2]);
+  hedgeRun('aarr-hedge-back', 12, 0.6, -13, [8, 1.2, 1.2]);
+  hedgeRun('aarr-hedge-wall', 18, 0.6, 21.5, [6, 1.2, 1.2]);
+  hedgeRun('aarr-hedge-pad', 14, 0.6, 14.6, [4.5, 1.0, 0.8]);
 
   // ---- North entrance: welcome sign + rusty car between sheds (fact 5) ----
   const signBoard = centred(builder, 'aarr-sign-board', [0, 1.9, -24.5], [3.2, 1.0, 0.15], lumber);
@@ -1713,7 +2270,10 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     const z = -34 + rand() * 68;
     if (Math.abs(x) < 44 || Math.abs(z) > 58) continue;
     const s = 0.5 + rand() * 0.7;
-    centred(builder, `aarr-scrub-${i}`, [x, s / 2, z], [s, s, s], hedge);
+    // Desert scrub is NOT lawn and must not carry the lawn's green: the same
+    // bake at the same (2, 2) repeat, tinted down to a dry sage, so the surround
+    // stops reading as mown grass at zero VRAM cost.
+    centred(builder, `aarr-scrub-${i}`, [x, s / 2, z], [s, s, s], desertScrubGreen);
     scrub += 1;
   }
   for (let i = 0; i < 30; i += 1) {
@@ -1726,6 +2286,191 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     rockCount += 1;
   }
 
+  // ---- LANE M / DESERT VEGETATION, 2026-09-16 ------------------------------
+  //
+  // `gray_topdown_01.png`, `street-teal.png`, `teal-side-lane.png` and
+  // `map__center-loop.png` all carry JOSHUA TREES with their spiky rosettes,
+  // clipped box hedges with a foliage edge, flowering shrubs at the kerb and
+  // desert scrub with agave. The render put flat green cuboids where the
+  // hedges should be, dry cubes for scrub, and left the Joshua trees to six
+  // far-desert GLBs that no street station frames. All four are answered here
+  // in code; `public/assets/**` is another lane's and no bake on disk carries
+  // a plant silhouette.
+  //
+  // READABILITY IS BOUNDED BY PLACEMENT, and the bound is geometric, not a
+  // promise. NOTHING below is solid — none of it reaches `builder`, so no
+  // sightline, bullet path or walkable surface changes at all. Beyond that:
+  //  - Every Joshua tree stands either OUTSIDE the perimeter wall (plan
+  //    |x| >= 26 or |z| >= 29, against the wall line at |x| 24 / z 24, and
+  //    clear of the service roads at plan |x| 27.5-34.5) or in one of the four
+  //    dead lot corners at plan (+-22.5, +-21.5..-24), which carry no lane, no
+  //    spawn and no cover. Its trunk is 0.52 m across and every rosette sits
+  //    above 2.3 m, i.e. over a standing player's head, so it cannot hide a
+  //    body at the range it is visible from.
+  //  - Hedge foliage is generated INSIDE each hedge's own world AABB grown by
+  //    at most 0.22 m. The tallest run goes from 1.20 m to about 1.42 m at the
+  //    clumps, still under a standing eye at 1.70 m, and the clumps are
+  //    discontinuous by construction, so a head crossing a hedge line is read
+  //    through the gaps exactly as it was before.
+  //  - Flowering shrubs are 0.8 m foundation planting on the front lawns at
+  //    plan |x| 16.5, clear of both driveways (inner edge plan 17.3) and of
+  //    both houses' z spans. They are below crouch height.
+  //  - Agave sits only on the desert apron beyond world |x| 40, outside the
+  //    playfield entirely.
+  const vegRand = mulberry32(0x5eed17);
+  /** One foliage clump: a low-poly lump, sunk into whatever it dresses. */
+  const dressClump = (material: THREE.Material, x: number, y: number, z: number, radius: number, squash: number): void => {
+    const transform = new THREE.Matrix4().makeScale(1, squash, 1);
+    transform.setPosition(x, y, z);
+    dressAdd(material, new THREE.IcosahedronGeometry(radius, 0), transform, true);
+  };
+  for (const run of hedgeRuns) {
+    const top = run.cy + run.h / 2;
+    const cols = Math.max(2, Math.round(run.w / 0.72));
+    const rows = Math.max(2, Math.round(run.d / 0.72));
+    for (let ci = 0; ci < cols; ci += 1) {
+      for (let ri = 0; ri < rows; ri += 1) {
+        const gx = -run.w / 2 + ((ci + 0.5) / cols) * run.w;
+        const gz = -run.d / 2 + ((ri + 0.5) / rows) * run.d;
+        const radius = 0.26 + vegRand() * 0.14;
+        dressClump(
+          hedgeFoliage,
+          run.cx + gx + (vegRand() - 0.5) * 0.18,
+          top - 0.10 + (vegRand() - 0.5) * 0.12,
+          run.cz + gz + (vegRand() - 0.5) * 0.18,
+          radius,
+          0.78,
+        );
+        // Flank clumps on the run's long edges only: two staggered heights are
+        // what turns a machined vertical face into planting.
+        const onEdge = run.w >= run.d ? ri === 0 || ri === rows - 1 : ci === 0 || ci === cols - 1;
+        if (!onEdge) continue;
+        const nx = run.w >= run.d ? 0 : Math.sign(gx || 1);
+        const nz = run.w >= run.d ? Math.sign(gz || 1) : 0;
+        for (const drop of [0.34, 0.72]) {
+          const r2 = 0.21 + vegRand() * 0.11;
+          dressClump(
+            hedgeFoliage,
+            run.cx + gx + nx * (run.w / 2 - 0.04) + (vegRand() - 0.5) * 0.12,
+            top - drop - vegRand() * 0.14,
+            run.cz + gz + nz * (run.d / 2 - 0.04) + (vegRand() - 0.5) * 0.12,
+            r2,
+            0.9,
+          );
+        }
+      }
+    }
+  }
+  /**
+   * One Joshua tree, in TRUE world metres.
+   *
+   * The plates' signal is the spiky ROSETTE, not the crown: a shaggy tapered
+   * trunk, three arms cocked up and out, and a fan of stiff blades at every
+   * arm tip and at the apex. Nine blades per rosette is the count that reads
+   * as spiky at street distance without becoming a ball; four radial segments
+   * per blade is a spike rather than a cone.
+   */
+  const joshuaTree = (x: number, z: number, scale: number, yaw: number): void => {
+    const trunkH = 2.35 * scale;
+    const trunkR = 0.26 * scale;
+    dressTube(joshuaBark, [x, trunkH / 2, z], trunkR * 0.76, trunkR, trunkH, 7);
+    const rosettes: Array<readonly [number, number, number, number]> = [[x, trunkH + 0.06 * scale, z, 1.06]];
+    const arms = 3;
+    for (let i = 0; i < arms; i += 1) {
+      const az = yaw + (i / arms) * Math.PI * 2 + (vegRand() - 0.5) * 0.7;
+      const tilt = 0.52 + vegRand() * 0.3;
+      const len = (1.2 + vegRand() * 0.55) * scale;
+      const baseY = trunkH - 0.3 * scale;
+      const dx = Math.cos(az) * Math.sin(tilt);
+      const dy = Math.cos(tilt);
+      const dz = Math.sin(az) * Math.sin(tilt);
+      dressTube(
+        joshuaBark,
+        [x + dx * len / 2, baseY + dy * len / 2, z + dz * len / 2],
+        0.12 * scale,
+        0.17 * scale,
+        len,
+        6,
+        new THREE.Euler(0, -az, -tilt, 'YZX'),
+      );
+      rosettes.push([x + dx * len, baseY + dy * len, z + dz * len, 0.86 + vegRand() * 0.3] as const);
+    }
+    for (const [rx, ry, rz, rs] of rosettes) {
+      for (let b = 0; b < 9; b += 1) {
+        dressBlade(desertBlade, [rx, ry, rz], 0.6 * scale * rs, 0.055 * scale * rs, (b / 9) * Math.PI * 2 + yaw, 0.52 + (b % 3) * 0.24);
+      }
+    }
+  };
+  // Plan-frame positions, mirrored; converted to world here so every number
+  // above can be checked against the layout numbers in this file's header.
+  const JOSHUA_PLAN: ReadonlyArray<readonly [number, number]> = [
+    [26, 30], [26, 12], [26, -6], [26, -24],
+    [36.5, 22], [36.5, 2], [36.5, -18],
+    [42, 34], [42, 10], [42, -14],
+    [9.5, 29], [13.5, 33], [20, 31],
+    [7.5, -30], [14, -32],
+    [22.5, 21.5], [22.5, -24],
+  ] as const;
+  let joshuaCount = 0;
+  for (const [px, pz] of JOSHUA_PLAN) {
+    for (const side of [-1, 1]) {
+      joshuaTree(
+        side * px * ATOMIC_ACRES_REBUILD_SPREAD,
+        pz * ATOMIC_ACRES_REBUILD_SPREAD,
+        0.86 + vegRand() * 0.42,
+        vegRand() * Math.PI * 2,
+      );
+      joshuaCount += 1;
+    }
+  }
+  // Agave rosettes on the desert apron beyond the playfield (world metres).
+  let agaveCount = 0;
+  for (let i = 0; i < 40; i += 1) {
+    const side = i % 2 === 0 ? -1 : 1;
+    const ax = side * (40 + vegRand() * 28);
+    const az = -56 + vegRand() * 112;
+    if (Math.abs(ax) > 44 && Math.abs(ax) < 55.2) continue; // clear of the service roads
+    const s = 0.8 + vegRand() * 0.5;
+    for (let b = 0; b < 11; b += 1) {
+      dressBlade(desertBlade, [ax, 0.05, az], 0.62 * s, 0.07 * s, (b / 11) * Math.PI * 2 + vegRand() * 0.2, 0.78 + (b % 3) * 0.16);
+    }
+    agaveCount += 1;
+  }
+  // Flowering shrubs, foundation planting on the four front-lawn faces.
+  let shrubCount = 0;
+  for (const pz of [8.4, 11.6, 14.8, 17.4, -6.2, -9.4]) {
+    for (const side of [-1, 1]) {
+      const sx = side * 16.5 * ATOMIC_ACRES_REBUILD_SPREAD;
+      const sz = pz * ATOMIC_ACRES_REBUILD_SPREAD;
+      for (let c = 0; c < 5; c += 1) {
+        const angle = (c / 5) * Math.PI * 2;
+        dressClump(
+          hedgeFoliage,
+          sx + Math.cos(angle) * 0.3,
+          0.3 + (c === 4 ? 0.24 : 0),
+          sz + Math.sin(angle) * 0.3,
+          0.3 + vegRand() * 0.1,
+          0.85,
+        );
+      }
+      for (let f = 0; f < 6; f += 1) {
+        dressClump(
+          shrubBloom,
+          sx + (vegRand() - 0.5) * 0.9,
+          0.5 + vegRand() * 0.28,
+          sz + (vegRand() - 0.5) * 0.9,
+          0.075 + vegRand() * 0.035,
+          1,
+        );
+      }
+      shrubCount += 1;
+    }
+  }
+
+  // One merged mesh per (material, castShadow) for every piece of interior
+  // dressing and every plant above. Nothing here is solid; see the batch header.
+  flushDress();
+
   const parts = root.children.length;
   root.userData.atomicAcresRebuildLayout = {
     parts,
@@ -1737,6 +2482,12 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     shotSurfaces: builder.shotSurfaces.length,
     spawns: 0,
     scrub,
+    // Lane M dressing + vegetation, merged: one mesh per (material, cast).
+    dressMeshes: dressStats.meshes,
+    dressTriangles: dressStats.triangles,
+    joshuaTrees: joshuaCount,
+    agaveRosettes: agaveCount,
+    floweringShrubs: shrubCount,
     rocks: rockCount,
     plates: [
       'batch-4-nuketown-graybox/gray_topdown_01.png',
