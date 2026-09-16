@@ -16,6 +16,20 @@ never delete their backing directories merely because this project home has move
 
 These rules apply to Codex, Hermes, Gemini/AGY, and any future human or automated contributor.
 
+## Atomic Acres visual work — start at the programme (owner directive 2026-09-16)
+
+Any pass on the `atomic-acres-rebuild` arena — assets, textures, PBR, lighting, shading,
+shadows, reflections, colour correction, effects, animation or camera work — starts at
+`docs/ATOMIC_ACRES_IMPROVEMENT_PROGRAM.md`, then `docs/ATOMIC_ACRES_REFERENCE.md` for the
+numeric brief. It defines the loop, the bar (556 owner reference images and the coverage
+number), the skill routing every lane must follow, and the standing constraints.
+
+Two of those constraints are the ones that get broken: a lane must **read the body of its
+named skills** before authoring (resolve via
+`_Scripts/gen_skill_catalogue.py --resolve <name> --read`; listing a catalogue does not
+count), and a presentation-only lane must **prove** it did not move gameplay authority by
+running `npx tsx artifacts/lane-f/census.ts` before and after.
+
 ## Sources of truth
 
 - `origin/main` is the only source branch for production candidates.
