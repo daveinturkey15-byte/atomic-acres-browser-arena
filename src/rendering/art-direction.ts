@@ -899,104 +899,120 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
   }),
   // Graybox wave 2026-09-14 (ShellGray): high-desert suburb rebuild at clear
   // late morning (LAYOUT_CONTRACT style: warm late-morning desert light).
-  // Same compositional family as raid2's bleached-midday row — lifted,
-  // low-contrast, thin haze — because the map is the same kind of open,
-  // sun-beaten ground. The CDL gain below is SEARCHED, not felt: 2,197 gain
-  // triples over the legal box ([0.82, 1.18]^3, step 0.03) enumerated against
-  // this test file's own probe set and metric
-  // (src/rendering/art-direction.test.ts `gradeThroughArena`, quality
-  // profile). Winner [1.18, 0.82, 1.18]: weakest pair 0.03091 vs raid2 —
-  // 43% of headroom over the 5.5/255 (0.02157) floor AS THAT SEARCH LEFT IT.
-  // Both that number and the catalog claim that used to follow it are
-  // restated, with the measurement, under GREEN GAMMA below. ZERO warm-key
-  // (r >= g >= b) triples clear even 1.2x the floor —
-  // the same full-warm-quadrant finding raid2's row records — so the warmth
-  // stays in the arena's own light (rendering/arenas/atomic-acres-rebuild.ts
-  // authors a warm key) and the grade carries the separation on magenta,
-  // exactly as far from raid2's cool bleach as the legal box allows. A later
-  // art pass may re-search this axis; the instrument to beat is recorded here.
   //
-  // GREEN GAMMA 1.08 -> 0.96 (interior look pass, 2026-09-15). The search
-  // above optimised ONE objective, distinctiveness, over eight generic probe
-  // colours. Its sample contained no interior surface and no hue-neutrality
-  // term at all, and this arena has since grown walkable ground floors. What
-  // the magenta costs in them was measured, not guessed:
-  //   * an ACHROMATIC-AXIS probe - pixels with |r-b| <= 0.03 in the readable
-  //     value band, so a magenta grade moves r and b together and cannot
-  //     select its way out of the sample - reads green deviation -0.001 to
-  //     -0.017 on all four batch-4 photoreal plates AND on both concept
-  //     cutaways, against -0.061 to -0.126 on every repo-state/rb7-rebuild-*
-  //     capture. Interiors are the worst at -0.126: neutral plaster goes
-  //     lavender and warm wood goes red, which is the sunset-red living room
-  //     the review calls out.
-  //   * ablating each hue term at CONSTANT Rec.709 luminance puts 83-90% of
-  //     that deficit on THIS ROW'S CDL. Take the hue out of it and interior
-  //     green deviation moves -0.112 / -0.161 / -0.143 -> -0.019 / -0.037 /
-  //     -0.014 on the ceiling, floor and plaster wall; the GAIN alone owns
-  //     -0.028 / -0.047 / -0.021 of that. Doing the same to
-  //     blender-lighting.ts hemisphereSky moves it by at most 0.020 and to
-  //     this arena's own ambientColor by 0.003. So the magenta is NOT the
-  //     shared rig's, and the shared-file lighting edit an earlier pass
-  //     proposed would have spent a world-studio and map3 risk surface on
-  //     the wrong term.
-  //   * the arena's own visual definition cannot reach it either: sweeping
-  //     ambientColor over the whole hue circle at constant luminance, capped
-  //     at the most saturated ambient in the roster (raid2's 0x93b6dd), buys
-  //     back at most +0.032 to +0.062 and only by authoring a mint-green
-  //     AmbientLight on a desert map.
-  // THE CAUSE IS THE GAIN; THE CHEAPEST CORRECTION IS THE GAMMA. The authored
-  // gamma is nearly uniform and owns only 0.004-0.008 of the deficit on its
-  // own - it is not the culprit. It is the lever because the gate's own
-  // instrument prices it about three times cheaper per unit of green
-  // recovered. Re-walking that instrument over gain[1] and gamma[1] - green
-  // only, and only upward (gain up / gamma down), so red and blue keep their
-  // authored slope and power EXACTLY - gain[1] 0.94 costs weakest 0.02365 to
-  // reach interior -0.093, while gamma[1] 0.96 holds weakest 0.02569 and
-  // reaches -0.062. 0.96 is two thirds of the way to the 0.92 safety bound
-  // and is deliberately not at it; nuketown2 already ships a sub-1 green
-  // gamma (0.98), so this is not a novel shape. The remaining half of the
-  // deficit needs this arena's hue identity re-searched out of the magenta
-  // quadrant entirely, which is an owner call and a full re-enumeration, not
-  // a trim.
-  // HEADROOM, RESTATED. This row's weakest pair falls 0.03091 -> 0.02569:
-  // from 2.39 to 1.05 eight-bit steps over the 5.5/255 floor, still four
-  // times the "quarter of a step" the ratchet's own comment calls too thin.
-  // The retired claim that this arena "is not the closest pair in the game"
-  // stopped being true before this change: world-studio joined the catalog
-  // and world-studio vs rustworks-1v1 measures 0.01937, below the floor.
-  // That failure is world-studio's, it is pre-existing, and nothing here
-  // touches it.
-  // LUMINANCE. gamma[1] < 1 raises green wherever the pre-tone-map value is
-  // below 1 and lowers it only above, so nothing readable can darken - and it
-  // was checked per pixel rather than argued. Pushing all five rb7 captures
-  // backwards through this chain and forwards again under 0.96: p1 rises on
-  // every one of them (interior 0.062 -> 0.083, street 0.321 -> 0.369), mean
-  // linear luminance rises, frac > 0.9 is unchanged on all five, and the only
-  // pixels that lose any luminance are the 12 brightest in -street and the 7
-  // brightest in -yard, already at display value >= 0.912, losing at most
-  // 0.61 of one eight-bit step.
+  // LANE I, 2026-09-16 - THE MAGENTA IS RETIRED, AND THE BOUND THAT LOOKED
+  // LIKE IT FORCED IT WAS CONDITIONAL.
+  //
+  // What was here. gain [1.18, 0.82, 1.18] with gamma [1.1, 0.96, 1.04]: red
+  // and blue IDENTICAL at the ceiling and green at the floor, i.e. a pure
+  // green cut, which renders every near-neutral as magenta. Two searches
+  // produced it and both recorded the same dead end - "ZERO warm-key
+  // (r >= g >= b) triples clear even 1.2x the floor" - so the arena's whole
+  // identity was parked on the one axis that also destroys neutrals.
+  //
+  // What that cost, measured through this file's own instrument
+  // (`gradeThroughArena`, quality profile) on a neutral linear ramp, as
+  // display green deviation g - (r + b) / 2:
+  //     linear   0.10     0.30     0.45     0.60     0.85
+  //     was    -0.0085  -0.0424  -0.0663  -0.0856  -0.1054
+  //     now    -0.0002  -0.0030  -0.0057  -0.0082  -0.0114
+  // and the SIGN is now right, not merely the size: all 18 reference plates in
+  // atomic-acres-catalog/_judge/refs measure green deviation POSITIVE (+0.000
+  // to +0.043), while 8 of the 9 shipped captures in
+  // artifacts/viewpoint-regression/wide/atomic-acres-rebuild measured it
+  // NEGATIVE (-0.006 to -0.047). The cast was inverted against the bar
+  // arena-wide, not only in the interiors.
+  //
+  // WHY THE OLD BOUND HELD AND WHY IT NO LONGER DOES. Both earlier searches
+  // swept the gain cube with every OTHER field pinned at raid2's values -
+  // crosstalkDelta -0.06, splitTone 0x2f6f86/0xfff4e2 1.45/0.52/0.42,
+  // midtoneContrastDelta 0.03, lift [0.002, 0.003, 0.006] - because this row
+  // was cloned from raid2 and separated on gain alone. With those pinned the
+  // finding reproduces exactly: re-swept here at step 0.02, the best warm-key
+  // triple that also neutralises green clears the 5.5/255 floor by 0.075 of
+  // one 8-bit step, thinner than the "quarter of a step" the ratchet's own
+  // comment already calls too thin. The bound was real. It was a bound on
+  // gain-with-raid2's-crosstalk, never on gain.
+  // crosstalkDelta is the axis neither search swept, and it is worth far more
+  // per unit than hue is. Measured, same instrument: best achievable weakest
+  // pair over the legal gain cube at each crosstalk, holding green neutral
+  // and the key warm:
+  //     crosstalkDelta  -0.13   -0.06    0.00    0.04    0.06    0.08
+  //     steps over floor -0.18   +0.08   +0.67   +0.97   +1.17   +1.32
+  // 0.07 is taken. It buys MORE headroom than the magenta ever had (1.162
+  // steps against 1.052 as shipped, 1.54x the floor), so this change does not
+  // spend the ratchet's margin - it adds to it - and nothing anywhere is
+  // relaxed to make it pass.
+  //
+  // WHAT THE GRADE NOW IS. Physics first, then one look. gain
+  // [0.96, 0.83, 0.82] is a warm daylight key that descends r > g > b, which
+  // is what a clear high-desert late morning measures; green sits at the
+  // arithmetic mean of red and blue to within 0.005, so a neutral stays
+  // neutral by construction instead of by correction. The look is carried by
+  // the split tone, which is LUMINANCE-PRESERVING (`applySplitTone`
+  // renormalises to the input luma) and tonally masked, so it can colour the
+  // shade without casting the midtones the way a gain does: desert sky blue
+  // 0x3f78b4 in the shade (raid2's 0x2f6f86 is pool cyan - a different place)
+  // against bleached straw sun 0xfff0cc.
+  //
+  // EXPOSURE AND RANGE. The composite gain luminance falls 0.9225 -> 0.8569
+  // (-7.1%), which is the direction the plates demand: pushing all nine
+  // captures back through the shipped chain and forward through this one
+  // (monotone neutral-luma round trip, validated to reproduce every shipped
+  // percentile to within 0.001) moves the plate-percentile error 0.5723 ->
+  // 0.5496 and the interior p50 0.574 -> 0.559 against the plate's 0.359.
+  // Be honest about the size of that: it is a 2.5% closing of a gap that is
+  // 60% wide, and IT CANNOT BE CLOSED FROM HERE. The best plate-percentile
+  // error reachable ANYWHERE in this file's legal envelope is 0.5297, and it
+  // costs dragging all three gains to the 0.82 floor; even there the interior
+  // p05 lands at 0.40 against the plate's 0.14. The interior's compressed
+  // range is a scene-radiance defect - almost every pixel sits above the
+  // midtone pivot, so no monotone curve inside these bounds can pull the
+  // shadows down without crushing the median - and it belongs to the light
+  // rig and the occlusion, not to the grade.
+  //
+  // saturationScale 1.12 -> 1.28 is compensation, not a look change:
+  // crosstalkDelta -0.06 -> 0.07 moves the COMPOSED crosstalk 0.00 -> 0.13,
+  // and positive crosstalk blends each channel toward its neighbours' mean
+  // (`applyChannelCrosstalk`), i.e. it desaturates. 1.28 restores that chroma
+  // on the scene-linear side, where it is still inside
+  // SCENE_SATURATION_BOUNDS after composition, and it is invisible to the
+  // distinctiveness gate (which never reads saturationScale), so it buys the
+  // colour back without borrowing any of the headroom above.
   'atomic-acres-rebuild': frozen({
     id: 'atomic-acres-rebuild',
     brief: 'High-desert suburb rebuild at clear late morning - bleached asphalt and siding, blue shade, dust in the air.',
     cdl: {
-      gain: [1.18, 0.82, 1.18],
-      lift: [0.002, 0.003, 0.006],
-      // green 1.08 -> 0.96: the interior trim derived above. Red and blue
-      // are untouched, so the magenta AXIS is unchanged and only its depth
-      // on the green channel moves.
-      gamma: [1.1, 0.96, 1.04],
+      // Warm daylight key, descending. green == (red + blue) / 2 to within
+      // 0.005: neutral in, neutral out.
+      gain: [0.96, 0.83, 0.82],
+      // Cool black point - the shade is sky-lit, so the floor lifts on blue.
+      lift: [0.001, 0.004, 0.005],
+      // Red lifted and blue compressed in the linear shadows (sunlight is
+      // warm); the blue of the shade arrives from the split tone instead,
+      // where it is luminance-preserving.
+      gamma: [0.92, 0.98, 1.1],
     },
-    saturationScale: 1.12,
+    // See the crosstalk note above: +0.16 against the shipped 1.12 restores
+    // exactly the chroma the composed crosstalk takes out.
+    saturationScale: 1.28,
     contrastScale: 1.02,
-    crosstalkDelta: -0.06,
+    // 0.00 -> +0.13 composed. This is the axis that carries this arena's
+    // distinctness now, and it is also on-brief: "bleached" siding and
+    // sun-beaten asphalt are a desaturated read, not a hue.
+    crosstalkDelta: 0.07,
     splitTone: {
-      shadowTint: 0x2f6f86,
-      highlightTint: 0xfff4e2,
-      strengthScale: 1.45,
-      shadowBalance: 0.52,
-      highlightBalance: 0.42,
+      shadowTint: 0x3f78b4, // open desert sky in the shade, not raid2's pool cyan
+      highlightTint: 0xfff0cc, // bleached straw sun on board siding
+      strengthScale: 1.55,
+      shadowBalance: 0.46,
+      highlightBalance: 0.5,
     },
-    midtoneContrastDelta: 0.03,
+    // 0.03 -> 0.05. Every plate is more contrasted than every capture; this is
+    // the only lever in this file that widens the display range without
+    // lifting the toe (`tone.toeStrengthScale` is lift-only by construction
+    // and would make the already-too-bright p05 worse).
+    midtoneContrastDelta: 0.05,
     vignette: { base: 0.06, settingScale: 1 },
     bloom: { intensityScale: 1.08, thresholdScale: 1 },
     atmosphere: {

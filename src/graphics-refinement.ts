@@ -119,7 +119,43 @@ const ARENA_ENVIRONMENT_SCALES: Readonly<Record<ArenaId, number>> = Object.freez
   // surface mix the shipped Nuke Town was fitted at, so the same 0.24.
   // nuketown2's 0.32 is NOT carried: that bump was measured for its own damp
   // asphalt + night-lighting lane, not for this map.
-  'atomic-acres-rebuild': 0.24,
+  //
+  // LANE I, 2026-09-16: 0.24 -> 0.30, and it is SPENT FROM A BUDGET THIS PASS
+  // FREED, not added on top. The same pass took the arena's CDL gain
+  // luminance 0.9225 -> 0.8569 (-7.1%; see `atomic-acres-rebuild` in
+  // rendering/art-direction.ts). The shadow-floor lane's own calibration on
+  // this route puts 0.24 -> 1.0 at +7.6% sunlit luma, i.e. +1% per 0.1 of
+  // scale, so 0.24 -> 0.30 returns about +0.6% of the 7.1% removed. Net the
+  // frame is still ~6.5% darker than it shipped, and the difference is that
+  // the returned light now arrives as ENVIRONMENT REFLECTION on the glass,
+  // chrome, vehicle panels and asphalt the owner asked for, instead of as a
+  // flat multiplier on every pixel.
+  //
+  // 0.30 IS THE GATE'S NUMBER, NOT A JUDGEMENT. graphics-refinement.test.ts
+  // "keeps neutral IBL subordinate to authored key lights in every arena"
+  // caps every id at 0.30 and grants nuketown2 an exact, separately reviewed
+  // 0.32 (docs/threejs-knowledge/ibl-contract-reconciliation.md). This pass
+  // first tried 0.40 on the budget argument above, the gate went red, and the
+  // value came back to the cap rather than the cap moving. If a stronger
+  // environment is wanted here it needs that contract re-derived on its own
+  // evidence, which is an owner-visible change, not a lane trim.
+  //
+  // THIS SCALAR IS THE ONLY REFLECTION LEVER THIS ARENA HAS, and that is the
+  // real ceiling on "shading and reflections" here. `scene.environment` is a
+  // single scalar and `material.envMapIntensity` is a literal no-op without a
+  // bound per-material envMap (measured, see the nuketown2 note above). The
+  // route that binds one exists and is NOT nuketown-specific in its
+  // selection: `bindNuketownVehicleReflections` (rendering/arena-environment-
+  // ibl.ts, gated on `arenaId === 'nuketown2'`) keys purely on
+  // `material.userData.forgeRole` in {glass, paint, chrome} and gives glass
+  // 1.2x and paint/chrome 0.7x of the reflection scale. Nothing in
+  // atomic-acres-rebuild-arena.ts tags `forgeRole` and the arena does not
+  // build through vehicle-forge/materials.ts, which is the only tagger in the
+  // tree - so ungating it for this arena today would traverse the scene and
+  // bind nothing. The unlock is on the ARENA side (tag the bus/semi/car glass,
+  // paint and chrome, or build them through the vehicle forge); after that
+  // this id can join the gate and get true per-family specular.
+  'atomic-acres-rebuild': 0.3,
 });
 
 export function arenaEnvironmentScale(arenaId: ArenaId): number {

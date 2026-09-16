@@ -227,6 +227,18 @@ export const definition = createProceduralArenaVisualDefinition({
     // 8. Bus closeup (kitbash proof): catalog GLB over massing placeholder.
     camera('atomic-acres-rebuild-bus-closeup', [3, 2.4, 1.5], [-5.5, 1.4, 0.8], 'geometry', 1.04),
     // 10-14. ADDED 2026-09-16 to make more of the reference corpus gradeable.
+    //
+    // RE-AIMED after the first capture: three of the five framed badly because
+    // they were placed against the house table's RAW cx/cz, and `centred()`
+    // multiplies plan positions AND sizes by ATOMIC_ACRES_REBUILD_SPREAD (1.6).
+    // The real extents, spread applied: west house x -27.36..-15.84 z -2.4..7.2;
+    // east house x 15.36..27.84 z -7.52..2.72; centre island r 7.68 at z 7.68;
+    // perimeter walls |x| <= 38.4, z in [-41.6, +38.4] (line 96 of the arena
+    // module states this outright and I did not read it the first time).
+    // side-lane-east sat 1.2 m off the east flank and filled the frame with one
+    // siding panel; road-far-end sat at z -34, past the road entirely, on bare
+    // apron; balcony-backyard sat OUTSIDE the west house's south wall at 4.6 m,
+    // looking at a utility pole. All three now derive from the spread extents.
     // `npm run qa:catalogue` reports 556 reference images against 9 paired
     // stations - 1.6% coverage - so almost nothing the owner authored is
     // actually being measured against. Even the 18-plate frozen bar only had 9
@@ -250,7 +262,7 @@ export const definition = createProceduralArenaVisualDefinition({
     // cz -1.5 against the west's +1.5, so mirroring the x was never going to
     // land. Moved outboard to sit between the east house and the x = +31
     // service road.
-    camera('atomic-acres-rebuild-side-lane-east', [29, 1.65, -10], [29, 1.5, 14], 'geometry', 1.04),
+    camera('atomic-acres-rebuild-side-lane-east', [33, 1.65, -12], [29, 1.5, 8], 'geometry', 1.04),
     // `yellow-backyard.png`: the east house's rear yard. -yard-geometry already
     // covers the west/north sweep; this is the matching east station, and it is
     // also the first camera this arena has ever pointed at the east house.
@@ -258,10 +270,10 @@ export const definition = createProceduralArenaVisualDefinition({
     // `road-far-end.png`: the loop road from its far end, held low and straight
     // down the carriageway so the road surface itself is the subject - it is the
     // most-resolved material in the build and nothing was framing it.
-    camera('atomic-acres-rebuild-road-far-end', [0, 1.55, -34], [0, 1.7, 30], 'geometry', 1.04),
+    camera('atomic-acres-rebuild-road-far-end', [0, 1.5, -20], [0, 1.8, 10], 'geometry', 1.04),
     // `balcony-backyard.png`: from the west upper storey out over its own back
     // lawn. Second station on the upper floor, which until today had none at all.
-    camera('atomic-acres-rebuild-balcony-backyard', [-17, 4.6, -4], [-15, 2.2, -20], 'light-occlusion', 1.04),
+    camera('atomic-acres-rebuild-balcony-backyard', [-21, 4.7, 2], [-21, 2.2, -16], 'light-occlusion', 1.04),
   ],
   collisionIdentity: {
     authoritativeArenaId: 'atomic-acres-rebuild',
