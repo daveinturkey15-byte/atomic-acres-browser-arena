@@ -252,3 +252,20 @@
 - Open defects (queued, not hidden): interior backsplash notch behind oven tower
   (critic gap 8 confirmed — cover panel or GLB patch); lavender wash persists at
   distance (V stopped at 1 correction by its stop rule; remains critic gap 1).
+
+## Midday set — 2026-09-16 (dave-gaming-pc, OMP)
+- Commit 93d39531a on contrib/dave-gaming-pc/omp/atomic-acres-rebuild-20260914 (pushed).
+- Integrated: Lane R round-1 (sun 17°→35° elevation, hue-only hemisphere/fill
+  renorm, arena-scoped branch — gdev direction correct, dark floor intact),
+  Lane C worn crates (centered) + kitchen-counter-v2 (notch fixed on pixels),
+  planting x2 (12 trees, 8 rocks, 10 pears, 60 scrub, 30 rocks), GLB泵 cache +
+  all loads through the one pump.
+- Pipeline fix: play serves dist-compare/, not dist/ — morning builds never
+  went live until the dist-compare rebuild. Always build both; curl-verify a
+  staged URL (200 + real bytecount, not the 1206B SPA fallback).
+- Root-caused the "invisible kitbash" saga: fence bays were live all along
+  (in-scene mesh census); N-crates carried a -5 m staging offset (C: D-C2),
+  fixed by the centered worn swap; captures need 90s+ settle for 10MB+ GLBs.
+- Captures: rebuild-rb11 (full), rebuild-rb12 (street+yard); published to
+  repo-state/rb11-*, rb12-*. Scene-graph census: 21/21 worn crates resolved,
+  21/21 fallbacks hidden, zero page errors.
