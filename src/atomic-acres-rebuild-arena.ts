@@ -956,8 +956,29 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     inPbr('WoodFloor', 1, 1, 0xc9bfae),
     inPbr('WoodFloor', 2, 1, 0xb6b0a6),
   ] as const;
-  const crateAge = (a: number, b: number): THREE.Material =>
-    crateAges[(((a * 3 + b * 5) % crateAges.length) + crateAges.length) % crateAges.length]!;
+  /**
+   * ROUNDS ITS INPUTS, and that is a fix rather than a nicety.
+   *
+   * This picked a material by grid position and was written for the integer
+   * loop counters the choke stack uses. The island cluster passes its authored
+   * spot offsets straight through, and those are FRACTIONAL: crateAge(-0.8, 2.2)
+   * evaluates to index 0.5999999999999996, `crateAges[0.6]` is `undefined`, and
+   * the non-null assertion swallowed it. Four of the five island crates were
+   * therefore built with NO MATERIAL and rendered as three.js's default white -
+   * which is exactly the "untextured white boxes" visible beside the bus and
+   * semi in every hero frame, and which had already been misattributed twice
+   * (once to a materials regression, once to placeholder massing surviving its
+   * GLB). The fifth crate sits at (0, 3), lands on a whole number, and renders
+   * correctly, which is why the cluster looked partly right.
+   *
+   * Rounding here rather than at the call site so no future caller can
+   * reintroduce it; the yard cluster was already rounding defensively at its
+   * own call and now does not need to.
+   */
+  const crateAge = (a: number, b: number): THREE.Material => {
+    const slot = Math.round(a) * 3 + Math.round(b) * 5;
+    return crateAges[((slot % crateAges.length) + crateAges.length) % crateAges.length]!;
+  };
 
   // ---- Desert surround + side service roads (fact 1; topdown plate edges) ----
   centred(builder, 'aarr-desert-apron', [0, -0.06, 0], [140, 0.1, 150], sand, { cast: false });
