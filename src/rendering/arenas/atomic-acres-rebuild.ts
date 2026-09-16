@@ -210,6 +210,20 @@ export const definition = createProceduralArenaVisualDefinition({
     //    interiors frame do not share a convention and deriving from the latter
     //    would have put this camera through a wall.
     camera('atomic-acres-rebuild-upper-landing', [-17, 4.7, 5.5], [-19.7, 4.2, 2.0], 'geometry', 1.04),
+    // 9. West great room looking NORTH at the glazed elevation. Added
+    //    2026-09-16 alongside the shell-wall aperture split, because that work
+    //    was unreviewable without it: a sun raycast proved 0.68 m2 of direct
+    //    sun now reaches the west floor where 0.00 m2 reached it before, but
+    //    the pool lands at z 5.73-6.13, just inside the north wall, and station
+    //    6 sits at z=5.5 looking toward z=2.0 - so the only lit floor in the
+    //    house is directly BEHIND that camera. A change that cannot be seen at
+    //    any authored station is a change nobody can regress. This station
+    //    faces the glazing the way `living-room-eye.png` does, so the pair is
+    //    also a fair comparison rather than a blank wall against a window wall.
+    //    West house spans x -27.4..-15.8, z -2.4..7.2 (cx/cz/w/d in the house
+    //    table are pre-SPREAD; SPREAD is 1.6), so this eye stands in the room's
+    //    south half and looks back at the north elevation.
+    camera('atomic-acres-rebuild-interior-sunlit', [-19, 1.7, 1.5], [-20.6, 0.85, 6.8], 'light-occlusion', 1.04),
     // 8. Bus closeup (kitbash proof): catalog GLB over massing placeholder.
     camera('atomic-acres-rebuild-bus-closeup', [3, 2.4, 1.5], [-5.5, 1.4, 0.8], 'geometry', 1.04),
   ],

@@ -193,6 +193,10 @@ export const VIEWPOINT_CATALOG = Object.freeze({
     'atomic-acres-rebuild-yard-geometry',
     'atomic-acres-rebuild-interior-west',
     'atomic-acres-rebuild-upper-landing',
+    // Added 2026-09-16 with the shell-wall aperture split: the only sunlit
+    // floor in the west house lands behind station -interior-west, so without
+    // this station the sun that now enters is unreviewable and unregressable.
+    'atomic-acres-rebuild-interior-sunlit',
     'atomic-acres-rebuild-bus-closeup',
   ]),
 });
