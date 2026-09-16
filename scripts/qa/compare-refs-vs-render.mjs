@@ -214,6 +214,35 @@ const arg = (name, fallback) => {
 const flag = (name) => argv.includes(name);
 
 const REFS_DIR = resolve(arg('--refs', 'C:/Users/david/Desktop/stuff/atomic-acres-catalog/_judge/refs'));
+
+/**
+ * Some pairings name a plate that does NOT live in the frozen-bar directory —
+ * `map__center-loop.png` is in `batch-2-layout/`, and it is the single most
+ * complete statement of this map's intended composition in the whole corpus, so
+ * it earns a pairing even though it sits outside `_judge/refs`.
+ *
+ * Without this the default run drew a REFERENCE MISSING diagnostic beside a
+ * perfectly good render, which is worse than useless: the instrument exists to
+ * say honestly what is and is not being compared, and a red panel there reads
+ * as "the engine produced nothing" when the truth is "the plate is in another
+ * folder". Resolve against the frozen bar first, then these, and report which.
+ */
+const REF_FALLBACK_DIRS = [
+  resolve('C:/Users/david/Desktop/stuff/atomic-acres-catalog/batch-2-layout'),
+  resolve('C:/Users/david/Desktop/stuff/atomic-acres-catalog/batch-3'),
+  resolve('C:/Users/david/Desktop/stuff/atomic-acres-catalog/batch-4-nuketown-graybox'),
+];
+
+/** Absolute path of a pairing's reference, searching the fallbacks in order. */
+function resolveRef(name) {
+  const primary = join(REFS_DIR, name);
+  if (existsSync(primary)) return primary;
+  for (const dir of REF_FALLBACK_DIRS) {
+    const candidate = join(dir, name);
+    if (existsSync(candidate)) return candidate;
+  }
+  return primary;
+}
 const CAPTURES_DIR = resolve(arg('--captures', 'C:/Users/david/Desktop/stuff/repo-state'));
 const OUT_DIR = resolve(arg('--out', 'C:/Users/david/Desktop/stuff/repo-state'));
 const PANEL_H = Number(arg('--panel-height', '720'));
@@ -391,11 +420,11 @@ const humanTime = (date) => {
 };
 
 const composeSheet = async (pair, index, total, context) => {
-  const refPath = join(REFS_DIR, pair.ref);
+  const refPath = resolveRef(pair.ref);
   const refExists = existsSync(refPath);
   const left = refExists
     ? await referencePanel(refPath)
-    : await diagnosticPanel('REFERENCE MISSING', `${pair.ref} was not found in ${REFS_DIR}`, 960);
+    : await diagnosticPanel('REFERENCE MISSING', `${pair.ref} was not found in ${REFS_DIR} or any fallback reference directory`, 960);
 
   let right;
   let rightTitle;
@@ -516,7 +545,7 @@ const composeIndex = async (sheets, context) => {
     const x = MARGIN + col * BLOCK_W;
     const y = gridTop + row * BLOCK_H;
 
-    const refPath = join(REFS_DIR, pair.ref);
+    const refPath = resolveRef(pair.ref);
     const refThumb = existsSync(refPath)
       ? await sharp(refPath).resize(THUMB_W, THUMB_H, { fit: 'contain', background: '#000000' }).png().toBuffer()
       : await sharp({ create: { width: THUMB_W, height: THUMB_H, channels: 4, background: '#3a2020' } }).png().toBuffer();
@@ -602,7 +631,7 @@ if (LIST_ONLY) {
     capturesSeen: CAPTURE_FILES.length,
     plan: PAIRINGS.map((pair) => ({
       ref: pair.ref,
-      refPresent: existsSync(join(REFS_DIR, pair.ref)),
+      refPresent: existsSync(resolveRef(pair.ref)),
       viewpoint: pair.viewpoint,
       match: pair.match,
       capture: context.resolved[pair.ref]?.path ?? null,
