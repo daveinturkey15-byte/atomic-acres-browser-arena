@@ -30,7 +30,7 @@ const val = (flag, dflt) => {
 };
 const CATALOG = val('--catalog', 'C:/Users/david/Desktop/stuff/atomic-acres-catalog');
 const OUT = val('--out', join(CATALOG, 'catalogue.html'));
-const CAPTURES = val('--captures', '');
+const CAPTURES = val('--captures', 'artifacts/viewpoint-regression/final-pm3/atomic-acres-rebuild');
 const THUMB_W = Number(val('--thumb-width', '360'));
 const FORCE = args.includes('--force');
 const THUMBS = join(CATALOG, '.thumbs');
@@ -116,13 +116,36 @@ async function thumb(src) {
   return dest;
 }
 
+// Captures live in the game repo, not under CATALOG, so they get their own
+// namespace in the thumb store rather than a relative path that would escape it.
+async function captureThumb(src) {
+  const dest = join(THUMBS, `capture__${basename(src)}.webp`);
+  if (!FORCE && existsSync(dest)) return dest;
+  mkdirSync(dirname(dest), { recursive: true });
+  await sharp(src).resize({ width: THUMB_W, withoutEnlargement: true }).webp({ quality: 72 }).toFile(dest);
+  return dest;
+}
+
+/**
+ * The in-engine counterpart for a paired reference, if one has been captured.
+ * A station with no capture renders as an explicit "not captured" panel rather
+ * than as an empty slot - the same honesty rule compare-refs-vs-render.mjs
+ * follows, for the same reason: a missing render is a finding, and a blank is
+ * indistinguishable from one that simply looks like nothing.
+ */
+function captureFor(station) {
+  if (!station || !CAPTURES) return null;
+  const file = join(CAPTURES, `${station}.png`);
+  return existsSync(file) ? file : null;
+}
+
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 console.log(`catalogue: ${CATALOG}`);
 mkdirSync(THUMBS, { recursive: true });
 
 const sections = [];
-let totalRefs = 0, totalOutput = 0, paired = 0, unpaired = 0;
+let totalRefs = 0, totalOutput = 0, paired = 0, unpaired = 0, withCapture = 0;
 
 for (const set of SETS) {
   const dir = join(CATALOG, set.dir);
@@ -139,12 +162,20 @@ for (const set of SETS) {
     const { size } = statSync(f);
     let dims = '';
     try { const m = await sharp(f).metadata(); dims = `${m.width}x${m.height}`; } catch { dims = '?'; }
+    const capFile = captureFor(station);
+    let capThumb = null;
+    if (capFile) {
+      try { capThumb = await captureThumb(capFile); } catch { capThumb = null; }
+    }
     items.push({
       href: relative(dirname(OUT), f).split('\\').join('/'),
       thumb: t ? relative(dirname(OUT), t).split('\\').join('/') : null,
+      capHref: capFile ? relative(dirname(OUT), capFile).split('\\').join('/') : null,
+      capThumb: capThumb ? relative(dirname(OUT), capThumb).split('\\').join('/') : null,
       name, station, dims, kb: Math.round(size / 1024),
       sub: relative(dir, dirname(f)).split('\\').join('/'),
     });
+    if (capFile) withCapture += 1;
   }
   sections.push({ ...set, items });
   console.log(`  ${set.id.padEnd(10)} ${String(files.length).padStart(4)} images`);
@@ -158,7 +189,15 @@ const cards = sections.map((s) => {
     const img = it.thumb
       ? `<img src="${esc(it.thumb)}" loading="lazy" alt="${esc(it.name)}">`
       : '<div class="broken">unreadable</div>';
-    return `<figure><a href="${esc(it.href)}" target="_blank">${img}</a>`
+    // Paired references show the in-engine frame beside the plate, so the page
+    // IS the comparison rather than an index pointing at one.
+    const pair = it.station
+      ? (it.capThumb
+        ? `<a href="${esc(it.capHref)}" target="_blank" class="cap"><img src="${esc(it.capThumb)}" loading="lazy" alt="in-engine"><b>IN-ENGINE</b></a>`
+        : '<div class="cap nocap">station authored, not captured in this set</div>')
+      : '';
+    const cls = it.station ? 'pairwrap' : '';
+    return `<figure class="${cls}"><div class="shots"><a href="${esc(it.href)}" target="_blank" class="ref"><img src="${esc(it.thumb ? it.thumb : '')}" loading="lazy" alt="${esc(it.name)}">${it.station ? '<b>REFERENCE</b>' : ''}</a>${pair}</div>`
       + `<figcaption>${esc(it.name)}<span>${it.dims} · ${it.kb} KB${it.sub && it.sub !== '.' ? ` · ${esc(it.sub)}` : ''}</span>${tag}</figcaption></figure>`;
   }).join('');
   return `<section id="${s.id}" class="${s.role}">
@@ -190,6 +229,13 @@ section.output{border-color:#4a3520;background:#171208}
 h2{font-size:15px;margin:0 0 4px}h2 small{color:var(--mute);font-weight:400;font-size:12px}
 .blurb{color:var(--mute);font-size:12px;margin:0 0 12px;max-width:100ch}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+figure.pairwrap{grid-column:span 2}
+.shots{display:grid;grid-template-columns:1fr;gap:0}
+figure.pairwrap .shots{grid-template-columns:1fr 1fr;gap:2px}
+.shots a{position:relative;display:block}
+.shots a b{position:absolute;left:4px;bottom:4px;font-size:8px;letter-spacing:.06em;background:rgba(0,0,0,.72);color:#dbe2f1;padding:1px 5px;border-radius:3px;font-weight:600}
+.shots a.cap b{color:#7ddc9a}
+.cap.nocap{display:flex;align-items:center;justify-content:center;text-align:center;font-size:10px;color:#ff7a7a;background:#2e1616;padding:8px;aspect-ratio:16/10}
 figure{margin:0;background:#0d111b;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 figure img{width:100%;display:block;aspect-ratio:16/10;object-fit:cover;background:#000}
 .broken{padding:30px 8px;text-align:center;color:var(--bad);font-size:11px}
@@ -207,6 +253,7 @@ a{color:var(--warn)}
 <div class="stat alert"><b>${unpaired}</b><span>NO station — ungraded</span></div>
 <div class="stat"><b>${totalOutput}</b><span>our output (not reference)</span></div>
 <div class="stat"><b>${(100 * paired / Math.max(1, totalRefs)).toFixed(1)}%</b><span>corpus coverage</span></div>
+<div class="stat"><b>${withCapture}</b><span>shown beside a live capture</span></div>
 </div>
 <nav>${nav}</nav>
 ${cards}
