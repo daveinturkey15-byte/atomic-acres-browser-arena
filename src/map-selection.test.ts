@@ -46,10 +46,11 @@ describe('opening arena selection', () => {
     expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town · New World', 'Nuketown', 'Raid Rebuild', 'Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3', 'Atomic Acres']);
     // HF-495 (owner, 2026-09-04): selectability derives the menu order from
     // this catalog; the retired original Raid is absent without a second list.
-    // Owner 2026-09-15: rebuild-only preview menu — world-studio stays
-    // registered and decodable, but the menu offers the rebuild alone.
+    // Owner 2026-09-16: the Atomic Acres rebuild is PARKED for a spec-driven
+    // rebuild and nuketown2 is un-parked in its place, so the menu offers
+    // nuketown2 alone. Every other arena stays registered and decodable.
     expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toEqual([
-      'atomic-acres-rebuild',
+      'nuketown2',
     ]);
     expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(13);
     expect(ARENA_SELECTIONS.length).toBe(13);
@@ -433,11 +434,15 @@ describe('opening arena selection', () => {
   // that would make the A/B meaningless: the rebuild being registered but not
   // offered ("published but unselectable"), and the two Nuke Towns being
   // indistinguishable in the menu.
-  it('retains the hidden Nuke Town Rebuild hosted contract', () => {
+  // RENAMED 2026-09-16: nuketown2 is UN-PARKED and is now the selectable arena,
+  // because the Atomic Acres rebuild was shelved for a spec-driven rebuild and
+  // menuArenaSelection() throws when the default is not selectable. Every
+  // feature assertion below is unchanged - only the roster role swapped.
+  it('offers the un-parked Nuke Town Rebuild as the selectable hosted arena', () => {
     const rebuild = arenaSelection('nuketown2');
     expect(rebuild.id).toBe('nuketown2');
-    expect(rebuild.selectable).toBe(false);
-    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).not.toContain('nuketown2');
+    expect(rebuild.selectable).toBe(true);
+    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toContain('nuketown2');
     // The owner's three kept features, as far as the registry can carry them.
     expect(rebuild.multiplayer).toBe(true);
     expect(rebuild.fieldSupport).toBe(true);
@@ -464,11 +469,14 @@ describe('opening arena selection', () => {
   // under test is the LAYOUT. What this pins is the brief: team kind, 1 bot
   // to open with max six, multiplayer + field support, code authoring, a
   // unique display name, and a route that does not steal the shipped id.
-  it('offers the Atomic Acres rebuild as a selectable hosted team arena', () => {
+  // RENAMED 2026-09-16: the rebuild is PARKED. It stays registered and decodable
+  // so network, replay and storage callers keep working - that boundary is the
+  // reason `selectable` exists as a separate flag from registration.
+  it('retains the parked Atomic Acres rebuild as a registered, decodable arena', () => {
     const rebuild = arenaSelection('atomic-acres-rebuild');
     expect(rebuild.id).toBe('atomic-acres-rebuild');
-    expect(rebuild.selectable).toBe(true);
-    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toContain('atomic-acres-rebuild');
+    expect(rebuild.selectable).toBe(false);
+    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).not.toContain('atomic-acres-rebuild');
     expect(rebuild.kind).toBe('team');
     expect(rebuild.multiplayer).toBe(true);
     expect(rebuild.fieldSupport).toBe(true);

@@ -82,9 +82,11 @@ describe('arena selectability', () => {
 
   it('offers exactly the rows the registry flags as selectable, and hides exactly the rest', () => {
     const offered = SELECTABLE_ARENAS.map((entry) => entry.id);
-    // Owner 2026-09-15: rebuild-only preview menu. world-studio stays
-    // registered and decodable (see the hidden-row assertions below).
-    expect(offered).toEqual(['atomic-acres-rebuild']);
+    // Owner 2026-09-16: the rebuild is PARKED for a spec-driven rebuild and
+    // nuketown2 is un-parked in its place. The pair moves together because
+    // menuArenaSelection() throws when the default is not selectable, so an
+    // empty roster is not a reachable state.
+    expect(offered).toEqual(['nuketown2']);
     // DERIVED on both sides. This replaces "the menu list IS the registry",
     // which was only true on the days nothing was parked and had to be
     // rewritten every time one was. Both partitions are computed from the flag,

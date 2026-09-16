@@ -32,7 +32,11 @@ export const ARENA_IDS = Object.freeze([
 export type ArenaId = typeof ARENA_IDS[number];
 
 /** Current menu default; retained IDs remain valid wire identities. */
-export const DEFAULT_ARENA_ID: ArenaId = 'atomic-acres-rebuild';
+// SHELVED 2026-09-16 (owner): the rebuild is parked for a spec-driven rebuild,
+// so the default follows the un-parked arena. This is the network/replay/storage
+// default as well as the menu's, which is why it moves with the selectable flag
+// rather than independently of it.
+export const DEFAULT_ARENA_ID: ArenaId = 'nuketown2';
 
 const CURRENT_ARENA_IDS: ReadonlySet<string> = new Set(ARENA_IDS);
 

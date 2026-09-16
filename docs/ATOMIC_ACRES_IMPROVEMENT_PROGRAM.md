@@ -21,6 +21,15 @@ Drive the arena toward the owner's reference corpus, continuously, in bounded lo
   every pass, never declared finished.
 - **Animations** — currently untouched; the last standing gap in the owner's list.
 - **POVs** — every reference pairs to a capture station, or it is not being graded.
+- **LAYOUT, CIRCULATION AND GAMEPLAY — first, and never frozen.** This heading was missing
+  from the first version of this document, and its absence is why sixteen consecutive lanes
+  were chartered to paint. Routes, cover, sightlines, verticality, flanks, apertures,
+  traversal and spawn quality are the SUBJECT of the work, not a constraint on it. A pass
+  that improves only the look of a map that does not play is a pass that failed.
+  System order is layout first and dressing last: S1 layout and circulation, S2 streets and
+  ground, S3 structures, S4 interiors and connectivity, S5 lighting rig, S6 materials,
+  S7 props, S8 motion, S9 time-of-day and weather. The rejected build did S6 and S7 first
+  and wrote its numeric brief at hour 32.
 
 ### The bar
 
@@ -154,9 +163,33 @@ looks good — that has happened here twice.
 
 - **PASS 82:** never add, remove, hide or toggle a light at runtime. Changing the light set
   invalidates every shader program.
-- **Presentation-only lanes must not move authority.** The arena builds to colliders 122,
-  physicsColliders 122, raycastMeshes 139, shotSurfaces 139. Run
-  `npx tsx artifacts/lane-f/census.ts` before and after; if either moves, revert.
+- **COMPLEXITY FLOORS, not a freeze.** This replaces the rule that broke the first build.
+  The previous text pinned the arena at colliders 122 / shotSurfaces 139 and told every lane
+  to REVERT if either moved. Combined with `AGENTS.md`, that made adding a wall, a room, a
+  ladder or a piece of cover a revert-able offence for every agent on the project, and it is
+  the direct cause of the rejected map: `atomic-acres-rebuild-authority.ts` - the file owning
+  every collider, shot surface and spawn - has exactly ONE commit in its history, while
+  89% of all line churn went into a file whose own header says it can contain no gameplay.
+  The result measured 122 colliders against nuketown2's 369 on 61% more ground, with a mean
+  of 1.7 cover pieces within 6 m of a spawn against nuketown2's 17.3.
+
+  A **presentation** lane still must not move authority, and still proves it with
+  `npx tsx artifacts/lane-f/census.ts` before and after. But a **layout lane is chartered to
+  move it**, and the gate is a FLOOR it must clear, not a pin it must match:
+
+  | floor | target | nuketown2 for scale |
+  |---|---|---|
+  | movement colliders | >= 300 | 369 |
+  | shot surfaces | >= 350 | 389 |
+  | breakable windows | >= 8 | 8 |
+  | spawns per team | 8 | 8 |
+  | cover pieces within 6 m of each spawn | >= 6 | 17.3 mean |
+  | reachable floors | >= 4 | - |
+  | distinct cross-map routes | >= 6 | - |
+  | 8x8 grid cells occupied | >= 50/64 | 55/64 |
+
+  Every lane brief must say which side of that line it is on. A brief that says neither is
+  malformed and must be rejected rather than guessed at.
 - **Readability beats decoration.** This is a competitive FPS map: an effect that hides a
   player is a bug.
 - **Never weaken a verifier, threshold or test to get green.**

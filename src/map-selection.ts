@@ -170,7 +170,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   // relative order below these two moved previews.
   Object.freeze({
     id: 'nuketown2' as const,
-    selectable: false,
+    selectable: true,
     routeId: 'nuke-town-rebuild' as const,
     // NUKETOWN2 is a team arena like the shipped Nuke Town; only Map 3 is the explore kind.
     kind: 'team' as const,
@@ -553,9 +553,17 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   // two-storey houses teal-west / yellow-east (fact 2), loop road spine with
   // south entry (fact 3 + batch-4 BRIEF mirror note), bus + semi
   // nose-to-nose center-loop cover (fact 4), crate clusters as cover.
+  // SHELVED 2026-09-16 (owner). The layout-validation rebuild is parked: its
+  // gameplay layer was authored once and then frozen by a presentation-only
+  // rule, leaving it at 122 colliders / 139 shot surfaces against nuketown2's
+  // 369 / 389 on 61% more ground. It is being rebuilt to the LAYOUT_CONTRACT
+  // spec rather than polished further. Parking it EMPTIES the selectable roster
+  // unless another arena is un-parked at the same time, because
+  // menuArenaSelection() throws 'Default arena must be selectable' - so
+  // nuketown2 is un-parked in the same edit and DEFAULT_ARENA_ID follows it.
   Object.freeze({
     id: 'atomic-acres-rebuild' as const,
-    selectable: true,
+    selectable: false,
     routeId: 'atomic-acres-rebuild' as const,
     kind: 'team' as const,
     legacyAliases: Object.freeze([]),
