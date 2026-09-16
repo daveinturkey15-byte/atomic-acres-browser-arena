@@ -178,8 +178,17 @@ export const definition = createProceduralArenaVisualDefinition({
   reviewCameras: [
     // 1. The whole plan from the south-east, high enough to read the loop,
     //    both houses, the garages, the sheds and the south-entry choke.
-    camera('atomic-acres-rebuild-overview', [64, 54, 77], [0, 2, -3], 'overview', 1.04),
-    camera('atomic-acres-rebuild-topdown', [0, 100, -13], [0, 0, -13], 'overview', 1.04),
+    // RE-FRAMED 2026-09-16. At [64,54,77] the eye stood 117 m from the aim point
+    // and the built area occupied a small patch in the middle of bare apron -
+    // `layout-angle.png` is a TIGHT three-quarter of the compound, and the pair
+    // was comparing a full frame against a distant island. The playfield is
+    // |x| <= 38.4, z in [-41.6, +38.4], so the built extent is ~77 x 80 m and a
+    // 70-degree review camera needs roughly 70 m of standoff, not 117.
+    camera('atomic-acres-rebuild-overview', [40, 33, 48], [0, 3, -1], 'overview', 1.04),
+    // RE-FRAMED with the overview and for the same reason: y=100 put ~55% of the
+    // frame outside the perimeter walls, where `layout-topdown.png` crops to the
+    // compound. 68 m frames the 77 x 80 m playfield with a modest margin.
+    camera('atomic-acres-rebuild-topdown', [0, 68, -2], [0, 0, -2], 'overview', 1.04),
     // 3. North end at eye height, looking south down the loop past the sheds
     //    toward the bus + semi pair. This is the frame that shows the north
     //    entrance reads as a gap, not a wall.

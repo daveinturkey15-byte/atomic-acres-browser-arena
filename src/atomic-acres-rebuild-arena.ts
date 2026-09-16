@@ -458,7 +458,42 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   // the bake's 0.69 texel spread plus real shading.
   const houseSkin = { west: inPbr('InteriorPlaster', 2, 1, 0x79ccd4), east: inPbr('InteriorPlaster', 2, 1, 0xf7de83) } as const;
   const roof = gndPbr('SidewalkConcrete', 3, 3, 0xc5dcff);
-  const asphalt = gndPbr('AsphaltLoop', 5, 5);
+  /**
+   * ASPHALT, PER AXIS - same defect the concrete pass fixed, left on the roads.
+   *
+   * A flat `repeat (5, 5)` was applied to every asphalt mesh regardless of its
+   * shape. On the two 7 x 90 m service roads that draws a tile 1.4 m across and
+   * 18 m ALONG - a 13:1 stretch - and the result does not read as asphalt at
+   * all: in the 15:37 overview and topdown captures both service roads render
+   * as long brown streaks that look like timber decking, which is exactly how
+   * they were first misread as a materials regression. They are not a
+   * regression; the tiling has been anisotropic since the roads were authored.
+   *
+   * The authored intent is recoverable from the mesh the repeat actually suited:
+   * the 25.2 x 20 m loop at repeat 5 gives a ~4.5 m tile, so that is the tile
+   * size both axes derive from.
+   *
+   * The ladder runs one step past the concrete one. 90 / 4.5 = 20, and the
+   * shared [1,2,4,8] ladder would clamp that to 8 - an 11.25 m tile, still a
+   * 3:1 stretch. Allowing 16 lands it at 5.6 m against 3.5 m across, i.e. 1.6:1.
+   * That costs at most one extra 1024^2 pair (`texture()` caches on
+   * path:repeatX:repeatY, so every distinct pair is its own upload plus mips)
+   * and the arena is at 358.7 MB of decoded VRAM with the budget gate at 500.
+   */
+  const ASPHALT_TILE_M = 4.5;
+  const ASPHALT_SNAP = [1, 2, 4, 8, 16] as const;
+  const snapAsphalt = (v: number): number => ASPHALT_SNAP.reduce(
+    (best, step) => (Math.abs(step - v) < Math.abs(best - v) ? step : best), ASPHALT_SNAP[0]);
+  const asphaltByRepeat = new Map<string, THREE.Material>();
+  const asphaltFor = (spanU: number, spanV = spanU): THREE.Material => {
+    const rx = snapAsphalt(spanU / ASPHALT_TILE_M);
+    const ry = snapAsphalt(spanV / ASPHALT_TILE_M);
+    const key = `${rx}:${ry}`;
+    let mat = asphaltByRepeat.get(key);
+    if (!mat) { mat = gndPbr('AsphaltLoop', rx, ry); asphaltByRepeat.set(key, mat); }
+    return mat;
+  };
+  const asphalt = asphaltFor(25.2, 20);
   const timber = inPbr('StairTimber', 2, 1);
   const sand = gndPbr('DesertSand', 8, 8);
   /**
@@ -605,7 +640,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
 
   // ---- Desert surround + side service roads (fact 1; topdown plate edges) ----
   centred(builder, 'aarr-desert-apron', [0, -0.06, 0], [140, 0.1, 150], sand, { cast: false });
-  pair(builder, 'aarr-service-road', 31, 0.0, 0, [7, 0.06, 90], asphalt, { cast: false });
+  pair(builder, 'aarr-service-road', 31, 0.0, 0, [7, 0.06, 90], asphaltFor(7, 90), { cast: false });
   // Parked trailers outside the walls (topdown plate east/west edges).
   for (const [side, z] of [[-31, -18], [-31, 8], [31, -8], [31, 16]] as Array<[number, number]>) {
     centred(builder, `aarr-outside-trailer-${side < 0 ? 'w' : 'e'}-${z}`, [side, 1.4, z], [2.6, 2.8, 9], vehicle);
@@ -657,9 +692,9 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   // stays on, which is the point: this is the surface the bus, the semi, the
   // houses and the fence lines finally have something to cast a shadow ONTO.
   centred(builder, 'aarr-road-loop', [0, 0.02, 2], [25.2, 0.04, 20], asphalt, { cast: false });
-  centred(builder, 'aarr-road-entry-south', [0, 0.02, 23], [7, 0.04, 22], asphalt, { cast: false });
-  centred(builder, 'aarr-road-spine-north', [0, 0.02, -17], [7, 0.04, 18], asphalt, { cast: false });
-  centred(builder, 'aarr-road-entry-stub-north', [0, 0.02, -29], [7, 0.04, 6], asphalt, { cast: false });
+  centred(builder, 'aarr-road-entry-south', [0, 0.02, 23], [7, 0.04, 22], asphaltFor(7, 22), { cast: false });
+  centred(builder, 'aarr-road-spine-north', [0, 0.02, -17], [7, 0.04, 18], asphaltFor(7, 18), { cast: false });
+  centred(builder, 'aarr-road-entry-stub-north', [0, 0.02, -29], [7, 0.04, 6], asphaltFor(7, 6), { cast: false });
   // Center island disc, SPREAD 1.6x (r 4.8 at z 4.8).
   const island = new THREE.Mesh(new THREE.CylinderGeometry(4.8, 4.8, 0.12, 24), concreteFor(9.6));
   island.name = 'aarr-loop-island';
