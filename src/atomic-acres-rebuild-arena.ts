@@ -86,6 +86,7 @@ import {
 } from './atomic-acres-rebuild-interiors';
 import { box, emptyTelemetry, standard, type Builder } from './additional-maps';
 import { texturedMaterial } from './art-kit';
+import { bindLateArenaReflectionSurfaces } from './rendering/arena-environment-ibl';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { ArenaId } from './arena-identity';
 import type { ArenaMap } from './map';
@@ -100,6 +101,97 @@ export const ATOMIC_ACRES_REBUILD_BOUNDS = Object.freeze({
   minZ: -48,
   maxZ: 48,
 });
+
+/**
+ * PER-FAMILY SPECULAR TAGS (lane-K, 2026-09-16).
+ *
+ * `scene.environmentIntensity` is one scalar for the entire scene, so the only
+ * way this arena can give its glass, its vehicle paint and its metal trim
+ * DIFFERENT amounts of reflection is a per-material `envMap`. The route that
+ * binds one already exists and is not arena-specific in its selection:
+ * `bindNuketownVehicleReflections` (rendering/nuketown-reflection-proxy.ts,
+ * driven from rendering/arena-environment-ibl.ts) keys purely on
+ * `material.userData.forgeRole` in {glass, paint, chrome} and binds the arena's
+ * own PMREM at 1.2x (glass) or 0.7x (paint, chrome) of the reflection scale.
+ * Until this pass nothing in this arena carried the tag - the arena does not
+ * build through vehicle-forge/materials.ts, which was the only tagger in the
+ * tree - so the route ran over it and bound nothing.
+ *
+ * WHAT IS DELIBERATELY NOT TAGGED. The point of a per-family binding is that it
+ * lifts the automotive and glazed surfaces WITHOUT lifting every matte wall, so
+ * the tag stays off siding, plaster, roofs, asphalt, concrete, hedge, rock,
+ * timber, canvas, rubber and every emissive lamp lens. `roof` in particular is
+ * shared between the six architectural roofs and the bus roof, and it is left
+ * untagged rather than split: making six house and garage roofs reflective to
+ * reach one 0.2 m bus panel that a catalog GLB covers anyway is the exact trade
+ * this selection exists to refuse.
+ */
+type ForgeRole = 'glass' | 'paint' | 'chrome';
+
+/** Tags a material for the per-family specular binding and returns it. */
+function forgeRole<T extends THREE.Material>(material: T, role: ForgeRole): T {
+  material.userData.forgeRole = role;
+  return material;
+}
+
+/**
+ * The catalog GLBs whose materials are classified.
+ *
+ * Restricted by asset family on purpose. The kitbash pump also streams crates,
+ * plants, litter, fences, sheds, signs and interior wear, and a name regex let
+ * loose over all of them would start tagging things like a "steel" crate band
+ * by accident. Vehicles, the two houses and the street lamps are the families
+ * the reference plates actually judge specular on.
+ */
+const REFLECTIVE_CATALOG_GLB = /\/(?:vehicles|houses)\/|\/spread\/lamp\.glb$/;
+const CATALOG_VEHICLE_GLB = /\/vehicles\//;
+
+/**
+ * Role for one catalog material, from the name the asset itself carries.
+ *
+ * These are this project's own authored GLBs and their material names are
+ * deterministic: BusGlassDark / SemiGlassDark / BurntGlassDark / JeepGlass /
+ * WindowGlass / GlassDark / SolarPanelGlass; SemiChrome / BusSteel / SemiSteel
+ * / WreckSteel / JeepSteel / GalvMetal / DarkMetal / BlackMetal; and the paint
+ * coats SchoolBusYellow / SemiCabRed / TrailerWhite / TrailerRib / OliveDrab /
+ * SunBleachTop / RustyCharBase / *TrimBlack. Classifying on the name rather
+ * than on `metalness` is what keeps the black-painted trim (metalness 0) apart
+ * from the bare steel (metalness 0.7-0.9) - both read as "dark" numerically and
+ * only one of them is metal.
+ *
+ * Paint is admitted on the VEHICLE families only. House siding is a matte
+ * painted wall; lifting it is the thing the per-family route exists to avoid.
+ */
+function catalogForgeRole(url: string, materialName: string): ForgeRole | null {
+  if (/glass|windshield|windscreen/i.test(materialName)) return 'glass';
+  if (/chrome|steel|metal/i.test(materialName)) return 'chrome';
+  if (CATALOG_VEHICLE_GLB.test(url) && /yellow|red|white|olive|drab|rib|bleach|rusty|trim|paint/i.test(materialName)) return 'paint';
+  return null;
+}
+
+/**
+ * Tags a resolved catalog GLB's materials in place. Returns true when anything
+ * new was tagged, which is the caller's signal that the binding has to be
+ * replayed for surfaces the environment pass has already run past.
+ *
+ * Idempotent: a material already carrying a role is left alone, so the repeated
+ * clones the pump produces do not re-mark materials for recompile.
+ */
+function tagCatalogReflectionRoles(url: string, loaded: THREE.Object3D): boolean {
+  if (!REFLECTIVE_CATALOG_GLB.test(url)) return false;
+  let tagged = false;
+  loaded.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return;
+    for (const material of Array.isArray(child.material) ? child.material : [child.material]) {
+      if (!material || material.userData.forgeRole) continue;
+      const role = catalogForgeRole(url, material.name);
+      if (!role) continue;
+      material.userData.forgeRole = role;
+      tagged = true;
+    }
+  });
+  return tagged;
+}
 
 function mulberry32(seed: number): () => number {
   let state = seed >>> 0;
@@ -294,6 +386,29 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   // grows with instance count and boot never settles.
   const glbCache = new Map<string, Promise<{ scene: THREE.Object3D }>>();
   const kitbash = (url: string, pos: Vec3, yaw: number, hide: THREE.Mesh[], hideHouseId?: string, raw?: boolean): void => {
+    // A PLACEHOLDER THAT CANNOT BE HIDDEN IS WORSE THAN NO PLACEHOLDER.
+    //
+    // Every mesh in `hide` is a fallback that must disappear the moment its GLB
+    // resolves, and the `.then()` below does exactly that - `mesh.visible =
+    // false`. It was not working, and the reason is that hiding the SOURCE mesh
+    // does nothing once the static batcher has merged its geometry into a
+    // combined draw: the merged copy is a different object and keeps rendering.
+    //
+    // additional-maps.ts:123 sets `presentationBatchCandidate = !solid && !shots`,
+    // and `centred()` in this module hard-pins BOTH to false on every mesh it
+    // makes - which is what keeps this file presentation-only. So every massing
+    // placeholder in the arena was, by construction, a batch candidate.
+    //
+    // The visible cost was the hero shots: `bus.glb` and `semi.glb` both load
+    // and render, and their massing boxes were still drawn around them, so the
+    // two vehicles the plates are built around read as white boxes. A raycast
+    // into the tiled pixels of the bus station returns `aarr-bus-body`, the
+    // placeholder, not the bus.
+    //
+    // Opting these meshes out of batching makes `visible = false` authoritative.
+    // The draw-call cost is transient and small: it applies only while the GLB
+    // is in flight, because after it resolves these meshes draw nothing at all.
+    for (const mesh of hide) mesh.userData.presentationBatchCandidate = false;
     const anchor = new THREE.Group();
     anchor.name = `aarr-glb-${url.split('/').pop()}`;
     // raw = asset authored at TRUE world dims (Lane N spread rebuilds):
@@ -311,6 +426,14 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
       }
       pending.then((gltf) => {
         anchor.add(gltf.scene.clone(true));
+        // THE HERO SURFACES ARRIVE AFTER THE ENVIRONMENT DOES. This pump is
+        // async and every vehicle GLB HIDES the massing it replaces, so the bus,
+        // the semi, the jeep, the rusty car, both houses and the lamps are not
+        // in the scene when arena-environment-ibl traverses it. Tag them and ask
+        // for the live binding to be replayed; the replay is a no-op unless this
+        // scene currently holds one, so a callback that lands after a map switch
+        // or under reflectionQuality 'off' touches nothing.
+        if (tagCatalogReflectionRoles(url, anchor)) bindLateArenaReflectionSurfaces(scene);
         for (const mesh of hide) mesh.visible = false;
         if (hideHouseId !== undefined) hideHouseSkin(hideHouseId);
       }).catch(() => {
@@ -511,16 +634,66 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
    * 7.38 stddev of panel structure where it had none.
    */
   const VEHICLE_GREY = 0xdedbd8;
-  const vehicle = inPbr('BathTile', 3, 1, VEHICLE_GREY);
-  const rust = standard(0x8a5a3a, 0.9, 0.1);
+  /**
+   * VEHICLE PANELS, PER AXIS - the identical defect `asphaltFor` above fixed on
+   * the service roads, left on the vehicles.
+   *
+   * The header's reasoning is right and the tint is right; the REPEAT was the
+   * bug. BathTile is an 8x8 SQUARE grid and it was applied at a flat (3, 1) to
+   * every vehicle panel regardless of the panel's shape. On the bus body that
+   * draws 24 columns across 17.6 m and 8 rows up 2.6 m - a 0.73 x 0.33 m cell -
+   * and `artifacts/viewpoint-regression/final-pm3/atomic-acres-rebuild/
+   * atomic-acres-rebuild-bus-closeup.png` shows the result honestly: the body
+   * reads as a tiled bathroom wall. A trailer's ribbing is a set of parallel
+   * VERTICAL ribs and contains no horizontal lines at all, so the horizontals
+   * were never wanted - they came in free with a square grid.
+   *
+   * Both axes now derive from one physical size. Across the body: one rib every
+   * VEHICLE_RIB_M, i.e. repeatX = span / (rib x 8 cells), snapped so the pair
+   * count stays bounded. Up the body: exactly ONE cell row over the full height
+   * (repeatY = 1/8), which stretches the bake's horizontal grout onto the
+   * panel's top and bottom EDGES - where a real trailer carries a rub rail and
+   * a roof cap - instead of ruling lines across its face.
+   *
+   * The snap ladder is deliberately two rungs, not the asphalt five. `texture()`
+   * caches on path:repeatX:repeatY and each distinct pair is its own 1024^2
+   * upload plus mips for BOTH the diffuse and the roughness bake, and the arena
+   * is at 358.7 MB of decoded VRAM against a 500 MB gate. Two rungs cover the
+   * whole set at one extra pair: the long bodies (bus 17.6 m, semi trailer
+   * 15.2 m, outside trailers 14.4 m) land on 4 for a 0.45-0.55 m rib, and the
+   * garage cars (6.7 m and 3.5 m) land on 2 for a 0.22-0.42 m rib.
+   */
+  const VEHICLE_RIB_M = 0.5;
+  const VEHICLE_BATHTILE_CELLS = 8;
+  const VEHICLE_RIB_SNAP = [2, 4] as const;
+  const vehicleByRepeat = new Map<number, THREE.Material>();
+  /**
+   * Vehicle panel coat for a body of `planLength` metres along its long axis.
+   * The argument is the PLAN length, the same number the `centred()` call site
+   * passes, because `centred()` is what multiplies x and z by SPREAD.
+   */
+  const vehicleFor = (planLength: number): THREE.Material => {
+    const wanted = (planLength * ATOMIC_ACRES_REBUILD_SPREAD) / (VEHICLE_RIB_M * VEHICLE_BATHTILE_CELLS);
+    const rx = VEHICLE_RIB_SNAP.reduce(
+      (best, step) => (Math.abs(step - wanted) < Math.abs(best - wanted) ? step : best), VEHICLE_RIB_SNAP[0]);
+    let mat = vehicleByRepeat.get(rx);
+    if (!mat) {
+      mat = forgeRole(inPbr('BathTile', rx, 1 / VEHICLE_BATHTILE_CELLS, VEHICLE_GREY), 'paint');
+      vehicleByRepeat.set(rx, mat);
+    }
+    return mat;
+  };
+  const rust = forgeRole(standard(0x8a5a3a, 0.9, 0.1), 'paint');
   // Green mass + rock + crate, measured 2026-09-16 by the integrator on the
   // yard capture: road stddev 19.3, house wall 10.4, fence 12.0, concrete 8.9,
   // but every green mass 0.21-1.62. The LawnPatchy bake itself measures 16.13,
   // so the flatness was the `standard()` colour, not the texture set. Each
   // green now rides that bake; hedge and scrub are darker than it, so both
   // tints stay under 1.0 per channel.
-  const olive = gndPbr('LawnPatchy', 2, 2, 0xeee6f7);
-  const darkPole = standard(0x3a3d42, 0.7, 0.4);
+  const olive = forgeRole(gndPbr('LawnPatchy', 2, 2, 0xeee6f7), 'paint');
+  // Lamp posts and the patio umbrella pole - the arena's only authored metal
+  // trim (metalness 0.4). The umbrella pole is never kitbashed over.
+  const darkPole = forgeRole(standard(0x3a3d42, 0.7, 0.4), 'chrome');
   const hedge = gndPbr('LawnPatchy', 2, 2, 0xb4f9cd);
   const rock = gndPbr('SidewalkConcrete', 1, 1, 0xd9e3f1);
 
@@ -643,7 +816,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   pair(builder, 'aarr-service-road', 31, 0.0, 0, [7, 0.06, 90], asphaltFor(7, 90), { cast: false });
   // Parked trailers outside the walls (topdown plate east/west edges).
   for (const [side, z] of [[-31, -18], [-31, 8], [31, -8], [31, 16]] as Array<[number, number]>) {
-    centred(builder, `aarr-outside-trailer-${side < 0 ? 'w' : 'e'}-${z}`, [side, 1.4, z], [2.6, 2.8, 9], vehicle);
+    centred(builder, `aarr-outside-trailer-${side < 0 ? 'w' : 'e'}-${z}`, [side, 1.4, z], [2.6, 2.8, 9], vehicleFor(9));
   }
 
   // ---- Lawns: green ONLY inside fenced lots (fact 1; aerial plates) ----
@@ -842,6 +1015,14 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     emissive: 0x24333d,
     emissiveIntensity: 0.3,
   });
+  // The sixteen window panes are the arena's only authored glazing, and glazing
+  // is the family the per-family binding pays the most for (1.2x against paint
+  // and chrome's 0.7x). At roughness 0.35 the envMap reads as a broad sky sheen
+  // across the pane rather than as a mirror, which is what the street plates
+  // show. Hidden per house once that house's catalog GLB lands - its own
+  // WindowGlass/GlassDark materials are tagged on arrival by the kitbash
+  // resolve - so both routes to a pane end up on the same binding.
+  forgeRole(windowGlass, 'glass');
 
   const rugTexture = starburstRugTexture();
   const rugMaterial = rugTexture
@@ -1316,8 +1497,8 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     centred(builder, `aarr-garage-${garage.id}-door`, [garage.cx, 1.1, garage.cz + 2.55], [2.6, 2.2, 0.12], roof);
     centred(builder, `aarr-garage-${garage.id}-driveway`, [garage.cx, 0.04, garage.cz + 5.5], [3.2, 0.08, 6.0], concreteFor(3.2, 6.0), { cast: false });
     const [carX, carZ] = garage.car;
-    centred(builder, `aarr-car-${garage.id}-body`, [carX, 0.55, carZ], [1.8, 0.7, 4.2], vehicle);
-    centred(builder, `aarr-car-${garage.id}-cabin`, [carX, 1.15, carZ - 0.2], [1.6, 0.6, 2.2], vehicle);
+    centred(builder, `aarr-car-${garage.id}-body`, [carX, 0.55, carZ], [1.8, 0.7, 4.2], vehicleFor(4.2));
+    centred(builder, `aarr-car-${garage.id}-cabin`, [carX, 1.15, carZ - 0.2], [1.6, 0.6, 2.2], vehicleFor(2.2));
   }
 
   // ---- Sheds in back (north) corners + rear patio sets (fact 8; aerials) ----
@@ -1340,12 +1521,12 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   // ---- Bus + semi nose-to-nose inside the loop (fact 4; all plates) ----
   // Bus body is catalog batch1 (Blender procedural + baked PBR, manifest
   // atomic-acres-rebuild-bus-20260915); massing stays as instant fallback.
-  const busBody = centred(builder, 'aarr-bus-body', [-3.2, 1.4, 0.5], [2.5, 2.6, 11.0], vehicle, { rotation: [0, 0.28, 0] });
+  const busBody = centred(builder, 'aarr-bus-body', [-3.2, 1.4, 0.5], [2.5, 2.6, 11.0], vehicleFor(11.0), { rotation: [0, 0.28, 0] });
   const busRoof = centred(builder, 'aarr-bus-roof', [-3.2, 2.8, 0.5], [2.5, 0.2, 11.0], roof, { rotation: [0, 0.28, 0] });
   // Base-frame catalog GLB: standard kitbash applies SPREAD + yaw.
   kitbash('./assets/rebuild/vehicles/bus.glb', [-3.2, 0, 0.5], 0.28, [busBody, busRoof]);
   const semiCab = centred(builder, 'aarr-semi-cab', [3.4, 1.5, -3.4], [2.5, 2.8, 2.8], rust, { rotation: [0, -0.22, 0] });
-  const semiTrailer = centred(builder, 'aarr-semi-trailer', [4.6, 1.6, 3.2], [2.6, 3.0, 9.5], vehicle, { rotation: [0, -0.22, 0] });
+  const semiTrailer = centred(builder, 'aarr-semi-trailer', [4.6, 1.6, 3.2], [2.6, 3.0, 9.5], vehicleFor(9.5), { rotation: [0, -0.22, 0] });
   // Catalog whole-rig GLB spans the cab+trailer zone at the shared yaw.
   kitbash('./assets/rebuild/vehicles/semi.glb', [4.0, 0, -0.1], -0.22, [semiCab, semiTrailer]);
 

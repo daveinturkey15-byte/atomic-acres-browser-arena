@@ -349,6 +349,10 @@ export class ParticleRuntime {
     const profile = arenaParticleProfile(this.arenaId);
     for (let index = 0; index < this.fieldList.length; index += 1) {
       this.fieldList[index].setVolume(profile.volumeRadiusM, profile.volumeAboveM, profile.volumeBelowM);
+      // Event families ignore it (`ParticleField.update` zeroes the floor for
+      // anything not flagged `ambient`), so this is one uniform write rather
+      // than a branch on family id.
+      this.fieldList[index].setPresenceFloor(profile.ambientPresenceFloor);
     }
 
     const motes = profile.motes;

@@ -189,6 +189,20 @@ export type ArenaParticleProfile = Readonly<{
   volumeRadiusM: number;
   volumeAboveM: number;
   volumeBelowM: number;
+  /**
+   * Floor under the birth/death envelope for this arena's AMBIENT families,
+   * 0..0.8. Default 0, which is the shipped behaviour exactly.
+   *
+   * See `ParticleField.setPresenceFloor` for the derivation. In one line: an
+   * ambient family churns rather than dying, its ages are spread uniformly
+   * over life, and the mean of the unfloored `rise * decay^2` across such a
+   * field is 0.27 - so an arena that authors its motes at the family opacity
+   * ceiling still renders a field whose MEAN alpha is about a quarter of that
+   * ceiling. This raises the mean. It does not raise the ceiling, the authored
+   * peak any particle is allowed to reach, the density, the instance count,
+   * the draw count or the buffer size.
+   */
+  ambientPresenceFloor: number;
 }>;
 
 const arena = (
@@ -200,6 +214,8 @@ const arena = (
   volumeRadiusM: number,
   volumeAboveM: number,
   volumeBelowM: number,
+  /** Optional, and omitted by every arena that has not measured one. */
+  ambientPresenceFloor = 0,
 ): ArenaParticleProfile => Object.freeze({
   arenaId,
   label,
@@ -209,6 +225,7 @@ const arena = (
   volumeRadiusM,
   volumeAboveM,
   volumeBelowM,
+  ambientPresenceFloor,
 });
 
 /**
@@ -331,11 +348,57 @@ export const ARENA_PARTICLE_PROFILES: Readonly<Record<ArenaId, ArenaParticleProf
   // readability contract as the nuketown2 row: motes at the 0.11 family
   // ceiling, drift under its 0.16, radii sized to subtend real pixels at the
   // 1280x720 review viewport (see the nuketown2 comment above).
+  //
+  // LANE L, 2026-09-16 — THE AIR WAS AUTHORED AND STILL NOT IN THE FRAME.
+  // Same failure as the nuketown2 row above, one layer down, and again
+  // measured rather than felt. Not one mote appears in any of the fourteen
+  // `final-pm3` captures, and the radius/alpha fix that rescued nuketown2 was
+  // already applied here. Two multiplicative causes, neither of which is
+  // density, opacity or instance count:
+  //
+  //   1. ENVELOPE. Ambient ages are spread uniformly over life and the
+  //      envelope is `rise * decay^2`, whose mean over that spread is 0.27
+  //      (1/3 for the decay, less 0.061 for the `rise` shoulder over the first
+  //      eighth of life). Authoring motes AT the 0.11 family ceiling therefore
+  //      renders a field whose MEAN alpha is roughly a quarter of it.
+  //      `ambientPresenceFloor` 0.5 raises the mean to 0.5 + 0.5 * 0.27 = 0.64
+  //      of peak - MEASURED 2.44x in `ambient-visibility.test.ts` - and cannot
+  //      loosen the bound: per-particle alpha is still that particle's own
+  //      authored peak, clamped to the 0.11 family ceiling at spawn.
+  //   2. VOLUME. The camera-riding box was 16 m tall (12 above the eye, 4
+  //      below), so most of the authored dust hung ABOVE head height, against
+  //      a bright sky, where an additive sprite adds nothing a viewer can see.
+  //      Real suspended desert dust sits in the lowest few metres. 5 above /
+  //      3 below is an 8 m band: the SAME instances at 2.0x the number density
+  //      through the air the player, the road and every review camera look at.
+  //
+  // Net: 2.44 x 2.0 = ~4.9x the integrated brightness along a horizontal sight
+  // line at eye level, for zero extra instances, zero extra draws, zero extra
+  // buffer and zero extra per-frame allocation.
+  // DENSITIES ARE BYTE-IDENTICAL to what shipped, deliberately, exactly as the
+  // nuketown2 fix kept its own - this is not a budget change.
+  //
+  // MOTION: hot, dry, STILL (docs/ATOMIC_ACRES_REFERENCE.md sections 1-2 -
+  // clear Mojave, 35.01 deg sun, ~54,500 lux on the horizontal). At that
+  // insolation on 0.30-albedo decomposed granite the air over this map is
+  // convecting, not advecting, so the dust rises and wanders instead of
+  // streaming: `riseMps` and `swirlMps` up, `windPull` down on both families,
+  // `fallMps` down and `flutterMps`/spin up on the drift so scrub litter turns
+  // over in a thermal rather than being blown along. `weather/wind-field.ts`
+  // carries the matching cut to the arena's mean wind.
+  //
+  // READABILITY: nothing here can hide a player. Both families are
+  // `obscuring: false` and additively blended, so they can only ever ADD light
+  // to a pixel and cannot darken a silhouette; peak alpha is unchanged and
+  // still clamped to the 0.11 / 0.16 family ceilings, themselves under the
+  // readability contract's 0.16 for fine matter; the centre cone, the ADS
+  // widening and the 0.35 m near-lens cull are untouched; and neither family
+  // enters the aggregate screen-load budget, because neither can obscure.
   'atomic-acres-rebuild': arena(
     'atomic-acres-rebuild', 'desert-dust-and-scrub-seed',
-    { density: 0.72, colorWarm: 0xe8d4a8, colorCool: 0xc4c0b0, radiusM: 0.026, riseMps: 0.055, swirlMps: 0.22, windPull: 0.72, opacity: 0.11 },
-    { density: 0.42, kind: 'seed', colorWarm: 0xd8c890, colorCool: 0xa8a488, radiusM: 0.055, fallMps: 0.29, windPull: 0.82, flutterMps: 0.56, spinRadiansPerSecond: 1.45, opacity: 0.15 },
-    0.55, 21, 12, 4,
+    { density: 0.72, colorWarm: 0xe8d4a8, colorCool: 0xc4c0b0, radiusM: 0.030, riseMps: 0.09, swirlMps: 0.26, windPull: 0.42, opacity: 0.11 },
+    { density: 0.42, kind: 'seed', colorWarm: 0xd8c890, colorCool: 0xa8a488, radiusM: 0.055, fallMps: 0.22, windPull: 0.55, flutterMps: 0.70, spinRadiansPerSecond: 1.7, opacity: 0.15 },
+    0.55, 21, 5, 3, 0.5,
   ),
 });
 
@@ -374,6 +437,10 @@ export function auditArenaParticleCoverage(
       || !(entry.volumeRadiusM > 0)
       || !(entry.volumeAboveM > 0)
       || !(entry.volumeBelowM > 0)
+      // A floor at or above 1 would delete the respawn crossfade entirely and
+      // make the field pop; the field clamps to 0.8 anyway, and a catalog row
+      // that asks for more than that is an authoring mistake, not a taste.
+      || !(entry.ambientPresenceFloor >= 0) || entry.ambientPresenceFloor > 0.8
       || entry.shaftResponse < 0;
   }).sort();
   return Object.freeze({

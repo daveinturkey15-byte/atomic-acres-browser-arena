@@ -19,6 +19,82 @@ import { createNuketownReflectionProxy, bindNuketownVehicleReflections, releaseN
 
 export { skyBackdropPreset };
 
+/**
+ * THE ARENAS ADMITTED TO PER-FAMILY SPECULAR.
+ *
+ * `bindNuketownVehicleReflections` is nuketown-NAMED and is not nuketown-
+ * scoped. Its selection keys purely on `material.userData.forgeRole` being one
+ * of {glass, paint, chrome} and it binds the arena's own environment texture as
+ * a real per-material `envMap` at 1.2x (glass) or 0.7x (paint, chrome) of the
+ * reflection scale. That binding is the ONLY route to per-family specular on
+ * this renderer: `scene.environmentIntensity` is a single scalar for the whole
+ * scene, and `material.envMapIntensity` is a measured no-op while no envMap is
+ * bound (graphics-refinement.ts, 2026-09-16).
+ *
+ * Membership is an explicit allow-list rather than "every arena", because
+ * admitting an arena is a look change and has to be reviewable as one. An arena
+ * belongs here only once its own builder tags `forgeRole`: nuketown2 tags
+ * through vehicle-forge/materials.ts, atomic-acres-rebuild tags in
+ * atomic-acres-rebuild-arena.ts (lane-K, 2026-09-16). Every arena outside this
+ * set traverses to zero tagged materials and is bit-identical either way - the
+ * gate is here so that stays true by construction rather than by coincidence.
+ */
+const PER_FAMILY_SPECULAR_ARENAS: ReadonlySet<ArenaId> = new Set<ArenaId>(['nuketown2', 'atomic-acres-rebuild']);
+
+/**
+ * The live binding, retained so surfaces that arrive AFTER the environment can
+ * be bound with the same texture and the same scale.
+ *
+ * The binder traverses the scene once, at generation time. atomic-acres-rebuild
+ * streams its catalog GLBs through an async four-deep pump and HIDES the
+ * massing each one replaces, so the bus, the semi, the jeep, the rusty car,
+ * both houses and the lamps are reachable only after this module has already
+ * run - i.e. exactly the surfaces the reference plate is judged on would be the
+ * ones the reflection pass never touched. `bindLateArenaReflectionSurfaces`
+ * replays the binding for them; it is deliberately a replay of what was bound
+ * rather than a second policy, so there is one source of truth for the texture
+ * and the scale.
+ */
+let lastPerFamilyBinding: {
+  readonly scene: THREE.Scene;
+  readonly texture: THREE.Texture | null;
+  readonly scale: number;
+} | null = null;
+
+/** Binds per-family specular for an admitted arena; a no-op receipt for the rest. */
+function bindArenaReflectionSurfaces(
+  scene: THREE.Scene,
+  arenaId: ArenaId,
+  texture: THREE.Texture | null,
+  scale: number,
+): void {
+  if (!PER_FAMILY_SPECULAR_ARENAS.has(arenaId)) {
+    // An unadmitted arena must also clear any retained binding, so a late
+    // surface in THIS arena can never pick up the previous arena's texture.
+    lastPerFamilyBinding = null;
+    return;
+  }
+  lastPerFamilyBinding = { scene, texture, scale };
+  bindNuketownVehicleReflections(scene, texture, scale);
+}
+
+/**
+ * Replays the live per-family binding over the scene for surfaces that were not
+ * in it when the environment was generated.
+ *
+ * No-op unless this exact scene currently holds a binding, so it is safe to
+ * call from an async asset callback that may outlive its arena: after a map
+ * switch, after `disposeArenaIbl`, or under `reflectionQuality: 'off'` the
+ * retained binding is null or belongs to another scene and nothing is touched.
+ * The binder itself only marks a material for recompile when its envMap
+ * actually changes, so repeated replays cost a traversal and no shader work.
+ */
+export function bindLateArenaReflectionSurfaces(scene: THREE.Scene): void {
+  const binding = lastPerFamilyBinding;
+  if (!binding || binding.scene !== scene) return;
+  bindNuketownVehicleReflections(scene, binding.texture, binding.scale);
+}
+
 /** PMREM resolution tiers gated by reflectionQuality graphics setting. */
 export type PmremResolutionTier = 128 | 256 | 512;
 
@@ -150,7 +226,7 @@ export async function generateArenaEnvironmentMap(
   // Apply to scene.environment with combined intensity
   scene.environment = environmentTexture;
   scene.environmentIntensity = budgetEnvironmentIntensity * arenaScale * reflectionScale;
-  if (arenaId === 'nuketown2') bindNuketownVehicleReflections(scene, environmentTexture, reflectionScale);
+  bindArenaReflectionSurfaces(scene, arenaId, environmentTexture, reflectionScale);
 
   pmrem.dispose();
 
@@ -172,6 +248,11 @@ export async function generateArenaEnvironmentMap(
  * Must be called before generating a new arena's environment map.
  */
 export function disposeArenaIbl(state: ArenaIblState): void {
+  // Drop the retained binding FIRST. `bindLateArenaReflectionSurfaces` exists
+  // to bind surfaces that arrive after generation, and an asset callback can
+  // land after teardown; replaying a disposed texture onto a live material is
+  // exactly the use-after-destroy this ordering forbids.
+  lastPerFamilyBinding = null;
   if (state.environmentTexture) {
     releaseNuketownVehicleReflections(state.environmentTexture);
     state.environmentTexture.dispose();
@@ -196,7 +277,7 @@ export function updateArenaEnvironmentIntensity(
   }
   const newIntensity = budgetEnvironmentIntensity * state.arenaEnvironmentScale * reflectionScale;
   scene.environmentIntensity = newIntensity;
-  if (state.arenaId === 'nuketown2') bindNuketownVehicleReflections(scene, state.environmentTexture, reflectionScale);
+  if (state.arenaId) bindArenaReflectionSurfaces(scene, state.arenaId, state.environmentTexture, reflectionScale);
   return Object.freeze({
     ...state,
     budgetEnvironmentIntensity,
@@ -248,7 +329,7 @@ export async function applyArenaEnvironmentIbl(
 ): Promise<ArenaIblState> {
   // If reflection quality is off, clear environment and return empty state
   if (reflectionQuality === 'off') {
-    if (arenaId === 'nuketown2') bindNuketownVehicleReflections(scene, null, 0);
+    bindArenaReflectionSurfaces(scene, arenaId, null, 0);
     if (scene.environment === currentIblState.environmentTexture) {
       scene.environment = null;
     }

@@ -206,6 +206,7 @@ export const VIEWPOINT_CATALOG = Object.freeze({
     'atomic-acres-rebuild-backyard-east',
     'atomic-acres-rebuild-road-far-end',
     'atomic-acres-rebuild-balcony-backyard',
+    'atomic-acres-rebuild-center-loop',
     'atomic-acres-rebuild-bus-closeup',
   ]),
 });

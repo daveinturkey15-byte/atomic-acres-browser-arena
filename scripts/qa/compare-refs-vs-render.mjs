@@ -158,6 +158,15 @@ export const PAIRINGS = Object.freeze([
     match: 'indicative',
     note: 'From the west upper storey out over its own back lawn. Second upper-floor station; before today the upper floor had none.',
   }),
+  // batch-2-layout/map__center-loop.png is not in _judge/refs, so pass --refs at
+  // that directory to compose this pair. Kept here because it is the most
+  // complete single statement of the map's intended composition in the corpus.
+  Object.freeze({
+    ref: 'map__center-loop.png',
+    viewpoint: 'atomic-acres-rebuild-center-loop',
+    match: 'direct',
+    note: 'Elevated centred read down the loop carriageway: both houses flanking, bus and semi nose-to-nose in the turnaround, desert and ridge beyond.',
+  }),
   Object.freeze({
     ref: 'teal-ground-cutaway.png',
     viewpoint: null,

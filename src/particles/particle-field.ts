@@ -276,6 +276,11 @@ export class ParticleField {
   private disposed = false;
 
   private volume: ParticleVolume = { radiusM: 20, aboveM: 12, belowM: 4 };
+  /**
+   * Floor under the birth/death envelope, AMBIENT FAMILIES ONLY. Default 0,
+   * which is the shipped behaviour byte for byte. See `setPresenceFloor`.
+   */
+  private presenceFloor = 0;
 
   constructor(spec: ParticleFamilySpec, seed: number) {
     this.spec = spec;
@@ -337,6 +342,43 @@ export class ParticleField {
     this.volume.radiusM = Math.max(1, radiusM);
     this.volume.aboveM = Math.max(0.5, aboveM);
     this.volume.belowM = Math.max(0.5, belowM);
+  }
+
+  /**
+   * Floor under the envelope for an AMBIENT family, 0..0.8.
+   *
+   * WHY THIS EXISTS, AND WHY IT IS NOT AN OPACITY RAISE. The envelope
+   * `rise * decay^2` is a BIRTH-AND-DEATH curve, and it is the right curve for
+   * an event family: a puff should appear, bloom and disperse. An ambient
+   * family does not die - `respawnAmbient` teleports the particle to a fresh
+   * point in the camera volume and resets its age - so the envelope is only
+   * ever a crossfade that hides the teleport. It is not a life cycle anybody is
+   * meant to watch.
+   *
+   * The cost of using it unfloored is arithmetic, not taste. Ambient ages are
+   * spread uniformly over life, so the mean of `decay^2` across the field is
+   * integral of (1-t)^2 dt over 0..1 = 1/3, and the `rise` shoulder over the
+   * first eighth of life takes another 0.061 off that, leaving 0.27. An arena
+   * that authors its motes AT the family opacity ceiling therefore renders a
+   * field whose MEAN alpha is roughly a QUARTER of that ceiling. That is the
+   * difference between a catalog that says the map has air and a frame that
+   * has none.
+   *
+   * With floor `f` the envelope becomes `f + (1 - f) * rise * decay^2`, so:
+   *   - the BOUND is unchanged - at `decay = 1` the expression is still 1, so
+   *     no particle can exceed its own authored peak, which `maintainAmbient`
+   *     already clamped to `spec.maxOpacity`. (The brightest SAMPLED particle
+   *     does rise a little, because the youngest particle in a finite
+   *     population is not at envelope 1. The bound is the guarantee; the
+   *     sample maximum is not, and `ambient-visibility.test.ts` says so.)
+   *   - the MEAN rises to `f + (1 - f) * 0.27`;
+   *   - the crossfade survives, at reduced depth, so respawn still does not pop.
+   *
+   * It costs no instance, no draw, no buffer and no branch on the hot path.
+   * Bounded at 0.8 so a floor can never remove the crossfade altogether.
+   */
+  setPresenceFloor(value: number): void {
+    this.presenceFloor = Number.isFinite(value) ? Math.min(0.8, Math.max(0, value)) : 0;
   }
 
   /** Live population an ambient family maintains. Ignored by event families. */
@@ -577,6 +619,8 @@ export class ParticleField {
     const colorArray = mesh.instanceColor ? (mesh.instanceColor.array as Float32Array) : null;
     const volume = this.volume;
     const wrapHeight = volume.aboveM + volume.belowM;
+    // Hoisted out of the per-particle loop; event families never take a floor.
+    const presenceFloor = this.spec.ambient ? this.presenceFloor : 0;
 
     let index = 0;
     while (index < this.live) {
@@ -641,7 +685,9 @@ export class ParticleField {
       // dispersal.
       const rise = normalizedAge < 0.125 ? normalizedAge * 8 : 1;
       const decay = 1 - normalizedAge;
-      const envelope = rise * decay * decay;
+      // `presenceFloor` is 0 for every event family and for every arena that
+      // does not author one, so this is an identity for all of them.
+      const envelope = presenceFloor + (1 - presenceFloor) * rise * decay * decay;
       const radius = this.radius0[index] + (this.radius1[index] - this.radius0[index]) * normalizedAge;
 
       // --- combat guards, applied to every particle, with no bypass ---------

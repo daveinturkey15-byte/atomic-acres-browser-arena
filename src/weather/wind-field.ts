@@ -242,7 +242,24 @@ export const WIND_PROFILES: Readonly<Record<ArenaId, WindProfile>> = Object.free
   // direction a 64 m walled corridor lets it run. Gust scale 22 m is the
   // spacing of the bodies that break it up: house, garage, bus + semi pair,
   // garage, house (LAYOUT_CONTRACT facts 2-4 + batch-4 garages).
-  'atomic-acres-rebuild': profile('atomic-acres-rebuild', 'desert-loop-channelled-draught', 1.57, 3.0, 2.6, 22, 0.7, false),
+  //
+  // LANE L, 2026-09-16 — SPEEDS RESOLVED TO THE HOUR, BEARING UNTOUCHED.
+  // `docs/ATOMIC_ACRES_REFERENCE.md` sections 1-2 fix this map at a clear
+  // Joshua Tree mid-morning: 34.13N, sun 35.01 deg, air mass 1.74, ~54,500 lux
+  // on the horizontal. That is the calm side of the desert diurnal cycle -
+  // the ground is heating hard but the afternoon upslope wind that actually
+  // moves air here has not started. Base 3.0 m/s is a Beaufort 2 breeze
+  // running the length of the street all morning, which is the wrong air for
+  // the hour and is why `atomic-acres` (a SHELTERED back yard) was authored
+  // slower than this open-map row at 0.62 + 2.4.
+  //
+  // 1.1 base + 1.9 gust is the same ceiling shape read as CONVECTION rather
+  // than advection: near-still between puffs, with thermal gusts that arrive
+  // and die. Peak (base + gust) falls 5.6 -> 3.0 m/s. The bearing, the 22 m
+  // gust scale and the 0.7 swing are unchanged, so the direction the street
+  // channels air - the only gameplay-legible term here, since it shears rain
+  // and leans foliage - is exactly where the layout lane left it.
+  'atomic-acres-rebuild': profile('atomic-acres-rebuild', 'desert-loop-still-morning-thermals', 1.57, 1.1, 1.9, 22, 0.7, false),
 });
 
 export function windProfile(arenaId: ArenaId): WindProfile {

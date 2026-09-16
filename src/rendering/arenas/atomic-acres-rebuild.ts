@@ -235,6 +235,19 @@ export const definition = createProceduralArenaVisualDefinition({
     camera('atomic-acres-rebuild-interior-sunlit', [-19, 1.7, 1.5], [-20.6, 0.85, 6.8], 'light-occlusion', 1.04),
     // 8. Bus closeup (kitbash proof): catalog GLB over massing placeholder.
     camera('atomic-acres-rebuild-bus-closeup', [3, 2.4, 1.5], [-5.5, 1.4, 0.8], 'geometry', 1.04),
+    // 15. The centre loop, slightly elevated, looking down the carriageway with
+    //     both houses flanking and the bus + semi nose-to-nose in the middle.
+    //     This is the composition of batch-2-layout/map__center-loop.png, which
+    //     is the single most complete statement of what this map is meant to
+    //     look like - and nothing was framing it. -bus-closeup stands ON the
+    //     vehicles and -street-south stands 45 m back at eye height, so neither
+    //     produces the plate's elevated centred read.
+    // Stood at z=30 on the first attempt, which is SOUTH of the entry choke: the
+    //     merged barricade filled the middle of the frame and hid the whole
+    //     turnaround. Moved north of it. `aarr-road-entry-south` spans z 12..34
+    //     and the centre island sits at z 7.68, so z=18 clears the choke and
+    //     still holds both houses in the flanks.
+    camera('atomic-acres-rebuild-center-loop', [0, 3.6, 18], [0, 1.9, -2], 'overview', 1.04),
     // 10-14. ADDED 2026-09-16 to make more of the reference corpus gradeable.
     //
     // RE-AIMED after the first capture: three of the five framed badly because

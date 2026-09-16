@@ -218,18 +218,43 @@ export const ARENA_AMBIENT_PROFILES: Readonly<Record<ArenaId, ArenaAmbientProfil
   ]),
   // Graybox wave 2026-09-14 (ShellGray): the rebuild's read is the same as
   // nuketown2's — houses are props, the loop road is the fight — with the
-  // LAYOUT_CONTRACT desert surround (fact 1) instead of test-town lawns:
-  // scrub rustle and a desert bird replace the lawn voices; the bus + semi
-  // nose-to-nose in the loop (fact 4) keep the cooling-shell tick and add a
-  // trailer creak; crates, fences, poles and lamps supply the knocks and hum.
-  'atomic-acres-rebuild': profile('atomic-acres-rebuild', 'desert-loop-street-and-parked-rigs', [8, 17], [
-    event('aa.bus-shell-tick', 'clank', 5, [780, 610], 0.20, 0.017, 0, 22),
-    event('aa.trailer-creak', 'creak', 4, [300, 210], 0.55, 0.016, 0, 26),
-    event('aa.crate-knock', 'clank', 4, [1_500, 1_180], 0.13, 0.014, 0, 24),
-    event('aa.loop-gust', 'whoosh', 6, [330, 160], 1.60, 0.018, 0.8, 16),
-    event('aa.scrub-rustle', 'rustle', 4, [2_300, 1_450], 0.50, 0.013, 1.3, 12),
-    event('aa.pole-hum-swell', 'call', 3, [120, 240], 1.20, 0.012, 0, 34),
-    event('aa.desert-bird', 'chirp', 2, [2_600, 3_100], 0.10, 0.019, 0, 47),
+  // LAYOUT_CONTRACT desert surround (fact 1) instead of test-town lawns.
+  //
+  // LANE L, 2026-09-16 — RE-AUTHORED FOR THE HOUR THE MAP IS ACTUALLY AT.
+  // The row above was nuketown2's suburb bed with two words swapped, and it
+  // read as a windy street. `docs/ATOMIC_ACRES_REFERENCE.md` sections 1-2 fix
+  // this arena at a clear Joshua Tree mid-morning - 34.13N, sun 35.01 deg,
+  // ~54,500 lux on the horizontal, air mass 1.74 - which is a HOT, DRY, STILL
+  // hour, not a breezy one. Three consequences, and each one is a voice:
+  //
+  //   - The loudest thing in a Mojave map at this hour is INSECT, not wind:
+  //     the Apache cicada starts ratcheting as surface temperature climbs and
+  //     is the highest-weight event here for that reason.
+  //   - The second loudest is METAL IN THE SUN. Two parked rigs (fact 4) with
+  //     painted steel shells under 54,500 lux tick and creak as they expand;
+  //     that is thermal, so it belongs to the still hour rather than being the
+  //     cooling-down tick the nuketown2 row borrowed.
+  //   - Air arrives as a CONVECTIVE PUFF and dies, which is the same reading of
+  //     the hour that `weather/wind-field.ts` now carries (base 3.0 -> 1.1 m/s)
+  //     - so `aar.thermal-puff` replaces the channelled `aa.loop-gust`.
+  //
+  // Wildlife is the local list, not a generic one: common raven and cactus
+  // wren are the two birds a Joshua Tree / Yucca Valley lot actually produces.
+  // The gap range widens 8-17 -> 9-20 s because a still hour should have more
+  // silence in it, and every gain stays inside the band the other profiles use
+  // so this cannot crowd combat audio. Ids are prefixed `aar.` rather than
+  // `aa.` so they can never collide with the shipped `atomic-acres` bed.
+  'atomic-acres-rebuild': profile('atomic-acres-rebuild', 'high-desert-still-morning-and-hot-metal', [9, 20], [
+    event('aar.cicada-ratchet', 'chirp', 6, [4_200, 4_900], 0.35, 0.016, 0, 10),
+    event('aar.bus-shell-tick', 'clank', 5, [820, 640], 0.14, 0.015, 0, 20),
+    event('aar.thermal-puff', 'whoosh', 5, [300, 130], 1.45, 0.016, 0.9, 16),
+    event('aar.semi-trailer-creak', 'creak', 4, [300, 205], 0.55, 0.015, 0, 26),
+    event('aar.scrub-rustle', 'rustle', 4, [2_300, 1_450], 0.55, 0.013, 1.3, 12),
+    event('aar.pole-transformer-hum', 'call', 3, [120, 240], 1.20, 0.012, 0, 34),
+    event('aar.raven-croak', 'call', 3, [640, 470], 0.30, 0.019, 0, 44),
+    event('aar.grit-skitter', 'rustle', 3, [3_100, 2_100], 0.40, 0.011, 1.8, 9),
+    event('aar.cactus-wren-chatter', 'chirp', 2, [2_600, 3_100], 0.16, 0.017, 0, 40),
+    event('aar.highway-truck', 'whoosh', 1, [170, 92], 2.20, 0.013, 0.7, 70),
   ]),
 });
 
