@@ -192,6 +192,10 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
       if (houseSkinInfixes.some((infix) => child.name.includes(infix))) child.visible = false;
     }
   };
+  // One fetch+parse per URL: repeated kitbashes (fence bays x20, crates x21)
+  // clone the resolved scene instead of re-loading. Without this the queue
+  // grows with instance count and boot never settles.
+  const glbCache = new Map<string, Promise<{ scene: THREE.Object3D }>>();
   const kitbash = (url: string, pos: Vec3, yaw: number, hide: THREE.Mesh[], hideHouseId?: string, raw?: boolean): void => {
     const anchor = new THREE.Group();
     anchor.name = `aarr-glb-${url.split('/').pop()}`;
@@ -203,12 +207,18 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     anchor.scale.set(spread, 1, spread);
     root.add(anchor);
     kitbashQueue.push(() => {
-      treeLoader.loadAsync(url).then((gltf) => {
-        anchor.add(gltf.scene);
+      let pending = glbCache.get(url);
+      if (pending === undefined) {
+        pending = treeLoader.loadAsync(url);
+        glbCache.set(url, pending);
+      }
+      pending.then((gltf) => {
+        anchor.add(gltf.scene.clone(true));
         for (const mesh of hide) mesh.visible = false;
         if (hideHouseId !== undefined) hideHouseSkin(hideHouseId);
       }).catch(() => {
         // Placeholder massing stays.
+        glbCache.delete(url);
       }).finally(() => {
         kitbashDepth -= 1;
         kitbashPump();
@@ -562,19 +572,8 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   // atomic-acres-rebuild-bus-20260915); massing stays as instant fallback.
   const busBody = centred(builder, 'aarr-bus-body', [-3.2, 1.4, 0.5], [2.5, 2.6, 11.0], vehicle, { rotation: [0, 0.28, 0] });
   const busRoof = centred(builder, 'aarr-bus-roof', [-3.2, 2.8, 0.5], [2.5, 0.2, 11.0], roof, { rotation: [0, 0.28, 0] });
-  const busAnchor = new THREE.Group();
-  busAnchor.name = 'aarr-bus-glb';
-  busAnchor.position.set(-3.2 * ATOMIC_ACRES_REBUILD_SPREAD, 0, 0.5 * ATOMIC_ACRES_REBUILD_SPREAD);
-  busAnchor.rotation.set(0, 0.28, 0);
-  busAnchor.scale.set(ATOMIC_ACRES_REBUILD_SPREAD, 1, ATOMIC_ACRES_REBUILD_SPREAD);
-  root.add(busAnchor);
-  treeLoader.loadAsync('./assets/rebuild/vehicles/bus.glb').then((gltf) => {
-    busAnchor.add(gltf.scene);
-    busBody.visible = false;
-    busRoof.visible = false;
-  }).catch(() => {
-    // Massing stays: a missing GLB never breaks the lane.
-  });
+  // Base-frame catalog GLB: standard kitbash applies SPREAD + yaw.
+  kitbash('./assets/rebuild/vehicles/bus.glb', [-3.2, 0, 0.5], 0.28, [busBody, busRoof]);
   const semiCab = centred(builder, 'aarr-semi-cab', [3.4, 1.5, -3.4], [2.5, 2.8, 2.8], rust, { rotation: [0, -0.22, 0] });
   const semiTrailer = centred(builder, 'aarr-semi-trailer', [4.6, 1.6, 3.2], [2.6, 3.0, 9.5], vehicle, { rotation: [0, -0.22, 0] });
   // Catalog whole-rig GLB spans the cab+trailer zone at the shared yaw.
@@ -591,20 +590,23 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     centred(builder, `aarr-choke-crate-top-${ix}`, [-1 + ix, 3.5, 14], [1, 1, 1], crate);
   }
   // Island cluster (street plate island): 2x2 + 1 top + planter pair.
-  for (const [dx, dz] of [[-0.8, 2.2], [0.8, 2.2], [-0.8, 3.8], [0.8, 3.8]] as Array<[number, number]>) {
-    centred(builder, `aarr-island-crate-${dx < 0 ? 'w' : 'e'}-${dz < 3 ? 's' : 'n'}`, [dx, 0.62, dz], [1, 1, 1], crate);
+  // Spread 06 crates (0.96 footprint inside the merged island collider).
+  const islandSpots: ReadonlyArray<readonly [number, number, number]> = [[-0.8, 2.2, 0], [0.8, 2.2, 0], [-0.8, 3.8, 0], [0.8, 3.8, 0], [0, 3, 0.6]] as const;
+  for (const [dx, dz, dy] of islandSpots) {
+    const box = centred(builder, `aarr-island-crate-${dx}-${dz}`, [dx, 0.62, dz], [1, 1, 1], crate);
+    kitbash('./assets/rebuild/spread/crate-06.glb', [dx * 1.6, dy, dz * 1.6], (dx + dz) * 0.4, [box], undefined, true);
   }
-  centred(builder, 'aarr-island-crate-top', [0, 1.62, 3], [1, 1, 1], crate);
   pair(builder, 'aarr-hedge-loop', 12.2, 0.6, -4.3, [1.2, 1.2, 2.0], hedge);
   // Yard clusters near fences/pads (topdown plate scatter).
   const yardClusters: ReadonlyArray<readonly [number, number]> = [[-8, -12], [8, -13], [-6, 9], [6, 8]] as const;
   for (const [cx, cz] of yardClusters) {
     const side = cx < 0 ? 'w' : 'e';
     const end = cz < 0 ? 'n' : 's';
-    centred(builder, `aarr-yard-crate-${side}-${end}-0`, [cx, 0.5, cz], [1, 1, 1], crate);
-    centred(builder, `aarr-yard-crate-${side}-${end}-1`, [cx + 1, 0.5, cz], [1, 1, 1], crate);
-    centred(builder, `aarr-yard-crate-${side}-${end}-2`, [cx + 0.5, 1.5, cz], [1, 1, 1], crate);
-    centred(builder, `aarr-yard-crate-${side}-${end}-3`, [cx + 0.5, 0.5, cz + 1], [1, 1, 1], crate);
+    const spots: ReadonlyArray<readonly [number, number, number]> = [[cx, cz, 0], [cx + 1, cz, 0], [cx + 0.5, cz, 0.6], [cx + 0.5, cz + 1, 0]] as const;
+    for (const [sx, sz, sy] of spots) {
+      const box = centred(builder, `aarr-yard-crate-${side}-${end}-${sx}-${sz}`, [sx, 0.5 + sy, sz], [1, 1, 1], crate);
+      kitbash('./assets/rebuild/spread/crate-06.glb', [sx * 1.6, sy, sz * 1.6], (sx + sz) * 0.7, [box], undefined, true);
+    }
   }
 
   // ---- Concrete pads: entrance + shed aprons + 4 lawn pads (fact 7) ----
@@ -627,9 +629,32 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     pair(builder, `aarr-pillar-side-${Math.abs(pz)}`, 24, 1.5, pz, [0.9, 3.0, 0.9], concrete);
   }
   // Wooden privacy fences dividing every lot (fact 9; aerial plates).
-  pair(builder, 'aarr-fence-lot-north', 10, 0.9, -10, [9, 1.8, 0.25], timber);
-  pair(builder, 'aarr-fence-lot-south', 10, 0.9, 8, [9, 1.8, 0.25], timber);
-  pair(builder, 'aarr-fence-drive', 20.5, 0.9, 6, [0.25, 1.8, 10], timber);
+  // Rebuilt bays (Lane N: 3.93 m world width, 2.14 tall, y=0 standing).
+  // Bay world width in base units: 3.93 / 1.6 = 2.456.
+  const fenceRuns: ReadonlyArray<{ name: string; cx: number; cz: number; alongX: boolean; bays: number }> = [
+    { name: 'lot-north', cx: 10, cz: -10, alongX: true, bays: 3 },
+    { name: 'lot-south', cx: 10, cz: 8, alongX: true, bays: 3 },
+    { name: 'drive', cx: 20.5, cz: 6, alongX: false, bays: 4 },
+  ] as const;
+  for (const run of fenceRuns) {
+    const [runW, runE] = pair(builder, `aarr-fence-${run.name}`, run.cx, 0.9, run.cz, run.alongX ? [9, 1.8, 0.25] : [0.25, 1.8, 10], timber);
+    const hide = [runW, runE];
+    for (const side of [-1, 1] as const) {
+      for (let b = 0; b < run.bays; b += 1) {
+        const off = (b - (run.bays - 1) / 2) * 2.456;
+        const bx = run.alongX ? side * run.cx + off : side * run.cx;
+        const bz = run.alongX ? run.cz : run.cz + off;
+        kitbash('./assets/rebuild/spread/fence-bay.glb', [bx * 1.6, 0, bz * 1.6], run.alongX ? 0 : Math.PI / 2, hide, undefined, true);
+      }
+      // Timber end posts close the remainder (bays cover 7.37 of 9, 9.83 of 10).
+      const endOff = run.alongX ? 4.4 : 4.9;
+      for (const e of [-endOff, endOff] as const) {
+        const px = run.alongX ? side * run.cx + e : side * run.cx;
+        const pz = run.alongX ? run.cz : run.cz + e;
+        centred(builder, `aarr-fence-${run.name}-post-${side < 0 ? 'w' : 'e'}-${e < 0 ? 'a' : 'b'}`, [px, 1.0, pz], [0.25, 2.0, 0.25], timber);
+      }
+    }
+  }
 
   // ---- Street lamps x6 (fact 9; street plate dark poles + lamp-pool massing) ----
   const lampSpots: ReadonlyArray<readonly [number, number]> = [[-7, -12], [7, -12], [-7.5, 8], [7.5, 8], [-5.5, 20], [5.5, 20]] as const;
@@ -687,37 +712,34 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     [18, -14, 'yard'],
     [-19, 16, 'yard'],
     [19, 16, 'yard'],
+    [-22, 4, 'yard'],
+    [22, 4, 'yard'],
     [-38, 30, 'desert'],
     [38, 30, 'desert'],
+    [-44, -20, 'desert'],
+    [44, -20, 'desert'],
+    [-40, 44, 'desert'],
+    [40, 44, 'desert'],
   ] as const;
   for (const [tx, tz, kind] of treeSpots) {
     const tag = `${kind}-${tx}-${tz}`;
     const trunk = centred(builder, `aarr-tree-${tag}-trunk`, [tx, 1.0, tz], [0.4, 2.0, 0.4], timber);
     const crown = centred(builder, `aarr-tree-${tag}-crown`, [tx, 2.8, tz], [2.2, 1.8, 2.2], hedge);
     const top = centred(builder, `aarr-tree-${tag}-top`, [tx, 4.0, tz], [1.2, 1.0, 1.2], hedge);
-    const anchor = new THREE.Group();
-    anchor.name = `aarr-tree-${tag}-glb`;
-    // SPREAD applies to placements (helpers do it for boxes; anchor is raw).
-    anchor.position.set(tx * ATOMIC_ACRES_REBUILD_SPREAD, 0, tz * ATOMIC_ACRES_REBUILD_SPREAD);
-    root.add(anchor);
-    treeLoader.loadAsync(treeGLBs[kind]).then((gltf) => {
-      anchor.add(gltf.scene);
-      trunk.visible = false;
-      crown.visible = false;
-      top.visible = false;
-    }).catch(() => {
-      // Placeholder blobs stay: a missing GLB never breaks the lane.
-    });
+    // Through the cached kitbash pump (raw: tree GLBs are world-scale like
+    // the spread rebuilds). Direct parallel loads starve the browser queue
+    // and nothing resolves before capture settle (see pump note above).
+    kitbash(treeGLBs[kind], [tx * ATOMIC_ACRES_REBUILD_SPREAD, 0, tz * ATOMIC_ACRES_REBUILD_SPREAD], 0, [trunk, crown, top], undefined, true);
   }
 
   // ---- Wave-3 dressing: rock clusters + prickly pears (Trellis GLBs over
   // massing blobs, manifest ground-plants-20260915). Non-solid dress.
-  const rockSpots: ReadonlyArray<readonly [number, number]> = [[0, 44], [20, 46], [-20, 46], [-40, 28]] as const;
+  const rockSpots: ReadonlyArray<readonly [number, number]> = [[0, 44], [20, 46], [-20, 46], [-40, 28], [-30, 40], [30, 40], [-44, -8], [44, -8]] as const;
   for (const [rx, rz] of rockSpots) {
     const blob = centred(builder, `aarr-rockdress-${rx}-${rz}`, [rx, 0.5, rz], [1.6, 1.0, 1.6], rock);
     kitbash('./assets/rebuild/plants/rock-cluster.glb', [rx, 0, rz], 0, [blob]);
   }
-  const pearSpots: ReadonlyArray<readonly [number, number]> = [[-24, 10], [24, -8], [-8, 24], [12, -22]] as const;
+  const pearSpots: ReadonlyArray<readonly [number, number]> = [[-24, 10], [24, -8], [-8, 24], [12, -22], [-28, -18], [28, -18], [-30, 28], [30, 28], [-14, 30], [14, 30]] as const;
   for (const [px, pz] of pearSpots) {
     const blob = centred(builder, `aarr-pear-${px}-${pz}`, [px, 0.5, pz], [0.8, 1.0, 0.8], hedge);
     kitbash('./assets/rebuild/plants/prickly-pear.glb', [px, 0, pz], 0, [blob]);
@@ -725,7 +747,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   const rand = mulberry32(ATOMIC_ACRES_REBUILD_SEED);
   let scrub = 0;
   let rockCount = 0;
-  for (let i = 0; i < 26; i += 1) {
+  for (let i = 0; i < 60; i += 1) {
     const side = i % 2 === 0 ? -1 : 1;
     const x = side * (27 + rand() * 30);
     const z = -34 + rand() * 68;
@@ -734,7 +756,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     centred(builder, `aarr-scrub-${i}`, [x, s / 2, z], [s, s, s], hedge);
     scrub += 1;
   }
-  for (let i = 0; i < 14; i += 1) {
+  for (let i = 0; i < 30; i += 1) {
     const side = i % 2 === 0 ? -1 : 1;
     const x = side * (28 + rand() * 28);
     const z = -32 + rand() * 64;
