@@ -528,7 +528,17 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   // hole in the wall with no window over it, which is exactly the failure this
   // lane exists to avoid, so both now read these.
   const DRESS_WIN_OFFSETS = [-1.8, 1.8] as const;
-  const DRESS_WIN_W = 0.95;
+  // WIDENED 0.95 -> 1.8 (integrator, 2026-09-16). With the aperture split in
+  // place, the sun reaching the west floor measured 0.68 m2 and lifted the
+  // frame's peak luminance only to 0.851, against 1.000 and 2.5% of pixels over
+  // 0.9 in `living-room-eye.png`: light was entering through two 0.95 m slots
+  // and could not become a key. The references are not slot windows - they are
+  // near-continuous glazed elevations. Because the aperture emitter derives its
+  // openings and piers from THIS constant, and `dressWindow()` reads it too,
+  // widening here moves the hole and its casing together and cannot desync
+  // them. Geometry still closes on a 7.2 m elevation: openings land at
+  // cx +/- [0.92, 2.68], leaving a 1.84 m centre pier and 0.92 m corner piers.
+  const DRESS_WIN_W = 1.8;
   // The hole cut in the casting shell is DRESS_APERTURE_MARGIN smaller than the
   // casing board on every edge, so the opaque (non-casting) casing overlaps the
   // hole by 32 mm all round. That overlap is what keeps the exterior silhouette
