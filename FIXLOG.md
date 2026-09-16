@@ -236,3 +236,19 @@
 - Evidence/artifacts:
   - `/root/jigglyclaw/projects/atomic-acres-browser-arena/.swarm/artifacts/post_change_build_10.log`
   - `/root/jigglyclaw/projects/atomic-acres-browser-arena/.swarm/artifacts/cycle_10_fix_manifest.json`
+
+## Day set — 2026-09-16 (dave-gaming-pc, OMP)
+- Commit 4fef26b9b on contrib/dave-gaming-pc/omp/atomic-acres-rebuild-20260914 (pushed).
+- Integrated: house v2 kitbash (Lane M, teal/yellow, hides gray shells), spread-dim
+  shed/lamp/sign (Lane N, raw world-frame kitbash mode), wear kit (Lane W: 4 shutter
+  windows, porch furniture x2 houses, sleepers/planters, 5 litter spots), value.patch
+  (asphalt loop+entry+spine carriageways — the dark surface the frame was missing),
+  inlight.patch (interior green gamma 1.08->0.96).
+- Gates: tsc clean, boot PASS webgpu, walk-through rebuild rows pass. 2 Direction-C
+  failures are PRE-EXISTING world-studio ledger gaps (no world-studio module in this
+  worktree; untouched by this set) — never weakened, recorded not fixed.
+- Captures: artifacts/viewpoint-regression/rebuild-day/ (street s1/s2 clean; street
+  main take has a one-frame transient foreground pop, s1/s2 confirm station healthy).
+- Open defects (queued, not hidden): interior backsplash notch behind oven tower
+  (critic gap 8 confirmed — cover panel or GLB patch); lavender wash persists at
+  distance (V stopped at 1 correction by its stop rule; remains critic gap 1).
