@@ -1,0 +1,510 @@
+{
+ "authority": [
+  "LAYOUT_CONTRACT.md",
+  "C:/Users/david/Documents/Codex/2026-09-11/p-le/work/fresh-world-20260912/references/ (18 PNGs; layout-topdown.png + layout-angle.png authoritative)"
+ ],
+ "base_light": "late-morning clear",
+ "compositions": [
+  {
+   "slug": "map__layout-topdown",
+   "cat": "maps",
+   "ref": "layout-topdown.png",
+   "camera": "orthographic top-down aerial, full board in frame",
+   "subject": "top-down aerial view of desert arena, teal two-story house west with sedan on driveway, yellow two-story house east with red-umbrella patio and BBQ, horseshoe asphalt loop with yellow school bus and red-cab semi with white trailer nose-to-nose, north welcome plaza with rusty car and sheds, south jeep with sandbags, concrete utility pads, wooden privacy fences"
+  },
+  {
+   "slug": "map__layout-angle",
+   "cat": "maps",
+   "ref": "layout-angle.png",
+   "camera": "high three-quarter aerial oblique from the south",
+   "subject": "three-quarter aerial of desert arena, teal house west and yellow house east with gray shingle roofs, loop road with yellow school bus and red-cab semi, north welcome sign with rusty car, south jeep and sandbags, sheds with laundry lines, desert sand scrub and Joshua trees surrounding"
+  },
+  {
+   "slug": "map__yellow-backyard",
+   "cat": "maps",
+   "ref": "yellow-backyard.png",
+   "camera": "eye-level exterior backyard perspective",
+   "subject": "backyard of yellow east house, yellow siding, stone chimney, raised wooden deck with dark outdoor dining set under bright red umbrella, rotary clothesline with white laundry, yellow garden shed, green lawn, desert mountains and Joshua trees beyond the fence"
+  },
+  {
+   "slug": "map__teal-backyard",
+   "cat": "maps",
+   "ref": "teal-backyard.png",
+   "camera": "eye-level exterior backyard perspective",
+   "subject": "backyard of teal west house, turquoise siding, red brick chimney, covered back patio, rotary clothesline with white laundry, matching teal shed, low side deck, wooden fence, desert mountains and Joshua trees in the distance"
+  },
+  {
+   "slug": "map__living-room-eye",
+   "cat": "interiors",
+   "ref": "living-room-eye.png",
+   "camera": "eye-level interior perspective",
+   "subject": "mid-century living room inside teal west house ground floor, sage green sofa, walnut coffee table, orange armchair, starburst clock, mustard-yellow kitchen cabinetry with dining furniture, open front door and wide picture window showing yellow school bus and yellow house across the street"
+  },
+  {
+   "slug": "map__bedroom-eye",
+   "cat": "interiors",
+   "ref": "bedroom-eye.png",
+   "camera": "eye-level interior perspective",
+   "subject": "upper-floor bedroom in yellow east house, bed with retro yellow orange cream patterned quilt, walnut nightstands, wooden dresser, gold starburst wall ornament, yellow patterned curtains, wide window with view of teal west house and desert"
+  },
+  {
+   "slug": "map__yellow-upper-cutaway",
+   "cat": "interiors",
+   "ref": "yellow-upper-cutaway.png",
+   "camera": "high-angle dollhouse cutaway",
+   "subject": "dollhouse cutaway of yellow east house upper floor, master bedroom with yellow bed, home office with dark wood desk and bookcase, blue-tiled bathroom, stair landing, exterior roofline balcony deck with outdoor dining table and red umbrella"
+  },
+  {
+   "slug": "map__yellow-ground-cutaway",
+   "cat": "interiors",
+   "ref": "yellow-ground-cutaway.png",
+   "camera": "high-angle dollhouse cutaway",
+   "subject": "dollhouse cutaway of yellow east house ground floor with attached two-car garage, living room with cream sofa armchairs and yellow rug, open kitchen with yellow cabinets refrigerator and circular dining set, central staircase, garage with concrete floor and storage shelving"
+  },
+  {
+   "slug": "map__teal-upper-cutaway",
+   "cat": "interiors",
+   "ref": "teal-upper-cutaway.png",
+   "camera": "high-angle dollhouse cutaway",
+   "subject": "dollhouse cutaway of teal west house upper floor, master bedroom with navy-dressed bed and striped rug, office with executive desk, blue-tiled bathroom, walk-in closet, central staircase, upper wooden balcony, vintage blue car on the driveway"
+  },
+  {
+   "slug": "map__teal-ground-cutaway",
+   "cat": "interiors",
+   "ref": "teal-ground-cutaway.png",
+   "camera": "high-angle dollhouse cutaway",
+   "subject": "dollhouse cutaway of teal west house ground floor with attached single-car garage, living room with cognac leather sofa and armchair, central staircase, powder room, spacious kitchen with yellow cabinets and square dining table, vintage light-blue sedan parked in the garage beside metal utility shelves"
+  },
+  {
+   "slug": "map__hero-vehicles",
+   "cat": "maps",
+   "ref": "hero-vehicles.png",
+   "camera": "eye-level street perspective looking north up the cul-de-sac to desert mountains",
+   "subject": "center of asphalt street, yellow school bus seen from the rear alongside oncoming red semi-truck hauling white enclosed cargo trailer, teal west house with stone chimney on the left, yellow east two-story house with upper balcony on the right, white globe lampposts, manicured hedges, Joshua tree foothills, clear blue sky"
+  },
+  {
+   "slug": "map__road-far-end",
+   "cat": "maps",
+   "ref": "road-far-end.png",
+   "camera": "low-angle wide street perspective looking north-northeast from the entrance bend",
+   "subject": "abandoned rusted brown four-door sedan in right foreground, entrance sign with brick columns fortified by sandbags, yellow school bus and red semi-truck with white trailer parked ahead between teal west house left and yellow east house right, globe streetlamps, clipped hedges, Joshua trees, rocky desert mountains"
+  },
+  {
+   "slug": "map__road-entrance",
+   "cat": "maps",
+   "ref": "road-entrance.png",
+   "camera": "eye-level frontal shot centered between wooden gate posts looking north",
+   "subject": "green military utility jeep behind defensive roadblock of stacked sandbags and wooden cargo crates in the roadway center, teal west house with stone chimney and carport left, yellow east house with upper balcony right, yellow school bus and red semi-truck with white trailer further down, desert mountains"
+  },
+  {
+   "slug": "map__yellow-side-lane",
+   "cat": "maps",
+   "ref": "yellow-side-lane.png",
+   "camera": "eye-level straight perspective looking north down the narrow walkway",
+   "subject": "narrow pedestrian lane beside yellow east house, pale yellow siding, attached garage, HVAC compressor, dark green trash bins, dense green hedges, vertical wooden plank fence with concrete posts and small gate on the right, white globe lamppost and wooden utility pole at the opening toward the cul-de-sac and desert mountains"
+  },
+  {
+   "slug": "map__teal-side-lane",
+   "cat": "maps",
+   "ref": "teal-side-lane.png",
+   "camera": "eye-level straight perspective looking north down the narrow concrete pathway",
+   "subject": "side walkway flanking teal west house, turquoise siding, brick chimney, HVAC unit, tall trimmed hedges, wooden privacy fence with metal posts and green bushes left, overhead power lines on wooden utility poles, open gate at the end revealing gray utility shed, green trash bin, vintage light-blue pickup truck, Joshua tree mountains"
+  },
+  {
+   "slug": "map__street-teal",
+   "cat": "maps",
+   "ref": "street-teal.png",
+   "camera": "elevated three-quarter perspective looking northeast from the teal house porch",
+   "subject": "teal west house in left foreground with white-trimmed windows, stone planter base, open arbor porch, across the asphalt the yellow school bus and red semi-truck with white trailer parked in the cul-de-sac, yellow east house with upper balcony and white garage right, manicured lawns, globe streetlamps, arid mountains"
+  },
+  {
+   "slug": "map__street-yellow",
+   "cat": "maps",
+   "ref": "street-yellow.png",
+   "camera": "elevated three-quarter perspective looking northwest from the yellow house front yard",
+   "subject": "yellow east house with horizontal siding, white balcony posts, stone-faced planters in right foreground, yellow school bus and red semi-truck with white trailer side by side in the cul-de-sac, teal west house with stone chimney and carport across the street with parked vintage light-blue sedan, Joshua trees and mountains"
+  },
+  {
+   "slug": "map__balcony-backyard",
+   "cat": "maps",
+   "ref": "balcony-backyard.png",
+   "camera": "high-angle wide perspective looking northwest from the yellow house second-floor balcony deck",
+   "subject": "wooden balcony foreground with large red patio umbrella, round glass-top dining table, four red chairs, stainless steel barbecue grill, fenced green lawn below with yellow storage shed and rotary clothesline with white laundry, cul-de-sac background with yellow school bus, red semi-truck with white trailer, olive military truck, and teal west house before desert mountains"
+  },
+  {
+   "slug": "prop__school-bus-hero",
+   "cat": "assets",
+   "ref": null,
+   "camera": "eye-level three-quarter vehicle portrait",
+   "subject": "yellow school bus parked in the desert arena loop, full side profile with front grille and door visible, cracked asphalt with road markings, red-cab semi behind, teal and yellow houses flanking, globe lampposts"
+  },
+  {
+   "slug": "prop__semi-rig-hero",
+   "cat": "assets",
+   "ref": null,
+   "camera": "eye-level three-quarter vehicle portrait",
+   "subject": "red-cab semi truck with white enclosed cargo trailer parked nose-to-nose with the school bus inside the loop, chrome grille and cab details, desert arena with both houses and fences in the background"
+  },
+  {
+   "slug": "prop__jeep-sandbags",
+   "cat": "assets",
+   "ref": null,
+   "camera": "eye-level frontal slightly low",
+   "subject": "green military utility jeep behind stacked sandbag emplacement and wooden cargo crates blocking the south road exit, asphalt with tire marks, fences and hedges both sides, desert beyond"
+  },
+  {
+   "slug": "prop__rusty-sedan",
+   "cat": "assets",
+   "ref": null,
+   "camera": "eye-level three-quarter, close",
+   "subject": "abandoned rusted brown four-door sedan with patina and flat tires beside a brick-column entrance sign fortified with sandbags at the north end, clipped hedges, globe lamppost, desert mountains"
+  },
+  {
+   "slug": "prop__welcome-sign",
+   "cat": "assets",
+   "ref": null,
+   "camera": "eye-level frontal, close",
+   "subject": "rustic wooden welcome sign on posts between two back-yard sheds, white laundry on lines each side, hedges, gravel patch, desert and fence behind"
+  },
+  {
+   "slug": "prop__teal-shed",
+   "cat": "assets",
+   "ref": null,
+   "camera": "eye-level exterior, close",
+   "subject": "white and teal wooden garden shed with small windows and padlocked door, rotary clothesline with white laundry beside it, green lawn, wooden fence, Joshua trees beyond"
+  },
+  {
+   "slug": "prop__yellow-shed",
+   "cat": "assets",
+   "ref": null,
+   "camera": "eye-level exterior, close",
+   "subject": "yellow wooden storage shed with white trim beside a raised deck with outdoor furniture, green lawn, privacy fence, desert mountains in the distance"
+  },
+  {
+   "slug": "prop__concrete-pad",
+   "cat": "assets",
+   "ref": null,
+   "camera": "eye-level slightly elevated, close",
+   "subject": "flat concrete utility slab with low concrete block walls and trimmed hedge rows in a front yard, AC condenser unit and gravel border, house wall behind, desert light with crisp shadows"
+  },
+  {
+   "slug": "prop__street-lamp",
+   "cat": "assets",
+   "ref": null,
+   "camera": "low-angle looking up the lamp",
+   "subject": "white globe streetlamp on a dark post at the loop curb, manicured hedge and sidewalk base, school bus and houses softly behind, clear desert sky"
+  },
+  {
+   "slug": "prop__privacy-fence",
+   "cat": "assets",
+   "ref": null,
+   "camera": "eye-level along the fence run",
+   "subject": "weathered wooden privacy fence runs with concrete posts and an ajar gate leaf dividing two lots, hedges above the boards, gravel path, houses each side"
+  },
+  {
+   "slug": "prop__utility-poles",
+   "cat": "assets",
+   "ref": null,
+   "camera": "eye-level wide along the road edge",
+   "subject": "wooden utility poles with sagging power lines and transformers running along the desert edge of the arena, sand scrub rocks and Joshua trees, fences and rooftops behind"
+  },
+  {
+   "slug": "prop__patio-bbq",
+   "cat": "assets",
+   "ref": null,
+   "camera": "eye-level close on the patio set",
+   "subject": "round glass-top patio table with four red chairs under a large red umbrella beside a stainless steel barbecue grill on a wooden deck, yellow house wall behind, sunny desert light"
+  },
+  {
+   "slug": "prop__sedan-carport",
+   "cat": "assets",
+   "ref": null,
+   "camera": "eye-level three-quarter vehicle portrait",
+   "subject": "vintage light-blue sedan parked under the teal house carport, chrome bumpers and round headlights, concrete driveway, stone chimney and turquoise siding behind"
+  },
+  {
+   "slug": "prop__pickup-gate",
+   "cat": "assets",
+   "ref": null,
+   "camera": "eye-level three-quarter vehicle portrait",
+   "subject": "vintage light-blue pickup truck parked by an open side gate next to a gray utility shed and green trash bin, wooden fence, trimmed hedges, Joshua tree mountains behind"
+  },
+  {
+   "slug": "prop__desert-dressing",
+   "cat": "assets",
+   "ref": null,
+   "camera": "eye-level wide map-edge vista",
+   "subject": "high-desert ground dressing at the arena edge, Joshua trees, sandstone rocks, dry scrub and raked sand, wooden fence line and rooftops behind, distant mountains under clear sky"
+  },
+  {
+   "slug": "xp__teal-spawn",
+   "cat": "experience",
+   "ref": null,
+   "camera": "first-person eye-level from the teal house porch, no weapon visible",
+   "subject": "player spawn view from the teal house front porch across the lawn and fence toward the loop, school bus and semi mid-frame, yellow house opposite, morning shadows across the asphalt"
+  },
+  {
+   "slug": "xp__yellow-spawn",
+   "cat": "experience",
+   "ref": null,
+   "camera": "first-person eye-level from the yellow house yard, no weapon visible",
+   "subject": "player spawn view from the yellow house front yard past stone planters toward the loop, bus and semi mid-frame, teal house opposite with carport sedan, hedges framing both sides"
+  },
+  {
+   "slug": "xp__loop-drive",
+   "cat": "experience",
+   "ref": null,
+   "camera": "low tracking view down the loop center, no weapon visible",
+   "subject": "view driving the loop center between the yellow school bus on one side and the red-cab semi on the other, cracked asphalt markings rushing under, houses fences and lamps wheeling past"
+  },
+  {
+   "slug": "xp__bus-cover",
+   "cat": "experience",
+   "ref": null,
+   "camera": "crouched eye-level behind the bus front wheel, no weapon visible",
+   "subject": "sightline from cover behind the school bus front wheel down the loop toward the south sandbags and jeep, asphalt foreground, semi trailer looming right, yellow house beyond"
+  },
+  {
+   "slug": "xp__balcony-overwatch",
+   "cat": "experience",
+   "ref": null,
+   "camera": "standing eye-level on the yellow house balcony, no weapon visible",
+   "subject": "overwatch view from the yellow house second-floor balcony over the umbrella table, across the whole loop with bus and semi centered, teal house and north sign beyond, full arena read"
+  },
+  {
+   "slug": "xp__backyard-flank",
+   "cat": "experience",
+   "ref": null,
+   "camera": "eye-level moving through the backyards, no weapon visible",
+   "subject": "flank route view through adjoining backyards past sheds, laundry lines, deck furniture and hedges, fences left and right, glimpse of the loop and bus through a gate gap ahead"
+  },
+  {
+   "slug": "xp__north-breach",
+   "cat": "experience",
+   "ref": null,
+   "camera": "eye-level advancing through the north gate, no weapon visible",
+   "subject": "breach approach through the north entrance past the rusted sedan and brick-column sign, opening onto the loop with bus and semi ahead, sheds and laundry falling behind"
+  },
+  {
+   "slug": "xp__south-hold",
+   "cat": "experience",
+   "ref": null,
+   "camera": "prone eye-level over the south sandbags looking north, no weapon visible",
+   "subject": "defensive hold view over stacked sandbags with the jeep hood low in frame, full street length ahead to the bus and semi, houses flanking, north sign tiny in the distance"
+  },
+  {
+   "slug": "xp__side-lane-squeeze",
+   "cat": "experience",
+   "ref": null,
+   "camera": "eye-level down the teal side lane, no weapon visible",
+   "subject": "tight flank view down the narrow concrete lane between turquoise siding with hedges and the wooden privacy fence, utility poles and wires above, open gate with shed and pickup glowing at the far end"
+  },
+  {
+   "slug": "xp__street-crossing",
+   "cat": "experience",
+   "ref": null,
+   "camera": "eye-level at the loop curb mid-crossing, no weapon visible",
+   "subject": "exposed crossing view at the loop curb between parked bus and semi, open asphalt both ways, both house fronts visible, lamps and hedges, moment of no cover"
+  },
+  {
+   "slug": "wpn__carbine-grip",
+   "cat": "weapons",
+   "ref": null,
+   "camera": "extreme closeup on the hands and grip",
+   "subject": "finger study: gloved hands gripping compact carbine, tan furniture, dark receiver, flip-up aperture sight plus front sight post, gloved hands, knuckles and trigger finger placement sharp, shallow depth, neutral light"
+  },
+  {
+   "slug": "wpn__carbine-texture",
+   "cat": "weapons",
+   "ref": null,
+   "camera": "macro detail callout, side light",
+   "subject": "material study: receiver seam and rail of compact carbine, tan furniture, dark receiver, flip-up aperture sight plus front sight post, gloved hands, machined edges, tan polymer texture against dark metal, shallow depth"
+  },
+  {
+   "slug": "wpn__carbine-ads-street",
+   "cat": "weapons",
+   "ref": null,
+   "camera": "FPS POV ADS centered",
+   "subject": "sight picture: compact carbine, tan furniture, dark receiver, flip-up aperture sight plus front sight post, gloved hands aimed down the desert arena street, aperture ring and front post centered on the school bus, street beyond softly blurred"
+  },
+  {
+   "slug": "wpn__carbine-firing",
+   "cat": "weapons",
+   "ref": null,
+   "camera": "FPS POV hip-fire, action freeze",
+   "subject": "firing frame: compact carbine, tan furniture, dark receiver, flip-up aperture sight plus front sight post, gloved hands mid-burst with muzzle flash and ejected casing frozen, gloved arms absorbing recoil, loop and bus behind"
+  },
+  {
+   "slug": "wpn__sniper-scope-picture",
+   "cat": "weapons",
+   "ref": null,
+   "camera": "full-screen scope view",
+   "subject": "sight picture: long sniper rifle, olive chassis, thumbhole stock, fluted barrel, tubular scope with mil-dot reticle scope centered on the yellow house balcony with mil-dot reticle sharp, circular scope mask, blurred desert beyond the glass"
+  },
+  {
+   "slug": "wpn__sniper-texture",
+   "cat": "weapons",
+   "ref": null,
+   "camera": "macro detail callout, side light",
+   "subject": "material study: olive chassis, fluted barrel and scope tube of long sniper rifle, olive chassis, thumbhole stock, fluted barrel, tubular scope with mil-dot reticle, thumbhole stock edge, machined turret caps, shallow depth"
+  },
+  {
+   "slug": "wpn__sniper-firing",
+   "cat": "weapons",
+   "ref": null,
+   "camera": "side view action freeze",
+   "subject": "firing frame: long sniper rifle, olive chassis, thumbhole stock, fluted barrel, tubular scope with mil-dot reticle at the shot with muzzle blast and bolt lift, spotter arms braced, rooftop and desert behind"
+  },
+  {
+   "slug": "wpn__smg-texture",
+   "cat": "weapons",
+   "ref": null,
+   "camera": "macro detail callout, side light",
+   "subject": "material study: compact 9mm pattern SMG, slim handguard, retractable stock, ring front sight, slim handguard vents, magazine ribs, retractable stock rails, ring front sight profile, shallow depth"
+  },
+  {
+   "slug": "wpn__scattergun-wood",
+   "cat": "weapons",
+   "ref": null,
+   "camera": "macro detail callout, warm side light",
+   "subject": "material study: pump shotgun, walnut furniture, ribbed pump, vented rib barrel, walnut grain, ribbed pump grooves, vented rib highlights, loading port edge, shallow depth"
+  },
+  {
+   "slug": "wpn__arms-carbine",
+   "cat": "weapons",
+   "ref": null,
+   "camera": "third-person medium shot from the side-front",
+   "subject": "arms and bot study: gloved arms holding compact carbine, tan furniture, dark receiver, flip-up aperture sight plus front sight post, gloved hands at relaxed hip carry, sleeves and gloves detailed, desert arena loop softly behind"
+  },
+  {
+   "slug": "wpn__arms-sniper",
+   "cat": "weapons",
+   "ref": null,
+   "camera": "third-person medium shot from the side",
+   "subject": "arms and bot study: gloved arms cradling long sniper rifle, olive chassis, thumbhole stock, fluted barrel, tubular scope with mil-dot reticle upright, scope glint, sleeves and gloves detailed, yellow house and bus softly behind"
+  },
+  {
+   "slug": "wpn__reflex-macro",
+   "cat": "weapons",
+   "ref": null,
+   "camera": "macro through the optic",
+   "subject": "optic study: reflex sight ring glowing on compact carbine, tan furniture, dark receiver, flip-up aperture sight plus front sight post, gloved hands, glass tint and hood edges sharp, blurred receiver each side, shallow depth"
+  }
+ ],
+ "lanes": {
+  "laneA": {
+   "tool": "codex exec",
+   "slugs": [
+    "map__layout-topdown",
+    "map__layout-angle",
+    "map__yellow-backyard",
+    "map__teal-backyard",
+    "map__living-room-eye",
+    "map__bedroom-eye",
+    "map__yellow-upper-cutaway",
+    "map__yellow-ground-cutaway",
+    "map__teal-upper-cutaway",
+    "map__teal-ground-cutaway",
+    "map__hero-vehicles",
+    "map__road-far-end",
+    "map__road-entrance",
+    "map__yellow-side-lane",
+    "map__teal-side-lane",
+    "map__street-teal",
+    "map__street-yellow",
+    "map__balcony-backyard"
+   ]
+  },
+  "laneB": {
+   "tool": "codex exec",
+   "slugs": [
+    "prop__school-bus-hero",
+    "prop__semi-rig-hero",
+    "prop__jeep-sandbags",
+    "prop__rusty-sedan",
+    "prop__welcome-sign",
+    "prop__teal-shed",
+    "prop__yellow-shed",
+    "prop__concrete-pad",
+    "prop__street-lamp",
+    "prop__privacy-fence",
+    "prop__utility-poles",
+    "prop__patio-bbq",
+    "prop__sedan-carport",
+    "prop__pickup-gate",
+    "prop__desert-dressing"
+   ]
+  },
+  "laneC": {
+   "tool": "codex exec",
+   "slugs": [
+    "xp__teal-spawn",
+    "xp__yellow-spawn",
+    "xp__loop-drive",
+    "xp__bus-cover",
+    "xp__balcony-overwatch",
+    "xp__backyard-flank",
+    "xp__north-breach",
+    "xp__south-hold",
+    "xp__side-lane-squeeze",
+    "xp__street-crossing"
+   ]
+  },
+  "laneD": {
+   "tool": "codex exec",
+   "slugs": [
+    "wpn__carbine-grip",
+    "wpn__carbine-texture",
+    "wpn__carbine-ads-street",
+    "wpn__carbine-firing",
+    "wpn__sniper-scope-picture",
+    "wpn__sniper-texture",
+    "wpn__sniper-firing",
+    "wpn__smg-texture",
+    "wpn__scattergun-wood",
+    "wpn__arms-carbine",
+    "wpn__arms-sniper",
+    "wpn__reflex-macro"
+   ]
+  }
+ },
+ "layout_binding": "west teal two-story house, east yellow two-story house, gray shingled roofs, front porches, central horseshoe asphalt loop road entering north looping south, yellow school bus and red-cab semi with white trailer parked nose-to-nose inside the loop, north rusty car plus wooden welcome sign between back-yard sheds, south military jeep plus sandbag emplacement, four concrete utility pads with low walls and hedges, wooden privacy fences, street lamps, desert sand scrub Joshua trees rocks and utility poles surrounding, green lawns only inside the two fenced lots; layout exactly as described, do not add buildings, do not change the road shape, do not replace the desert with greenery",
+ "map": "Atomic Acres - New World",
+ "negative_block": "blurry, low quality, text, watermark, logo, gore, green suburb beyond the lots, forest, city skyline, extra buildings, military grime, protected-game resemblance, brand marks, distorted anatomy",
+ "notes": [
+  "compositions[] fills next: ~43 environment bases (18 concept-faithful + ~15 prop/asset + ~10 experience/POV) + ~12 weapon-detail plates; each gets base prompt + 4 variant -i edits",
+  "outcome maths: ~55 bases x (1 base + 4 variants) = ~275 max; minimum accepted 220",
+  "prompt assembly per base: f\"{subject}, {camera}, {style_block_env}, {layout_binding}\" (env) with negative_block; weapons append identity via subject already; variants via codex exec -i edit_instruction"
+ ],
+ "provenance": "sha256 per output image recorded in manifest.json; generator codex exec (GPT Image); 16:9 landscape matching tranche-1 (~1672x941)",
+ "schemaVersion": 1,
+ "style_block_env": "high-desert late-morning light, long soft shadows, game-screenshot realism, 16:9, no text, no watermark",
+ "variants": [
+  {
+   "edit_instruction": "codex exec -i <base.png>: same composition, same camera, same props; change light and weather only to soft dawn haze with low mist patches in the loop and long pale shadows",
+   "id": "dawn-mist",
+   "name": "Dawn mist"
+  },
+  {
+   "edit_instruction": "codex exec -i <base.png>: same composition, same camera, same props; change light and weather only to golden-hour dusk, warm low sun, long amber shadows, lamps on",
+   "id": "golden-dusk",
+   "name": "Golden dusk"
+  },
+  {
+   "edit_instruction": "codex exec -i <base.png>: same composition, same camera, same props; change light and weather only to flat overcast midday, soft shadowless light, dull sky",
+   "id": "overcast",
+   "name": "Overcast"
+  },
+  {
+   "edit_instruction": "codex exec -i <base.png>: same composition, same camera, same props; change light and weather only to night rain: dark wet asphalt with reflections, rain streaks, headlights and lamps on, moody clouds",
+   "id": "night-rain",
+   "name": "Night rain (wet street)"
+  }
+ ],
+ "weapon_identities": {
+  "carbine": "compact carbine, tan furniture, dark receiver, flip-up aperture sight plus front sight post, gloved hands",
+  "scattergun": "pump shotgun, walnut furniture, ribbed pump, vented rib barrel",
+  "smg": "compact 9mm pattern SMG, slim handguard, retractable stock, ring front sight",
+  "sniper": "long sniper rifle, olive chassis, thumbhole stock, fluted barrel, tubular scope with mil-dot reticle"
+ }
+}
