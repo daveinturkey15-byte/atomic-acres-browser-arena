@@ -391,6 +391,22 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   // `artifacts/viewpoint-regression/pre-polish/.../interior-west.png` are both
   // dominated by an orange plank lid. The refs show a pale ceiling with a slim
   // white cornice, so the slab now gets a separate board under it.
+  // NOT FIXABLE FROM THIS LANE, STATED RATHER THAN FAKED (lane H, 2026-09-16).
+  // The cream interior walls (`plasterFor`) and every ceiling and trim run
+  // below are the two flattest surfaces in the arena - InteriorPlaster 0.74 and
+  // InteriorCeiling 0.41 luma stddev, i.e. solid colour to a camera - and they
+  // are also the largest by screen area in `interior-west`, `interior-sunlit`
+  // and `upper-landing`. They cannot be re-routed the way the fence, the
+  // crates, the lawns and the vehicle panels were, because `material.color`
+  // MULTIPLIES: reaching InteriorPlaster's linear (0.8248, 0.7476, 0.6397) or
+  // InteriorCeiling's (0.9326, 0.9156, 0.8656) from ANY of the eight detailed
+  // bakes needs a ratio above 1.0 in at least two channels (the brightest
+  // detailed bake on disk is BathTile at (0.5342, 0.5928, 0.6549), so even it
+  // is 1.54x short in red). The only ways out are a new pale detailed bake -
+  // which is the asset lane's to author, not this one's - or darkening the
+  // walls, which would be compensating for the light rig while lane G is
+  // changing it. Left alone deliberately; re-tiling them changes nothing a
+  // camera can see, because there is nothing in the map to re-tile.
   const interiorCeiling = inPbr('InteriorCeiling', 3, 3);
   const interiorTrim = inPbr('InteriorCeiling', 1, 1);
   // CARPET RIDES DesertSand, NOT PLASTER (integrator capture 2026-09-16: the
@@ -404,8 +420,28 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   // only one whose grain reads as a fine wool pile AND whose unmodified mean
   // (#c5ac8c) is already the refs' warm carpet beige, so the living band takes
   // it untinted and the bedroom band tints it to `bedroom-eye`'s gold.
-  const livingCarpet = gndPbr('DesertSand', 6, 6);
-  const upperCarpet = gndPbr('DesertSand', 6, 6, 0xf8ffda);
+  // SCALE, added by lane H 2026-09-16. DesertSand's ripple period is about an
+  // eighth of a tile. At the shipped flat `repeat 6` over an 11 m house floor
+  // that put a ripple at 0.23 m and a pebble at 0.1 m, and
+  // `atomic-acres-rebuild-interior-sunlit.png` shows the result honestly: the
+  // living-room floor reads as a DUNE FIELD, complete with scattered stones,
+  // not as the wool pile the note above intended. The bake is still the right
+  // choice - it is the only detailed bake whose mean is already the refs' warm
+  // beige - but it has to be tiled at carpet scale. One tile per 0.9 m puts a
+  // ripple at 0.11 m and a fleck at 0.05 m, which reads as a corded pile.
+  // Derived per floor so a 2 m bedroom band and an 11 m ground floor get the
+  // same physical grain instead of the same number of repeats.
+  const carpetByRepeat = new Map<string, THREE.Material>();
+  const carpetFor = (spanU: number, spanV = spanU, color?: number): THREE.Material => {
+    const rx = spanU < 8 ? 6 : 12;
+    const ry = spanV < 8 ? 6 : 12;
+    const key = `${rx}:${ry}:${color ?? 0}`;
+    let mat = carpetByRepeat.get(key);
+    if (!mat) { mat = gndPbr('DesertSand', rx, ry, color); carpetByRepeat.set(key, mat); }
+    return mat;
+  };
+  const UPPER_CARPET_GOLD = 0xf8ffda;
+  const livingCarpet = carpetFor(6, 6);
   const kitchenTile = inPbr('BathTile', 3, 3, 0xf3d9b2);
   const sageAccent = inPbr('InteriorPlaster', 3, 1, 0xabccb5);
   // WoodFloor keeps its bake but loses its job: nothing in the refs is a plank
@@ -422,13 +458,25 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   // the bake's 0.69 texel spread plus real shading.
   const houseSkin = { west: inPbr('InteriorPlaster', 2, 1, 0x79ccd4), east: inPbr('InteriorPlaster', 2, 1, 0xf7de83) } as const;
   const roof = gndPbr('SidewalkConcrete', 3, 3, 0xc5dcff);
-  const concrete = gndPbr('SidewalkConcrete', 2, 2);
   const asphalt = gndPbr('AsphaltLoop', 5, 5);
-  const sidewalk = gndPbr('SidewalkConcrete', 2, 2);
   const timber = inPbr('StairTimber', 2, 1);
-  const lawn = gndPbr('LawnPatchy', 3, 3);
   const sand = gndPbr('DesertSand', 8, 8);
-  const vehicle = standard(0xa8adb3, 0.6, 0.3);
+  /**
+   * VEHICLE PANELS (ref `hero-vehicles.png`, `street-teal.png`). Three of the
+   * five vehicle massings are kitbashed over by a catalog GLB, but the four
+   * outside trailers and both garage cars are NOT, and they were the last flat
+   * `standard()` colour on a large mesh: a 2.6 x 2.8 x 9 m box in one solid
+   * grey. BathTile is an 8x8 square grid, which on a box trailer is exactly
+   * right - the refs' trailers are ribbed panel sides, and a 0.5 m tile pitch
+   * is the panel pitch. The tint is the OLD colour, reproduced exactly rather
+   * than re-art-directed: #a8adb3 is linear (0.3916, 0.4179, 0.4508) and the
+   * BathTile bake means (0.5342, 0.5928, 0.6549), so the ratios are 0.733 /
+   * 0.705 / 0.688 - all below 1.0, so this one IS reachable, unlike the cream
+   * interior walls below. Nothing about the surface's value changes; it gains
+   * 7.38 stddev of panel structure where it had none.
+   */
+  const VEHICLE_GREY = 0xdedbd8;
+  const vehicle = inPbr('BathTile', 3, 1, VEHICLE_GREY);
   const rust = standard(0x8a5a3a, 0.9, 0.1);
   // Green mass + rock + crate, measured 2026-09-16 by the integrator on the
   // yard capture: road stddev 19.3, house wall 10.4, fence 12.0, concrete 8.9,
@@ -440,7 +488,120 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   const darkPole = standard(0x3a3d42, 0.7, 0.4);
   const hedge = gndPbr('LawnPatchy', 2, 2, 0xb4f9cd);
   const rock = gndPbr('SidewalkConcrete', 1, 1, 0xd9e3f1);
-  const crate = inPbr('StairTimber', 1, 1);
+
+  // ---- LANE H / SYSTEM 5, 2026-09-16: SURFACE DETAIL AT TRUE SIZE ----------
+  // Re-measured every shipped bake myself (128x128 box resample, luma stddev,
+  // and a linear-space mean over the full-res PNG) rather than trusting the
+  // header above, because the tint maths below only works off the linear mean:
+  //   LawnPatchy 14.53  DesertSand 12.09  AsphaltLoop 11.94  SidewalkConcrete
+  //   8.78  BathTile 7.38  WoodFloor 4.83  GarageConcrete 2.72  StairTimber
+  //   1.93  InteriorPlaster 0.74  InteriorCeiling 0.41.
+  // What each bake actually CONTAINS (looked at, not inferred): BathTile is an
+  // 8x8 square tile grid; WoodFloor is 8 parallel PLANK lines running along u;
+  // GarageConcrete and SidewalkConcrete are 2x2 slab grids (the latter with
+  // pebbles and specks); StairTimber is four barely-there horizontal lines on
+  // flat brown; InteriorPlaster and InteriorCeiling are, to a camera, solid
+  // colours. So the only structural vocabulary on disk is: planks, tiles,
+  // slabs, ripples, patches, cracks.
+  //
+  // THE RULE THIS SECTION FOLLOWS (morning-diner BUILD.md, System 5 rev 2):
+  // roughness is close to inert on a light surface, and albedo steps under
+  // ~5% are film grain. A surface only gains detail here if the substituted
+  // bake carries a REAL albedo step at the size the object actually is. So
+  // each helper below picks `repeat` from the mesh's own span to put one
+  // texture tile at a stated real-world size, instead of the fixed 2 or 3 the
+  // file used everywhere regardless of whether the mesh was 0.9 m or 16 m.
+  //
+  // MEASURED BEFORE (11:36 wide capture, patch luma stddev):
+  //   choke barricade 3.70, porch/roof boxes 7.08, hedge 9.22, fence run 11.12,
+  //   lawn 10.99-25.72, road 12.71, concrete 18.77-24.82.
+  // The barricade is the flattest large surface in the set and it is the one
+  // thing in the frame that is still a placeholder box, so it goes first.
+
+  /**
+   * SidewalkConcrete is a 2x2 slab grid, so one slab = tile/2; a 2.4 m tile
+   * puts a slab at 1.2 m, which is a poured bay. The file used a flat
+   * `repeat (2, 2)` on every concrete mesh regardless of size, which is only
+   * ever right by accident: on the 22 m entry sidewalk it drew slabs 1.1 m
+   * across and 11 m long, and on a 0.9 m pillar it drew four 0.45 m slabs
+   * where a cast pier has none. Both axes are derived independently so a long
+   * thin run does not get square tiles stretched along it.
+   */
+  // VRAM, NOT FILESIZE (repo memory `gotcha-baked-glb-vram-not-filesize`).
+  // `texture()` in art-kit.ts caches on `path:repeatX:repeatY`, so every new
+  // repeat pair is a SEPARATE 1024^2 upload - about 5.3 MB with mips, and each
+  // material here binds a diffuse AND a roughness. A freely-derived repeat
+  // would have produced ~28 new pairs, i.e. ~300 MB of VRAM for tiling alone,
+  // on top of the ~25 pairs the file already had. So every derived repeat
+  // snaps to a short shared ladder. Tints are free by comparison - `color` is
+  // a material uniform, not a texture - which is why the crate ages and the
+  // fence cap vary by tint and reuse each other's tiling.
+  const SNAP = [1, 2, 4, 8] as const;
+  const snap = (v: number): number => SNAP.reduce((best, step) => (Math.abs(step - v) < Math.abs(best - v) ? step : best), SNAP[0]);
+  const concreteByRepeat = new Map<string, THREE.Material>();
+  const concreteFor = (spanU: number, spanV = spanU): THREE.Material => {
+    const rx = snap(spanU / 2.4);
+    const ry = snap(spanV / 2.4);
+    const key = `${rx}:${ry}`;
+    let mat = concreteByRepeat.get(key);
+    if (!mat) { mat = gndPbr('SidewalkConcrete', rx, ry); concreteByRepeat.set(key, mat); }
+    return mat;
+  };
+  /**
+   * LawnPatchy's bald patches are roughly a quarter of a tile across. At the
+   * old flat `repeat 3` over an 11 m lawn that made every dirt patch ~0.9 m —
+   * in `atomic-acres-rebuild-yard-geometry.png` they read as craters, and
+   * `teal-backyard.png` has no bald spot anywhere near that size. Tile 2.4 m
+   * puts a patch at 0.6 m, which is a worn line of grass, not geology.
+   */
+  const lawnByRepeat = new Map<number, THREE.Material>();
+  const lawnFor = (span: number): THREE.Material => {
+    const r = span / 2.4 < 4.5 ? 3 : 6;
+    let mat = lawnByRepeat.get(r);
+    if (!mat) { mat = gndPbr('LawnPatchy', r, r); lawnByRepeat.set(r, mat); }
+    return mat;
+  };
+  /**
+   * FENCE (ref `teal-backyard.png`, `street-teal.png`). The refs show a honey
+   * stockade fence with boards, a cap rail, and posts a shade off the panel.
+   * What shipped was one flat terracotta slab: StairTimber (stddev 1.93) at
+   * `repeat 2` over a 9 m panel, i.e. its four faint lines stretched to 4.5 m
+   * each — `yard-geometry` 380-760 x 410-520 is a plain orange wall with a
+   * hint of banding, and the end posts are the same material so they vanish.
+   * WoodFloor is 2.5x the texel spread AND carries eight real plank lines;
+   * `repeat (4, 1)` on a 1.8 m panel puts a board at 225 mm and a board length
+   * at 2.25 m, both true. Posts stay on the darker StairTimber so the member
+   * separates from the boards, which is the thing that makes a fence read as a
+   * fence at street distance. The bake cannot be tinted TOWARD the refs' sunlit
+   * honey (#c9a06a needs r x1.4 off WoodFloor's #a5774a and `color` only
+   * multiplies), so it is left untinted at its brightest — stated, not faked.
+   */
+  const fenceBoard = inPbr('WoodFloor', 4, 1);
+  const fencePost = inPbr('StairTimber', 1, 1, 0xd8c4b4);
+  const fenceCap = inPbr('WoodFloor', 4, 1, 0xd6c6b6);
+  /** Finished lumber (bench, planter, sign board) — plank lines, not flat brown. */
+  const lumber = inPbr('WoodFloor', 2, 1);
+  /**
+   * CRATES. The south choke barricade is fifteen 1 m boxes and, unlike the
+   * island and yard clusters, no worn-crate GLB is kitbashed over it, so its
+   * material is what the camera gets. All fifteen shared one StairTimber
+   * instance and merged into a single orange slab: measured stddev 3.70 over
+   * `street-south` 575-705 x 325-395, the flattest patch anywhere in the nine
+   * stations. A stack of crates is a stack of DIFFERENT crates — different
+   * timber, different ages, some turned. WoodFloor at `repeat 1` puts eight
+   * slats across a 1 m face; four variants alternate slat pitch and age tone
+   * (every tint is <= 1.0 per channel against WoodFloor's #a5774a, so all four
+   * are reachable) and are picked by the crate's own grid position, so the
+   * variation is deterministic and the same crate is the same crate every run.
+   */
+  const crateAges: readonly THREE.Material[] = [
+    inPbr('WoodFloor', 1, 1),
+    inPbr('WoodFloor', 2, 1, 0xd9cec2),
+    inPbr('WoodFloor', 1, 1, 0xc9bfae),
+    inPbr('WoodFloor', 2, 1, 0xb6b0a6),
+  ] as const;
+  const crateAge = (a: number, b: number): THREE.Material =>
+    crateAges[(((a * 3 + b * 5) % crateAges.length) + crateAges.length) % crateAges.length]!;
 
   // ---- Desert surround + side service roads (fact 1; topdown plate edges) ----
   centred(builder, 'aarr-desert-apron', [0, -0.06, 0], [140, 0.1, 150], sand, { cast: false });
@@ -451,9 +612,9 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   }
 
   // ---- Lawns: green ONLY inside fenced lots (fact 1; aerial plates) ----
-  pair(builder, 'aarr-lawn-front', 14, 0.03, 12, [11, 0.06, 12], lawn, { cast: false });
-  pair(builder, 'aarr-lawn-back', 14, 0.03, -16, [12, 0.06, 10], lawn, { cast: false });
-  pair(builder, 'aarr-lawn-side', 21, 0.03, -2, [5, 0.06, 9], lawn, { cast: false });
+  pair(builder, 'aarr-lawn-front', 14, 0.03, 12, [11, 0.06, 12], lawnFor(11.5), { cast: false });
+  pair(builder, 'aarr-lawn-back', 14, 0.03, -16, [12, 0.06, 10], lawnFor(11), { cast: false });
+  pair(builder, 'aarr-lawn-side', 21, 0.03, -2, [5, 0.06, 9], lawnFor(7), { cast: false });
 
   // ---- Loop road + south entry (fact 3; all plates, BRIEF mirror note) ----
   // THE CARRIAGEWAY ITSELF (aa-swarm lane-value, 2026-09-15). This section
@@ -500,14 +661,14 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   centred(builder, 'aarr-road-spine-north', [0, 0.02, -17], [7, 0.04, 18], asphalt, { cast: false });
   centred(builder, 'aarr-road-entry-stub-north', [0, 0.02, -29], [7, 0.04, 6], asphalt, { cast: false });
   // Center island disc, SPREAD 1.6x (r 4.8 at z 4.8).
-  const island = new THREE.Mesh(new THREE.CylinderGeometry(4.8, 4.8, 0.12, 24), concrete);
+  const island = new THREE.Mesh(new THREE.CylinderGeometry(4.8, 4.8, 0.12, 24), concreteFor(9.6));
   island.name = 'aarr-loop-island';
   island.position.set(0, 0.06, 4.8);
   island.receiveShadow = true;
   root.add(island);
-  pair(builder, 'aarr-sidewalk-entry', 4.6, 0.03, 23, [2.2, 0.06, 22], sidewalk, { cast: false });
-  pair(builder, 'aarr-sidewalk-loop', 13.6, 0.03, 2, [2.0, 0.06, 20], sidewalk, { cast: false });
-  pair(builder, 'aarr-sidewalk-north', 8, 0.03, -8, [9, 0.06, 2.0], sidewalk, { cast: false });
+  pair(builder, 'aarr-sidewalk-entry', 4.6, 0.03, 23, [2.2, 0.06, 22], concreteFor(2.2, 22), { cast: false });
+  pair(builder, 'aarr-sidewalk-loop', 13.6, 0.03, 2, [2.0, 0.06, 20], concreteFor(2.0, 20), { cast: false });
+  pair(builder, 'aarr-sidewalk-north', 8, 0.03, -8, [9, 0.06, 2.0], concreteFor(9, 2.0), { cast: false });
 
   // ---- Exterior dress vocabulary (ported from wave-2 lane F dress.patch;
   // full derivation in aa-swarm-20260915/lane-dress/RATIONALE.md). BASE-frame
@@ -693,7 +854,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
       if (rect.x1 - rect.x0 <= 0.05 || rect.z1 - rect.z0 <= 0.05) return;
       centred(builder, `aarr-house-${id}-zonefloor-${tag}`, [(rect.x0 + rect.x1) / 2, finishY, (rect.z0 + rect.z1) / 2], [rect.x1 - rect.x0, 0.04, rect.z1 - rect.z0], material, { cast: false });
     };
-    finish('living', living, livingCarpet);
+    finish('living', living, carpetFor(living.x1 - living.x0, living.z1 - living.z0));
     finish('kitchen', kitchen, kitchenTile);
     finish('dining', dining, kitchenTile);
     finish('bath', bath, bathTile);
@@ -808,7 +969,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     // is the sub-floor the per-zone finishes below sit on, and it is what shows
     // if the house GLB never resolves, so it carries the largest zone's finish
     // (carpet) rather than the plank bake it used to.
-    centred(builder, `aarr-house-${house.id}-floor`, [house.cx, 0.06, house.cz], [house.w, 0.12, house.d], livingCarpet, { cast: false });
+    centred(builder, `aarr-house-${house.id}-floor`, [house.cx, 0.06, house.cz], [house.w, 0.12, house.d], carpetFor(house.w, house.d), { cast: false });
     // FINISHED FLOOR LEVEL. The catalog house GLB brings its own foundation
     // slab and it is HIGHER than this sub-floor, so the sub-floor is not what a
     // player sees once the GLB resolves: measured on the shipped files (node
@@ -907,7 +1068,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     // carpet of `bedroom-eye.png`, not the plank bake that used to double as
     // every ground-floor ceiling.
     for (const [index, slab] of upperSlabs(house.id).entries()) {
-      centred(builder, `aarr-house-${house.id}-upper-slab-${index}`, [(slab.x0 + slab.x1) / 2, 2.875, (slab.z0 + slab.z1) / 2], [slab.x1 - slab.x0, 0.25, slab.z1 - slab.z0], upperCarpet, { cast: false });
+      centred(builder, `aarr-house-${house.id}-upper-slab-${index}`, [(slab.x0 + slab.x1) / 2, 2.875, (slab.z0 + slab.z1) / 2], [slab.x1 - slab.x0, 0.25, slab.z1 - slab.z0], carpetFor(slab.x1 - slab.x0, slab.z1 - slab.z0, UPPER_CARPET_GOLD), { cast: false });
       centred(builder, `aarr-house-${house.id}-ceiling-board-${index}`, [(slab.x0 + slab.x1) / 2, REBUILD_UPPER_FLOOR_Y - REBUILD_UPPER_SLAB_T - 0.04, (slab.z0 + slab.z1) / 2], [slab.x1 - slab.x0, 0.04, slab.z1 - slab.z0], interiorCeiling, { cast: false });
     }
     for (const wall of upperWalls(house.id)) {
@@ -972,7 +1133,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
       centred(builder, `aarr-house-${house.id}-inlintel-${door.id}`, [door.at, (door.headY + 3) / 2, door.centre], [0.2, 3 - door.headY, door.width], massing);
     }
     const porchX = house.cx + face * (house.w / 2 + 1.0);
-    centred(builder, `aarr-house-${house.id}-porch-slab`, [porchX, 0.15, house.cz], [2.0, 0.3, house.d * 0.9], concrete);
+    centred(builder, `aarr-house-${house.id}-porch-slab`, [porchX, 0.15, house.cz], [2.0, 0.3, house.d * 0.9], concreteFor(2.0, house.d * 0.9));
     centred(builder, `aarr-house-${house.id}-porch-roof`, [porchX, 3.1, house.cz], [2.0, 0.25, house.d * 0.9], roof);
     for (const dz of [-house.d * 0.4, house.d * 0.4]) {
       centred(builder, `aarr-house-${house.id}-porch-post-${dz < 0 ? 'n' : 's'}`, [porchX + face * 0.8, 1.6, house.cz + dz], [0.18, 2.8, 0.18], massing);
@@ -1008,7 +1169,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
       const railLen = Math.abs(railZ1 - railZ0);
       centred(builder, `aarr-house-${house.id}-porch-apron-${tag}`, [porchX + face * 0.8, 0.75, (railZ0 + railZ1) / 2], [0.12, 0.5, railLen], massing);
       centred(builder, `aarr-house-${house.id}-porch-rail-${tag}`, [porchX + face * 0.8, 1.06, (railZ0 + railZ1) / 2], [0.2, 0.12, railLen + 0.1], massing);
-      centred(builder, `aarr-house-${house.id}-porch-planter-${tag}`, [porchX + face * 0.35, 0.575, house.cz + sign * (house.d * 0.4 - 0.25)], [0.55, 0.55, 0.55], timber);
+      centred(builder, `aarr-house-${house.id}-porch-planter-${tag}`, [porchX + face * 0.35, 0.575, house.cz + sign * (house.d * 0.4 - 0.25)], [0.55, 0.55, 0.55], lumber);
     }
     // ---- Wave-2 furniture (Trellis GLBs, manifest rebuild-furniture-20260915).
     // Async over bare rooms: no placeholders (rooms read dressed or empty, never
@@ -1103,21 +1264,28 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     centred(builder, `aarr-garage-${garage.id}-floor`, [garageInner.cx, 0.06, garageInner.cz], [REBUILD_GARAGE_W, 0.12, REBUILD_GARAGE_D], garageConcrete, { cast: false });
     centred(builder, `aarr-garage-${garage.id}-roof`, [garage.cx, 2.925, garage.cz], [3.8, 0.25, 5.4], roof);
     centred(builder, `aarr-garage-${garage.id}-door`, [garage.cx, 1.1, garage.cz + 2.55], [2.6, 2.2, 0.12], roof);
-    centred(builder, `aarr-garage-${garage.id}-driveway`, [garage.cx, 0.04, garage.cz + 5.5], [3.2, 0.08, 6.0], concrete, { cast: false });
+    centred(builder, `aarr-garage-${garage.id}-driveway`, [garage.cx, 0.04, garage.cz + 5.5], [3.2, 0.08, 6.0], concreteFor(3.2, 6.0), { cast: false });
     const [carX, carZ] = garage.car;
     centred(builder, `aarr-car-${garage.id}-body`, [carX, 0.55, carZ], [1.8, 0.7, 4.2], vehicle);
     centred(builder, `aarr-car-${garage.id}-cabin`, [carX, 1.15, carZ - 0.2], [1.6, 0.6, 2.2], vehicle);
   }
 
   // ---- Sheds in back (north) corners + rear patio sets (fact 8; aerials) ----
-  const [shedW, shedE] = pair(builder, 'aarr-shed', 16, 1.1, -21, [3.0, 2.2, 2.6], massing);
+  // The back-yard shed is not bare massing: in `teal-backyard.png` it is clad
+  // and painted in the SAME colour as the house it stands behind, with a white
+  // door, which is what ties the back lot to its team half. Cream massing made
+  // it read as a third, unrelated building. Emitted as two `centred()` calls
+  // rather than `pair()` only because each half needs its own skin material;
+  // the names, positions and size are byte-identical to what `pair()` emitted.
+  const shedE = centred(builder, 'aarr-shed-east', [-16, 1.1, -21], [3.0, 2.2, 2.6], houseSkin.east);
+  const shedW = centred(builder, 'aarr-shed-west', [16, 1.1, -21], [3.0, 2.2, 2.6], houseSkin.west);
   const [shedRoofW, shedRoofE] = pair(builder, 'aarr-shed-roof', 16, 2.3, -21, [3.4, 0.25, 3.0], roof);
   // Catalog shed GLBs sit on the same pads at the same yaw (none).
   kitbash('./assets/rebuild/spread/shed.glb', [-25.6, 0, -33.6], 0, [shedW, shedRoofW], undefined, true);
   kitbash('./assets/rebuild/spread/shed.glb', [25.6, 0, -33.6], 0, [shedE, shedRoofE], undefined, true);
-  pair(builder, 'aarr-patio-table', 10, 0.4, -19, [1.4, 0.8, 1.4], concrete);
+  pair(builder, 'aarr-patio-table', 10, 0.4, -19, [1.4, 0.8, 1.4], concreteFor(1.4));
   pair(builder, 'aarr-patio-umbrella-pole', 10, 1.4, -19, [0.12, 2.4, 0.12], darkPole);
-  pair(builder, 'aarr-patio-bench', 10, 0.3, -17.2, [1.6, 0.6, 0.5], timber);
+  pair(builder, 'aarr-patio-bench', 10, 0.3, -17.2, [1.6, 0.6, 0.5], lumber);
 
   // ---- Bus + semi nose-to-nose inside the loop (fact 4; all plates) ----
   // Bus body is catalog batch1 (Blender procedural + baked PBR, manifest
@@ -1135,17 +1303,17 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   // South choke barricade across the entry: 4-wide x 3-tall + 3-crate top row.
   for (let ix = 0; ix < 4; ix += 1) {
     for (let iy = 0; iy < 3; iy += 1) {
-      centred(builder, `aarr-choke-crate-${ix}-${iy}`, [-1.5 + ix, 0.5 + iy, 14], [1, 1, 1], crate);
+      centred(builder, `aarr-choke-crate-${ix}-${iy}`, [-1.5 + ix, 0.5 + iy, 14], [1, 1, 1], crateAge(ix, iy));
     }
   }
   for (let ix = 0; ix < 3; ix += 1) {
-    centred(builder, `aarr-choke-crate-top-${ix}`, [-1 + ix, 3.5, 14], [1, 1, 1], crate);
+    centred(builder, `aarr-choke-crate-top-${ix}`, [-1 + ix, 3.5, 14], [1, 1, 1], crateAge(ix, 4));
   }
   // Island cluster (street plate island): 2x2 + 1 top + planter pair.
   // Spread 06 crates (0.96 footprint inside the merged island collider).
   const islandSpots: ReadonlyArray<readonly [number, number, number]> = [[-0.8, 2.2, 0], [0.8, 2.2, 0], [-0.8, 3.8, 0], [0.8, 3.8, 0], [0, 3, 0.6]] as const;
   for (const [dx, dz, dy] of islandSpots) {
-    const box = centred(builder, `aarr-island-crate-${dx}-${dz}`, [dx, 0.62, dz], [1, 1, 1], crate);
+    const box = centred(builder, `aarr-island-crate-${dx}-${dz}`, [dx, 0.62, dz], [1, 1, 1], crateAge(dx, dz));
     kitbash('./assets/rebuild/crates-worn/crate-06-worn.glb', [dx * 1.6, dy, dz * 1.6], (dx + dz) * 0.4, [box], undefined, true);
   }
   pair(builder, 'aarr-hedge-loop', 12.2, 0.6, -4.3, [1.2, 1.2, 2.0], hedge);
@@ -1156,29 +1324,29 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     const end = cz < 0 ? 'n' : 's';
     const spots: ReadonlyArray<readonly [number, number, number]> = [[cx, cz, 0], [cx + 1, cz, 0], [cx + 0.5, cz, 0.6], [cx + 0.5, cz + 1, 0]] as const;
     for (const [sx, sz, sy] of spots) {
-      const box = centred(builder, `aarr-yard-crate-${side}-${end}-${sx}-${sz}`, [sx, 0.5 + sy, sz], [1, 1, 1], crate);
+      const box = centred(builder, `aarr-yard-crate-${side}-${end}-${sx}-${sz}`, [sx, 0.5 + sy, sz], [1, 1, 1], crateAge(Math.round(sx), Math.round(sz)));
       kitbash('./assets/rebuild/crates-worn/crate-06-worn.glb', [sx * 1.6, sy, sz * 1.6], (sx + sz) * 0.7, [box], undefined, true);
     }
   }
 
   // ---- Concrete pads: entrance + shed aprons + 4 lawn pads (fact 7) ----
-  centred(builder, 'aarr-pad-entrance', [0, 0.05, 19], [10, 0.1, 4], concrete, { cast: false });
-  pair(builder, 'aarr-pad-shed-apron', 16, 0.05, -18.4, [4, 0.1, 2.4], concrete, { cast: false });
-  pair(builder, 'aarr-pad-lawn-sw-se', 14, 0.09, 12, [4.5, 0.08, 4.5], concrete, { cast: false });
-  pair(builder, 'aarr-pad-lawn-mid', 14, 0.09, -4, [4.0, 0.08, 4.0], concrete, { cast: false });
+  centred(builder, 'aarr-pad-entrance', [0, 0.05, 19], [10, 0.1, 4], concreteFor(10, 4), { cast: false });
+  pair(builder, 'aarr-pad-shed-apron', 16, 0.05, -18.4, [4, 0.1, 2.4], concreteFor(4, 2.4), { cast: false });
+  pair(builder, 'aarr-pad-lawn-sw-se', 14, 0.09, 12, [4.5, 0.08, 4.5], concreteFor(4.5), { cast: false });
+  pair(builder, 'aarr-pad-lawn-mid', 14, 0.09, -4, [4.0, 0.08, 4.0], concreteFor(4.0), { cast: false });
 
   // ---- Perimeter concrete walls with pillars, CLOSED with gaps (BRIEF; topdown) ----
   // South wall (z=+24) with 8 m entry gap; north wall (z=-26) with 6 m entrance gap.
-  pair(builder, 'aarr-wall-south', 14, 1.2, 24, [16, 2.4, 0.5], concrete);
-  pair(builder, 'aarr-wall-north', 13.5, 1.2, -26, [17, 2.4, 0.5], concrete);
-  pair(builder, 'aarr-wall-side', 24, 1.2, -1, [0.5, 2.4, 49], concrete);
+  pair(builder, 'aarr-wall-south', 14, 1.2, 24, [16, 2.4, 0.5], concreteFor(16, 2.4));
+  pair(builder, 'aarr-wall-north', 13.5, 1.2, -26, [17, 2.4, 0.5], concreteFor(17, 2.4));
+  pair(builder, 'aarr-wall-side', 24, 1.2, -1, [0.5, 2.4, 49], concreteFor(49, 2.4));
   // Pillars every ~8 m along each run.
   for (const px of [-20, -12, -4, 4, 12, 20]) {
-    pair(builder, `aarr-pillar-south-${Math.abs(px)}`, Math.abs(px) < 4 ? 6 : px, 1.5, 24, [0.9, 3.0, 0.9], concrete);
-    pair(builder, `aarr-pillar-north-${Math.abs(px)}`, Math.abs(px) < 3 ? 5 : px, 1.5, -26, [0.9, 3.0, 0.9], concrete);
+    pair(builder, `aarr-pillar-south-${Math.abs(px)}`, Math.abs(px) < 4 ? 6 : px, 1.5, 24, [0.9, 3.0, 0.9], concreteFor(0.9, 3.0));
+    pair(builder, `aarr-pillar-north-${Math.abs(px)}`, Math.abs(px) < 3 ? 5 : px, 1.5, -26, [0.9, 3.0, 0.9], concreteFor(0.9, 3.0));
   }
   for (const pz of [-20, -12, -4, 4, 12, 20]) {
-    pair(builder, `aarr-pillar-side-${Math.abs(pz)}`, 24, 1.5, pz, [0.9, 3.0, 0.9], concrete);
+    pair(builder, `aarr-pillar-side-${Math.abs(pz)}`, 24, 1.5, pz, [0.9, 3.0, 0.9], concreteFor(0.9, 3.0));
   }
   // Wooden privacy fences dividing every lot (fact 9; aerial plates).
   // Rebuilt bays (Lane N: 3.93 m world width, 2.14 tall, y=0 standing).
@@ -1189,8 +1357,17 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
     { name: 'drive', cx: 20.5, cz: 6, alongX: false, bays: 4 },
   ] as const;
   for (const run of fenceRuns) {
-    const [runW, runE] = pair(builder, `aarr-fence-${run.name}`, run.cx, 0.9, run.cz, run.alongX ? [9, 1.8, 0.25] : [0.25, 1.8, 10], timber);
-    const hide = [runW, runE];
+    const [runW, runE] = pair(builder, `aarr-fence-${run.name}`, run.cx, 0.9, run.cz, run.alongX ? [9, 1.8, 0.25] : [0.25, 1.8, 10], fenceBoard);
+    // CAP RAIL. Every fence in `teal-backyard.png` and `street-teal.png` is
+    // capped, and at street distance the cap is the only line the eye gets off
+    // a fence: a lit horizontal edge with its own shadow under it, breaking the
+    // panel's top against the sky. The shipped run had a bare cut top, which is
+    // most of why `yard-geometry` reads it as a garden WALL rather than a
+    // fence. 0.12 m thick, 0.15 m proud of each face, casting (the shadow is
+    // the point), and hidden with the panel when the bay GLB resolves so it
+    // cannot double up on the catalog bay's own cap.
+    const [capW, capE] = pair(builder, `aarr-fence-${run.name}-cap`, run.cx, 1.86, run.cz, run.alongX ? [9.2, 0.12, 0.55] : [0.55, 0.12, 10.2], fenceCap);
+    const hide = [runW, runE, capW, capE];
     for (const side of [-1, 1] as const) {
       for (let b = 0; b < run.bays; b += 1) {
         const off = (b - (run.bays - 1) / 2) * 2.456;
@@ -1203,7 +1380,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
       for (const e of [-endOff, endOff] as const) {
         const px = run.alongX ? side * run.cx + e : side * run.cx;
         const pz = run.alongX ? run.cz : run.cz + e;
-        centred(builder, `aarr-fence-${run.name}-post-${side < 0 ? 'w' : 'e'}-${e < 0 ? 'a' : 'b'}`, [px, 1.0, pz], [0.25, 2.0, 0.25], timber);
+        centred(builder, `aarr-fence-${run.name}-post-${side < 0 ? 'w' : 'e'}-${e < 0 ? 'a' : 'b'}`, [px, 1.0, pz], [0.25, 2.0, 0.25], fencePost);
       }
     }
   }
@@ -1212,7 +1389,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   const lampSpots: ReadonlyArray<readonly [number, number]> = [[-7, -12], [7, -12], [-7.5, 8], [7.5, 8], [-5.5, 20], [5.5, 20]] as const;
   for (const [lx, lz] of lampSpots) {
     const tag = `${lx < 0 ? 'w' : 'e'}-${Math.round(lz)}`;
-    centred(builder, `aarr-lamp-${tag}-base`, [lx, 0.3, lz], [0.9, 0.6, 0.9], concrete);
+    centred(builder, `aarr-lamp-${tag}-base`, [lx, 0.3, lz], [0.9, 0.6, 0.9], concreteFor(0.9));
     const pole = centred(builder, `aarr-lamp-${tag}-pole`, [lx, 3.1, lz], [0.18, 5.6, 0.18], darkPole);
     const head = centred(builder, `aarr-lamp-${tag}-head`, [lx, 5.9, lz], [0.7, 0.35, 0.4], darkPole);
     // Catalog lamp post GLB over the pole+head (base plinth stays).
@@ -1227,7 +1404,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   pair(builder, 'aarr-hedge-pad', 14, 0.6, 14.6, [4.5, 1.0, 0.8], hedge);
 
   // ---- North entrance: welcome sign + rusty car between sheds (fact 5) ----
-  const signBoard = centred(builder, 'aarr-sign-board', [0, 1.9, -24.5], [3.2, 1.0, 0.15], timber);
+  const signBoard = centred(builder, 'aarr-sign-board', [0, 1.9, -24.5], [3.2, 1.0, 0.15], lumber);
   // Catalog sign GLB over the board (posts stay).
   kitbash('./assets/rebuild/spread/sign.glb', [0, 0, -39.2], 0, [signBoard], undefined, true);
   centred(builder, 'aarr-sign-post-e', [1.2, 0.9, -24.5], [0.18, 1.8, 0.18], timber);
@@ -1242,7 +1419,7 @@ export function buildAtomicAcresRebuild(scene: THREE.Scene): ArenaMap {
   // Catalog jeep GLB at the same pad and yaw (none).
   kitbash('./assets/rebuild/vehicles/jeep.glb', [7.5, 0, 21], 0, [jeepBody, jeepCabin]);
   for (let ix = 0; ix < 5; ix += 1) {
-    centred(builder, `aarr-sandbag-${ix}`, [-6.5 + ix * 1.1, 0.35, 18.5], [1.0, 0.7, 0.8], concrete);
+    centred(builder, `aarr-sandbag-${ix}`, [-6.5 + ix * 1.1, 0.35, 18.5], [1.0, 0.7, 0.8], concreteFor(1.0));
   }
 
   // ---- Utility poles flanking the street (street + aerial plates) ----

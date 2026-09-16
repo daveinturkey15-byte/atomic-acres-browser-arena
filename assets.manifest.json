@@ -1796,8 +1796,8 @@
         },
         {
           "path": "public/assets/rebuild/props/shed.glb",
-          "sha256": "da704f304b708eb6147f43b41e993b7884aaaa73b851e65136ce723569885cac",
-          "bytes": 295088
+          "sha256": "204368ec14013f4913a1fc9622edec63216fc35d002f5132f5869f1b7eefda37",
+          "bytes": 237492
         },
         {
           "path": "public/assets/rebuild/props/sign.glb",
@@ -1914,8 +1914,8 @@
         },
         {
           "path": "public/assets/rebuild/spread/fence-bay.glb",
-          "sha256": "1f3f72f0a311eaf4bc783c543fc0768ca2b30b585e260fd915f991d4ccb889af",
-          "bytes": 95540
+          "sha256": "45d686e8ec5b89edbd08589c8c95f8253fd98e187df9634c90ca7e0d988b5632",
+          "bytes": 157136
         },
         {
           "path": "public/assets/rebuild/spread/lamp.glb",
@@ -1929,8 +1929,8 @@
         },
         {
           "path": "public/assets/rebuild/spread/shed.glb",
-          "sha256": "f573d42ed8a92761245c0c6d2587a6e1200af47236aeb549935cc21620a5dca2",
-          "bytes": 335568
+          "sha256": "52121c232d3b84c3b8780c5ee64963f22892d4555307bd05b4a0fd74bbf4550c",
+          "bytes": 277512
         },
         {
           "path": "public/assets/rebuild/spread/sign.glb",
@@ -1939,8 +1939,8 @@
         },
         {
           "path": "public/assets/rebuild/spread/wall-bay.glb",
-          "sha256": "b86e61334a7d22796e6e8193760b15be85a49701ffbf88d9e221b6a2352972dc",
-          "bytes": 11280
+          "sha256": "8ab4daebf28ab1d0d23e9440a248fa997da359eb36ebdc93b4abf934b8dc752a",
+          "bytes": 76704
         }
       ],
       "provenanceState": "ORIGINAL_AGENT_AUTHORED",

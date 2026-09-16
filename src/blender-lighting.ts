@@ -378,11 +378,117 @@ const NUKETOWN2_SHADOW_FLOOR: Readonly<Partial<ArenaLightingProfile>> = Object.f
  * greybox surfaces, so `frac > 0.9` and p99 are the numbers that decide whether
  * this needs a shoulder correction next round.
  */
+/**
+ * ROUND 3 — THE APERTURE IS OPEN NOW, AND THE SUN IS COMING IN EDGE-ON.
+ *
+ * Section 8 above ends "there is no aperture for the key to come through ...
+ * the rig-side lever that would matter once an aperture exists is the sun
+ * AZIMUTH, which round 1 deliberately held fixed". The aperture now exists:
+ * `emitGlazedWall()` cuts a real hole in the casting shell and
+ * `DRESS_WIN_W` was widened 0.95 -> 1.80 m (integrator, 2026-09-16). This is
+ * that azimuth, solved rather than guessed. Full derivation, with the solar
+ * geometry, the illuminance budget and what could NOT be established:
+ * `docs/ATOMIC_ACRES_REFERENCE.md`.
+ *
+ * 1. WHAT THE APERTURE ACTUALLY IS, read out of atomic-acres-rebuild-arena.ts:
+ *    sill `DRESS_SILL_Y` 0.95 m, head `DRESS_HEAD_Y` 2.35 m, casing 1.80 m
+ *    wide, two per elevation, and the hole cut in the CASTING shell is
+ *    `DRESS_APERTURE_MARGIN` 0.02 m smaller per edge -> 1.76 x 1.36 m =
+ *    2.394 m2 of open sky per opening. The ONLY glazed elevations are the +-z
+ *    house faces (the dress loop's `'south'` = z0 and `'north'` = z1).
+ *
+ * 2. WHERE THE SUN LANDS, COMPUTED FROM THOSE HEIGHTS RATHER THAN PROBED. The
+ *    profile angle is beta = atan(tan h / cos gamma), where gamma is the plan
+ *    angle between the sun azimuth and the glazed wall's outward normal, and a
+ *    sill/head at height y hits the floor at y / tan beta. At HEAD the standoff
+ *    `[-52.7, 45.7, 32.3]` sits at gamma = atan(52.7 / 32.3) = 58.51 degrees
+ *    off the +z normal, so with the pinned h = 35.01:
+ *
+ *      beta = atan(0.70053 / cos 58.51) = 53.28 deg
+ *      floor hit, 0.95 sill -> 0.71 m;  2.35 head -> 1.75 m
+ *
+ *    The WHOLE patch lives between 0.71 m and 1.75 m of the glazed wall. The
+ *    `interior-west` review camera stands at z 5.5 with the +z glazed wall at
+ *    z 7.2 behind it (house `west` cx -13.5 cz 1.5 d 6.0, x SPREAD 1.6), i.e.
+ *    1.7 m out from that wall, looking away from it. THE SUN PATCH IS BEHIND
+ *    THE CAMERA. That is the whole of the reported defect: peak display 0.859
+ *    and 0.14% of the frame over 0.8, against 1.000 and 4.4% on
+ *    `living-room-eye.png`. The room is lit; the key is out of frame.
+ *
+ * 3. AND THE SAME ANGLE HALVES THE LIGHT. Flux admitted per unit of glazing is
+ *    cos(theta_inc) = cos h . cos gamma = 0.8191 x 0.5226 = 0.428, and the
+ *    sunlit floor area per opening is A . cos h . cos gamma / sin h =
+ *    3.418 . cos gamma = 1.79 m2, so a whole glazed elevation puts 3.57 m2 of
+ *    sun on a 96 m2 ground floor. NO INTENSITY CAN FIX EITHER HALF: the key is
+ *    one DirectionalLight, so raising it raises the sunlit EXTERIOR by exactly
+ *    the same factor, and it can neither move a patch into frame nor widen it.
+ *
+ * 4. THE SOLVE. Requirement: put the body of the patch in the camera's floor
+ *    band (1.7-6.2 m out from that wall) with the head-hit line about a third
+ *    of the way across the 9.6 m room, which is where `living-room-eye.png`
+ *    puts the far edge of its beam relative to that room's depth. d_head 2.9 m
+ *    -> tan beta = 2.35 / 2.9 = 0.8103 -> beta 39.02 -> cos gamma = 0.70053 /
+ *    0.8103 = 0.8645 -> GAMMA = 30.2, taken as 30.0 (d_head 2.91 m).
+ *    Note what is NOT solvable: d_sill >= 1.7 m would need beta <= 29.2 and so
+ *    cos gamma = 1.25, which is impossible at this elevation. The sill hit
+ *    maxes out at 1.36 m even square-on, so the near edge of the patch starts
+ *    just behind the camera plane no matter what. Stated, not hidden.
+ *
+ * 5. WHAT MOVES. A PURE AZIMUTH ROTATION of the shared standoff about the
+ *    vertical through the aim point (centreX, 2.4, centreZ) - the exact
+ *    counterpart of round 1's pure ELEVATION rotation, and the same two
+ *    invariants are held by construction:
+ *
+ *      elevation   35.019 -> 35.030 deg   (aim height 2.4, delta 0.01)
+ *      |standoff|  76.870 -> 76.847 m     (delta 0.023 m, round 1 spent 0.03)
+ *
+ *    so graphics-refinement.ts's derivation of this arena's shadow `far: 176`
+ *    from "the volume's own diagonal (96.3 m) plus the sun standoff (76.9 m)"
+ *    stays true without editing the file it lives in. Because the ELEVATION is
+ *    unchanged, sunlit horizontal irradiance, sunlit display luminance and
+ *    every cast-shadow LENGTH in the map (1.43x object height) are unchanged to
+ *    three places; the only exterior quantity that moves is shadow DIRECTION.
+ *
+ *      beta on the glazed elevations   53.3 -> 39.0 deg
+ *      floor hit, sill / head          0.71 / 1.75 -> 1.17 / 2.91 m
+ *      patch depth                     1.04 -> 1.73 m          +66%
+ *      cos(theta_inc), flux admitted   0.428 -> 0.709          +66%
+ *      sunlit floor per elevation      3.57 -> 5.92 m2         +66%
+ *      patch skew per m of depth       1.63 -> 0.58 m
+ *
+ * 6. THE PRICE, AND IT IS THE OWNER'S CALL. Shadow direction in plan rotates
+ *    28.5 degrees across the whole map, and that is gameplay-visible - it is
+ *    the reason round 1 froze the azimuth. This unfreezes it on a derivation
+ *    from authored geometry, not on a guess, and the revert is this one triple.
+ *    The graybox top-down plate is NOT used as the derivation: it is an
+ *    uncalibrated oblique aerial with an unknown yaw, exactly as round 1
+ *    refused to read elevation off it.
+ *
+ * 7. WHAT IS NOT CLAIMED. No display-luminance prediction is given for the new
+ *    patch. Round 2's predictions were obtained by inverting the shipped chain
+ *    on measured pixels; this lane may not run a build or a capture, so every
+ *    number above is geometric - patch position, patch area, admitted flux -
+ *    and the capture is what decides the display end. Two things the rig cannot
+ *    reach are reported in the brief rather than attempted here: the reference
+ *    plate's peak is largely a BLOWN-OUT EXTERIOR through the glass, which this
+ *    arena's `windowGlass` (opacity 0.42 over 0x9fb8c8) veils by construction;
+ *    and the rig's direct:indirect on a horizontal is 1.6-2.0 : 1 (0.7-1.0
+ *    stops) against a real clear-Mojave 2.45 stops, which is a coordinated
+ *    re-solve against raid2's 0.44 silhouette finding, not a 90-minute change.
+ *
+ * WHAT THIS IS NOT. No light is created, destroyed, parented, hidden or
+ * toggled; no intensity, exposure, count, bias, budget or threshold appears
+ * below. One `sunPosition` triple on the `DirectionalLight` every profile
+ * already builds (PASS 82), arena-scoped exactly as round 1 left it, so no
+ * other arena moves.
+ */
 const ATOMIC_ACRES_REBUILD_LIGHTING: Readonly<Partial<ArenaLightingProfile>> = Object.freeze({
   hemisphereSky: 0xc3bebb,
   hemisphereGround: 0xaf9261,
   fillColor: 0xe4deda,
-  sunPosition: [-52.7, 45.7, 32.3] as const,
+  // Round 3, section 4 above: gamma 58.51 -> 30.00 deg off the glazed +-z
+  // elevations' normal, elevation and standoff magnitude held.
+  sunPosition: [-30.9, 45.7, 53.5] as const,
 });
 
 /**

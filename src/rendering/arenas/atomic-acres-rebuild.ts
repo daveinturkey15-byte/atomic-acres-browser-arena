@@ -241,7 +241,16 @@ export const definition = createProceduralArenaVisualDefinition({
     // between a house flank and the boundary fence - fence one side, siding and
     // hedges the other, garage and ridge line closing the far end.
     camera('atomic-acres-rebuild-side-lane-west', [-22, 1.65, -10], [-22, 1.5, 14], 'geometry', 1.04),
-    camera('atomic-acres-rebuild-side-lane-east', [22, 1.65, -10], [22, 1.5, 14], 'geometry', 1.04),
+    // NOT the mirror of the west lane, and that is the finding. x = -22 puts the
+    // west camera in open lane (29,002 distinct colours, healthy); x = +22 put
+    // the east camera INSIDE the east house, filling the frame with one ochre
+    // siding panel - 3,942 distinct colours, which the harness's own
+    // frame-variety gate failed the whole run on. The two houses are not
+    // symmetric: east is the wider of the pair (w 7.8 against 7.2) and sits at
+    // cz -1.5 against the west's +1.5, so mirroring the x was never going to
+    // land. Moved outboard to sit between the east house and the x = +31
+    // service road.
+    camera('atomic-acres-rebuild-side-lane-east', [29, 1.65, -10], [29, 1.5, 14], 'geometry', 1.04),
     // `yellow-backyard.png`: the east house's rear yard. -yard-geometry already
     // covers the west/north sweep; this is the matching east station, and it is
     // also the first camera this arena has ever pointed at the east house.
