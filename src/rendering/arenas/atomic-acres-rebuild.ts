@@ -226,6 +226,33 @@ export const definition = createProceduralArenaVisualDefinition({
     camera('atomic-acres-rebuild-interior-sunlit', [-19, 1.7, 1.5], [-20.6, 0.85, 6.8], 'light-occlusion', 1.04),
     // 8. Bus closeup (kitbash proof): catalog GLB over massing placeholder.
     camera('atomic-acres-rebuild-bus-closeup', [3, 2.4, 1.5], [-5.5, 1.4, 0.8], 'geometry', 1.04),
+    // 10-14. ADDED 2026-09-16 to make more of the reference corpus gradeable.
+    // `npm run qa:catalogue` reports 556 reference images against 9 paired
+    // stations - 1.6% coverage - so almost nothing the owner authored is
+    // actually being measured against. Even the 18-plate frozen bar only had 9
+    // stations. These five pair the plates that had none.
+    //
+    // Placed from the arena's own authored extents rather than guessed: side
+    // lawns sit at x = +/-21 z = -2, back lawns at x = +/-14 z = -16, front
+    // lawns at z = +12, service roads at x = +/-31, apron 140 x 150. Front is
+    // +z, back is -z (aarr-lawn-front / aarr-lawn-back).
+    //
+    // `teal-side-lane.png` / `yellow-side-lane.png`: eye-level down the lane
+    // between a house flank and the boundary fence - fence one side, siding and
+    // hedges the other, garage and ridge line closing the far end.
+    camera('atomic-acres-rebuild-side-lane-west', [-22, 1.65, -10], [-22, 1.5, 14], 'geometry', 1.04),
+    camera('atomic-acres-rebuild-side-lane-east', [22, 1.65, -10], [22, 1.5, 14], 'geometry', 1.04),
+    // `yellow-backyard.png`: the east house's rear yard. -yard-geometry already
+    // covers the west/north sweep; this is the matching east station, and it is
+    // also the first camera this arena has ever pointed at the east house.
+    camera('atomic-acres-rebuild-backyard-east', [22, 2.6, -26], [12, 1.4, -12], 'light-occlusion', 1.04),
+    // `road-far-end.png`: the loop road from its far end, held low and straight
+    // down the carriageway so the road surface itself is the subject - it is the
+    // most-resolved material in the build and nothing was framing it.
+    camera('atomic-acres-rebuild-road-far-end', [0, 1.55, -34], [0, 1.7, 30], 'geometry', 1.04),
+    // `balcony-backyard.png`: from the west upper storey out over its own back
+    // lawn. Second station on the upper floor, which until today had none at all.
+    camera('atomic-acres-rebuild-balcony-backyard', [-17, 4.6, -4], [-15, 2.2, -20], 'light-occlusion', 1.04),
   ],
   collisionIdentity: {
     authoritativeArenaId: 'atomic-acres-rebuild',

@@ -197,6 +197,15 @@ export const VIEWPOINT_CATALOG = Object.freeze({
     // floor in the west house lands behind station -interior-west, so without
     // this station the sun that now enters is unreviewable and unregressable.
     'atomic-acres-rebuild-interior-sunlit',
+    // Added 2026-09-16: the reference corpus is 556 images against 9 paired
+    // stations (1.6%). These five pair frozen-bar plates that had no station at
+    // all - both side lanes, the east backyard, the road's far end and the
+    // upper-storey balcony view.
+    'atomic-acres-rebuild-side-lane-west',
+    'atomic-acres-rebuild-side-lane-east',
+    'atomic-acres-rebuild-backyard-east',
+    'atomic-acres-rebuild-road-far-end',
+    'atomic-acres-rebuild-balcony-backyard',
     'atomic-acres-rebuild-bus-closeup',
   ]),
 });

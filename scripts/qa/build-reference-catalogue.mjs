@@ -90,6 +90,11 @@ const PAIRING = {
   'street-teal.png': 'atomic-acres-rebuild-street-north',
   'street-yellow.png': 'atomic-acres-rebuild-street-south',
   'bedroom-eye.png': 'atomic-acres-rebuild-upper-landing',
+  'teal-side-lane.png': 'atomic-acres-rebuild-side-lane-west',
+  'yellow-side-lane.png': 'atomic-acres-rebuild-side-lane-east',
+  'yellow-backyard.png': 'atomic-acres-rebuild-backyard-east',
+  'road-far-end.png': 'atomic-acres-rebuild-road-far-end',
+  'balcony-backyard.png': 'atomic-acres-rebuild-balcony-backyard',
 };
 
 function walk(dir, recurse = true, out = []) {

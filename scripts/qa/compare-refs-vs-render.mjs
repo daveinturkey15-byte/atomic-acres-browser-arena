@@ -120,6 +120,44 @@ export const PAIRINGS = Object.freeze([
     match: 'indicative',
     note: 'Upper landing toward the front-bedroom door. This station was MISSING when this instrument was first written - the catalog listed it but the arena no longer authored it - and was restored on 2026-09-16, so it now captures. Graded indicative rather than direct: the reference frames a furnished bedroom interior, while the restored camera was placed one storey above the known-good interior-west eye and its exact aim against the landing is not yet confirmed against the authored geometry.',
   }),
+  // ADDED 2026-09-16. `npm run qa:catalogue` reported 556 reference images
+  // against 9 paired stations - 1.6% corpus coverage - and even the 18-plate
+  // frozen bar had only 9. These five plates had NO station at all, so five were
+  // authored for them in src/rendering/arenas/atomic-acres-rebuild.ts. Graded
+  // 'indicative' rather than 'direct' on first pass: the stations are placed
+  // from the arena's authored extents (side lawns x +/-21, back lawns z -16,
+  // service roads x +/-31) and their framing against these plates has not yet
+  // been confirmed by eye.
+  Object.freeze({
+    ref: 'teal-side-lane.png',
+    viewpoint: 'atomic-acres-rebuild-side-lane-west',
+    match: 'indicative',
+    note: 'Eye-level down the west (teal) side lane: boundary fence one side, house siding and hedges the other, outbuilding and ridge closing the far end.',
+  }),
+  Object.freeze({
+    ref: 'yellow-side-lane.png',
+    viewpoint: 'atomic-acres-rebuild-side-lane-east',
+    match: 'indicative',
+    note: 'The east (yellow) mirror of the same lane.',
+  }),
+  Object.freeze({
+    ref: 'yellow-backyard.png',
+    viewpoint: 'atomic-acres-rebuild-backyard-east',
+    match: 'indicative',
+    note: 'East house rear yard. Also the first station this arena has ever pointed at the east house - every earlier interior and yard camera was on the west.',
+  }),
+  Object.freeze({
+    ref: 'road-far-end.png',
+    viewpoint: 'atomic-acres-rebuild-road-far-end',
+    match: 'indicative',
+    note: 'The loop road from its far end, held low and straight down the carriageway. The road surface is the most-resolved material in the build and nothing was framing it.',
+  }),
+  Object.freeze({
+    ref: 'balcony-backyard.png',
+    viewpoint: 'atomic-acres-rebuild-balcony-backyard',
+    match: 'indicative',
+    note: 'From the west upper storey out over its own back lawn. Second upper-floor station; before today the upper floor had none.',
+  }),
   Object.freeze({
     ref: 'teal-ground-cutaway.png',
     viewpoint: null,
