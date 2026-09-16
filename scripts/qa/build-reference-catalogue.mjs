@@ -95,6 +95,9 @@ const PAIRING = {
   'yellow-backyard.png': 'atomic-acres-rebuild-backyard-east',
   'road-far-end.png': 'atomic-acres-rebuild-road-far-end',
   'balcony-backyard.png': 'atomic-acres-rebuild-balcony-backyard',
+  // Not in _judge/refs - this one lives in batch-2-layout, and it is the most
+  // complete single statement of the map's intended composition in the corpus.
+  'map__center-loop.png': 'atomic-acres-rebuild-center-loop',
 };
 
 function walk(dir, recurse = true, out = []) {
