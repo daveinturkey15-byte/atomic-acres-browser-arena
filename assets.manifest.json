@@ -1708,16 +1708,17 @@
       "files": [
         {
           "path": "public/assets/rebuild/trees/joshua.glb",
-          "sha256": "b6748b4ca28896cc70bdd9191e932ca05094a713acddabad7a1039107cd3f858",
-          "bytes": 7442656
+          "sha256": "b588b18bb5466adf379edaf029e8cf0d6dc349ce68c1e10cba283cc4aef0d4a3",
+          "bytes": 1279568
         },
         {
           "path": "public/assets/rebuild/trees/street-leafy.glb",
-          "sha256": "71ee55f4ff0ef88236ba616c7cd6a4159d2bfd7924affefd2f75aebcdaff1215",
-          "bytes": 9124524
+          "sha256": "4eee965e29a198d96812d428513147491b0934609c55a6659c90d6602db9d4aa",
+          "bytes": 3135072
         }
       ],
-      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED",
+      "postProcess": "Texture budget pass 2026-09-16 (scripts/assets/compress-rebuild-glbs.mjs): gltf-transform resize to a maximum texture edge of 512 px, 1024 px for interiors, 1024 px for ground, 1024 px for furniture, followed by lossless WebP encoding. Geometry, materials, node names and extras are unchanged; only the embedded texture resolution and encoding differ from the authored asset."
     },
     {
       "id": "atomic-acres-rebuild-bus-20260915",
@@ -1728,11 +1729,12 @@
       "files": [
         {
           "path": "public/assets/rebuild/vehicles/bus.glb",
-          "sha256": "5ee885ca0d9a19e5272775bf61c0b1d670a82f8cccc6323f8aaa56996bf7c885",
-          "bytes": 991696
+          "sha256": "0698a152e1bb15bb92f91f7b920734eabb628961f04d07a56b54dbd70c7a7686",
+          "bytes": 392568
         }
       ],
-      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED",
+      "postProcess": "Texture budget pass 2026-09-16 (scripts/assets/compress-rebuild-glbs.mjs): gltf-transform resize to a maximum texture edge of 512 px, 1024 px for interiors, 1024 px for ground, 1024 px for furniture, followed by lossless WebP encoding. Geometry, materials, node names and extras are unchanged; only the embedded texture resolution and encoding differ from the authored asset."
     },
     {
       "id": "atomic-acres-rebuild-furniture-20260915",
@@ -1743,26 +1745,27 @@
       "files": [
         {
           "path": "public/assets/rebuild/furniture/bath-set.glb",
-          "sha256": "4e5dfe1c99d91d05b73abb2fc92f79f08d61c5ac624918b4229a7c4aec688316",
-          "bytes": 1621816
+          "sha256": "15a5f1364914aad459e88dced5374f925f4514c3e812f51ee8ccd68af7ab0035",
+          "bytes": 1521012
         },
         {
           "path": "public/assets/rebuild/furniture/bed-double.glb",
-          "sha256": "3d84e9f98765803a427980a9114726586310da32607ba1a2589cf2cc2fb926de",
-          "bytes": 2998964
+          "sha256": "63d5ecb96956f8330344b6f5119994cc9827cacca50cfa8af532ebe22a13f6ad",
+          "bytes": 2921432
         },
         {
           "path": "public/assets/rebuild/furniture/kitchen-counter.glb",
-          "sha256": "3f4a6cb2982bb89517e6c24324338a12cc9bda955c340b781033735c5b24a9e6",
-          "bytes": 2684428
+          "sha256": "506684b851697e8f7260c41e1d359df6ce2a2abbdb6eaca3fcd940d6fb5626d9",
+          "bytes": 2623072
         },
         {
           "path": "public/assets/rebuild/furniture/sofa.glb",
-          "sha256": "6ab6ed1dacb382a6a5129de3d327b5cc965b5a08b26f1a67cf27b964a709d5f6",
-          "bytes": 2194424
+          "sha256": "ddca92d182c786a17de2443020d0d27762660825d935ab04eba6bcf32725d74c",
+          "bytes": 2126508
         }
       ],
-      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED",
+      "postProcess": "Texture budget pass 2026-09-16 (scripts/assets/compress-rebuild-glbs.mjs): gltf-transform resize to a maximum texture edge of 512 px, 1024 px for interiors, 1024 px for ground, 1024 px for furniture, followed by lossless WebP encoding. Geometry, materials, node names and extras are unchanged; only the embedded texture resolution and encoding differ from the authored asset."
     },
     {
       "id": "atomic-acres-rebuild-vehicles-props-20260915",
@@ -1773,36 +1776,37 @@
       "files": [
         {
           "path": "public/assets/rebuild/vehicles/jeep.glb",
-          "sha256": "72ab32f5ca4a03aa2424b37826eeb78e41f13047dc36ac5f89d7d3690dd96cb6",
-          "bytes": 1325888
+          "sha256": "13a0482abe8bcb5ce96861317c0e90d173360b9fbf775f0e85731658493aa30a",
+          "bytes": 377668
         },
         {
           "path": "public/assets/rebuild/vehicles/rusty-car.glb",
-          "sha256": "56228dedbd3d03a49fabd6b4b4f329e91fa9c4089a51479ace0d786a0de1c425",
-          "bytes": 888908
+          "sha256": "793b88bd822bb4e3579dc01df66f9111968841c892d7fad2135a24c81e40892d",
+          "bytes": 207304
         },
         {
           "path": "public/assets/rebuild/vehicles/semi.glb",
-          "sha256": "e95b043be406941c9f238b73b7e8f862fb1c7508e9fe508fd76bcdffa9c1a485",
-          "bytes": 1390460
+          "sha256": "17160e5b1f30a089d2d60a6d42b35859708681f2e8d8b9c75f2bf670b4528f18",
+          "bytes": 458268
         },
         {
           "path": "public/assets/rebuild/props/lamp.glb",
-          "sha256": "70103ef3aef4267799dd75c6be05d2d836a6c35fe0cf273f92ae0dff26e48b25",
-          "bytes": 1114588
+          "sha256": "a3c51c4f4710e78b1784d3aa020967f282472acdb5c9af3d96f947250316cd17",
+          "bytes": 189280
         },
         {
           "path": "public/assets/rebuild/props/shed.glb",
-          "sha256": "87434cd82ec829eef54f9e3382c12864f8a4d42558004df701123c201f4f1bdf",
-          "bytes": 1124192
+          "sha256": "da704f304b708eb6147f43b41e993b7884aaaa73b851e65136ce723569885cac",
+          "bytes": 295088
         },
         {
           "path": "public/assets/rebuild/props/sign.glb",
-          "sha256": "8139bc436f8a92305dc498a9c956c98d0ab9ec71ffafc690766446e12d04c390",
-          "bytes": 586228
+          "sha256": "aa8b7560d664cf0bb453f4d2279c39e3d80f8c4043d3171b787fd685295aa37a",
+          "bytes": 123204
         }
       ],
-      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED",
+      "postProcess": "Texture budget pass 2026-09-16 (scripts/assets/compress-rebuild-glbs.mjs): gltf-transform resize to a maximum texture edge of 512 px, 1024 px for interiors, 1024 px for ground, 1024 px for furniture, followed by lossless WebP encoding. Geometry, materials, node names and extras are unchanged; only the embedded texture resolution and encoding differ from the authored asset."
     },
     {
       "id": "atomic-acres-rebuild-ground-plants-20260915",
@@ -1853,16 +1857,17 @@
         },
         {
           "path": "public/assets/rebuild/plants/prickly-pear.glb",
-          "sha256": "94a5e5e13889e28e9caaecfc245d0a4e54472b393f684830d2c0376d82c216b1",
-          "bytes": 3478420
+          "sha256": "f14b4876c9c8ffbfaffb9b4051ab4783c4ecea3c83f27c0c305e907e267f3714",
+          "bytes": 2332480
         },
         {
           "path": "public/assets/rebuild/plants/rock-cluster.glb",
-          "sha256": "efd6fce3c9fb8a52dae2cc202ce70d4c91341dbd88e32e65ff409fedeac018ce",
-          "bytes": 1942396
+          "sha256": "afc7929008c10e24f31fced8f1e9b889c8ba7387b3644cceb96042b32882ec66",
+          "bytes": 1318772
         }
       ],
-      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED",
+      "postProcess": "Texture budget pass 2026-09-16 (scripts/assets/compress-rebuild-glbs.mjs): gltf-transform resize to a maximum texture edge of 512 px, 1024 px for interiors, 1024 px for ground, 1024 px for furniture, followed by lossless WebP encoding. Geometry, materials, node names and extras are unchanged; only the embedded texture resolution and encoding differ from the authored asset."
     },
     {
       "id": "atomic-acres-rebuild-houses-v2-20260915",
@@ -1873,16 +1878,17 @@
       "files": [
         {
           "path": "public/assets/rebuild/houses/house-east-yellow.glb",
-          "sha256": "b9b4ec9904497c40471a72b41e59ad822bdf2dd7f40d357dc0c7a856c57a88f0",
-          "bytes": 730040
+          "sha256": "2030d2887cc3b7d79fa3198e38eb6f9ca088d7a97d51082d65daaff218966589",
+          "bytes": 530436
         },
         {
           "path": "public/assets/rebuild/houses/house-west-teal.glb",
-          "sha256": "f9b9a4c12e6a794173c20e97a1e3e22962d56ea344716d1f272d45c5d6649fef",
-          "bytes": 1706380
+          "sha256": "c120b7e5aefc7b3bc51269038214f57266fb16f80f7a5248be70e260177b3a6e",
+          "bytes": 636716
         }
       ],
-      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED",
+      "postProcess": "Texture budget pass 2026-09-16 (scripts/assets/compress-rebuild-glbs.mjs): gltf-transform resize to a maximum texture edge of 512 px, 1024 px for interiors, 1024 px for ground, 1024 px for furniture, followed by lossless WebP encoding. Geometry, materials, node names and extras are unchanged; only the embedded texture resolution and encoding differ from the authored asset."
     },
     {
       "id": "atomic-acres-rebuild-spread-props-20260916",
@@ -1893,51 +1899,52 @@
       "files": [
         {
           "path": "public/assets/rebuild/spread/crate-06.glb",
-          "sha256": "7b0cf1b1575c473dabc02e40c10ba083764c6bc473f06a168c968951b193c91a",
-          "bytes": 418872
+          "sha256": "0c5066a38385886c5c97ac02f30cd126bedcc94418b5c366c35c4b816c3d6464",
+          "bytes": 92008
         },
         {
           "path": "public/assets/rebuild/spread/crate-09.glb",
-          "sha256": "5f1099abc413e260521e85cb42f3dd56d4977e6f474c5728041eb3c69d326a1b",
-          "bytes": 423956
+          "sha256": "b577f5a1f02106bea20d64599934b5e9221e2c8b4fd215966baf00d31316ecde",
+          "bytes": 97092
         },
         {
           "path": "public/assets/rebuild/spread/crate-12.glb",
-          "sha256": "f20c52172e5d1276d38a4a9580358e2b9dfcfb18811b80a91efc2d683cf2bb3a",
-          "bytes": 433196
+          "sha256": "e9a18daf75ea3a6b966ef7ca965c89a169d6597622bc03fbb1debbcc364bca32",
+          "bytes": 106328
         },
         {
           "path": "public/assets/rebuild/spread/fence-bay.glb",
-          "sha256": "63e4b13d34b59e867ef50d131dfad5621edc15dd3bdc6abbc114b8ec7dff8230",
-          "bytes": 358524
+          "sha256": "1f3f72f0a311eaf4bc783c543fc0768ca2b30b585e260fd915f991d4ccb889af",
+          "bytes": 95540
         },
         {
           "path": "public/assets/rebuild/spread/lamp.glb",
-          "sha256": "f1f95188c6e3c81500bf17b4ef6a024f059d08943ef673d2e5995dadc1366687",
-          "bytes": 1293756
+          "sha256": "448652ea47f6802468947c80f28ff34b2878f1592f773fc860536675127972d3",
+          "bytes": 222184
         },
         {
           "path": "public/assets/rebuild/spread/pallet.glb",
-          "sha256": "a8e0435cf98fb1bf27b4224b73eb2573538e9b493a9ebe1906f8de627bea8b80",
-          "bytes": 95908
+          "sha256": "9b2a07e2588cc7dca5e0a8efb7cbdbf45bbaf047dcd4375fcfa543af07522fb0",
+          "bytes": 23704
         },
         {
           "path": "public/assets/rebuild/spread/shed.glb",
-          "sha256": "a7be21cbca83931c1d29103527e72280092f0126d03827ea7abe9c45991cdea8",
-          "bytes": 1216060
+          "sha256": "f573d42ed8a92761245c0c6d2587a6e1200af47236aeb549935cc21620a5dca2",
+          "bytes": 335568
         },
         {
           "path": "public/assets/rebuild/spread/sign.glb",
-          "sha256": "55f996eac965abefe11ec53beca31ea7443b88685217d67d6a73ee43e1db616e",
-          "bytes": 630088
+          "sha256": "e874872ea9e552a219a1c9e2b4579d28237c3e5ea346b712dc5b18759384e772",
+          "bytes": 123568
         },
         {
           "path": "public/assets/rebuild/spread/wall-bay.glb",
-          "sha256": "44837125de98d6efa5ce013638035d910559d655713440f45d9cc74d3dfb8101",
-          "bytes": 78156
+          "sha256": "b86e61334a7d22796e6e8193760b15be85a49701ffbf88d9e221b6a2352972dc",
+          "bytes": 11280
         }
       ],
-      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED",
+      "postProcess": "Texture budget pass 2026-09-16 (scripts/assets/compress-rebuild-glbs.mjs): gltf-transform resize to a maximum texture edge of 512 px, 1024 px for interiors, 1024 px for ground, 1024 px for furniture, followed by lossless WebP encoding. Geometry, materials, node names and extras are unchanged; only the embedded texture resolution and encoding differ from the authored asset."
     },
     {
       "id": "atomic-acres-rebuild-wear-20260916",
@@ -1948,51 +1955,52 @@
       "files": [
         {
           "path": "public/assets/rebuild/wear/bed_sleeper.glb",
-          "sha256": "6e106cf6be5cd015a88fec58abe58cafe76c5d9c99afd62f6a7f2e299cd93d3d",
-          "bytes": 5761080
+          "sha256": "17d6e8f18b72d4aacf4cef90db5b6e0d7b641a21b44c4b5fd24a87f32b74d91d",
+          "bytes": 995356
         },
         {
           "path": "public/assets/rebuild/wear/chair_folding.glb",
-          "sha256": "9940f8c574a21afd14beaea0b79dbe5dfe1460a9e6294a64b6ad24db0ff8986d",
-          "bytes": 6014112
+          "sha256": "b17dbd2c7fa243512c8a25155034b3964e60cce317562e0ff47685489773992e",
+          "bytes": 1071560
         },
         {
           "path": "public/assets/rebuild/wear/chair_slat.glb",
-          "sha256": "cc3bf8ada405ce378f123bde48cc29850d15904abe64eb531cc873c29a695634",
-          "bytes": 4331648
+          "sha256": "47016ef8ec5b53e633aa36821061874aa35d39af3a69aca4edb9f789f7d2a169",
+          "bytes": 866704
         },
         {
           "path": "public/assets/rebuild/wear/edging_run.glb",
-          "sha256": "4394a46e3ca790af7fa410121e08cf99620ed38f478000ebda71454a0c72d3aa",
-          "bytes": 3999188
+          "sha256": "69f7fa611b1cb9c2ac5c7349f710a603ea91e6476a7d5b4167924583f3f474ad",
+          "bytes": 582484
         },
         {
           "path": "public/assets/rebuild/wear/litter_atlas.glb",
-          "sha256": "d8f3b40562919e358b77a2f6dfe8e7b142faaf376230f1cd9e345bcdc1135308",
-          "bytes": 3380880
+          "sha256": "6af25aac8b3fcdbf09c4f2e0cc33f70b1091c5179d74f560aa491dd77ab613e2",
+          "bytes": 701820
         },
         {
           "path": "public/assets/rebuild/wear/planter_conc.glb",
-          "sha256": "3c2b64c3897d1a8d2eb907b30165734613d5f1749d91e02cd209aa33367eadc4",
-          "bytes": 8369444
+          "sha256": "144a7e7730f8f0b70263034233ffd6583de8b63a50159d6e7579a785a395d1b0",
+          "bytes": 1417164
         },
         {
           "path": "public/assets/rebuild/wear/table_side.glb",
-          "sha256": "6207d8082b7d4ee226210804053989a31c95d1de38e01223cbf33cf50ad9c5f8",
-          "bytes": 6174952
+          "sha256": "0db5020587cba3ebf4187067b9ddb0dcf3879735c53d0edf522d892ad6f313ca",
+          "bytes": 1059752
         },
         {
           "path": "public/assets/rebuild/wear/window_shuttered.glb",
-          "sha256": "4ddc1a58a32afd5621fbc50a483bf3ff19da3dae499398d48f628f39ebda2335",
-          "bytes": 8472384
+          "sha256": "25607cfb61960e6a0c9cf9c67ac181d94713a1901d9761755c364527952c099a",
+          "bytes": 1824792
         },
         {
           "path": "public/assets/rebuild/wear/window_wide.glb",
-          "sha256": "1f4bc8297d91b79e52e71c78fa34922aa73bc000431bc5d5cf31ce58959e5cec",
-          "bytes": 5258532
+          "sha256": "11a2f5ef4c22c3d2c850d53859a973244dfa71b20e67375f4c5b3734d0dd8a58",
+          "bytes": 1008600
         }
       ],
-      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED",
+      "postProcess": "Texture budget pass 2026-09-16 (scripts/assets/compress-rebuild-glbs.mjs): gltf-transform resize to a maximum texture edge of 512 px, 1024 px for interiors, 1024 px for ground, 1024 px for furniture, followed by lossless WebP encoding. Geometry, materials, node names and extras are unchanged; only the embedded texture resolution and encoding differ from the authored asset."
     },
     {
       "id": "atomic-acres-rebuild-crates-worn-counter-v2-20260916",
@@ -2003,26 +2011,27 @@
       "files": [
         {
           "path": "public/assets/rebuild/crates-worn/crate-06-worn.glb",
-          "sha256": "ef6211f730d2f0b811a695da2642569f5a0db2e3344c381afaffa053b4400902",
-          "bytes": 11779924
+          "sha256": "1d5057e246a66c47d9fd2a7e269f40a1f56171cbbfb0d97ed0c53a3f9a0a45d7",
+          "bytes": 1831260
         },
         {
           "path": "public/assets/rebuild/crates-worn/crate-09-worn.glb",
-          "sha256": "d7dbaee6b7445f4724cb4737cb7c06640864a190ef8e69a1d32df0cd1187fe70",
-          "bytes": 10666392
+          "sha256": "7bf168a2dca94899b1ba691d5d78bbd5cdc77884ca7782c44fb224fc4ba5571a",
+          "bytes": 1769300
         },
         {
           "path": "public/assets/rebuild/crates-worn/crate-12-worn.glb",
-          "sha256": "b32f8a775c11721ddb058e9f5a3879b36c26c7a16174ac494ab9ddb8f033abb3",
-          "bytes": 11445956
+          "sha256": "bcb19fa93f2b3f1cdb9781e1ea5856696a53abccd7cf5f81da4b68f86f4ac515",
+          "bytes": 1795976
         },
         {
           "path": "public/assets/rebuild/furniture/kitchen-counter-v2.glb",
-          "sha256": "ba18bdb6f3453dc39001b41d71d997569483bf62fce98daa34f329a6cd81ee1f",
-          "bytes": 2692452
+          "sha256": "f4960087a5d5d601bcd2073de88e384e3054b7059e1e11617d30f47c31285072",
+          "bytes": 2631092
         }
       ],
-      "provenanceState": "ORIGINAL_AGENT_AUTHORED"
+      "provenanceState": "ORIGINAL_AGENT_AUTHORED",
+      "postProcess": "Texture budget pass 2026-09-16 (scripts/assets/compress-rebuild-glbs.mjs): gltf-transform resize to a maximum texture edge of 512 px, 1024 px for interiors, 1024 px for ground, 1024 px for furniture, followed by lossless WebP encoding. Geometry, materials, node names and extras are unchanged; only the embedded texture resolution and encoding differ from the authored asset."
     }
   ],
   "rejectedCandidates": [

@@ -385,6 +385,233 @@ const ATOMIC_ACRES_REBUILD_LIGHTING: Readonly<Partial<ArenaLightingProfile>> = O
   sunPosition: [-52.7, 45.7, 32.3] as const,
 });
 
+/**
+ * ROUND 2 — THE SKY IS IN THE FRAME TWICE, AND THE INTERIOR PAYS FOR IT.
+ *
+ * WHERE ROUND 1 LEFT IT. The hue half of the block above landed: re-metered on
+ * `repo-state/rb11-rebuild-*.png` against `rb8-*`, green deviation improved in
+ * 31 of 32 named regions and `r-b` warmed in all 32. The VALUE half did not.
+ * Round 1 moved only the sun angle, so it lifted the sunlit side by 45% and
+ * left the flat indirect exactly where it was — and this arena's `interior-west`
+ * review camera, the frame the owner called flat and directionless, is the one
+ * camera in the map the key does not reach at all. Measured on it: p99 = 0.841
+ * and `frac > 0.9` = 0.000, i.e. NOT ONE PIXEL in that room is key-lit.
+ *
+ * 0. WHICH PROFILE THESE FRAMES ARE, ESTABLISHED FROM SOURCE RATHER THAN
+ *    INFERRED. `scripts/qa/capture-arena-viewpoints.mjs` hardcodes
+ *    `render=quality` into the capture URL, and `resolveRenderProfile`
+ *    (render-profile.ts) maps `quality -> 'blender'` — and its no-preference
+ *    fallback is `'blender'` too, so the owner's own session resolves there as
+ *    well. EVERY review frame this arena has, and everything the owner sees, is
+ *    the BLENDER base. Cross-checked: the 10:50 `render=quality` capture on
+ *    nvidia/blackwell webgpu (`artifacts/viewpoint-regression/pre-polish/`) is
+ *    identical to `rb11-rebuild-interior.png` to <= 0.0001 on every region and
+ *    bit-identical on every frame percentile, so rb11 is a blender frame too.
+ *    Lane R's incidental note that the captures were `performance` is WRONG,
+ *    and wrong for an instructive reason: it was inferred by matching a modelled
+ *    shade/lit of 0.518 against a measured 0.515, using a model that omitted the
+ *    environment term in 2 below. Adding the missing term makes the blender
+ *    composition match the same capture. An omitted light looks exactly like the
+ *    wrong profile.
+ *
+ * 1. THE IRRADIANCE BUDGET OF THAT ROOM, SOLVED FROM THE CAPTURE. Inverting the
+ *    shipped chain (exposure 1.04, this arena's art-direction row, ACES, the
+ *    filmic display stages) on the measured `wall-far-plaster` pixel
+ *    [0.5899, 0.5257, 0.5836] with that wall's authored albedo — `0x8f9296`, the
+ *    graybox grey at `atomic-acres-rebuild-interiors.ts:509` — the wall must be
+ *    receiving linear irradiance [0.9099, 0.8377, 0.7536], Y 0.8470. On the
+ *    BLENDER base (hemisphere 0.7, fill 0.22, `indirectLightScale` 1 on every
+ *    named quality preset) the rig accounts for only 0.5364 of it:
+ *
+ *      ambient      0xb7b2af x 0.55                    Y 0.2475   29.2%
+ *      hemisphere   0.5 x (sky + ground) x 0.70        Y 0.2889   34.1%
+ *      fill         0.22, ndl = 0 on this normal       Y 0.0000    0.0%
+ *      RESIDUAL                                        Y 0.3105   36.7%
+ *
+ *    The budget closes to 0.00%. The residual is real and it is over a THIRD of
+ *    the light in that room.
+ *
+ * 2. THE RESIDUAL HAS A NAME. `scene.environment` — a PMREM convolved off the
+ *    `range-midmorning` backdrop — bound at `scene.environmentIntensity =
+ *    graphicsEffectsBudget(profile).environmentIntensity x
+ *    arenaEnvironmentScale('atomic-acres-rebuild') (0.24) x reflectionScale`.
+ *    On blender, `renderProfileConfig` gives pixelRatioCap 1, so that budget is
+ *    the `full` tier's 1.0 and the bound intensity is 0.24 — TWICE what the
+ *    `performance` route binds. Its measured chromaticity is r:g:b =
+ *    0.988 : 1.000 : 0.968, i.e. NEARLY NEUTRAL, which is the right answer and
+ *    not a coincidence: a vertical normal's diffuse convolution takes half the
+ *    upper hemisphere (blue, zenith stop #2f5f9e) and half the lower band,
+ *    which `sky-backdrop.ts` paints WARM (#c7bb9c, #b39a72, #7d6c4e). The two
+ *    halves cancel. Falsifiable in one run: drive `arenaEnvironmentScale` for
+ *    this arena to 0 and exactly Y 0.311 must leave those two wall regions.
+ *    The arena definition's own comment calls this IBL "(inert)". It is not
+ *    inert; it is 37% of the light in the room.
+ *
+ * 3. SO THE SKY IS COUNTED TWICE, AND ON THIS BASE THE SECOND COUNT IS BIGGER
+ *    THAN THE FIRST. `HemisphereLight(hemisphereSky, hemisphereGround, 0.7)` is
+ *    a sky model and `scene.environment` is the same sky, convolved properly,
+ *    added on top. On a vertical the hemisphere's SKY half is
+ *    0.5 x Y(0xc3bebb) x 0.7 = 0.1821 and the IBL supplies Y 0.3105 — so the
+ *    IBL ALONE ALREADY OVER-SUPPLIES THE SKY, and the honest de-double-count
+ *    leaves the hemisphere carrying only its GROUND half, the sunlit-sand bounce
+ *    the backdrop cannot supply because its lower band is painted sky rather
+ *    than this map's ground: 0.5 x Y(0xaf9261) x 0.7 = 0.1069. A hemisphere
+ *    whose total on a vertical is 0.1069 is
+ *
+ *      `hemisphereIntensity 0.7 -> 0.26`   (0.1069 / 0.4114 = 0.2589)
+ *
+ *    The intensity scales both halves, so this does not claim to zero the sky;
+ *    it claims the hemisphere's TOTAL should shrink to the size of the one term
+ *    the IBL cannot provide.
+ *
+ *      `fillIntensity 0.22 -> 0.482`. SOLVED, by bisection, as the fill that
+ *      holds the exterior shadow-side fill-facing wall's rig irradiance EXACTLY
+ *      where round 1 left it (0.7175 -> 0.7175). That is the quantity raid2's
+ *      module measures its 0.44 silhouette finding on, so the finding is
+ *      honoured by construction rather than by argument.
+ *
+ * 4. WHY THE INTERIOR IS ALLOWED TO GET DARKER — THE PLATES, MEASURED, NOT
+ *    ASSERTED. sRGB-encoded frame luminance percentiles:
+ *
+ *                              p05    p25    p50    p95    p99   frac>0.9
+ *      living-room-eye.png    0.109  0.234  0.359  0.767  0.943   0.025
+ *      bedroom-eye.png        0.119  0.264  0.368  0.876  0.937   0.029
+ *      interior-west (HEAD)   0.284  0.376  0.505  0.837  0.841   0.000
+ *
+ *    The render's interior is +0.175 at p05, +0.142 at p25 and +0.146 at p50
+ *    against the bar, and it has NO highlight at all where both plates put
+ *    2.5-2.9% of the frame above 0.9. The room is not too dark and it is not
+ *    mis-hued; it is too BRIGHT in the shadows and it has no top end. Every
+ *    number here moves it the way that table says, and none of them moves it
+ *    far enough to overshoot.
+ *
+ *    This supersedes the "interior must not fall by more than 0.03" bound Lane
+ *    R wrote on its unapplied draft. That bound was a check on whether ITS fill
+ *    solve had held, not an art direction; measured against the plates the
+ *    interior needs to fall by 0.146, so a bound forbidding 0.03 is measuring
+ *    the wrong thing. No shipped test, gate or threshold is touched.
+ *
+ * 5. PREDICTED, PER SURFACE, THROUGH THE SHIPPED CHAIN, WITH THE IBL TERM
+ *    CARRIED (it does not move, so it cushions every cut below). sRGB-encoded
+ *    display luminance on the `interior-west` frame, blender base:
+ *
+ *      wall-right / wall-far plaster (no fill)   0.543 -> 0.466   -0.077
+ *      ceiling (no fill)                         0.388 -> 0.336   -0.052
+ *      floor (InteriorPlaster, ndl 0.249)        0.849 -> 0.814   -0.035
+ *      kitchen cabinet run (full fill)           0.483 -> 0.484   +0.001  HELD
+ *
+ *    The model is validated against the capture on the rows it did not solve
+ *    for: predicted wall 0.543 vs measured 0.544, predicted floor 0.849 vs
+ *    measured 0.829. The ceiling row is the least pinned — its albedo is
+ *    inferred rather than authored as a hex — and is quoted as approximate.
+ *
+ *    THAT LAST ROW IS THE POINT. `fillLight.castShadow = false`
+ *    (legacy-main.ts), so the shadow-side fill is the ONE directional light
+ *    that reaches inside a closed house. Trading 63% off an omnidirectional
+ *    term onto an aimed one gives the room a light side and a dark side where
+ *    it had neither: interior fill-lit vs fill-averted vertical goes from
+ *    Y 1.003 / 0.846 (spread 0.157, ratio 1.19) to Y 1.009 / 0.664 (spread
+ *    0.345, ratio 1.52). "Directionless" is a measurement, and that is the
+ *    measurement moving.
+ *
+ * 6. EXTERIOR, AND THE PRICE. Shadow-side fill-facing wall 0.785 -> 0.785
+ *    (-0.0001, the bisection's own rounding). Shaded horizontal ground
+ *    0.728 -> 0.659. Sunlit ground 0.893 -> 0.885 — the ACES shoulder is flat up
+ *    there, which is also why exposure was not the lever. Horizontal shade/lit
+ *    0.385 -> 0.337, which is round 1's stated unfinished business. Silhouette
+ *    separation for an operator at albedo 0.10 / 0.18 / 0.30 against the surface
+ *    behind: shadow-side wall 0.491/0.327/0.156 -> 0.491/0.327/0.156
+ *    (unchanged, to three places); shaded ground 0.451/0.289/0.123 ->
+ *    0.433/0.281/0.127, i.e. -4.0% on the darkest operator and +3.3% on the
+ *    brightest. Those are the veto numbers.
+ *
+ * 7. THE LAVENDER IS NOT THE RIG'S, AND HERE IS THE ABLATION THAT SAYS SO.
+ *    Through the shipped chain on the interior wall, blender base:
+ *
+ *      radiance (albedo x irradiance), pre-grade   r-b +0.0201  gdev +0.0009
+ *      as shipped                                  r-b +0.0064  gdev -0.0609
+ *      arena CDL gain neutralised                  r-b -0.0059  gdev +0.0517
+ *      neutral albedo, CDL kept                    r-b +0.0506  gdev -0.0588
+ *      IBL removed (rig only)                      r-b +0.0279  gdev -0.0381
+ *
+ *    The radiance leaving that wall is DEAD NEUTRAL before the grade touches it
+ *    (gdev +0.0009): round 1's warm indirect and the near-neutral IBL compose to
+ *    neutral. Every bit of the displayed cast is the arena's CDL gain
+ *    [1.18, 0.82, 1.18] — a PURE green cut, red and blue identical — which moves
+ *    green by 0.1126 on its own and renders any neutral as magenta. The wall's
+ *    own albedo owns the small `r-b` tilt and 0.002 of the green; the IBL owns
+ *    0.023, by diluting warmth rather than by adding blue. THERE IS NO HUE LEFT
+ *    IN THIS FILE TO SPEND: round 1 already neutralised every hex the rig owns,
+ *    and warming them further to cancel a grade would be masking. The owner of
+ *    what remains is the catalog hue assignment behind that CDL row, which
+ *    `art-direction.test.ts` pins and which Lane R already costed: every
+ *    relaxation past a 0.86 green gain fails the 5.5/255 distinctiveness floor.
+ *
+ * 8. NOR DOES THIS PUT SUN ON AN INTERIOR FLOOR. It cannot: there is no aperture
+ *    for the key to come through. `dressWindow` (atomic-acres-rebuild-arena.ts)
+ *    builds `-casing`, `-reveal` and `-shutter` boxes on the shell's OUTER
+ *    plane — solid meshes, not a hole — so every graybox "window" in this map is
+ *    opaque, and `frac > 0.9` = 0.000 on the interior frame is the receipt. The
+ *    rig-side lever that would matter once an aperture exists is the sun
+ *    AZIMUTH, which round 1 deliberately held fixed because it is
+ *    gameplay-visible; moving it on a guess is the move this method forbids.
+ *    Reported, not attempted — the aperture is owned by the arena module.
+ *
+ * 9. WHY THERE ARE TWO PARTIALS AND NOT ONE NUMBER. Both values are INTENSITIES
+ *    solved against a specific base AND against a specific environment budget,
+ *    and neither premise survives a change of either:
+ *
+ *      blender      base 0.7 / 0.22, environment budget 1.0 -> IBL Y 0.3105.
+ *                   DERIVED ABOVE, on the frames the harness and the owner both
+ *                   actually load. hemisphere 0.26, fill 0.482.
+ *      performance  base 1.05 / 0.32, environment budget 0.5 (pixelRatioCap
+ *                   0.75 -> the `balanced` tier) -> the same IBL at HALF the
+ *                   intensity, Y 0.155. The sky half here is
+ *                   0.5 x 0.5173 x 1.05 = 0.2716, which the IBL does NOT
+ *                   over-supply, so the subtraction is finite:
+ *                   0.2716 - 0.155 = 0.1166, plus the ground half 0.1603, gives
+ *                   0.2769 -> hemisphereIntensity 0.673. Shipped at 0.6 — the
+ *                   value NUKETOWN2_SHADOW_FLOOR above already authors for this
+ *                   field on this rig, owner-reviewed, 11% below the derivation
+ *                   on the side the plates in 4 ask for — with fill 0.588 from
+ *                   the same exact-hold bisection on its own base. This route
+ *                   has no capture of its own; its IBL term is the blender
+ *                   measurement scaled by the documented budget ratio, and that
+ *                   is stated rather than hidden.
+ *      compat       environment budget is 0 — there is no second sky on the
+ *                   software/WebGL2 route, so there is no double count to
+ *                   remove, and COMPAT_LIGHTING's deliberate flat brightening
+ *                   (hemisphere 1.9, fill 0.66) is load-bearing for that route's
+ *                   playability. Left bit-identical.
+ *
+ *    Note the two derivations agree on the PHYSICS even though they disagree on
+ *    the bookkeeping: the interior wall loses 21.5% of its irradiance on blender
+ *    and 21.4% on performance. The split below is about which base each number
+ *    is correct FOR, not about two different looks.
+ *
+ *    Verified mechanically rather than asserted: resolving `arenaLightingProfile`
+ *    for all 13 arenas plus the no-arena case across all three profiles, 40 of
+ *    the 42 results are byte-identical to HEAD and the 2 that move are
+ *    `atomic-acres-rebuild` on `blender` and on `performance`.
+ *
+ * WHAT THIS IS NOT. No light is created, destroyed, parented, hidden or
+ * toggled: every field below is an intensity VALUE on the `HemisphereLight` and
+ * the `shadow-side-arena-fill` `DirectionalLight` that every profile already
+ * builds, so the light set and therefore the WebGPU program set are untouched
+ * (PASS 82). No count, no exposure, no bias, no budget and no threshold appears
+ * here. Arena-scoped exactly as RUSTWORKS_BRIGHTENING and NUKETOWN2_SHADOW_FLOOR
+ * already are, so no other arena moves.
+ */
+const ATOMIC_ACRES_REBUILD_SHADE_DEPTH_BLENDER: Readonly<Partial<ArenaLightingProfile>> = Object.freeze({
+  hemisphereIntensity: 0.26,
+  fillIntensity: 0.482,
+});
+
+const ATOMIC_ACRES_REBUILD_SHADE_DEPTH_PERFORMANCE: Readonly<Partial<ArenaLightingProfile>> = Object.freeze({
+  hemisphereIntensity: 0.6,
+  fillIntensity: 0.588,
+});
+
 export function arenaLightingProfile(profile: RenderProfile, arenaId?: string): ArenaLightingProfile {
   const base = profile === 'blender' ? BLENDER_LIGHTING : profile === 'compat' ? COMPAT_LIGHTING : DEFAULT_LIGHTING;
   const source = arenaId === 'atomic-acres' && profile !== 'compat'
@@ -393,10 +620,23 @@ export function arenaLightingProfile(profile: RenderProfile, arenaId?: string): 
       ? { ...base, ...RUSTWORKS_BRIGHTENING }
       : arenaId === 'nuketown2' && profile !== 'compat'
         ? { ...base, ...NUKETOWN2_SHADOW_FLOOR }
-        // Hue and sun direction only, so it composes over every profile
-        // including compat without fighting COMPAT_LIGHTING's flat brightening.
+        // The hue and sun direction compose over EVERY profile including compat:
+        // they are hexes and a direction, they cannot fight COMPAT_LIGHTING's
+        // deliberate flat brightening, and the sun direction is gameplay-visible
+        // so it must not vary by preset. The shade-depth values are INTENSITIES,
+        // each solved against its own base AND its own environment budget, so
+        // they are selected per base rather than shared — and compat, whose
+        // environment budget is 0, takes neither (section 9 above).
         : arenaId === 'atomic-acres-rebuild'
-          ? { ...base, ...ATOMIC_ACRES_REBUILD_LIGHTING }
+          ? profile === 'compat'
+            ? { ...base, ...ATOMIC_ACRES_REBUILD_LIGHTING }
+            : {
+              ...base,
+              ...ATOMIC_ACRES_REBUILD_LIGHTING,
+              ...(profile === 'blender'
+                ? ATOMIC_ACRES_REBUILD_SHADE_DEPTH_BLENDER
+                : ATOMIC_ACRES_REBUILD_SHADE_DEPTH_PERFORMANCE),
+            }
           : base;
   return { ...source, sunPosition: [...source.sunPosition], fillPosition: [...source.fillPosition] };
 }

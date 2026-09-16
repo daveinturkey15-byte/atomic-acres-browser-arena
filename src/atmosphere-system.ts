@@ -189,6 +189,41 @@ export const NUKETOWN2_HAZE_PALETTE = Object.freeze({
   warm: 0xd9a06a,
 });
 
+/**
+ * LANE-E (sky + horizon, 2026-09-16): the rebuild's own haze palette.
+ *
+ * Until now this arena fell through to the LAST branch in `setArena` —
+ * `{ shadow: 0x708083, light: 0xb8c6c4, smoke: 0x77868a, warm: 0xaebdbc }` —
+ * which is the cool neutral INDOOR-FACILITY haze the gun range uses. On a
+ * high-desert map under a clear late-morning key (LAYOUT_CONTRACT fact 1;
+ * rendering/arenas/atomic-acres-rebuild.ts notes 1 and 5) that is the wrong
+ * air: it is the same grey wash the reviewer reads as pastel graybox, and it
+ * is on the opposite side of the horizon from the arena's own fog colour
+ * (0xe0ddd2, r-b +0.055) and the 'range-midmorning' horizon stop (#e7d9ba,
+ * r-b +0.176).
+ *
+ * The four values below are taken from the band this lane builds so the two
+ * cannot drift: `light` and `warm` are the near-scrub band's base (0xc8b795)
+ * and the mid range's base (0xd3cab6), and `shadow` / `smoke` are the blue-grey
+ * the far peaks resolve to (0xaeb4c6 / 0x9aa0b4) — i.e. the haze in the air
+ * matches the haze baked into the mountains it is seen against. The warm side
+ * stays warmer than the cool side on the r-b axis and the cool side stays cool,
+ * so the note-2 invariant on the lighting rig (shade must not read warmer than
+ * the sun casting it) is not touched from this direction either.
+ *
+ * NOTE ON REACH: none of this is on screen today. legacy-main.ts disables
+ * AtmosphereSystem outright (`const atmosphereSystem = ((): AtmosphereSystem |
+ * null => null)();`), so this file builds nothing that reaches a frame. It is
+ * kept correct and in step with src/atomic-acres-rebuild-horizon.ts so that
+ * re-enabling the system lands the matching air rather than the facility grey.
+ */
+export const ATOMIC_ACRES_REBUILD_HAZE_PALETTE = Object.freeze({
+  shadow: 0xaeb4c6,
+  light: 0xc8b795,
+  smoke: 0x9aa0b4,
+  warm: 0xd3cab6,
+});
+
 const MAX_MIST_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
 const MAX_SMOKE_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.smoke.length));
 const MAX_DUST_MOTES = 96;
@@ -227,6 +262,15 @@ function atmosphereDustLayout(profile: RenderProfile, arenaId: ArenaId): DustLay
   if (arenaId === 'nuketown2') return {
     count: quality ? 48 : 32, minX: -26, maxX: 26, minZ: -24, maxZ: 24, color: 0xe8d4a8, opacity: quality ? 0.08 : 0.06,
   };
+  // LANE-E (2026-09-16): the fallthrough below is the gun-range INDOOR lane
+  // strip (x -15..15, z -44..-3). On this arena that covers under a quarter of
+  // the plan, sits entirely on one side of the loop and puts no dust in either
+  // yard — the bounds are x +-32, z +-36 (graphics-refinement.ts). Warm desert
+  // dust across the whole plan instead, keyed to the near-scrub band of
+  // src/atomic-acres-rebuild-horizon.ts so the air and the horizon agree.
+  if (arenaId === 'atomic-acres-rebuild') return {
+    count: quality ? 64 : 40, minX: -32, maxX: 32, minZ: -36, maxZ: 36, color: 0xe3cfa4, opacity: quality ? 0.12 : 0.08,
+  };
   return {
     count: quality ? 32 : 24, minX: -15, maxX: 15, minZ: -44, maxZ: -3, color: 0xc4cbc4, opacity: quality ? 0.12 : 0.09,
   };
@@ -259,6 +303,12 @@ function atmosphereOpacity(profile: RenderProfile, arenaId: ArenaId): Readonly<{
   // fallthrough it replaced, so Nuke Town runs lighter cards: aerial
   // perspective on the far treeline, not wash over mid-ground vehicles.
   if (arenaId === 'nuketown2') return quality ? { mist: 0.09, smoke: 0.05 } : { mist: 0.07, smoke: 0.04 };
+  // LANE-E (2026-09-16): the visual definition pins this arena CLEAR (mist
+  // 0.05, clouds false) over high desert. The 0.14 fallthrough is the damp
+  // facility default and would put more haze in dry desert air than raid2
+  // carries under cloud; depth on this map is the horizon band's job, not a
+  // ground-mist wash across the loop.
+  if (arenaId === 'atomic-acres-rebuild') return quality ? { mist: 0.06, smoke: 0.04 } : { mist: 0.045, smoke: 0.03 };
   return quality ? { mist: 0.14, smoke: 0.08 } : { mist: 0.1, smoke: 0.06 };
 }
 
@@ -595,6 +645,10 @@ export class AtmosphereSystem {
           // layout, not by palette.
           : arenaId === 'nuketown2'
             ? NUKETOWN2_HAZE_PALETTE
+          // LANE-E: high-desert air keyed to this arena's own horizon band,
+          // not the cool indoor-facility fallthrough below it.
+          : arenaId === 'atomic-acres-rebuild'
+            ? ATOMIC_ACRES_REBUILD_HAZE_PALETTE
           : { shadow: 0x708083, light: 0xb8c6c4, smoke: 0x77868a, warm: 0xaebdbc };
     (this.material.uniforms.uShadowColor.value as THREE.Color).setHex(palette.shadow);
     (this.material.uniforms.uLightColor.value as THREE.Color).setHex(palette.light);

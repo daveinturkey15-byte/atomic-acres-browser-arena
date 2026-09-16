@@ -59,6 +59,10 @@ import {
   type WeatherPresentationRuntime,
 } from './weather-settings';
 import type { WindSample } from './wind-field';
+import {
+  disposeAtomicAcresRebuildHorizon,
+  syncAtomicAcresRebuildHorizon,
+} from '../atomic-acres-rebuild-horizon';
 
 export type RainQualityTier = 'low' | 'high' | 'ultra';
 
@@ -1105,6 +1109,32 @@ export class RainPresentation {
     options: RainUpdateOptions = {},
   ): void {
     if (this.disposed) return;
+    // LANE-E (sky + horizon), 2026-09-16. The distant band behind
+    // `atomic-acres-rebuild` is ticked from here, and this is the one thing in
+    // this file that is not about rain. It is here because of where the hooks
+    // are, not because it belongs to weather:
+    //
+    //   - The system that SHOULD own it, AtmosphereSystem, is disabled in the
+    //     live runtime. legacy-main.ts reads
+    //     `const atmosphereSystem = ((): AtmosphereSystem | null => null)();`
+    //     (the same pattern as the disabled GrassSystem two lines below it), so
+    //     every call site is optional-chained into a no-op and nothing that
+    //     module builds reaches a frame. atmosphere-system.ts still carries
+    //     this arena's scoped haze entry, kept in step with the band's palette,
+    //     and will attach nothing twice if it is ever switched back on: the
+    //     band is a per-scene singleton that attaches at most once.
+    //   - Of everything this lane owns (atmosphere-system.ts, weather/**, its
+    //     own module), `RainPresentation.update` is the ONLY live per-frame
+    //     entry point that is handed BOTH the persistent scene (kept from
+    //     `build`) and the camera. A camera-locked backdrop needs both.
+    //
+    // It sits above the bypass returns below on purpose: the horizon is two
+    // untextured draws and must not disappear because the RAIN pass was
+    // bypassed on a software renderer or by `?rain=off`. It is arena-scoped
+    // inside `syncAtomicAcresRebuildHorizon`, which attaches nothing at all on
+    // any other arena, and it adds no light — the PASS 82 light-set freeze is
+    // untouched.
+    syncAtomicAcresRebuildHorizon(this.sceneRoot, camera);
     this.presentation = options.presentation ?? activeWeatherPresentation();
     this.wetness = clamp01(finite(weather.wetness, 0));
     this.rainRate = clamp01(finite(weather.rainRate, 0));
@@ -1428,6 +1458,9 @@ export class RainPresentation {
     this.flashLight = null;
     this.overcastLight?.dispose();
     this.overcastLight = null;
+    // LANE-E: the horizon band is ticked from `update`, so it is retired here
+    // too — before `sceneRoot` is dropped, which is the handle it is keyed on.
+    disposeAtomicAcresRebuildHorizon(this.sceneRoot);
     this.sceneRoot = null;
     this.root.removeFromParent();
     this.root.clear();

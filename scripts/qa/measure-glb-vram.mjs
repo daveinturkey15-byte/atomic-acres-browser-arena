@@ -70,6 +70,25 @@ function jpegDimensions(bytes) {
   return null;
 }
 
+// Added 2026-09-16 after the texture-budget pass: every rebuild GLB now carries
+// EXT_texture_webp, and without this reader the instrument scored all 272
+// textures as unreadable, reported 0.0 MB and would have FALSELY PASSED a
+// --budget gate. A measuring tool that silently reads zero is worse than none.
+function webpDimensions(bytes) {
+  if (bytes.length < 30 || bytes.toString('ascii', 0, 4) !== 'RIFF'
+    || bytes.toString('ascii', 8, 12) !== 'WEBP') return null;
+  const format = bytes.toString('ascii', 12, 16);
+  // VP8L packs width-1 and height-1 as 14 bits each, little-endian, after the
+  // 0x2F signature byte.
+  if (format === 'VP8L') {
+    const bits = bytes.readUInt32LE(21);
+    return { width: (bits & 0x3fff) + 1, height: ((bits >> 14) & 0x3fff) + 1 };
+  }
+  if (format === 'VP8X') return { width: bytes.readUIntLE(24, 3) + 1, height: bytes.readUIntLE(27, 3) + 1 };
+  if (format === 'VP8 ') return { width: bytes.readUInt16LE(26) & 0x3fff, height: bytes.readUInt16LE(28) & 0x3fff };
+  return null;
+}
+
 function measure(file) {
   const buffer = readFileSync(file);
   const { json, bin } = parseGlb(buffer);
@@ -81,7 +100,7 @@ function measure(file) {
     if (!view) continue;
     const start = view.byteOffset ?? 0;
     const bytes = bin.subarray(start, start + view.byteLength);
-    const size = pngDimensions(bytes) ?? jpegDimensions(bytes);
+    const size = pngDimensions(bytes) ?? jpegDimensions(bytes) ?? webpDimensions(bytes);
     // A texture whose header we cannot read is reported, never counted as zero.
     if (!size) { unreadable += 1; continue; }
     vram += size.width * size.height * BYTES_PER_TEXEL * MIP_CHAIN_FACTOR;
