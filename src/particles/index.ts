@@ -58,6 +58,7 @@
  */
 
 import * as THREE from 'three';
+import { publishAtomicAcresRebuildShafts } from './atomic-acres-rebuild-shafts';
 import type { ArenaId } from '../arena-identity';
 import { isSoftwareWebGLRenderer } from '../atomic-signal';
 import type { RenderProfile } from '../render-profile';
@@ -314,6 +315,12 @@ export class ParticleRuntime {
   setArena(arenaId: ArenaId): void {
     if (this.arenaId === arenaId) return;
     this.arenaId = arenaId;
+    // atomic-acres-rebuild has no atmosphere module of its own to publish from -
+    // farcrysis registers its cones at the end of `buildAtmosphere`, and this
+    // arena has no equivalent seam. Publishing here keeps the shaft table beside
+    // the runtime that consumes it and costs one comparison per arena change.
+    // If this arena ever grows an atmosphere module, the table should move there.
+    if (arenaId === 'atomic-acres-rebuild') publishAtomicAcresRebuildShafts();
     this.applyArenaProfile();
     for (let index = 0; index < this.fieldList.length; index += 1) {
       this.fieldList[index].clear();
