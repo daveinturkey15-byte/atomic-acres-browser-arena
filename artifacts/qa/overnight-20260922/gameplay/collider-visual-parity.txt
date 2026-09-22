@@ -1,0 +1,91 @@
+World Studio Blender assets failed to load TypeError: Failed to parse URL from /assets/world-studio/blender/hero-bus.glb
+    at new Request (node:internal/deps/undici/undici:10415:19)
+    at FileLoader.load (C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\node_modules\three\build\three.cjs:44597:15)
+    ... 6 lines matching cause stack trace ...
+    at createStudioBlenderAssets (C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\src\world-studio\blender-assets\index.ts:149:17)
+    at buildWorldStudio (C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\src\world-studio\arena.ts:149:20) {
+  [cause]: TypeError: Invalid URL
+      at new URL (node:internal/url:828:25)
+      at new Request (node:internal/deps/undici/undici:10413:25)
+      at FileLoader.load (C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\node_modules\three\build\three.cjs:44597:15)
+      at GLTFLoader.load (C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\node_modules\three\examples\jsm\loaders\GLTFLoader.js:319:10)
+      at C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\node_modules\three\build\three.cjs:44347:10
+      at new Promise (<anonymous>)
+      at GLTFLoader.loadAsync (C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\node_modules\three\build\three.cjs:44345:10)
+      at <anonymous> (C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\src\world-studio\blender-assets\index.ts:149:45)
+      at Array.map (<anonymous>)
+      at createStudioBlenderAssets (C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\src\world-studio\blender-assets\index.ts:149:17) {
+    code: 'ERR_INVALID_URL',
+    input: '/assets/world-studio/blender/hero-bus.glb'
+  }
+}
+
+=== world-studio: 0 invisible collider(s), 0 walk-through mesh(es) [786 colliders, 1 boundary, 0 runtime-replaced statics, 254 visible meshes]
+  rule-excluded substantial meshes: terrain/sky-scale surface=14, walkable surface=4, above reachable height (no standing contact)=4
+
+=== nuketown2: 0 invisible collider(s), 0 walk-through mesh(es) [373 colliders, 6 boundary, 0 runtime-replaced statics, 631 visible meshes]
+  rule-excluded substantial meshes: walkable surface=77, above reachable height (no standing contact)=9, sky/atmosphere dressing=2, outside playable bounds (backdrop)=15, terrain/sky-scale surface=22, particle/volumetric effect=1
+
+=== raid2: 0 invisible collider(s), 0 walk-through mesh(es) [212 colliders, 0 boundary, 0 runtime-replaced statics, 216 visible meshes]
+  rule-excluded substantial meshes: walkable surface=1, water volume presentation=4, above reachable height (no standing contact)=17
+
+=== atomic-acres: 0 invisible collider(s), 8 walk-through mesh(es) [209 colliders, 0 boundary, 8 runtime-replaced statics, 823 visible meshes]
+  WALK-THROUGH MESH {"name":"yard-root-flare","path":"original-arena-art/yard-root-flare","centre":[-9,0.22,-28.03],"size":[1.39,0.95,0.4],"presentationOnly":false,"instanced":false,"vertices":52}
+  WALK-THROUGH MESH {"name":"yard-root-flare","path":"original-arena-art/yard-root-flare","centre":[-8.53,0.22,-28.5],"size":[0.4,0.95,1.39],"presentationOnly":false,"instanced":false,"vertices":52}
+  WALK-THROUGH MESH {"name":"yard-root-flare","path":"original-arena-art/yard-root-flare","centre":[-9,0.22,-28.97],"size":[1.39,0.95,0.4],"presentationOnly":false,"instanced":false,"vertices":52}
+  WALK-THROUGH MESH {"name":"yard-root-flare","path":"original-arena-art/yard-root-flare","centre":[-9.47,0.22,-28.5],"size":[0.4,0.95,1.39],"presentationOnly":false,"instanced":false,"vertices":52}
+  WALK-THROUGH MESH {"name":"yard-root-flare","path":"original-arena-art/yard-root-flare","centre":[9,0.22,28.97],"size":[1.39,0.95,0.4],"presentationOnly":false,"instanced":false,"vertices":52}
+  WALK-THROUGH MESH {"name":"yard-root-flare","path":"original-arena-art/yard-root-flare","centre":[9.47,0.22,28.5],"size":[0.4,0.95,1.39],"presentationOnly":false,"instanced":false,"vertices":52}
+  WALK-THROUGH MESH {"name":"yard-root-flare","path":"original-arena-art/yard-root-flare","centre":[9,0.22,28.03],"size":[1.39,0.95,0.4],"presentationOnly":false,"instanced":false,"vertices":52}
+  WALK-THROUGH MESH {"name":"yard-root-flare","path":"original-arena-art/yard-root-flare","centre":[8.53,0.22,28.5],"size":[0.4,0.95,1.39],"presentationOnly":false,"instanced":false,"vertices":52}
+  rule-excluded substantial meshes: walkable surface=18, above reachable height (no standing contact)=146, training target (solidity owned by runtime colliders)=6, terrain/sky-scale surface=18, soft foliage=6, outside playable bounds (backdrop)=9
+
+=== skyline-terminal: 0 invisible collider(s), 0 walk-through mesh(es) [154 colliders, 0 boundary, 0 runtime-replaced statics, 277 visible meshes]
+  rule-excluded substantial meshes: water volume presentation=14, sky/atmosphere dressing=49, above reachable height (no standing contact)=12, terrain/sky-scale surface=5
+
+=== rustworks-1v1: 0 invisible collider(s), 0 walk-through mesh(es) [63 colliders, 0 boundary, 0 runtime-replaced statics, 104 visible meshes]
+  rule-excluded substantial meshes: terrain/sky-scale surface=6, above reachable height (no standing contact)=4
+
+=== gun-range: 0 invisible collider(s), 3 walk-through mesh(es) [37 colliders, 2 boundary, 0 runtime-replaced statics, 247 visible meshes]
+  WALK-THROUGH MESH {"name":"gun-range-presentation-batch-0","path":"Acres Indoor Gun Range arena/gun-range-presentation-batch-0","centre":[75.7,12.54,6.32],"size":[38.2,25.08,50.95],"presentationOnly":true,"instanced":false,"vertices":504}
+  WALK-THROUGH MESH {"name":"gun-range-wallbang-panel-interior-wall","path":"Acres Indoor Gun Range arena/gun-range-wallbang-panel-interior-wall","centre":[-12.7,1.45,-7.6],"size":[1.5,2.9,0.42],"presentationOnly":false,"instanced":false,"vertices":24}
+  WALK-THROUGH MESH {"name":"gun-range-wallbang-panel-brick","path":"Acres Indoor Gun Range arena/gun-range-wallbang-panel-brick","centre":[-9.5,1.45,-7.6],"size":[1.5,2.9,0.7],"presentationOnly":false,"instanced":false,"vertices":24}
+  rule-excluded substantial meshes: above reachable height (no standing contact)=8, soft foliage=1, training target (solidity owned by runtime colliders)=4
+
+=== farcrysis: 0 invisible collider(s), 0 walk-through mesh(es) [6057 colliders, 4 boundary, 0 runtime-replaced statics, 541 visible meshes]
+  rule-excluded substantial meshes: terrain/sky-scale surface=58, water volume presentation=122, above reachable height (no standing contact)=18, outside playable bounds (backdrop)=27
+
+=== high-seas: 0 invisible collider(s), 0 walk-through mesh(es) [213 colliders, 0 boundary, 0 runtime-replaced statics, 260 visible meshes]
+  rule-excluded substantial meshes: terrain/sky-scale surface=2, water volume presentation=10, above reachable height (no standing contact)=24
+
+=== test1: 0 invisible collider(s), 0 walk-through mesh(es) [122 colliders, 0 boundary, 0 runtime-replaced statics, 296 visible meshes]
+  rule-excluded substantial meshes: terrain/sky-scale surface=7, above reachable height (no standing contact)=2, outside playable bounds (backdrop)=4
+
+=== test2: 0 invisible collider(s), 0 walk-through mesh(es) [307 colliders, 0 boundary, 0 runtime-replaced statics, 401 visible meshes]
+  rule-excluded substantial meshes: water volume presentation=10, walkable surface=1, above reachable height (no standing contact)=37, terrain/sky-scale surface=5, outside playable bounds (backdrop)=2
+
+=== map3: 0 invisible collider(s), 4 walk-through mesh(es) [232 colliders, 0 boundary, 0 runtime-replaced statics, 158 visible meshes]
+  WALK-THROUGH MESH {"name":"map3-physics-paddle-wheel","path":"Map3 arena/map3-lane-physics/map3-physics-paddle-wheel","centre":[-24,0.88,75],"size":[2.3,1.52,1.52],"presentationOnly":false,"instanced":false,"vertices":548}
+  WALK-THROUGH MESH {"name":"map3-shoreline-rover-body","path":"Map3 arena/map3-lane-shoreline/map3-shoreline-rover-body","centre":[-26,1.06,-33.87],"size":[1.7,1.58,3.06],"presentationOnly":false,"instanced":false,"vertices":496}
+  WALK-THROUGH MESH {"name":"map3-forest-rover-frame","path":"Map3 arena/map3-lane-vegetation/map3-forest-rover-frame","centre":[0,1.24,33.8],"size":[1.85,1.87,3.8],"presentationOnly":false,"instanced":false,"vertices":376}
+  WALK-THROUGH MESH {"name":"map3-physics-jenga-block","path":"Map3 arena/map3-lane-physics/map3-physics-jenga-block","centre":[-24,0.88,43],"size":[0.57,1.67,0.58],"presentationOnly":false,"instanced":true,"vertices":24}
+  rule-excluded substantial meshes: terrain/sky-scale surface=4, walkable surface=7, soft foliage=8, outside playable bounds (backdrop)=5, water volume presentation=4, sky/atmosphere dressing=2
+
+=== newworld-prime: 3 invisible collider(s), 11 walk-through mesh(es) [30 colliders, 0 boundary, 0 runtime-replaced statics, 602 visible meshes]
+  INVISIBLE COLLIDER {"sources":["colliders","physicsColliders"],"worldBounds":{"minX":-26.15,"maxX":-25.85,"minY":0,"maxY":2,"minZ":-8.4,"maxZ":6},"centre":[-26,1,-1.2],"size":[0.3,2,14.4],"bestPartialCoverage":0.03,"nearestVisibleMesh":"newworld-prime-newworld-prime-fence-west-fence-panel-bay-3 @ (-26, -1.2) (0.0m from collider centre)"}
+  INVISIBLE COLLIDER {"sources":["colliders","physicsColliders"],"worldBounds":{"minX":25.85,"maxX":26.15,"minY":0,"maxY":2,"minZ":-22.4,"maxZ":-8},"centre":[26,1,-15.2],"size":[0.3,2,14.4],"bestPartialCoverage":0.03,"nearestVisibleMesh":"newworld-prime-newworld-prime-fence-east-fence-panel-bay-3 @ (26, -15.2) (0.0m from collider centre)"}
+  INVISIBLE COLLIDER {"sources":["colliders","physicsColliders"],"worldBounds":{"minX":-8,"maxX":4,"minY":0,"maxY":2,"minZ":-30.15,"maxZ":-29.85},"centre":[-2,1,-30],"size":[12,2,0.3],"bestPartialCoverage":0.04,"nearestVisibleMesh":"newworld-prime-newworld-prime-fence-north-fence-post-bay-2 @ (-2, -30) (0.0m from collider centre)"}
+  WALK-THROUGH MESH {"name":"newworld-prime-newworld-prime-hedge-north-hedge-blob-0","path":"New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-north-hedge-blob-0","centre":[-14,0.57,-24],"size":[0.98,0.92,0.98],"presentationOnly":true,"instanced":false,"vertices":60}
+  WALK-THROUGH MESH {"name":"newworld-prime-newworld-prime-hedge-north-hedge-blob-1","path":"New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-north-hedge-blob-1","centre":[-12.9,0.55,-24],"size":[1.12,0.92,1.12],"presentationOnly":true,"instanced":false,"vertices":60}
+  WALK-THROUGH MESH {"name":"newworld-prime-newworld-prime-hedge-north-hedge-blob-2","path":"New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-north-hedge-blob-2","centre":[-11.8,0.57,-24],"size":[0.96,0.92,0.96],"presentationOnly":true,"instanced":false,"vertices":60}
+  WALK-THROUGH MESH {"name":"newworld-prime-newworld-prime-hedge-north-hedge-blob-3","path":"New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-north-hedge-blob-3","centre":[-10.7,0.51,-24],"size":[1.01,0.92,1.01],"presentationOnly":true,"instanced":false,"vertices":60}
+  WALK-THROUGH MESH {"name":"newworld-prime-newworld-prime-hedge-north-hedge-blob-4","path":"New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-north-hedge-blob-4","centre":[-9.6,0.52,-24],"size":[1.15,0.92,1.15],"presentationOnly":true,"instanced":false,"vertices":60}
+  WALK-THROUGH MESH {"name":"newworld-prime-newworld-prime-hedge-south-hedge-blob-0","path":"New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-south-hedge-blob-0","centre":[14,0.57,24],"size":[0.98,0.92,0.98],"presentationOnly":true,"instanced":false,"vertices":60}
+  WALK-THROUGH MESH {"name":"newworld-prime-newworld-prime-hedge-south-hedge-blob-1","path":"New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-south-hedge-blob-1","centre":[12.9,0.55,24],"size":[1.12,0.92,1.12],"presentationOnly":true,"instanced":false,"vertices":60}
+  WALK-THROUGH MESH {"name":"newworld-prime-newworld-prime-hedge-south-hedge-blob-2","path":"New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-south-hedge-blob-2","centre":[11.8,0.57,24],"size":[0.96,0.92,0.96],"presentationOnly":true,"instanced":false,"vertices":60}
+  WALK-THROUGH MESH {"name":"newworld-prime-newworld-prime-hedge-south-hedge-blob-3","path":"New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-south-hedge-blob-3","centre":[10.7,0.51,24],"size":[1.01,0.92,1.01],"presentationOnly":true,"instanced":false,"vertices":60}
+  WALK-THROUGH MESH {"name":"newworld-prime-newworld-prime-hedge-south-hedge-blob-4","path":"New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-south-hedge-blob-4","centre":[9.6,0.52,24],"size":[1.15,0.92,1.15],"presentationOnly":true,"instanced":false,"vertices":60}
+  WALK-THROUGH MESH {"name":"newworld-prime-newworld-east-yellow-chimney-stack","path":"New World Prime arena (blockout)/newworld-prime-newworld-east-yellow-chimney-stack","centre":[17.55,3.35,-1.5],"size":[0.8,5.45,0.8],"presentationOnly":true,"instanced":false,"vertices":24}
+  rule-excluded substantial meshes: above reachable height (no standing contact)=1
+
+Gate: any unexplained collider fails the run (exit 1). Walk-through meshes are reported for triage (--gate-walkthrough hardens this); src/collider-visual-parity-gate.test.ts hardens both directions in vitest.

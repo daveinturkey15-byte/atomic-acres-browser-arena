@@ -1,0 +1,52 @@
+{
+  "base": "http://127.0.0.1:4201/",
+  "arena": "newworld-prime",
+  "steps": [
+    {
+      "name": "boot",
+      "bootedArena": "newworld-prime"
+    },
+    {
+      "name": "spawn",
+      "position": [
+        -32,
+        1.6983986282348633,
+        -8
+      ],
+      "alive": true
+    },
+    {
+      "name": "spawn-walk-forward-2s",
+      "position": [
+        -20.189132690429688,
+        1.725489535331726,
+        -5.047290325164795
+      ],
+      "alive": true,
+      "movedMetres": 12.17
+    },
+    {
+      "name": "door-portal-approach",
+      "before": {
+        "position": [
+          -13.5,
+          1.72573659658432,
+          7.500000953674316
+        ],
+        "alive": true
+      },
+      "after": {
+        "position": [
+          -13.500003814697266,
+          1.7258884692192078,
+          -1.0332543849945068
+        ],
+        "alive": true
+      },
+      "movedMetres": 8.53
+    }
+  ],
+  "pageErrors": [],
+  "consoleErrors": [],
+  "ok": true
+}
