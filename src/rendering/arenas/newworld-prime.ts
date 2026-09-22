@@ -17,7 +17,11 @@ export const definition = createProceduralArenaVisualDefinition({
   assetDependencies: [],
   sharedAssetDependencies: SHARED_GAMEPLAY_ASSETS,
   lighting: {
-    sunColor: 0xfff1ce, sunIntensity: 3.2, ambientColor: 0x8fb0bf, ambientIntensity: 0.42,
+    // Day-3 graphics: key 3.2 -> 2.8 tames the pale-siding/roof clip seen in
+    // graphics-before (west house reads white); ambient 0.42 -> 0.55 lifts
+    // shadow-side dark identities (wall-bay posts, poles) via the one
+    // indirect term this definition owns. Hues untouched.
+    sunColor: 0xfff1ce, sunIntensity: 2.8, ambientColor: 0x8fb0bf, ambientIntensity: 0.55,
     practicals: [
       { id: 'newworld-prime-street-fixtures', policy: 'emissive-only', maximumDistance: 0, castsShadow: false },
       { id: 'newworld-prime-interior-fixtures', policy: 'emissive-only', maximumDistance: 0, castsShadow: false },
@@ -26,7 +30,7 @@ export const definition = createProceduralArenaVisualDefinition({
   },
   fog: { color: 0xb1c0be, near: 58, far: 148 },
   shadows: { enabled: true, mapSize: 2048, maximumDistance: 184, normalBias: 0.035 },
-  atmosphere: { preset: 'newworld-prime-late-morning', mist: 0.3, dust: 0.28, clouds: true },
+  atmosphere: { preset: 'newworld-prime-late-morning', mist: 0.24, dust: 0.22, clouds: true },
   colorPipeline: colorPipeline('pass64.newworld-prime.hdr.v1', NEWWORLD_PRIME_EXPOSURE_LATE_MORNING),
   budgets: budgets({ maximumDrawCalls: 590, maximumTriangles: 1_500_000 }),
   reviewCameras: [

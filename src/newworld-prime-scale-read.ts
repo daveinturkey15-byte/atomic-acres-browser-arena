@@ -222,10 +222,12 @@ export const NEWWORLD_PRIME_SCALE_READ_WINDOW_GLOW: readonly NewworldPrimeScaleR
  * Emissive intensity for the shared lamp-lens role. Day variants read 0
  * (off at noon: late-morning + overcast); dusk/night variants lift the
  * cards and the street-lamp lenses together as one practical-light role.
+ * Day-3 graphics: golden-dusk 1.6 -> 1.9 so the cards stay legible against
+ * amber-lit siding. Emissive-only light-source role: no dark identity moves.
  */
 export function newworldPrimeScaleReadGlowIntensity(variant: NewworldPrimeLightingVariant): number {
   switch (variant) {
-    case 'golden-dusk': return 1.6;
+    case 'golden-dusk': return 1.9;
     case 'night-rain': return 2.2;
     case 'dawn-mist': return 0.9;
     case 'overcast':

@@ -225,13 +225,39 @@ const STANDIN_COLORS: Readonly<Record<string, number>> = Object.freeze({
 
 const STANDIN_FALLBACK_COLOR = 0xb0a890;
 
+/**
+ * Day-3 graphics: per-role MeshStandardMaterial finish (roughness/metalness).
+ * Uniform 0.9/0.02 flattened every surface in graphics-before: glass read as
+ * paint and dark rubber/doorway insets crushed to void black on shadow sides.
+ * Hues (STANDIN_COLORS) untouched; only specular response varies, so no hue
+ * or linear-contrast change lands on any dark identity. Roles absent here
+ * keep the matte default.
+ */
+const STANDIN_FINISHES: Readonly<Record<string, Readonly<{ roughness: number; metalness: number }>>> = Object.freeze({
+  // Reflection sources: vehicle glass, house glazing, lamp lenses, headlights.
+  'newworld-prime-vehicle-glass-v1': Object.freeze({ roughness: 0.22, metalness: 0.12 }),
+  'newworld-glass': Object.freeze({ roughness: 0.22, metalness: 0.12 }),
+  'newworld-prime-lamp-lens-v1': Object.freeze({ roughness: 0.38, metalness: 0.05 }),
+  'newworld-prime-headlight-v1': Object.freeze({ roughness: 0.3, metalness: 0.2 }),
+  // Painted metal / steel trim: bus, sedan, lamp posts, poles hardware.
+  'newworld-prime-steel-v1': Object.freeze({ roughness: 0.45, metalness: 0.6 }),
+  'newworld-prime-lamp-steel-v1': Object.freeze({ roughness: 0.5, metalness: 0.55 }),
+  'newworld-prime-sedan-silver-v1': Object.freeze({ roughness: 0.42, metalness: 0.5 }),
+  'newworld-prime-bus-yellow-v1': Object.freeze({ roughness: 0.5, metalness: 0.25 }),
+  'newworld-prime-truck-cab-red-v1': Object.freeze({ roughness: 0.5, metalness: 0.25 }),
+  // Dark rubber reads (tires, doorway insets): a touch of specular so the
+  // surface edge survives shade instead of flattening to exact black.
+  'newworld-prime-rubber-v1': Object.freeze({ roughness: 0.68, metalness: 0.0 }),
+});
+
 function standinMaterial(ctx: BlockoutContext, materialId: string): THREE.Material {
   const cached = ctx.materials.get(materialId);
   if (cached) return cached;
+  const finish = STANDIN_FINISHES[materialId] ?? { roughness: 0.9, metalness: 0.02 };
   const material = new THREE.MeshStandardMaterial({
     color: STANDIN_COLORS[materialId] ?? STANDIN_FALLBACK_COLOR,
-    roughness: 0.9,
-    metalness: 0.02,
+    roughness: finish.roughness,
+    metalness: finish.metalness,
   });
   ctx.materials.set(materialId, material);
   return material;

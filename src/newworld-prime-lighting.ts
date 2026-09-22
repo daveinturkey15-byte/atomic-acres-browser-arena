@@ -40,10 +40,10 @@ export const NEWWORLD_PRIME_SUN_POSITION_OVERCAST = Object.freeze([-12, 64, 8] a
 /** Night-rain key (moon) position in metres: steep cool wash above the rain. */
 export const NEWWORLD_PRIME_SUN_POSITION_NIGHT_RAIN = Object.freeze([18, 58, -22] as const);
 
-/** Late-morning key sun intensity (mirrors the blender-family ~3.2 neutral day). */
-export const NEWWORLD_PRIME_SUN_INTENSITY_LATE_MORNING = 3.2;
-/** Late-morning ambient intensity. */
-export const NEWWORLD_PRIME_AMBIENT_INTENSITY_LATE_MORNING = 0.42;
+/** Late-morning key sun intensity (Day-3 graphics 3.2 -> 2.8: tames pale-siding clip). */
+export const NEWWORLD_PRIME_SUN_INTENSITY_LATE_MORNING = 2.8;
+/** Late-morning ambient intensity (Day-3 graphics 0.42 -> 0.55: shadow-side dark-identity lift). */
+export const NEWWORLD_PRIME_AMBIENT_INTENSITY_LATE_MORNING = 0.55;
 /** Late-morning fog window in metres. */
 export const NEWWORLD_PRIME_FOG_NEAR_LATE_MORNING_METRES = 58;
 export const NEWWORLD_PRIME_FOG_FAR_LATE_MORNING_METRES = 148;
@@ -117,7 +117,7 @@ export const NEWWORLD_PRIME_LATE_MORNING_LIGHTING: NewworldPrimeLightingParams =
     nearMetres: NEWWORLD_PRIME_FOG_NEAR_LATE_MORNING_METRES,
     farMetres: NEWWORLD_PRIME_FOG_FAR_LATE_MORNING_METRES,
   },
-  atmosphere: { preset: 'newworld-prime-late-morning', mist: 0.3, dust: 0.28, clouds: true },
+  atmosphere: { preset: 'newworld-prime-late-morning', mist: 0.24, dust: 0.22, clouds: true },
   rain: 0,
 });
 
@@ -151,7 +151,9 @@ export const NEWWORLD_PRIME_GOLDEN_DUSK_LIGHTING: NewworldPrimeLightingParams = 
   sunIntensity: 2.6,
   sunPosition: NEWWORLD_PRIME_SUN_POSITION_GOLDEN_DUSK,
   ambientColor: 0xb08d7f,
-  ambientIntensity: 0.34,
+  // Day-3 graphics: 0.34 -> 0.38 keeps doorway/wall dark identities readable
+  // under the low amber key instead of crushing them; hue untouched.
+  ambientIntensity: 0.38,
   hemisphereSky: 0xd9a988,
   hemisphereGround: 0x8d7f6e,
   hemisphereIntensity: 0.6,
