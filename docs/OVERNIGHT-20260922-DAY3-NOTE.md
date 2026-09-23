@@ -63,8 +63,11 @@ Session closed ~10:03Z after the Day-4 push; resumed 16:58 BST same day.
 
 - CI `static-and-unit` (run 35840697552) failed on both runners at
   `npm run lint` → `qa:text-integrity`: `src/world-studio/pbr-library.ts`
-  contained double-encoded UTF-8 (mojibake `â€”`/`â€¦`/`â†’`/`Ã—`). Fixed in
-  `2d9783c7d` (comment-only, restores real `—`/`…`/`→`/`×`); local scan of
+  contained double-encoded UTF-8: mojibake forms of U+2014 em-dash,
+  U+2026 ellipsis, U+2192 arrow and U+00D7 multiplication sign (Latin-1
+  lookalike pairs; spelled as code points here because the integrity
+  gate scans .md text too and flags any literal example). Fixed in
+  `2d9783c7d` (comment-only, restores the real characters); local scan of
   all 3,897 locally-present tracked text files ok, `tsc --noEmit` 0.
 - Root cause of the false "no lint script" belief: the 1,731 tracked
   `.qa-dist/**` build artifacts carry skip-worktree in this checkout, so the
