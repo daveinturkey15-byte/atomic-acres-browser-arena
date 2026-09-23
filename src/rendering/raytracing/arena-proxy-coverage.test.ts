@@ -152,6 +152,16 @@ const COVERAGE_FLOOR: Record<string, { meshes: number; footprintM2: number }> = 
   // have left the count at 2 and only moved a number nobody could attribute.
   // Pinned at 207, not a round number, for the same reason as before.
   raid2: { meshes: 2, footprintM2: 207 },
+  // Build 19 world-studio (Nuke Town New World): MEASURED on first sweep
+  // 2026-09-23 via the throwaway coverage probe (9 meshes / 218.4 m2),
+  // pinned from that measurement, not guessed.
+  'world-studio': { meshes: 9, footprintM2: 218 },
+  // PASS 97 Day-4: newworld-prime MEASURED zero on first sweep — every
+  // surface matte by standin default. Fixed by authoring the bus + truck
+  // paint as real polished car paint (0.20/0.62, nuketown2 precedent),
+  // re-measured 3 meshes / 63.4 m2 via the same probe, pinned here so this
+  // coverage cannot be silently spent later.
+  'newworld-prime': { meshes: 3, footprintM2: 63 },
 };
 
 type Coverage = {
@@ -216,6 +226,8 @@ beforeAll(async () => {
     // NUKETOWN2 (owner 2026-09-02, HF-407): the Nuke Town Rebuild joins it too.
     { buildNuketown2 },
     { buildRaid2 },
+    // Build 19: Nuke Town New World joins the sweep (world-studio arena).
+    { buildWorldStudio },
     // PASS 97 (2026-09-14): New World Prime Day-1 standby blockout.
     { buildNewworldPrime },
     { addNeighbourhoodLife, loadArenaArt },
@@ -230,6 +242,8 @@ beforeAll(async () => {
     import('../../map3-arena'),
     import('../../nuketown2-arena'),
     import('../../raid2-arena'),
+    // Build 19: Nuke Town New World joins the sweep (world-studio arena).
+    import('../../world-studio/arena'),
     // PASS 97 (2026-09-14): New World Prime Day-1 standby blockout.
     import('../../newworld-prime-arena'),
     import('../../environment-assets'),
@@ -260,6 +274,8 @@ beforeAll(async () => {
     nuketown2: buildNuketown2,
     // RAID2 (owner 2026-09-02, HF-408).
     raid2: buildRaid2,
+    // Build 19: Nuke Town New World joins the sweep (world-studio arena).
+    'world-studio': buildWorldStudio,
     // PASS 97 (2026-09-14): New World Prime Day-1 standby blockout joins the
     // proxy-coverage sweep from its first commit.
     'newworld-prime': buildNewworldPrime,

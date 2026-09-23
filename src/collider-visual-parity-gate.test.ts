@@ -95,6 +95,22 @@ const ACCEPTED_WALK_THROUGH: Record<string, Array<{ name: string; centre: [numbe
     { name: 'gun-range-wallbang-panel-interior-wall', centre: [-12.7, 1.45, -7.6], reason: 'penetration-lab panel: authored shots:true/solid:false behind the firing-line barrier' },
     { name: 'gun-range-wallbang-panel-brick', centre: [-9.5, 1.45, -7.6], reason: 'penetration-lab panel: authored shots:true/solid:false behind the firing-line barrier' },
   ],
+  'newworld-prime': [
+    // PASS 97 Day-4: hedge blobs are shrub dressing, by-design non-solid per
+    // the newworld-prime authority header (fact 7). Sub-metre foliage a
+    // player walks through; every static solid in their corridors IS
+    // collided. Centres measured from the gate's own findings.
+    { name: 'newworld-prime-newworld-prime-hedge-north-hedge-blob-0', centre: [-14, 0.57, -24], reason: 'shrub dressing, by-design non-solid (authority fact 7)' },
+    { name: 'newworld-prime-newworld-prime-hedge-north-hedge-blob-1', centre: [-12.9, 0.55, -24], reason: 'shrub dressing, by-design non-solid (authority fact 7)' },
+    { name: 'newworld-prime-newworld-prime-hedge-north-hedge-blob-2', centre: [-11.8, 0.57, -24], reason: 'shrub dressing, by-design non-solid (authority fact 7)' },
+    { name: 'newworld-prime-newworld-prime-hedge-north-hedge-blob-3', centre: [-10.7, 0.51, -24], reason: 'shrub dressing, by-design non-solid (authority fact 7)' },
+    { name: 'newworld-prime-newworld-prime-hedge-north-hedge-blob-4', centre: [-9.6, 0.52, -24], reason: 'shrub dressing, by-design non-solid (authority fact 7)' },
+    { name: 'newworld-prime-newworld-prime-hedge-south-hedge-blob-0', centre: [14, 0.57, 24], reason: 'shrub dressing, by-design non-solid (authority fact 7)' },
+    { name: 'newworld-prime-newworld-prime-hedge-south-hedge-blob-1', centre: [12.9, 0.55, 24], reason: 'shrub dressing, by-design non-solid (authority fact 7)' },
+    { name: 'newworld-prime-newworld-prime-hedge-south-hedge-blob-2', centre: [11.8, 0.57, 24], reason: 'shrub dressing, by-design non-solid (authority fact 7)' },
+    { name: 'newworld-prime-newworld-prime-hedge-south-hedge-blob-3', centre: [10.7, 0.51, 24], reason: 'shrub dressing, by-design non-solid (authority fact 7)' },
+    { name: 'newworld-prime-newworld-prime-hedge-south-hedge-blob-4', centre: [9.6, 0.52, 24], reason: 'shrub dressing, by-design non-solid (authority fact 7)' },
+  ],
 };
 
 const CENTRE_TOLERANCE = 0.06;

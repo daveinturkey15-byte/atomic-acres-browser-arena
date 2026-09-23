@@ -42,7 +42,7 @@
       "expected": "src/newworld-prime-arena.ts (buildNewworldPrime), src/newworld-prime-lighting.ts, src/newworld-prime-structures.ts, src/newworld-prime-props.ts and src/rendering/arenas/newworld-prime.ts are byte-untouched by Shell and satisfy every registry-side contract Shell depends on: builder signature (scene)=>ArenaMap, deterministic seeded PRNG, TSL-registry materials, late-morning lighting variant, four review cameras including a light-occlusion station, coherent practical policies, and cited layout plates.",
       "falsifier": "Any of the five files differs from the generator handoff; buildNewworldPrime is non-deterministic across runs; a review camera id in the visual module disagrees with scripts/qa/viewpoint-catalog.mjs; the atmosphere preset fails skyBackdropPreset identity; a practical claims shadowed-local without a shadow.",
       "acceptance": "mechanical",
-      "state": "verified",
+      "state": "pending",
       "evidence": [
         {
           "kind": "manual",
@@ -54,13 +54,19 @@
           "kind": "unit",
           "ref": "src/ballistics.test.ts",
           "command": "npx vitest run src/ballistics.test.ts",
-          "note": "Measured on candidate HEAD via throwaway probe (since removed): newworld-prime fallback=0 unbacked=0 orphans=0 — clean census, pinned at 0 floors. world-studio on the same run: fallback=0, unbacked=786, orphans=61 (pre-existing live-line debt, fails the dynamic-target assert; not pinned, owned by the live line)."
+          "note": "Measured on candidate HEAD via throwaway probe (since removed): newworld-prime fallback=0 unbacked=0 orphans=0 \u2014 clean census, pinned at 0 floors. world-studio on the same run: fallback=0, unbacked=786, orphans=61 (pre-existing live-line debt, fails the dynamic-target assert; not pinned, owned by the live line)."
         },
         {
           "kind": "unit",
           "ref": "scripts/qa/viewpoint-catalog.mjs",
           "command": "node --test scripts/qa/arena-viewpoint-regression.test.mjs",
           "note": "Catalog carries exactly the four authored cameras (overview, yard-geometry, depot-wall-closed, depot-door-open). NOT YET RUN AT THIS HEAD. Required receipt, not a claim."
+        },
+        {
+          "kind": "contract",
+          "ref": "lane git history",
+          "command": "git log --oneline 402214b68..HEAD -- src/newworld-prime-arena.ts src/newworld-prime-lighting.ts",
+          "note": "Day-3: lighting values + per-role finishes (72966704f). Day-4: bus/truck paint to polished 0.20/0.62 for reflection coverage (uncommitted). Registry contracts re-verified: tsc 0, PRNG/plates/cameras untouched. Byte-untouched premise no longer holds; needs integrator re-verify."
         }
       ]
     },
@@ -77,6 +83,12 @@
           "ref": "src/legacy-main.ts",
           "command": "Serve the candidate and boot ?map=newworld-prime, ?map=new-world-prime, then drive selectArena('newworld-prime') via __ATOMIC_ACRES_DEBUG__ after bootstrapMenuPreview.",
           "note": "UNVERIFIED AT THIS HEAD. No build/server run is owned by Shell (orchestrator gates). Required receipt, not a claim."
+        },
+        {
+          "kind": "browser",
+          "ref": "artifacts/qa/perf-soak-20260923/soak-high.json",
+          "command": "installed-Chrome headless WebGPU soak vs http://127.0.0.1:4201/",
+          "note": "SELECTABLE REALITY: cold boot menu->active 55.8s, 660/660 active samples x2 profiles, bots live, authority constructed. Standby fallback expectations (c577f79e1 promotion to selectable) are superseded; expectation rewrite is an integrator/owner call, not a worker edit."
         }
       ]
     },
@@ -99,6 +111,12 @@
           "ref": "src/rendering/arenas/newworld-prime.ts",
           "command": "AA_PREVIEW_REVIEW_ONLY=1 AA_PREVIEW_ARENAS=newworld-prime (sanctioned generator) plus a served capture at the four review cameras.",
           "note": "UNVERIFIED AT THIS HEAD. Capture + grade-search measurement belong to the authority/visual pass, which also re-runs the art-direction distinctiveness gate (Shell-authored grade values are inside safety bounds but the pair floor is unmeasured)."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifacts/qa/overnight-20260922/graphics-day4/",
+          "command": "5-camera fixed judgeset, 4 gauntlet cycles, both profiles",
+          "note": "PARTIAL: placeholder verified (PREVIEW STANDBY in served DOM, no borrowed bytes), late-morning look evidenced both profiles, card 02 NEW WORLD PRIME present by selectable design (MENU-CARD-02 lead/owner call). menu-preview-video.test.ts 7/9, 2 failures pre-existing at clean tree, file untouched."
         }
       ]
     },
@@ -115,6 +133,12 @@
           "ref": "src/spawn-layout-quality.test.ts",
           "command": "npx vitest run src/spawn-layout-quality.test.ts src/collider-visual-parity-gate.test.ts src/walkable-surface-parity-gate.test.ts src/rendering/raytracing/arena-proxy-coverage.test.ts",
           "note": "RUN 2026-09-14 (lieutenant pack + Main judgment). Interiors pilot: 15/15 focused, tsc 0, rendering pair 18/18, walkable failures world-studio-only (pre-existing). Open Day-2 debts (predate interiors, owned by follow-ups, no gate weakened): spawn team-0 count 3 vs >=6 pin + lobby-spread + span 0.174 vs 0.18 + HF-402 cover rows; collider gate names fence-bay/hedge/chimney presentation meshes (fences want solid-per-fact-9 decision) + Direction C gunfire/ratchet rows; world-studio orphan/underlay debt unchanged (61 orphans, 786 unbacked). Interiors add zero new findings: interior/house lines absent from collider output, zero newworld lines in walkable."
+        },
+        {
+          "kind": "unit",
+          "ref": "lane gate runs 2026-09-23",
+          "command": "npx vitest run src/spawn-layout-quality.test.ts src/collider-visual-parity-gate.test.ts src/walkable-surface-parity-gate.test.ts src/rendering/raytracing/arena-proxy-coverage.test.ts",
+          "note": "NEWWORLD-PRIME GREEN: spawn 6/team cover/sight/floor/route (only world-studio residuals), parity invisible+walkthrough+Direction C clean (only world-studio ghost/ledger residuals), walkable clean, proxy 5/5 with measured floors (prime 3/63.4, studio 9/218.4). Hedge ledger (10, gate-measured centres) + floors have triage reasons, nothing weakened. ESCALATED: frame-pacing policy vs MAX-admission test are textually contradictory (literal required and forbidden in startGame); lifecycle gates blocked by bundled-Chromium-no-WebGPU/menu 30s-vs-55s-deploy. world-studio rows pre-existing, other arena, untouched."
         }
       ]
     }

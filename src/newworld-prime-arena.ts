@@ -240,11 +240,16 @@ const STANDIN_FINISHES: Readonly<Record<string, Readonly<{ roughness: number; me
   'newworld-prime-lamp-lens-v1': Object.freeze({ roughness: 0.38, metalness: 0.05 }),
   'newworld-prime-headlight-v1': Object.freeze({ roughness: 0.3, metalness: 0.2 }),
   // Painted metal / steel trim: bus, sedan, lamp posts, poles hardware.
+  // Day-4: bus yellow + truck cab red are authored as real polished car paint
+  // (0.20/0.62, nuketown2 precedent) — vehicle paint really is polished and
+  // metallic, and the ray-traced reflection preset had nothing to reflect on
+  // this arena (0 reflective meshes). Sedan silver stays a matte showcase
+  // read; lamp steel stays galvanised, not mirror.
   'newworld-prime-steel-v1': Object.freeze({ roughness: 0.45, metalness: 0.6 }),
   'newworld-prime-lamp-steel-v1': Object.freeze({ roughness: 0.5, metalness: 0.55 }),
   'newworld-prime-sedan-silver-v1': Object.freeze({ roughness: 0.42, metalness: 0.5 }),
-  'newworld-prime-bus-yellow-v1': Object.freeze({ roughness: 0.5, metalness: 0.25 }),
-  'newworld-prime-truck-cab-red-v1': Object.freeze({ roughness: 0.5, metalness: 0.25 }),
+  'newworld-prime-bus-yellow-v1': Object.freeze({ roughness: 0.2, metalness: 0.62 }),
+  'newworld-prime-truck-cab-red-v1': Object.freeze({ roughness: 0.2, metalness: 0.62 }),
   // Dark rubber reads (tires, doorway insets): a touch of specular so the
   // surface edge survives shade instead of flattening to exact black.
   'newworld-prime-rubber-v1': Object.freeze({ roughness: 0.68, metalness: 0.0 }),

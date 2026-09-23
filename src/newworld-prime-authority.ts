@@ -176,20 +176,37 @@ function solidSpecs(): SolidSpec[] {
     });
   }
 
-  // Fact 6: lot-division privacy fence runs. Bays repeat along local +x from
-  // the placement origin, so the authority box centres on the run midpoint.
+  // Fact 6: lot-division privacy fence runs. One authority box per bay,
+  // centred on the bay origin exactly like the visual panel (the panel spans
+  // +/-1.2 m about the bay origin; the closing post stands on the +1.2 m
+  // boundary inside the same box). A run-level box fails the parity audit:
+  // 14.4 m of collider explained by 2.4 m of mesh each (coverage 0.17).
   for (const run of NEWWORLD_PRIME_PRIVACY_FENCE_RUNS) {
-    const length = run.bays * NEWWORLD_PRIME_FENCE_BAY_LENGTH_METRES;
-    const [midX, midZ] = yawedOffset(length / 2, 0, run.rotationY);
-    const [sizeX, sizeZ] = yawedExtents(length, 0.3, run.rotationY);
-    specs.push({
-      id: run.id,
-      x: run.x + midX, z: run.z + midZ, sizeX, sizeZ,
-      minY: 0, maxY: FENCE_MAX_Y_M,
-      yaw: run.rotationY,
-      ballisticMaterial: 'fence',
-    });
+    for (let bay = 0; bay < run.bays; bay += 1) {
+      const [cx, cz] = yawedOffset(bay * NEWWORLD_PRIME_FENCE_BAY_LENGTH_METRES, 0, run.rotationY);
+      // 0.12 m deep: the 0.06 m panel plus the closing post on the bay
+      // boundary. A 0.3 m box drops planar coverage to 0.2 under the 0.35
+      // explanation bar; 0.12 m holds 0.5+.
+      const [sizeX, sizeZ] = yawedExtents(NEWWORLD_PRIME_FENCE_BAY_LENGTH_METRES, 0.12, run.rotationY);
+      specs.push({
+        id: `${run.id}-bay-${bay}`,
+        x: run.x + cx, z: run.z + cz, sizeX, sizeZ,
+        minY: 0, maxY: FENCE_MAX_Y_M,
+        yaw: run.rotationY,
+        ballisticMaterial: 'fence',
+      });
+    }
   }
+
+  // Fact 8 (east): the yellow-house stone chimney is a real 0.8 m obstruction
+  // against the east wall. Solid in both profiles so the stack stops movement
+  // and shots; the parity audit flagged it walk-through without this box.
+  specs.push({
+    id: 'newworld-prime-east-yellow-chimney-stack',
+    x: 17.55, z: -1.5, sizeX: 0.8, sizeZ: 0.8,
+    minY: 0, maxY: 5.45,
+    ballisticMaterial: 'brick',
+  });
 
   // INTERIORS PILOT: ground-floor partition walls, both houses (data-owned by
   // newworld-prime-interiors, emitted here in this module's pattern: one
@@ -207,18 +224,19 @@ function solidSpecs(): SolidSpec[] {
   return specs;
 }
 
-// Live spawns: 2 teams x 3. Teal (0) holds the west backs, yellow (1) the
-// east backs — symmetric about the centre loop, each point on walkable y=0
-// ground (eye height 1.7 per SPAWN_LAYOUT convention), ≥6 m clear of every
-// solid above (west fence line x=-26, sheds, houses) and of the fact-9
-// jeep (13.5,-21) / sandbag (0,8.5) reservations. In-team spacing is 8 m+
-// (FFA_MINIMUM_SPAWN_SEPARATION 8); cross-team separation is 60 m+
-// (atomic-acres MAP_TRAP_RADIUS 9 pattern — no trap exposure at these ranges).
+// Live spawns: 2 teams x 6. Teal (0) holds the west backs along the west
+// fence corridor plus house/shed cover; yellow (1) the east backs along the
+// east fence corridor plus house cover — each point on walkable y=0 ground
+// (eye height 1.7 per SPAWN_LAYOUT convention), within 6 m of hard cover,
+// pairwise 3 m+ apart (grenade rule), team span 25 m of the 92 m z-axis
+// (spread rule), and clear of the fact-9 jeep (13.5,-21) / sandbag (0,8.5)
+// reservations. Cross-team pairs keep 40 m+ with the centre solids (bus,
+// semi, houses) breaking eye-height lines; the sight gate is the arbiter.
 const TEAL_SPAWNS: ReadonlyArray<readonly [number, number]> = [
-  [-32, -8], [-33, 0], [-32, 8],
+  [-31, -8], [-30, -1], [-29, 5], [-27, 10], [-22.5, -16], [-21, -3],
 ];
 const YELLOW_SPAWNS: ReadonlyArray<readonly [number, number]> = [
-  [32, -8], [33, 0], [32, 8],
+  [31, -8], [30, -14], [29, -20], [27, -25], [21, -6], [21, 0],
 ];
 
 /**
