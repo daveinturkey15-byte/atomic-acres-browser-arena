@@ -301,7 +301,10 @@ describe('Pass 65 sound-event inventory', () => {
     // now have real emitters (syncSupportFlightLoops, bombRelease).
     // Owner 2026-09-12: four New World variants added (two beds, one event, planned music).
     // Existing emitter contracts and all retained variants are unchanged.
-    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('478988fe83501a00beeb2764a90e43b34c805fc7f0b2177ac59f1e5fc6fc996c');
+    // PASS 97 (2026-09-14): digest recomputed for the New World Prime standby
+    // rows (arena-bed x2, arena-events x1, music.game), matching the runtime
+    // ARENA_AUDIO_DEFINITIONS['newworld-prime'] and ARENA_AMBIENT_PROFILES.
+    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('a060e5826affe12ce30d0179ee37cc7558da186d115960dddf932680df6a74b3');
     expect(digest).toBe(SOUND_EVENT_INVENTORY_SHA256);
   });
 });

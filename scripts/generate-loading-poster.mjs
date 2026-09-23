@@ -58,6 +58,7 @@ const flag = (name) => argv.includes(name);
 
 /** Curated representative station per arena. See the header for the rule. */
 export const REPRESENTATIVE_CAMERA = Object.freeze({
+  'world-studio': 'world-studio-overview',
   'atomic-acres': 'nuke-town-street-axis',
   'skyline-terminal': 'terminal-overview',
   'rustworks-1v1': 'rustrig-overview',
@@ -69,6 +70,11 @@ export const REPRESENTATIVE_CAMERA = Object.freeze({
   map3: 'map3-hub-vista',
   nuketown2: 'nuketown2-street-centre',
   raid2: 'raid2-estate-overview',
+  // New World Prime day-1 standby: 'newworld-prime-overview' is the widest
+  // authored view of the high-desert town yard (the defining space); the
+  // topdown map-read is excluded by the curated-station rule like every
+  // other arena's plan view.
+  'newworld-prime': 'newworld-prime-overview',
 });
 
 export function representativeCamera(arenaId) {

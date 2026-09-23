@@ -5,6 +5,13 @@ import testArenasChoreographyJson from '../../source-assets/menu/pass79-test-are
 import map3ChoreographyJson from '../../source-assets/menu/pass84-map3-preview/choreography.json';
 import nuketown2ChoreographyJson from '../../source-assets/menu/pass85-nuketown2-preview/choreography.json';
 import raid2ChoreographyJson from '../../source-assets/menu/pass87-raid2-preview/choreography.json';
+// NEWWORLD-PRIME (PASS 97, 2026-09-14): same extension pattern once more, and
+// the same honesty as map3/raid2/world-studio - the camera recipe is authored
+// here before any media exists, because a card cannot leave standby without
+// one and authoring it now makes the capture a mechanical step rather than a
+// design step. The orbit is fitted to NEWWORLD_PRIME_ARENA_BOUNDS (80 x 92 m),
+// not inherited; see the note in the JSON.
+import newworldPrimeChoreographyJson from '../../source-assets/menu/pass97-newworld-prime-preview/choreography.json';
 import worldStudioChoreographyJson from '../../source-assets/menu/world-studio-preview/choreography.json';
 import type { ArenaId } from '../map-selection';
 
@@ -176,6 +183,10 @@ const RAID2_CHOREOGRAPHY = raid2ChoreographyJson as unknown as Readonly<{
   recipeId: string;
   arenas: Readonly<{ raid2: HelicopterRecipe }>;
 }>;
+const NEWWORLD_PRIME_CHOREOGRAPHY = newworldPrimeChoreographyJson as unknown as Readonly<{
+  recipeId: string;
+  arenas: Readonly<{ 'newworld-prime': HelicopterRecipe }>;
+}>;
 const WORLD_STUDIO_CHOREOGRAPHY = worldStudioChoreographyJson as unknown as Readonly<{
   arenas: Readonly<{ 'world-studio': HelicopterRecipe }>;
 }>;
@@ -193,6 +204,8 @@ const CHOREOGRAPHY: ChoreographyRecipe = Object.freeze({
     ...NUKETOWN2_CHOREOGRAPHY.arenas,
     ...RAID2_CHOREOGRAPHY.arenas,
     ...WORLD_STUDIO_CHOREOGRAPHY.arenas,
+    // NEWWORLD-PRIME is last in ARENA_SELECTIONS, so it is spread last here too.
+    ...NEWWORLD_PRIME_CHOREOGRAPHY.arenas,
   }),
 });
 const DURATION_MS = CHOREOGRAPHY.durationSeconds * 1_000;

@@ -165,9 +165,23 @@ export const FORGED_VEHICLE_SPECS: readonly VehicleSpec[] = Object.freeze([
  * Triangle fences for the dressed presentation meshes. These leave room for
  * the authored trim above the measured current counts without allowing a
  * detail pass to turn a parked vehicle into a high-density prop.
+ *
+ * Measured against the actual authored arena
+ * (`src/vehicle-forge/arena-budget.test.ts` census, which partitions every
+ * merged triangle once per quantized vehicle anchor):
+ *
+ *   coach  9,982  (single build)               -> 10,000
+ *   truck  8,024  cab + bogie share one anchor ->  9,000
+ *   saloon 9,102  the dressed head-car pair    -> 10,000
+ *
+ * The truck fence covers the WHOLE anchor, not the cab alone: the trailer
+ * frame (commit c58f2331) bolts its bogie onto the cab anchor, so the
+ * per-vehicle cap must span cab + bogie. The saloon fence covers the
+ * heaviest dressed saloon variant; the plain driveway cars measure 8,994.
+ * Rounded up to the existing round-thousand convention for headroom.
  */
 export const FORGED_VEHICLE_TRIANGLE_BUDGETS = Object.freeze({
   coach: 10_000,
-  truck: 6_000,
-  saloon: 9_000,
+  truck: 9_000,
+  saloon: 10_000,
 });

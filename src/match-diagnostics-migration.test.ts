@@ -38,6 +38,13 @@ const raid2ArenaExpansionMigration = readFileSync(
   new URL('../worker/migrations/0009_add_raid2_arena.sql', import.meta.url),
   'utf8',
 );
+// WORLD-STUDIO + NEW WORLD PRIME (owner 2026-09-23, PR #72 overnight pass):
+// 0010 rebuilds the CHECK to the thirteen-arena set. Same pattern, same
+// reason, applied AFTER 0009 in production order.
+const worldStudioAndPrimeExpansionMigration = readFileSync(
+  new URL('../worker/migrations/0010_add_world_studio_and_prime_arenas.sql', import.meta.url),
+  'utf8',
+);
 
 const insertDiagnostic = (database: DatabaseSync, receiptId: string, arena: string): void => {
   database.prepare(`
@@ -75,6 +82,7 @@ describe('match diagnostics arena expansion migration', () => {
       database.exec(map3ArenaExpansionMigration);
       database.exec(nuketown2ArenaExpansionMigration);
       database.exec(raid2ArenaExpansionMigration);
+      database.exec(worldStudioAndPrimeExpansionMigration);
 
       for (const arena of ARENA_IDS) insertDiagnostic(database, `new-${arena}`, arena);
 

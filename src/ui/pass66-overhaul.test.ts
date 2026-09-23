@@ -48,10 +48,14 @@ describe('Pass 66 tactical UI overhaul', () => {
     expect(css).toContain('.loadout-save-status[data-kind=\'error\']');
   });
 
-  it('adds a sticky killstreak demo rail and minimal video cockpit symbology', () => {
+  it('keeps quick-choice streaks and cockpit symbology after the reward-preview removal', () => {
     const streaks = killstreakLoadoutPanelMarkup();
-    expect(streaks).toContain('id="killstreak-demo-rail"');
-    expect(streaks).toContain('data-demo-poster');
+    // Owner-requested removal (c74884d9a, 2026-09-12: "Owner requested removal
+    // of chat and reward preview"): the demo rail no longer mounts inside the
+    // loadout panel; quick-choice buttons replaced the hover-preview select.
+    expect(streaks).not.toContain('id="killstreak-demo-rail"');
+    expect(streaks).toContain('class="killstreak-loadout-layout"');
+    expect(streaks).toContain('data-streak-choice=');
     expect(streaks).not.toContain('data-killstreak-preview=');
     const preview = menuPreviewVideoMarkup();
     expect(preview).toContain('class="preview-cockpit-hud"');

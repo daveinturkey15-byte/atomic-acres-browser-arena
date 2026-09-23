@@ -516,6 +516,20 @@ export function createStudioGardens(options: StudioGardensOptions = {}): StudioG
       }
     }
 
+    // ------------------------------------------------------------------ spawn-side cover trough
+    // HF-402: the team spawns at (±32, 20) measured 7.77 m to their nearest
+    // qualifying hard cover (the shed roof mass at the yard's far end), so
+    // `spawn-layout-quality.test.ts` failed both points. This trough sits in
+    // yard-local (lx 5, z 17.3) — just south of the garden-exit lane
+    // (`exit-lane-south`, z 18.5-23.5) and 2.4 m from the spawn disc — with a
+    // 0.9 m top, above the 0.7 m hard-cover line and below the 1.8 m
+    // wall-in-the-face line, so it hides a standing body without walling one in.
+    prop = 'cover-trough';
+    part('mass', 'cedar', [5, 0.45, 17.3], [1.6, 0.9, 0.6], { solid: 'wood' });
+    part('soil', 'soil', [5, 0.93, 17.3], [1.5, 0.06, 0.5]);
+    for (let n = 0; n < 4; n += 1)
+      part(`shrub-${n}`, 'foliage', [4.5 + n * 0.34, 1.15, 17.3], [0.34, 0.3, 0.34], { shape: 'clump' });
+
     // ------------------------------------------------------------------ utilities
     prop = 'condenser';
     part('pad', 'concrete', [0.3, 0.03, 1.65], [0.5, 0.06, 1.0]);

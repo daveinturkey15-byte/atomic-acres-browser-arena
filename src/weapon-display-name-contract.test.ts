@@ -12,7 +12,11 @@ const retiredLabels = [
   /\bLongline\b/i,
   /\bVX-8\b/i,
   /\bAster(?:\s*9|\s*18)?\b/i,
-  /\bVerdict(?:\s+Magnum)?\b/i,
+  // The retired label is the two-word weapon name ("Verdict Magnum", see the
+  // exempt changelog history). Bare "verdict" is ordinary English — the
+  // technique-lab gauntlet demo uses it as a common noun — so the old bare
+  // alternative false-positived on non-weapon prose.
+  /\bVerdict\s+Magnum\b/i,
   /\bG18\s+AUTO\b/i,
 ] as const;
 

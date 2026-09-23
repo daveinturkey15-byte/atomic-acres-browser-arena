@@ -45,11 +45,14 @@ describe('HF-184/HF-185 killstreak demo media registry', () => {
     expect(allCopy).not.toMatch(/hold (?:to possess|to gun)/iu);
   });
 
-  it('binds hover/focus preview and enforces reduced-motion poster mode', () => {
+  it('keeps the demo library self-contained after the owner-directed preview removal', () => {
     const menuSource = readFileSync(new URL('./killstreak-loadout-menu.ts', import.meta.url), 'utf8');
     const demoSource = readFileSync(new URL('./killstreak-demo-presentation.ts', import.meta.url), 'utf8');
-    expect(menuSource).toContain("addEventListener('pointerenter'");
-    expect(menuSource).toContain("addEventListener('focusin'");
+    // Owner requested removal of the reward preview (c74884d9a, 2026-09-12):
+    // the loadout menu no longer binds hover/focus preview listeners, and the
+    // rail is unmounted from the live menu.
+    expect(menuSource).not.toContain("addEventListener('pointerenter'");
+    expect(menuSource).not.toContain("addEventListener('focusin'");
     expect(demoSource).toContain("matchMedia('(prefers-reduced-motion: reduce)')");
     expect(demoSource).toContain("rail.dataset.motion = reducedMotion() ? 'poster' : panelVisible() ? 'video' : 'inactive'");
     expect(demoSource).toContain("video.removeAttribute('src')");

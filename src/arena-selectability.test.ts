@@ -82,8 +82,11 @@ describe('arena selectability', () => {
 
   it('offers exactly the rows the registry flags as selectable, and hides exactly the rest', () => {
     const offered = SELECTABLE_ARENAS.map((entry) => entry.id);
-    // Owner 2026-09-12 retains the older identities but offers only New World.
-    expect(offered).toEqual(['world-studio']);
+    // Owner 2026-09-12 retained the older identities but offered only New
+    // World. Day-2 (2026-09-14) promoted newworld-prime to selectable
+    // (map-selection.ts flip); standby pin rewritten with owner authorization
+    // 2026-09-23 (PR #72 owner call 2).
+    expect(offered).toEqual(['world-studio', 'newworld-prime']);
     // DERIVED on both sides. This replaces "the menu list IS the registry",
     // which was only true on the days nothing was parked and had to be
     // rewritten every time one was. Both partitions are computed from the flag,

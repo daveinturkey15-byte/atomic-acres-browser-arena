@@ -1075,6 +1075,12 @@ const events: SoundEventInventoryEntry[] = [
       // ARENA_AUDIO_DEFINITIONS.raid2's bed and air placements: the bed over the
       // circular drive, the air over the pool terrace.
       'raid2.terrace-breeze', 'raid2.pool-water',
+      // NEWWORLD-PRIME (PASS 97 standby, 2026-09-14). Two sources, matching
+      // ARENA_AUDIO_DEFINITIONS['newworld-prime'] (identity
+      // high-desert-loop-hum-and-yard-wind): the low loop hum at the west teal
+      // house lot and the yard wind over the east yellow lot's fence line,
+      // one at each end of the horseshoe loop (the nuketown2 placement rule).
+      'newworld-prime.loop-hum', 'newworld-prime.yard-wind',
     ],
     emitterSymbols: ['setArena'], contractRefs: ['R304', 'R307', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'arena-generation',
     coverageDetail: 'Every arena owns two distinct repository-procedural continuous sources, replaced atomically at arena generation changes.',
@@ -1093,6 +1099,10 @@ const events: SoundEventInventoryEntry[] = [
       'nuketown2.test-town',
       // RAID2 (owner 2026-09-02, HF-408).
       'raid2.open-terrace',
+      // NEWWORLD-PRIME (PASS 97 standby, 2026-09-14): matches
+      // ARENA_AMBIENT_PROFILES['newworld-prime']
+      // (high-desert-loop-and-fenced-lots) in arena-ambient-events.ts.
+      'newworld-prime.high-desert-lots',
       'world-studio.neighbourhood',
     ],
     emitterSymbols: ['setArena'], contractRefs: ['R304', 'R307', 'R308'], concurrency: WORLD_TRANSIENT, lifecycleOwner: 'arena-generation',
@@ -1115,7 +1125,8 @@ const events: SoundEventInventoryEntry[] = [
     // owner 2026-09-02 (HF-405): Map 3 added.
     // owner 2026-09-02 (HF-407): Nuke Town Rebuild added.
     // owner 2026-09-03 (HF-408): the Raid rebuild added.
-    variants: ['world-studio', 'atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis', 'high-seas', 'test1', 'test2', 'map3', 'nuketown2', 'raid2'],
+    // PASS 97 (2026-09-14): New World Prime standby added.
+    variants: ['world-studio', 'atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis', 'high-seas', 'test1', 'test2', 'map3', 'nuketown2', 'raid2', 'newworld-prime'],
     contractRefs: ['R303', 'R304', 'R307', 'R308'], concurrency: GAME_MUSIC_LOOP, lifecycleOwner: 'arena-generation',
     coverageDetail: 'In-game music is arena-generation-owned, independently controlled, and fully manifested before runtime use.',
   }),
@@ -1133,7 +1144,12 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
 // owner 2026-09-03 (HF-408): recomputed once more over the MERGED inventory -
 // neither branch's pin is correct once both the Nuke Town Rebuild's and the
 // Raid Rebuild's bed, event and music rows are present.
-export const SOUND_EVENT_INVENTORY_SHA256 = '478988fe83501a00beeb2764a90e43b34c805fc7f0b2177ac59f1e5fc6fc996c';
+// PASS 97 (2026-09-14): recomputed for the New World Prime standby rows -
+// arena-bed ('newworld-prime.loop-hum', 'newworld-prime.yard-wind' matching
+// ARENA_AUDIO_DEFINITIONS['newworld-prime']), arena-events
+// ('newworld-prime.high-desert-lots' matching ARENA_AMBIENT_PROFILES) and
+// music.game, per the every-arena pattern.
+export const SOUND_EVENT_INVENTORY_SHA256 = 'a060e5826affe12ce30d0179ee37cc7558da186d115960dddf932680df6a74b3';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

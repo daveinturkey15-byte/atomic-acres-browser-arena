@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { ArenaMap, BreakableWindow } from '../map';
 import { createBallisticSurface } from '../ballistics';
+import { classifyImpactSurface } from '../combat-feedback';
 import { createStudioArchitecture } from './architecture';
 import { createStudioNature } from './nature';
 import { createStudioGround, type StudioSolid } from './ground';
@@ -42,17 +43,57 @@ export function buildWorldStudio(scene: THREE.Scene, housePresentationOptions?: 
     anchors: architecture.root.userData.furnitureAnchors as StudioInteriorAnchor[], mode: 'presentation' });
   const solids: StudioSolid[] = [...ground.solids, ...architecture.solids, ...vehicles.solids, ...interiors.solids, ...gardens.solids];
   const breakableWindows: BreakableWindow[] = [];
+  // Shot-authority backing meshes. Every other arena stamps its raycast meshes
+  // with a singular `ballisticSurfaceId` + `ballisticMaterial` pair — the live
+  // shot-resolution parent walk in legacy-main reads both — and the
+  // registered-blocker census in src/ballistics.test.ts requires one backed
+  // mesh per surface. This arena shares one visible mesh across many solids
+  // (one kerb mesh carries 75 stone proxies; the fence runs, streetlamps and
+  // lamp plinths repeat it), and nothing ever read the plural
+  // `ballisticSurfaceIds` array it stamped instead. So each solid now gets its
+  // own invisible authority proxy — the same emit pattern as
+  // newworld-prime-authority — except dynamic glass panes, which back
+  // themselves through the breakable-glass registry.
+  const raycastMeshes: THREE.Object3D[] = [];
+  const proxyMaterial = new THREE.MeshBasicMaterial();
   const shotSurfaces = solids.map((solid) => {
     const windowId = solid.material === 'glass' ? `world-studio-window:${solid.id.toLowerCase()}` : undefined;
     const surface = createBallisticSurface(`world-studio:${solid.id}`, solid.id, solid.bounds, { material: solid.material }, windowId);
+    let backing: THREE.Object3D;
     if (windowId && solid.mesh instanceof THREE.Mesh) {
       breakableWindows.push({ id: windowId, mesh: solid.mesh, broken: false });
       solid.mesh.userData.breakableWindowId = windowId;
-      solid.mesh.userData.ballisticSurfaceId = surface.id;
       solid.mesh.userData.dynamic = true;
+      backing = solid.mesh;
+    } else {
+      const bounds = solid.bounds;
+      // Some legacy solid sites omit Y bounds; the repo convention (see
+      // studio-vehicles) grounds them at 0 rather than rejecting them.
+      const minY = bounds.minY ?? 0;
+      const maxY = bounds.maxY ?? 0;
+      const proxy = new THREE.Mesh(
+        new THREE.BoxGeometry(bounds.maxX - bounds.minX, maxY - minY, bounds.maxZ - bounds.minZ),
+        proxyMaterial,
+      );
+      proxy.name = solid.id;
+      proxy.position.set(
+        (bounds.minX + bounds.maxX) / 2,
+        (minY + maxY) / 2,
+        (bounds.minZ + bounds.maxZ) / 2,
+      );
+      if (bounds.rotation) proxy.rotation.set(...bounds.rotation);
+      // Authority-only: never renders, never shadows, never presents.
+      proxy.visible = false;
+      proxy.castShadow = false;
+      proxy.receiveShadow = false;
+      proxy.userData.collisionProxy = true;
+      proxy.userData.impactSurface = classifyImpactSurface({ name: solid.id });
+      root.add(proxy);
+      backing = proxy;
     }
-    const ids = solid.mesh.userData.ballisticSurfaceIds ??= [];
-    ids.push(surface.id);
+    backing.userData.ballisticSurfaceId = surface.id;
+    backing.userData.ballisticMaterial = surface.material;
+    raycastMeshes.push(backing);
     return surface;
   });
   // Intact panes join movement through the game's dynamic glass registry.
@@ -64,7 +105,6 @@ export function buildWorldStudio(scene: THREE.Scene, housePresentationOptions?: 
   root.userData.worldStudioBotStepColliders = new Set(solids
     .filter(solid => /-house-(?:ext-)?stair-\d+$/.test(solid.id))
     .map(solid => solid.bounds));
-  const raycastMeshes = [...new Set(solids.map(solid => solid.mesh))];
   // Blender house shells: presentation only. The root is attached now but stays invisible until
   // every shell has been decided; only a house whose load resolved AND audit passed is then
   // shown, and only that house's procedural art is hidden. Failure leaves procedural art.

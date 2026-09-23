@@ -201,6 +201,9 @@ describe('src/legacy-main.ts carries the fences (source fence)', () => {
   });
 
   it('holds the legacy-main line ceiling', () => {
-    expect(source.split('\n').length - 1).toBeLessThanOrEqual(37_560);
+    // Mirrors LINE_CEILING + the newest CEILING_HISTORY entry in
+    // src/legacy-main-size-ratchet.test.ts (PASS 97 line integration raise,
+    // 2026-09-23). Keep the two literals in sync.
+    expect(source.split('\n').length - 1).toBeLessThanOrEqual(37_710);
   });
 });

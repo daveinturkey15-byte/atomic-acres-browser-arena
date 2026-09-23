@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 37_560;
+const LINE_CEILING = 37_710;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -306,10 +306,20 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       + 'that correctly could not mount it, then wired at three sites (construct on arena '
       + 'selection, quality by graphics tier, per-frame update with sun direction). (2) createSky '
       + 'for the IN-GAME Map 3 - the previous round fixed only the /map3.html showcase page, so '
-      + 'the owner never saw the moving sun. (3) the cold-submission fence retry on the arena '
-      + 'transition. Measured 37494 at the merged head. OWED: extracting the arena-transition region '
-      + 'into its own module is preferable to this raise and is the next streamline target - the '
-      + 'ratchet header says so and it is right.',
+    + 'the owner never saw the moving sun. (3) the cold-submission fence retry on the arena '
+    + 'transition. Measured 37494 at the merged head. OWED: extracting the arena-transition region '
+    + 'into its own module is preferable to this raise and is the next streamline target - the '
+    + 'ratchet header says so and it is right.',
+  },
+  {
+    date: '2026-09-23',
+    lines: 37_710,
+    note:
+      'PASS 97 line integration: the density/dressing batches (garages, crates, perimeter walls, '
+      + 'yard sets), the interiors pilot (walkable ground floors + ingress in both houses) and the '
+      + 'New World Prime Day-2 selectable registration grew arena registration and dressing wiring. '
+      + 'Growth predates the overnight lane (0 added lines in this file from 402214b68..6158b2b30); '
+      + 'measured 37710 at head 6158b2b30 on PR #72. Same OWED note: extraction over raising.',
   },
 ];
 
