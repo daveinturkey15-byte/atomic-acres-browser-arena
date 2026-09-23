@@ -12,15 +12,21 @@ import { menuPreviewVideoDefinition } from '../ui/menu-preview-video';
 const retainedIds = [
   'nuketown2', 'raid2', 'atomic-acres', 'skyline-terminal', 'rustworks-1v1',
   'gun-range', 'farcrysis', 'high-seas', 'test1', 'test2', 'map3',
-  // PASS 97 (2026-09-14): New World Prime Day-1 standby. Retained like every
-  // hidden row: decodes, never offered, menu falls back to the default.
-  'newworld-prime',
 ] as const;
+
+// Day-2 (2026-09-14): New World Prime gameplay authority landed, so the row
+// was promoted from PASS 97 Day-1 standby to selectable (`map-selection.ts`
+// Day-2 flip comment). Standby expectation rewrite authorized by the owner
+// 2026-09-23 (PR #72 owner call 2; `acceptance/pass-97.json` records that
+// the standby fallback expectations are superseded by the selectable
+// reality). The prime row is still last in `ARENA_IDS` and still decodes
+// for network/replay/storage.
+const promotedPrimeId = 'newworld-prime' as const;
 
 describe('New World selection and retained multiplayer identity', () => {
   it('offers only the new arena while retaining every historical ID and alias', () => {
-    expect(ARENA_IDS).toEqual(['world-studio', ...retainedIds]);
-    expect(SELECTABLE_ARENAS.map((row) => row.id)).toEqual(['world-studio']);
+    expect(ARENA_IDS).toEqual(['world-studio', ...retainedIds, promotedPrimeId]);
+    expect(SELECTABLE_ARENAS.map((row) => row.id)).toEqual(['world-studio', promotedPrimeId]);
     for (const id of retainedIds) {
       const row = arenaSelection(id);
       expect(row.id).toBe(id);
@@ -30,6 +36,13 @@ describe('New World selection and retained multiplayer identity', () => {
         expect(menuArenaSelection(alias).id).toBe('world-studio');
       }
     }
+    const prime = arenaSelection(promotedPrimeId);
+    expect(prime.id).toBe(promotedPrimeId);
+    expect(prime.selectable).toBe(true);
+    expect(prime.legacyAliases).toEqual([]);
+    expect(decodeArenaId(promotedPrimeId)).toBe(promotedPrimeId);
+    expect(menuArenaSelection(promotedPrimeId).id).toBe(promotedPrimeId);
+    expect(menuArenaSelection('new-world-prime').id).toBe(promotedPrimeId);
   });
 
   it.each([null, undefined, '', 'missing-map', 'WORLD-STUDIO', ' world-studio '])(
@@ -54,12 +67,17 @@ describe('New World selection and retained multiplayer identity', () => {
     expect(DEFAULT_PRIVATE_MATCH_CONFIG.arenaId).toBe('world-studio');
   });
 
-  it('admits only the visible multiplayer map in host controls', () => {
+  it('admits only the visible multiplayer maps in host controls', () => {
     expect(isMenuMultiplayerArenaId('world-studio')).toBe(true);
+    expect(isMenuMultiplayerArenaId(promotedPrimeId)).toBe(true);
     for (const id of [...retainedIds, 'unknown', '', 'WORLD-STUDIO']) {
       expect(isMenuMultiplayerArenaId(id)).toBe(false);
     }
     expect(arenaSelection('world-studio')).toMatchObject({
+      kind: 'team', multiplayer: true, fieldSupport: true,
+      soloBotCount: 2, maximumSoloBots: 2,
+    });
+    expect(arenaSelection(promotedPrimeId)).toMatchObject({
       kind: 'team', multiplayer: true, fieldSupport: true,
       soloBotCount: 2, maximumSoloBots: 2,
     });
@@ -68,10 +86,11 @@ describe('New World selection and retained multiplayer identity', () => {
   it('binds initial shell, dropdown and media standby to the new identity', () => {
     const html = renderPass64Shell(createPass64ShellViewModel('Operator'));
     expect([...html.matchAll(/data-arena-route="([^"]+)"/g)].map((match) => match[1]))
-      .toEqual(['world-studio']);
+      .toEqual(['world-studio', 'new-world-prime']);
     const lobbyOptions = html.match(/<select id="lobby-arena">([\s\S]*?)<\/select>/)?.[1];
     expect(lobbyOptions).toContain('value="world-studio"');
-    expect((lobbyOptions?.match(/<option /g) ?? [])).toHaveLength(1);
+    expect(lobbyOptions).toContain('value="newworld-prime"');
+    expect((lobbyOptions?.match(/<option /g) ?? [])).toHaveLength(2);
     expect(html).toContain('aria-label="Nuke Town · New World multiplayer arena"');
     expect(html).toContain('data-arena="world-studio"');
     expect(html).toContain('PREVIEW STANDBY');
