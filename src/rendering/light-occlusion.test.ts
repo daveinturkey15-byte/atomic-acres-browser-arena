@@ -28,4 +28,21 @@ describe('Pass 64 local-light occlusion policy', () => {
     root.add(worldLeak, viewmodelOnly);
     expect(auditLocalLightOcclusion(root, 1).violations).toEqual(['world-leak:unoccluded-active-light']);
   });
+
+  it('accepts only bounded catalog lights under the clustered-local policy', () => {
+    const root = new THREE.Group();
+    const clustered = new THREE.PointLight(0xffffff, 1, 8, 2);
+    clustered.name = 'clustered';
+    clustered.userData.clusteredLocalLight = true;
+    clustered.userData.clusteredSource = 'street-lamp';
+    root.add(clustered);
+    expect(auditLocalLightOcclusion(root)).toMatchObject({
+      activeLocalLights: 1,
+      clusteredLocalLights: 1,
+      violations: [],
+    });
+
+    clustered.distance = Infinity;
+    expect(auditLocalLightOcclusion(root).violations).toEqual(['clustered:invalid-clustered-local-light']);
+  });
 });

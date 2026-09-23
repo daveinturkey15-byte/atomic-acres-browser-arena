@@ -36,7 +36,7 @@ describe('Pass 69.3 real-authored near-plane evidence boundary', () => {
   it('covers the complete canonical weapon catalog with independent exact retreat expectations', () => {
     const spec = readFileSync('tests/e2e/pass69-3-authored-near-plane-catalog.spec.ts', 'utf8');
     const runner = readFileSync('scripts/qa/run-pass69-3-authored-near-plane-catalog.mjs', 'utf8');
-    expect(WEAPON_IDS).toHaveLength(20);
+    expect(WEAPON_IDS).toHaveLength(21);
     expect(spec).toContain('satisfies Readonly<Record<WeaponId, number>>');
     expect(spec).toContain("expect(Object.keys(EXPECTED_CONTACT_RETREAT).sort()).toEqual([...WEAPON_IDS].sort())");
     expect(spec).toContain('for (const [index, weapon] of WEAPON_IDS.entries())');
@@ -59,7 +59,9 @@ describe('Pass 69.3 real-authored near-plane evidence boundary', () => {
       "socketContractReady: true",
       "presentation.armsSource, `${label}: authored two-chain arms`).toBe('authored-two-chain')",
       "contract: 'authored-glb-contact-retreat-2026-08-09-v1'",
-      'cameraNear: 0.08',
+      // HF-410: the spec now derives this from FIRST_PERSON_CAMERA_NEAR_METERS
+      // instead of restating 0.08. The token this grep pins moves with it.
+      'cameraNear: FIRST_PERSON_CAMERA_NEAR_METERS,',
       'requiredMargin: 0.02',
       'baseRetreat: 0.06',
       'maximumSurfaceRetreat: 0.28',

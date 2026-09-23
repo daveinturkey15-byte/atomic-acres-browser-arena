@@ -1,0 +1,2149 @@
+{
+ "contract": "farcrysis-traversal-sweep-v1",
+ "measuredAt": "2026-09-03T00:34:06.465Z",
+ "arena": "farcrysis",
+ "url": "http://127.0.0.1:4180",
+ "method": {
+  "rings": [
+   {
+    "name": "beach",
+    "radius": 46
+   },
+   {
+    "name": "jungle",
+    "radius": 26
+   }
+  ],
+  "startsPerRing": 12,
+  "headings": 4,
+  "walkMs": 4000,
+  "blockerNearM": 1.2,
+  "slopeStepM": 0.6,
+  "groundSource": "downward traceBallistics against the canonical shot surfaces - the same set gunfire uses"
+ },
+ "summary": {
+  "starts": 25,
+  "unusableStarts": 0,
+  "walksClassified": 95,
+  "walksDiscardedOutsideActiveMatch": 1,
+  "byClassification": {
+   "walked": 84,
+   "stopped-at-surface": 10,
+   "stopped-no-cause-found": 1
+  },
+  "invisibleWalls": 0
+ },
+ "discardedWalks": [
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "ended",
+   "aliveAtWalk": true,
+   "start": [
+    13,
+    22.5
+   ],
+   "yaw": 3.142,
+   "outcome": "stopped",
+   "classification": "stopped-no-cause-found",
+   "walkedM": 3.83,
+   "end": [
+    12.87,
+    2.89,
+    26.33
+   ],
+   "blocker": null,
+   "groundStepAheadM": 0.185,
+   "movementBlockedAt": [
+    false,
+    false,
+    false
+   ]
+  }
+ ],
+ "invisibleWallSuspects": [],
+ "unusableStarts": [],
+ "rows": [
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    46,
+    0
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 21.26,
+   "end": [
+    46.02,
+    2.71,
+    -21.26
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    46,
+    0
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 18.8,
+   "end": [
+    27.23,
+    6.8,
+    -0.97
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    46,
+    0
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.99,
+   "end": [
+    46.05,
+    2.64,
+    20.99
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    46,
+    0
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 17.54,
+   "end": [
+    63.54,
+    -0.87,
+    0
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    39.8,
+    23
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 21.39,
+   "end": [
+    39.95,
+    1.72,
+    1.61
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    39.8,
+    23
+   ],
+   "yaw": 1.571,
+   "outcome": "stopped",
+   "classification": "stopped-at-surface",
+   "walkedM": 10.55,
+   "end": [
+    29.28,
+    7.12,
+    23.69
+   ],
+   "blocker": {
+    "name": "farcrysis-canopy-trunk-se-0",
+    "material": "concrete",
+    "distanceM": 0.41
+   },
+   "groundStepAheadM": -0.089,
+   "movementBlockedAt": [
+    false,
+    false,
+    false
+   ]
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    39.8,
+    23
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.76,
+   "end": [
+    39.8,
+    1.68,
+    43.76
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    39.8,
+    23
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.31,
+   "end": [
+    60.11,
+    -0.16,
+    23
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    23,
+    39.8
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 14.01,
+   "end": [
+    23.04,
+    5.59,
+    25.79
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    23,
+    39.8
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 21.17,
+   "end": [
+    1.83,
+    2.34,
+    39.9
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    23,
+    39.8
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.18,
+   "end": [
+    23.03,
+    -0.1,
+    59.98
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    23,
+    39.8
+   ],
+   "yaw": 4.712,
+   "outcome": "stopped",
+   "classification": "stopped-at-surface",
+   "walkedM": 4.12,
+   "end": [
+    27.12,
+    1.96,
+    39.8
+   ],
+   "blocker": {
+    "name": "farcrysis-crate-22",
+    "material": "wood",
+    "distanceM": 0.41
+   },
+   "groundStepAheadM": -0.121,
+   "movementBlockedAt": [
+    true,
+    true,
+    true
+   ]
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    0,
+    46
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.43,
+   "end": [
+    0.3,
+    3.88,
+    25.57
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    0,
+    46
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.8,
+   "end": [
+    -20.8,
+    2.02,
+    45.99
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    0,
+    46
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 17.54,
+   "end": [
+    0,
+    -0.76,
+    63.54
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    0,
+    46
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 21,
+   "end": [
+    21,
+    2.69,
+    46.03
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -23,
+    39.8
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 10.53,
+   "end": [
+    -23.48,
+    7.48,
+    29.28
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -23,
+    39.8
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 16.3,
+   "end": [
+    -39.29,
+    3.48,
+    40.27
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -23,
+    39.8
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.42,
+   "end": [
+    -22.92,
+    -0.14,
+    60.21
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -23,
+    39.8
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.99,
+   "end": [
+    -3.01,
+    1.71,
+    39.8
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -39.8,
+    23
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.85,
+   "end": [
+    -40.36,
+    3.34,
+    2.16
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -39.8,
+    23
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.61,
+   "end": [
+    -60.41,
+    -0.2,
+    23.01
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -39.8,
+    23
+   ],
+   "yaw": 3.142,
+   "outcome": "stopped",
+   "classification": "stopped-at-surface",
+   "walkedM": 0.29,
+   "end": [
+    -39.8,
+    1.65,
+    23.29
+   ],
+   "blocker": {
+    "name": "farcrysis-barrel-03",
+    "material": "thin-metal",
+    "distanceM": 0.41
+   },
+   "groundStepAheadM": 0,
+   "movementBlockedAt": [
+    true,
+    true,
+    false
+   ]
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -39.8,
+    23
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 14.02,
+   "end": [
+    -25.79,
+    7.91,
+    23.54
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -46,
+    0
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 22.19,
+   "end": [
+    -46.01,
+    1.79,
+    -22.19
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -46,
+    0
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 17.54,
+   "end": [
+    -63.54,
+    -0.72,
+    0
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -46,
+    0
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 21.17,
+   "end": [
+    -46,
+    1.79,
+    21.17
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -46,
+    0
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.36,
+   "end": [
+    -25.64,
+    3.75,
+    -0.3
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -39.8,
+    -23
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 22.85,
+   "end": [
+    -40.11,
+    2.56,
+    -45.84
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -39.8,
+    -23
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 21.48,
+   "end": [
+    -61.28,
+    -0.51,
+    -23
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -39.8,
+    -23
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.58,
+   "end": [
+    -39.94,
+    2.77,
+    -2.42
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -39.8,
+    -23
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.02,
+   "end": [
+    -19.81,
+    6.64,
+    -21.98
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -23,
+    -39.8
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.76,
+   "end": [
+    -23,
+    -0.08,
+    -60.56
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -23,
+    -39.8
+   ],
+   "yaw": 1.571,
+   "outcome": "stopped",
+   "classification": "stopped-at-surface",
+   "walkedM": 4.13,
+   "end": [
+    -27.12,
+    2.37,
+    -40.01
+   ],
+   "blocker": {
+    "name": "farcrysis-crate-21",
+    "material": "wood",
+    "distanceM": 0.41
+   },
+   "groundStepAheadM": 0.03,
+   "movementBlockedAt": [
+    true,
+    true,
+    true
+   ]
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -23,
+    -39.8
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.78,
+   "end": [
+    -22.04,
+    5.83,
+    -20.04
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -23,
+    -39.8
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 21.9,
+   "end": [
+    -1.1,
+    2.16,
+    -40.06
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    0,
+    -46
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 17.54,
+   "end": [
+    0,
+    -0.83,
+    -63.54
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    0,
+    -46
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.7,
+   "end": [
+    -20.7,
+    1.74,
+    -46
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    0,
+    -46
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 15.58,
+   "end": [
+    -0.84,
+    8.4,
+    -30.44
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    0,
+    -46
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.91,
+   "end": [
+    20.91,
+    2.19,
+    -46.06
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    23,
+    -39.8
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.4,
+   "end": [
+    23,
+    -0.18,
+    -60.2
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    23,
+    -39.8
+   ],
+   "yaw": 1.571,
+   "outcome": "stopped",
+   "classification": "stopped-at-surface",
+   "walkedM": 9.06,
+   "end": [
+    13.94,
+    2.33,
+    -39.8
+   ],
+   "blocker": {
+    "name": "farcrysis-cover-jungle-10",
+    "material": "wood",
+    "distanceM": 0.44
+   },
+   "groundStepAheadM": 0.032,
+   "movementBlockedAt": [
+    true,
+    true,
+    true
+   ]
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    23,
+    -39.8
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.43,
+   "end": [
+    22.57,
+    3.5,
+    -19.38
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    23,
+    -39.8
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 16.29,
+   "end": [
+    39.29,
+    1.72,
+    -39.8
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    39.8,
+    -23
+   ],
+   "yaw": 0,
+   "outcome": "stopped",
+   "classification": "stopped-at-surface",
+   "walkedM": 0.29,
+   "end": [
+    39.8,
+    4.18,
+    -23.29
+   ],
+   "blocker": {
+    "name": "farcrysis-barrel-04",
+    "material": "thin-metal",
+    "distanceM": 0.41
+   },
+   "groundStepAheadM": -0.091,
+   "movementBlockedAt": [
+    false,
+    false,
+    false
+   ]
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    39.8,
+    -23
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 14.01,
+   "end": [
+    25.79,
+    3.63,
+    -23.05
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    39.8,
+    -23
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.77,
+   "end": [
+    39.82,
+    1.72,
+    -3.23
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "beach",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    39.8,
+    -23
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.19,
+   "end": [
+    59.99,
+    -0.02,
+    -23
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    26,
+    0
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 22.31,
+   "end": [
+    26.01,
+    3.82,
+    -22.31
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    26,
+    0
+   ],
+   "yaw": 1.571,
+   "outcome": "stopped",
+   "classification": "stopped-at-surface",
+   "walkedM": 5.08,
+   "end": [
+    20.92,
+    6.16,
+    0
+   ],
+   "blocker": {
+    "name": "farcrysis-enhanced-palm-trunk-collider-37",
+    "material": "wood",
+    "distanceM": 0.41
+   },
+   "groundStepAheadM": -0.37,
+   "movementBlockedAt": [
+    false,
+    false,
+    false
+   ]
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    26,
+    0
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 21.38,
+   "end": [
+    25.85,
+    7.11,
+    21.38
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    26,
+    0
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 22.33,
+   "end": [
+    48.33,
+    1.81,
+    0
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    22.5,
+    13
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.47,
+   "end": [
+    22.28,
+    6.19,
+    -7.47
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    22.5,
+    13
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.48,
+   "end": [
+    2.02,
+    2.31,
+    13
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    22.5,
+    13
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 21.46,
+   "end": [
+    22.29,
+    3.79,
+    34.46
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    22.5,
+    13
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.38,
+   "end": [
+    42.88,
+    2.57,
+    12.77
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    13,
+    22.5
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.61,
+   "end": [
+    12.72,
+    3.48,
+    2.9
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    13,
+    22.5
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 18.57,
+   "end": [
+    -5.57,
+    6.08,
+    22.5
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    13,
+    22.5
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 17.46,
+   "end": [
+    30.46,
+    7.57,
+    22.11
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    0,
+    26
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.54,
+   "end": [
+    -0.02,
+    1.73,
+    6.46
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    0,
+    26
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 17.53,
+   "end": [
+    -17.51,
+    9.48,
+    26.77
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    0,
+    26
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.08,
+   "end": [
+    -0.07,
+    2.59,
+    46.08
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    0,
+    26
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.3,
+   "end": [
+    19.3,
+    4.47,
+    26.17
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -13,
+    22.5
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.75,
+   "end": [
+    -13,
+    1.72,
+    2.75
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -13,
+    22.5
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.72,
+   "end": [
+    -32.72,
+    5.71,
+    22.17
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -13,
+    22.5
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.02,
+   "end": [
+    -12.76,
+    1.69,
+    42.52
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -13,
+    22.5
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.04,
+   "end": [
+    7.04,
+    2.5,
+    22.5
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -22.5,
+    13
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 21.18,
+   "end": [
+    -22.31,
+    3.77,
+    -8.18
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -22.5,
+    13
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.56,
+   "end": [
+    -42.06,
+    1.87,
+    12.67
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -22.5,
+    13
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.33,
+   "end": [
+    -22.14,
+    7.08,
+    32.32
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -22.5,
+    13
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.86,
+   "end": [
+    -2.64,
+    2.58,
+    13
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -26,
+    0
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.07,
+   "end": [
+    -26.34,
+    5.22,
+    -20.07
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -26,
+    0
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.6,
+   "end": [
+    -45.6,
+    2.22,
+    -0.17
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -26,
+    0
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 17.98,
+   "end": [
+    -26.17,
+    8.58,
+    17.98
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -26,
+    0
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.8,
+   "end": [
+    -6.2,
+    1.73,
+    0
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -22.5,
+    -13
+   ],
+   "yaw": 0,
+   "outcome": "stopped",
+   "classification": "stopped-at-surface",
+   "walkedM": 10.48,
+   "end": [
+    -22.64,
+    6.19,
+    -23.48
+   ],
+   "blocker": {
+    "name": "farcrysis-canopy-trunk-nw-1",
+    "material": "concrete",
+    "distanceM": 0.41
+   },
+   "groundStepAheadM": 0.273,
+   "movementBlockedAt": [
+    false,
+    false,
+    false
+   ]
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -22.5,
+    -13
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 18.62,
+   "end": [
+    -41.11,
+    1.7,
+    -13.65
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -22.5,
+    -13
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.9,
+   "end": [
+    -21.92,
+    4.36,
+    6.9
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -22.5,
+    -13
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.89,
+   "end": [
+    -2.61,
+    2.25,
+    -12.88
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -13,
+    -22.5
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.74,
+   "end": [
+    -13.02,
+    1.71,
+    -42.24
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -13,
+    -22.5
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.64,
+   "end": [
+    -33.64,
+    4.4,
+    -22.5
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -13,
+    -22.5
+   ],
+   "yaw": 3.142,
+   "outcome": "stopped",
+   "classification": "stopped-at-surface",
+   "walkedM": 2.35,
+   "end": [
+    -13,
+    7.6,
+    -20.15
+   ],
+   "blocker": {
+    "name": "farcrysis-enhanced-palm-trunk-collider-42",
+    "material": "wood",
+    "distanceM": 0.41
+   },
+   "groundStepAheadM": -0.757,
+   "movementBlockedAt": [
+    false,
+    false,
+    false
+   ]
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    -13,
+    -22.5
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.01,
+   "end": [
+    7.01,
+    4.5,
+    -22.42
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    0,
+    -26
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.48,
+   "end": [
+    0,
+    1.74,
+    -45.48
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    0,
+    -26
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.15,
+   "end": [
+    -19.15,
+    7.37,
+    -26.09
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    0,
+    -26
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.12,
+   "end": [
+    0,
+    1.77,
+    -6.88
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    0,
+    -26
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 20.06,
+   "end": [
+    20.06,
+    3.4,
+    -26
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    13,
+    -22.5
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 19.49,
+   "end": [
+    13.19,
+    2.28,
+    -41.99
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    13,
+    -22.5
+   ],
+   "yaw": 1.571,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 18.58,
+   "end": [
+    -5.48,
+    7.24,
+    -20.6
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    13,
+    -22.5
+   ],
+   "yaw": 3.142,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 15.88,
+   "end": [
+    13,
+    1.71,
+    -6.62
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    13,
+    -22.5
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 16.45,
+   "end": [
+    29.45,
+    4.57,
+    -22.32
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    22.5,
+    -13
+   ],
+   "yaw": 0,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 18.02,
+   "end": [
+    22.51,
+    3.33,
+    -31.02
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    22.5,
+    -13
+   ],
+   "yaw": 1.571,
+   "outcome": "stopped",
+   "classification": "stopped-at-surface",
+   "walkedM": 0.01,
+   "end": [
+    22.5,
+    4.85,
+    -13
+   ],
+   "blocker": {
+    "name": "farcrysis-enhanced-palm-trunk-collider-49",
+    "material": "wood",
+    "distanceM": 0.1
+   },
+   "groundStepAheadM": -0.552,
+   "movementBlockedAt": [
+    false,
+    false,
+    false
+   ]
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    22.5,
+    -13
+   ],
+   "yaw": 3.142,
+   "outcome": "stopped",
+   "classification": "stopped-no-cause-found",
+   "walkedM": 0,
+   "end": [
+    22.5,
+    4.84,
+    -13
+   ],
+   "blocker": null,
+   "groundStepAheadM": 0.254,
+   "movementBlockedAt": [
+    false,
+    false,
+    false
+   ]
+  },
+  {
+   "ring": "jungle",
+   "matchPhaseAtWalk": "active",
+   "aliveAtWalk": true,
+   "start": [
+    22.5,
+    -13
+   ],
+   "yaw": 4.712,
+   "outcome": "walked",
+   "classification": "walked",
+   "walkedM": 18.36,
+   "end": [
+    40.86,
+    2.09,
+    -13.3
+   ],
+   "blocker": null,
+   "groundStepAheadM": null,
+   "movementBlockedAt": null
+  }
+ ],
+ "notes": [
+  "match ended (phase ended) before start 13,22.5 yaw 4.71 - rematched"
+ ]
+}

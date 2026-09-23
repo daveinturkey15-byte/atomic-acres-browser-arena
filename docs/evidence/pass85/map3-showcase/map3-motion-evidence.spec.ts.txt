@@ -1,0 +1,358 @@
+/**
+ * MAP3 (HF-409) evidence, REPAIR REVISION 2026-09-02.
+ *
+ * The first revision of this spec produced evidence a skeptic correctly threw
+ * out, and every change here answers one of those findings:
+ *
+ *  1. THE VIEWS FACED THE WRONG WAY. `camera.rotation.set(pitch, yaw, 0, 'YXZ')`
+ *     means forward is (-sin yaw, 0, -cos yaw), and the corridors run OUTWARD
+ *     from the hub, so an edge-0 lane is seen at yaw 0, not yaw PI. Every yaw in
+ *     the old table was exactly PI off, i.e. every "corridor" still was a
+ *     photograph of the hub with the corridor behind the camera. The yaws below
+ *     are derived from `EDGE_ROTATION` in src/map3-arena.ts, and each view now
+ *     stands INSIDE its corridor (lane-local z = -14, or -6 where -14 is inside
+ *     an exhibit) looking further out along it.
+ *  2. THE MOTION FALSIFIER COULD NOT FAIL. It byte-compared full-viewport PNGs
+ *     while the HUD burned a match countdown and an FPS counter into every
+ *     frame, so "the bytes differ" was guaranteed whether or not one uniform
+ *     advanced. Now: (a) the primary falsifier is NUMERIC - the world transform
+ *     of every mesh under every lane is read at t and t+5 s and the moved set is
+ *     reported, which is exactly 0 if `ArenaMap.update` is not driving the
+ *     corridors; (b) the frame pair is captured with every DOM overlay hidden,
+ *     so the pixels compared are the rendered world alone.
+ *  3. THE EVIDENCE PREDATED EXPLORE MODE. Every old frame read TEAM DEATHMATCH /
+ *     FIVE MINUTES. `map3-explore-hud.png` is a full frame WITH the HUD, taken
+ *     on the shipped tree, so what the HUD says about a 0-bot arena is on the
+ *     record either way.
+ *  4. AN UNTRIAGED VIEWMODEL DEFECT SAT IN THE EVIDENCE. The old hub still put
+ *     the player at (0, 1.7, 0), which is inside the 7.2 m plinth, and showed
+ *     the viewmodel exploded across half the frame. Both poses are captured now
+ *     - on the plinth and four metres off it - so the trigger is on the record.
+ *
+ * This is evidence, not a gate: it is run by hand for a lane report and is in
+ * no npm script.
+ */
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { expect, test } from '@playwright/test';
+
+type DebugApi = {
+  selectArena: (id: string) => Promise<void>;
+  startSolo: () => void;
+  teleportPlayer: (x: number, y: number, z: number, yaw?: number, pitch?: number) => void;
+  snapshot: () => { matchPhase: string; gameStarted: boolean };
+  sampleSceneGraph: () => unknown;
+};
+
+const OUT = resolve('artifacts/pass85-laneV/motion2');
+
+/** MAP3_LANE_START in src/map3-arena.ts. Lane-local z = 0 is the corridor mouth. */
+const LANE_START = 34;
+
+/** id -> edge/lateral, copied from MAP3_LANES. */
+// `depth` is the lane-local z the camera stands at. -14 is well inside the
+// corridor for six of them; the raymarch gallery's first SDF block is centred
+// at -0.28 * LEN (~ -14) and its proxy box is 5.4 m across, so standing there
+// puts the camera INSIDE the exhibit, and the colosseum's overlook terrace is
+// stepped up from its apron. Both are framed from nearer the mouth instead.
+const LANES: Array<{ id: string; edge: 0 | 1 | 2 | 3; lateral: number; depth: number }> = [
+  { id: 'shoreline', edge: 0, lateral: -26, depth: -14 },
+  { id: 'colosseum', edge: 0, lateral: 26, depth: -6 },
+  { id: 'raymarch', edge: 1, lateral: -13, depth: -6 },
+  { id: 'grammar', edge: 1, lateral: 13, depth: -14 },
+  { id: 'vegetation', edge: 2, lateral: 0, depth: -14 },
+  { id: 'godrays', edge: 3, lateral: -13, depth: -14 },
+  { id: 'seasons', edge: 3, lateral: 14, depth: -14 },
+];
+
+/** laneToWorld() from src/map3-arena.ts, repeated so the spec is self-contained. */
+function laneToWorld(lane: { edge: number; lateral: number }, x: number, z: number) {
+  const px = x + lane.lateral;
+  const pz = z - LANE_START;
+  switch (lane.edge) {
+    case 0: return { x: px, z: pz };
+    case 1: return { x: -pz, z: px };
+    case 2: return { x: -px, z: -pz };
+    default: return { x: pz, z: -px };
+  }
+}
+
+/**
+ * The yaw that looks ALONG a lane, away from the hub.
+ *
+ * forward = (-sin yaw, 0, -cos yaw); edge 0 runs to -z, 1 to +x, 2 to +z, 3 to -x.
+ */
+const EDGE_VIEW_YAW = [0, -Math.PI / 2, Math.PI, Math.PI / 2];
+
+type Probe = { ordinal: number; name: string; path: string; position: [number, number, number]; quaternion: [number, number, number, number] };
+
+test('map3 in game: the showcase is present, framed, and moving', async ({ page }) => {
+  test.setTimeout(900_000);
+  mkdirSync(OUT, { recursive: true });
+  const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(String(error).slice(0, 300)));
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text().slice(0, 300));
+  });
+
+  await page.goto('/?release=latest&renderer=webgpu&map=map3', { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(
+    () => Boolean((window as unknown as { __ATOMIC_ACRES_DEBUG__?: DebugApi }).__ATOMIC_ACRES_DEBUG__),
+    undefined,
+    { timeout: 120_000 },
+  );
+  await page.evaluate(async () => {
+    await (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.selectArena('map3');
+  });
+  await page.evaluate(() => {
+    (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.startSolo();
+  });
+  await page.waitForFunction(() => {
+    const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: DebugApi }).__ATOMIC_ACRES_DEBUG__?.snapshot();
+    return state?.matchPhase === 'active' && state?.gameStarted === true;
+  }, undefined, { timeout: 240_000 });
+  await page.waitForTimeout(4_000);
+
+  // Overlay control. Every ancestor chain sibling of the render canvas is
+  // hidden, so a "world" capture contains the rendered frame and nothing else.
+  await page.addScriptTag({ content: `
+    window.__map3Overlays = {
+      hide() {
+        const canvases = Array.from(document.querySelectorAll('canvas'));
+        const canvas = canvases.sort((a, b) => (b.width * b.height) - (a.width * a.height))[0];
+        const changed = [];
+        let node = canvas;
+        while (node && node !== document.body && node.parentElement) {
+          for (const sibling of Array.from(node.parentElement.children)) {
+            if (sibling === node) continue;
+            changed.push([sibling, sibling.style.visibility]);
+            sibling.style.visibility = 'hidden';
+          }
+          node = node.parentElement;
+        }
+        window.__map3Overlays.changed = changed;
+        return changed.length;
+      },
+      show() {
+        for (const [element, previous] of (window.__map3Overlays.changed || [])) element.style.visibility = previous;
+        window.__map3Overlays.changed = [];
+      },
+      changed: [],
+    };
+  ` });
+
+  // STRUCTURE: what is actually in the arena root, by lane.
+  const structure = await page.evaluate(() => {
+    const api = window as unknown as { __ATOMIC_ACRES_DEBUG__: { sampleSceneGraph: () => unknown } };
+    const scene = api.__ATOMIC_ACRES_DEBUG__.sampleSceneGraph() as {
+      traverse: (visit: (node: Record<string, unknown>) => void) => void;
+    };
+    const lanes: Record<string, { meshes: number; triangles: number; names: string[] }> = {};
+    let arenaRootChildren: string[] = [];
+    scene.traverse((node) => {
+      const name = String((node as { name?: string }).name ?? '');
+      if (name === 'Map3 arena') {
+        arenaRootChildren = ((node as { children?: Array<{ name?: string }> }).children ?? [])
+          .map((child) => String(child.name ?? '(unnamed)'));
+      }
+      if (!name.startsWith('map3-lane-')) return;
+      const entry = { meshes: 0, triangles: 0, names: [] as string[] };
+      (node as unknown as { traverse: (visit: (n: Record<string, unknown>) => void) => void })
+        .traverse((child) => {
+          const geometry = (child as { geometry?: { index?: { count: number }; attributes?: { position?: { count: number } } } }).geometry;
+          if (!geometry) return;
+          entry.meshes += 1;
+          entry.triangles += Math.round(((geometry.index?.count ?? geometry.attributes?.position?.count ?? 0) / 3));
+          const childName = String((child as { name?: string }).name ?? '(unnamed)');
+          if (!entry.names.includes(childName)) entry.names.push(childName);
+        });
+      lanes[name] = entry;
+    });
+    return { arenaRootChildren, lanes };
+  });
+  writeFileSync(resolve(OUT, 'map3-scene-structure.json'), `${JSON.stringify(structure, null, 2)}\n`);
+
+  // ANIMATION, the falsifier that CAN fail: every mesh under every lane, its
+  // WORLD transform, read twice five seconds apart from one fixed pose. If
+  // ArenaMap.update never reaches the corridors this list is empty.
+  const readProbes = async (): Promise<Probe[]> => page.evaluate(() => {
+    const api = window as unknown as { __ATOMIC_ACRES_DEBUG__: { sampleSceneGraph: () => unknown } };
+    const scene = api.__ATOMIC_ACRES_DEBUG__.sampleSceneGraph() as {
+      traverse: (visit: (node: Record<string, unknown>) => void) => void;
+    };
+    const probes: Probe[] = [];
+    let ordinal = 0;
+    scene.traverse((node) => {
+      const anyNode = node as unknown as {
+        name?: string;
+        geometry?: unknown;
+        matrixWorld?: { elements: number[] };
+        parent?: { name?: string; parent?: unknown };
+      };
+      if (!anyNode.geometry || !anyNode.matrixWorld) return;
+      // Only meshes inside a lane group.
+      let ancestor = anyNode as unknown as { name?: string; parent?: unknown } | undefined;
+      let lane = '';
+      while (ancestor) {
+        const name = String(ancestor.name ?? '');
+        if (name.startsWith('map3-lane-')) { lane = name; break; }
+        ancestor = ancestor.parent as { name?: string; parent?: unknown } | undefined;
+      }
+      if (!lane) return;
+      const e = anyNode.matrixWorld.elements;
+      // IDENTITY IS THE TRAVERSAL ORDINAL, not the name: a lane holds four
+      // meshes called `map3-forest-rover-tyre`, and keying by name silently
+      // compared one wheel at t against a different wheel at t+5.
+      ordinal += 1;
+      // Decompose is not needed: the raw basis + translation IS the transform.
+      probes.push({
+        ordinal,
+        name: String(anyNode.name ?? '(unnamed)'),
+        path: lane,
+        position: [e[12]!, e[13]!, e[14]!],
+        quaternion: [e[0]!, e[5]!, e[10]!, e[1]!],
+      });
+    });
+    return probes;
+  }) as Promise<Probe[]>;
+
+  // Stand in the rain corridor: seasons is edge 3, lateral 14.
+  const rainStand = laneToWorld({ edge: 3, lateral: 14 }, 0, -14);
+  await page.evaluate((v) => {
+    (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi })
+      .__ATOMIC_ACRES_DEBUG__.teleportPlayer(v.x, 1.7, v.z, Math.PI / 2, -0.05);
+  }, rainStand);
+  await page.waitForTimeout(3_000);
+
+  const probesT0 = await readProbes();
+  await page.evaluate(() => (window as unknown as { __map3Overlays: { hide: () => number } }).__map3Overlays.hide());
+  await page.waitForTimeout(300);
+  const worldT0 = await page.screenshot();
+  writeFileSync(resolve(OUT, 'map3-motion-t0.png'), worldT0);
+  await page.waitForTimeout(5_000);
+  const worldT5 = await page.screenshot();
+  writeFileSync(resolve(OUT, 'map3-motion-t5.png'), worldT5);
+  const probesT5 = await readProbes();
+  await page.evaluate(() => (window as unknown as { __map3Overlays: { show: () => void } }).__map3Overlays.show());
+
+  const byKey = new Map(probesT0.map((probe) => [probe.ordinal, probe]));
+  const moved: Array<{ key: string; metres: number; rotationDelta: number }> = [];
+  let compared = 0;
+  for (const later of probesT5) {
+    const key = `${later.path}/${later.name}#${later.ordinal}`;
+    const earlier = byKey.get(later.ordinal);
+    if (!earlier) continue;
+    compared += 1;
+    const dx = later.position[0] - earlier.position[0];
+    const dy = later.position[1] - earlier.position[1];
+    const dz = later.position[2] - earlier.position[2];
+    const metres = Math.sqrt((dx * dx) + (dy * dy) + (dz * dz));
+    const rotationDelta = Math.max(
+      ...later.quaternion.map((value, index) => {
+        const delta = Math.abs(value - earlier.quaternion[index]!);
+        return Number.isFinite(delta) ? delta : 0;
+      }),
+    );
+    if (metres > 1e-4 || rotationDelta > 1e-4) moved.push({ key, metres: Number(metres.toFixed(4)), rotationDelta: Number(rotationDelta.toFixed(5)) });
+  }
+  moved.sort((a, b) => b.metres - a.metres);
+  const movedLanes = [...new Set(moved.map((entry) => entry.key.split('/')[0]))].sort();
+  const stillLanes = Object.keys(structure.lanes).filter((lane) => !movedLanes.includes(lane)).sort();
+
+  writeFileSync(resolve(OUT, 'map3-animation-probe.json'), `${JSON.stringify({
+    method: 'world matrixWorld translation + basis of every mesh under every map3-lane-* group, read at t and t+5 s from one fixed pose, HUD irrelevant',
+    meshesCompared: compared,
+    movedCount: moved.length,
+    movedLanes,
+    stillLanes,
+    moved,
+    frameBytes: { t0: worldT0.length, t5: worldT5.length, identical: Buffer.compare(worldT0, worldT5) === 0 },
+    pageErrors,
+    consoleErrors,
+  }, null, 2)}\n`);
+
+  // VIEWS: stand INSIDE each corridor, looking further out along it.
+  for (const lane of LANES) {
+    const spot = laneToWorld(lane, 0, lane.depth);
+    await page.evaluate((v) => {
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi })
+        .__ATOMIC_ACRES_DEBUG__.teleportPlayer(v.x, 1.7, v.z, v.yaw, -0.05);
+    }, { x: spot.x, z: spot.z, yaw: EDGE_VIEW_YAW[lane.edge]! });
+    await page.waitForTimeout(1_800);
+    await page.evaluate(() => (window as unknown as { __map3Overlays: { hide: () => number } }).__map3Overlays.hide());
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: resolve(OUT, `map3-view-${lane.id}.png`) });
+    await page.evaluate(() => (window as unknown as { __map3Overlays: { show: () => void } }).__map3Overlays.show());
+  }
+
+  // HUB, both poses, WITH the viewmodel, to put the exploded-viewmodel trigger
+  // on the record: on the plinth (the old capture's pose) and four metres off it.
+  for (const hub of [
+    { id: 'hub-on-plinth', x: 0, z: 0, yaw: 0 },
+    { id: 'hub-off-plinth', x: 0, z: 10, yaw: 0 },
+  ]) {
+    await page.evaluate((v) => {
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi })
+        .__ATOMIC_ACRES_DEBUG__.teleportPlayer(v.x, 1.7, v.z, v.yaw, -0.05);
+    }, hub);
+    await page.waitForTimeout(1_800);
+    await page.screenshot({ path: resolve(OUT, `map3-${hub.id}.png`) });
+  }
+
+  // EXPLORE HUD: a full frame WITH the HUD on the shipped configuration.
+  await page.evaluate(() => {
+    (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi })
+      .__ATOMIC_ACRES_DEBUG__.teleportPlayer(0, 1.7, 14, 0, -0.05);
+  });
+  await page.waitForTimeout(1_500);
+  await page.screenshot({ path: resolve(OUT, 'map3-explore-hud.png') });
+  const hudText = await page.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').slice(0, 1200));
+  writeFileSync(resolve(OUT, 'map3-explore-hud.txt'), `${hudText}\n`);
+
+  writeFileSync(resolve(OUT, 'map3-errors.json'), `${JSON.stringify({ pageErrors, consoleErrors }, null, 2)}\n`);
+
+  expect(moved.length, 'no mesh under any map3 lane moved in five seconds: the corridors are frozen').toBeGreaterThan(0);
+  expect(movedLanes.length, 'motion is confined to one lane').toBeGreaterThan(1);
+  expect(pageErrors).toEqual([]);
+});
+
+test('map3 showcase page still ships from the single build graph', async ({ page }) => {
+  test.setTimeout(300_000);
+  mkdirSync(OUT, { recursive: true });
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(String(error).slice(0, 300)));
+  const consoleErrors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text().slice(0, 300));
+  });
+  const started = Date.now();
+  const response = await page.goto(process.env.MAP3_PAGE_PATH ?? '/map3.html', { waitUntil: 'domcontentloaded' });
+  expect(response?.status(), '/map3.html must be served from dist').toBe(200);
+  // The page compiles ~10k lines of TSL and boots its own Rapier world, so wait
+  // for its own boot banner to clear rather than guessing a timeout. A first
+  // 20 s capture found the banner still up, which is a finding either way.
+  let booted = false;
+  try {
+    await page.waitForFunction(
+      () => !/Starting Map 3/u.test(document.body.innerText),
+      undefined,
+      { timeout: 180_000 },
+    );
+    booted = true;
+  } catch {
+    booted = false;
+  }
+  const bootMs = Date.now() - started;
+  await page.waitForTimeout(3_000);
+  await page.screenshot({ path: resolve(OUT, 'map3-showcase-page.png') });
+  const bodyText = await page.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').slice(0, 400));
+  writeFileSync(resolve(OUT, 'map3-showcase-page.json'), `${JSON.stringify({
+    status: response?.status() ?? null,
+    booted,
+    bootMs,
+    bodyText,
+    pageErrors,
+    consoleErrors,
+  }, null, 2)}\n`);
+});

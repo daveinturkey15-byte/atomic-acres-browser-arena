@@ -1,0 +1,192 @@
+{
+  "contract": "hf399-fps-phase-probe-v1",
+  "measuredAt": "2026-09-04T16:19:43.004Z",
+  "label": "A1-hitl4",
+  "arena": "nuketown2",
+  "base": "http://127.0.0.1:4300/",
+  "requestedProfile": "none",
+  "viewport": {
+    "width": 2560,
+    "height": 1440
+  },
+  "secondsPerPhase": 10,
+  "phases": [
+    {
+      "phase": "menu",
+      "frames": 11725,
+      "elapsedMs": 10011,
+      "fps": 1171.2,
+      "frameMs": {
+        "p50": 0.7,
+        "p95": 1.5,
+        "p99": 2.5,
+        "max": 16,
+        "mean": 0.85
+      },
+      "perFrame": {
+        "draws": 0,
+        "triangles": 0,
+        "instances": 0,
+        "renderPasses": 0,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 0
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 0,
+        "shaderModulesTotal": 0
+      },
+      "longTasks": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0
+      },
+      "heap": {
+        "startBytes": 129122827,
+        "endBytes": 110309146,
+        "deltaMbPerMinute": -107.54
+      },
+      "activeClipPlanes": 7,
+      "pose": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0,
+        "alive": true,
+        "phase": "warmup"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-perf\\docs\\evidence\\pass94\\perf-hitl5\\probe\\A1-hitl4-nuketown2-menu.png"
+    },
+    {
+      "phase": "deployed-idle",
+      "frames": 592,
+      "elapsedMs": 10026,
+      "fps": 59,
+      "frameMs": {
+        "p50": 16.7,
+        "p95": 32.2,
+        "p99": 33.7,
+        "max": 34.9,
+        "mean": 16.9
+      },
+      "perFrame": {
+        "draws": 167.3,
+        "triangles": 325545,
+        "instances": 10835.3,
+        "renderPasses": 24,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 24
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 418,
+        "shaderModulesTotal": 450
+      },
+      "longTasks": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0
+      },
+      "heap": {
+        "startBytes": 428871333,
+        "endBytes": 462932867,
+        "deltaMbPerMinute": 194.39
+      },
+      "activeClipPlanes": 7,
+      "pose": {
+        "position": [
+          14,
+          1.6983986282348633,
+          34
+        ],
+        "yaw": 0.3906070436976868,
+        "alive": true,
+        "phase": "active"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-perf\\docs\\evidence\\pass94\\perf-hitl5\\probe\\A1-hitl4-nuketown2-deployed-idle.png"
+    },
+    {
+      "phase": "move",
+      "frames": 540,
+      "elapsedMs": 10019,
+      "fps": 53.9,
+      "frameMs": {
+        "p50": 18.3,
+        "p95": 32.4,
+        "p99": 34.6,
+        "max": 84.1,
+        "mean": 18.51
+      },
+      "perFrame": {
+        "draws": 157.7,
+        "triangles": 325470.6,
+        "instances": 10699.2,
+        "renderPasses": 24,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 24
+      },
+      "created": {
+        "renderPipelines": 1,
+        "computePipelines": 0,
+        "shaderModules": 1,
+        "renderPipelinesTotal": 419,
+        "shaderModulesTotal": 451
+      },
+      "longTasks": {
+        "count": 2,
+        "totalMs": 145,
+        "maxMs": 86
+      },
+      "heap": {
+        "startBytes": 441081964,
+        "endBytes": 238008286,
+        "deltaMbPerMinute": -1159.8
+      },
+      "activeClipPlanes": 7,
+      "pose": {
+        "position": [
+          -6.0453081130981445,
+          1.8051911973953247,
+          13.705184936523438
+        ],
+        "yaw": 0.3906070436976868,
+        "alive": true,
+        "phase": "active"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-perf\\docs\\evidence\\pass94\\perf-hitl5\\probe\\A1-hitl4-nuketown2-move.png"
+    }
+  ],
+  "profileSelection": {
+    "before": "high",
+    "after": "high",
+    "options": [
+      "performance=PERFORMANCE",
+      "balanced=BALANCED",
+      "high=QUALITY",
+      "max=MAX",
+      "custom=CUSTOM",
+      "rtx-native-runtime-info=RTX — WHAT IS IT?"
+    ]
+  },
+  "profileState": {
+    "graphicsPreset": "high",
+    "renderBackend": "webgpu",
+    "effective": "EFFECTIVE: HIGH",
+    "advanced": null,
+    "devicePixelRatio": 1,
+    "hardwareConcurrency": 16,
+    "deviceMemory": 32
+  }
+}

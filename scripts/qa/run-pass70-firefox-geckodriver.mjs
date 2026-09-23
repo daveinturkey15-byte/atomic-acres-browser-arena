@@ -920,8 +920,13 @@ async function runSoloCycle(driver, label) {
       weapon: state.player?.weapon,
     } : null;
   `), (state) => state?.gameStarted && state.matchPhase === 'active' && state.botCount === 1, 90_000);
+  // HF-331: failClosed === true means "requested WebGPU but fell back", so a
+  // healthy fail-closed WebGPU run reports failClosed === false
+  // (render-runtime.ts telemetry). The prior `!== true` polarity (42d0f48b)
+  // could never pass alongside backend === 'webgpu'; corrected per the
+  // de476b56 fix already applied to verify-installed-firefox.mjs.
   if (active.weapon !== 'carbine' || active.requestedBackend !== 'webgpu' || active.backend !== 'webgpu'
-    || active.failClosed !== true || active.deviceLost !== false || active.uncapturedErrors !== 0
+    || active.failClosed !== false || active.deviceLost !== false || active.uncapturedErrors !== 0
     || active.qualityAssetState !== 'ready' || active.post?.depthAwareBloom !== true
     || active.post?.advancedGraphics?.bloomStrength <= 0) {
     throw new Error(`${label} Firefox one-bot backend/weapon mismatch: ${JSON.stringify(active)}`);

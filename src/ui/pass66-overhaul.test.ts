@@ -40,15 +40,22 @@ describe('Pass 66 tactical UI overhaul', () => {
     expect(css).not.toContain('.kit-card .weapon-menu-presentation { display: block; }');
     expect(css).toContain('.custom-kit-grid .kit-card:not(.manage-kit-card)');
     expect(css).toContain('.custom-kit-grid { grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 14px; }');
-    expect(css).toContain('background: linear-gradient(150deg, #16302f, #0d1e20)');
+    // Pass 79 reskin: the ground gradient moved from the rejected cold
+    // blue-black (#16302f/#0d1e20) onto the warm instrument sheet. Same
+    // structural presence check, warmer value.
+    expect(css).toContain('background: linear-gradient(150deg, #26201a, #14100c)');
     expect(css).toContain('.kit-card.selected em { display: inline-flex; align-items: center; }');
     expect(css).toContain('.loadout-save-status[data-kind=\'error\']');
   });
 
-  it('adds a sticky killstreak demo rail and minimal video cockpit symbology', () => {
+  it('keeps quick-choice streaks and cockpit symbology after the reward-preview removal', () => {
     const streaks = killstreakLoadoutPanelMarkup();
-    expect(streaks).toContain('id="killstreak-demo-rail"');
-    expect(streaks).toContain('data-demo-poster');
+    // Owner-requested removal (c74884d9a, 2026-09-12: "Owner requested removal
+    // of chat and reward preview"): the demo rail no longer mounts inside the
+    // loadout panel; quick-choice buttons replaced the hover-preview select.
+    expect(streaks).not.toContain('id="killstreak-demo-rail"');
+    expect(streaks).toContain('class="killstreak-loadout-layout"');
+    expect(streaks).toContain('data-streak-choice=');
     expect(streaks).not.toContain('data-killstreak-preview=');
     const preview = menuPreviewVideoMarkup();
     expect(preview).toContain('class="preview-cockpit-hud"');

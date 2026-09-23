@@ -1,0 +1,83 @@
+# Overnight Day-3 note — newworld-prime (worker lane, NOT a CURRENT update)
+
+Date: 2026-09-22 overnight (lease to 2026-09-23T04:00Z). Lane: `omp-newworld-prime-live-20260914`,
+worktree `C:/Users/david/Desktop/stuff/aa-omp-newworld-prime-live`,
+branch `contrib/dave-gaming-pc/omp/newworld-prime-live-20260914`.
+Base: `402214b68` (PASS 97 density). `docs/handoff/CURRENT.json` untouched (integrator-owned).
+
+## Commits on top of base
+
+- `7977f80e2` gameplay verify-only: zero source edits. Day-2 authority healthy —
+  spawn, 12.17 m walk, door-portal walk-through (shot-leaf blocks bullets, not players),
+  `src/newworld-prime-interiors.test.ts` 15/15, collider-visual parity rows triaged as
+  threshold artifacts (fence split-presentation, by-design hedge dressing, wall-backed chimney).
+  Live WebGPU proof (installed Chrome, nvidia/blackwell): `artifacts/qa/overnight-20260922/gameplay/`.
+- `72966704f` graphics: 4 owned files, +45/-11. Key 3.2→2.8, ambient up, mist/dust down
+  (hues untouched); per-role roughness/metalness finishes; golden-dusk glow 1.6→1.9 on the
+  emissive role only. `tsc` 0, viewpoint regression 23/23 unweakened, before/after captures
+  in Performance+Quality (`graphics-before/`, `graphics-after/` local), FPS within probe
+  variance, no structural cost. No authority/collider edits; no GLB regen; no other arenas.
+
+## How to see it
+
+Dev server (left running): `http://127.0.0.1:4201/` — serves this lane's tree.
+Select the newworld-prime arena; Performance vs Quality in the graphics surface.
+
+## Still OPEN (not claimed)
+
+Visual, long-duration performance, and production acceptance. No publish, no merge, no
+`main`/`gh-pages` push from this lane. Next step needs the integrator: registry readback,
+`pipeline:handoff` capability gate, PR into `main` by the normal contribution path.
+
+## Day-4 (2026-09-23): gate-led completion
+
+Fixed genuine newworld-prime gate findings; visuals re-verified stable.
+
+- Spawns 3→6/team with cover/sight/floor/route (`authority.ts`): spawn gate
+  newworld-prime fully green (179/181 suite-wide; only world-studio residuals).
+- Fence authority per-bay (17 boxes matching panels, 0.12 m deep) + east
+  chimney solid + 10 hedge walk-through ledger rows: parity gate
+  newworld-prime fully green (only world-studio ghost/ledger residuals).
+- world-studio factory added to the proxy sweep (was a hard TypeError);
+- Soaks: 660/660 active samples x2 profiles, zero freezes/leaks, 0 page
+  errors. Performance run logged GLTF blob-texture decode errors (quality
+  run: zero); all GLB textures are embedded PNG, and the mid-soak frame
+  shows no white/magenta untextured surfaces — transient headless-decode
+  noise, residual, not a blocker.
+- Viewpoint round: newworld-prime 5/5 shots; pixel diff vs Day-3 baseline is
+  gloss-only on vehicle bands (yard 3.95/4.28%, rest ≤1.79/1.41%).
+  Automated verdict blocked by pre-existing nuketown2 flat frames (other arena).
+- Menu/lifecycle gates blocked environmentally (bundled Chromium has no
+  WebGPU; menu 30 s timeout vs 55 s deploy).
+- ESCALATED (owner call, both green impossible): frame-pacing policy forbids
+  the raw whole-scene compile literal in startGame while the MAX-admission
+  test requires the same literal in the same branch. Untouched by this lane.
+- Manifest `acceptance/pass-97.json`: R2 back to pending (byte-untouched
+  premise broken by Day-3/4 deltas, contracts re-verified), R3/R4/R5 pending
+  with Day-4 evidence; standby expectations superseded by the Day-2
+  selectable promotion (integrator/owner rewrite, not a worker edit).
+
+## Resume 2026-09-23 PM (same lane, session continuity)
+
+Session closed ~10:03Z after the Day-4 push; resumed 16:58 BST same day.
+
+- CI `static-and-unit` (run 35840697552) failed on both runners at
+  `npm run lint` → `qa:text-integrity`: `src/world-studio/pbr-library.ts`
+  contained double-encoded UTF-8: mojibake forms of U+2014 em-dash,
+  U+2026 ellipsis, U+2192 arrow and U+00D7 multiplication sign (Latin-1
+  lookalike pairs; spelled as code points here because the integrity
+  gate scans .md text too and flags any literal example). Fixed in
+  `2d9783c7d` (comment-only, restores the real characters); local scan of
+  all 3,897 locally-present tracked text files ok, `tsc --noEmit` 0.
+- Root cause of the false "no lint script" belief: the 1,731 tracked
+  `.qa-dist/**` build artifacts carry skip-worktree in this checkout, so the
+  local integrity run crashes ENOENT before reporting; CI checks them out
+  and scans them. Local lint therefore cannot complete on this worktree as
+  configured. Flagged for integrator: `.qa-dist/**` sits outside this
+  lane's `allowedPaths` (pre-existing commits, not Day-4).
+- Dev server on :4201 restored as a persistent supervised process
+  (previously died with the closed terminal).
+- Run 35886312271 (fix head) hung 25+ min inside `actions/checkout@v4`
+  (infra, not content); cancelled and re-triggered by this docs-only push,
+  which the workflow's `cancel-in-progress` concurrency converts into a
+  clean fresh run.

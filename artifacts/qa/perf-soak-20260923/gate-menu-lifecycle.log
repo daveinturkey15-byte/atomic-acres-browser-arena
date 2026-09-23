@@ -1,0 +1,465 @@
+
+Running 10 tests using 1 worker
+
+(node:32464) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   1 [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:430:7 › Pass 65 active-match menu lifecycle › persists, reloads and deploys the saved Custom 2 without a compensating selection click (20.7s)
+(node:29076) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   2 [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:488:7 › Pass 65 active-match menu lifecycle › keeps pre-match helo/cat preview ownership and reduced-motion accessibility (13.6s)
+(node:31584) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   3 [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:501:7 › Pass 65 active-match menu lifecycle › hides once through rejected/transient-null requests and Resume never bounces (35.8s)
+(node:19792) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   4 [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:582:7 › Pass 65 active-match menu lifecycle › distinguishes focus suspension from a real Escape lock loss (34.9s)
+(node:18732) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   5 [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:624:7 › Pass 65 active-match menu lifecycle › Escape from active-match Options commits once and returns directly to play (35.5s)
+(node:9236) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   6 [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:656:7 › Pass 65 active-match menu lifecycle › restarts all four countdown cues and latches one F press for care capture (21.8s)
+(node:33048) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   7 [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:735:7 › Pass 65 active-match menu lifecycle › does not skip Atomic Acres countdown cues across a long presentation stall (25.6s)
+(node:22956) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   8 [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:757:7 › Pass 65 active-match menu lifecycle › survives twenty all-arena solo starts without an unsolicited menu bounce (24.4s)
+(node:24184) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[pass65 multiplayer admission failure]
+{
+  "failedRole": "host",
+  "peerTimeoutMs": 45000,
+  "elapsedMs": 2854.061899999999,
+  "host": {
+    "role": "host",
+    "pageClosed": false,
+    "url": "http://127.0.0.1:4201/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass65-lifecycle-host&previewTime=0&multiplayerQa=1&peerQaPort=9165",
+    "visibilityState": "visible",
+    "hidden": false,
+    "harnessHasFocus": true,
+    "admission": null,
+    "bootstrap": null,
+    "privateMatch": null,
+    "presentationScheduling": null,
+    "menuLifecycle": null,
+    "networkStatus": null,
+    "networkStatusKind": null
+  },
+  "guest": {
+    "role": "guest",
+    "pageClosed": false,
+    "diagnosticError": "guest diagnostic timed out after 1500ms"
+  },
+  "browserErrors": [
+    "host: Cannot read properties of undefined (reading 'snapshot')"
+  ]
+}
+  ✘   9 [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:819:7 › Pass 65 active-match menu lifecycle › keeps synchronized host and guest countdowns hidden until active play and resumes deliberately (15.3s)
+(node:28432) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  10 [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:952:7 › Pass 65 active-match menu lifecycle › falls back nonfatally with no stale pixels when compositor and canvas readbacks are unavailable (35.1s)
+
+
+  1) [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:430:7 › Pass 65 active-match menu lifecycle › persists, reloads and deploys the saved Custom 2 without a compensating selection click 
+
+    TimeoutError: locator.selectOption: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for locator('#loadout-manage-preset')
+        - waiting for" http://127.0.0.1:4201/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass65-menu-lifecycle&previewTime=0" navigation to finish...
+        - navigated to "http://127.0.0.1:4201/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass65-menu-lifecycle&previewTime=0"
+        - locator resolved to <select id="loadout-manage-preset">…</select>
+      - attempting select option action
+        2 × waiting for element to be visible and enabled
+          - element is not visible
+        - retrying select option action
+        - waiting 20ms
+        2 × waiting for element to be visible and enabled
+          - element is not visible
+        - retrying select option action
+          - waiting 100ms
+        26 × waiting for element to be visible and enabled
+           - element is not visible
+         - retrying select option action
+           - waiting 500ms
+
+
+      437 |     await page.locator('[data-custom-preset-id="custom-2"] [data-custom-modify]').click();
+      438 |     await expect(page.locator('#loadout-manager')).toBeVisible();
+    > 439 |     await page.locator('#loadout-manage-preset').selectOption('custom-2');
+          |                                                  ^
+      440 |     await page.locator('#loadout-preset-name').fill('Night Ops');
+      441 |     await page.locator('#loadout-primary').selectOption('minigun');
+      442 |     await page.locator('#loadout-secondary').selectOption('explosive-crossbow');
+        at C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\tests\e2e\pass65-menu-lifecycle.spec.ts:439:50
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-624d9-ompensating-selection-click-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-624d9-ompensating-selection-click-chromium\error-context.md
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-624d9-ompensating-selection-click-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-624d9-ompensating-selection-click-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-624d9-ompensating-selection-click-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:488:7 › Pass 65 active-match menu lifecycle › keeps pre-match helo/cat preview ownership and reduced-motion accessibility 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator:  locator('#menu-preview-frame')
+    Expected: visible
+    Received: hidden
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "toBeVisible" with timeout 10000ms
+      - waiting for locator('#menu-preview-frame')
+        23 × locator resolved to <div data-generation="1" data-active="false" data-motion="static" id="menu-preview-frame" data-frame="helicopter" data-arena="world-studio" data-renderer-submissions="0" data-media-state="poster-fallback" data-presentation="menu-video-runtime-helo-world-studio-v1">…</div>
+           - unexpected value "hidden"
+
+
+      490 |     await expect(page.locator('#menu')).toHaveAttribute('data-lifecycle-surface', 'pre-match');
+      491 |     await expect(page.locator('#menu')).toHaveAttribute('aria-hidden', 'false');
+    > 492 |     await expect(page.locator('#menu-preview-frame')).toBeVisible();
+          |                                                       ^
+      493 |     await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-motion', 'static');
+      494 |     await expect(page.locator('#menu-showcase > #game')).toHaveCount(0);
+      495 |     await expect(page.locator('#menu-preview-poster')).toBeVisible();
+        at C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\tests\e2e\pass65-menu-lifecycle.spec.ts:492:55
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-b4cae-educed-motion-accessibility-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-b4cae-educed-motion-accessibility-chromium\error-context.md
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-b4cae-educed-motion-accessibility-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-b4cae-educed-motion-accessibility-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-b4cae-educed-motion-accessibility-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:501:7 › Pass 65 active-match menu lifecycle › hides once through rejected/transient-null requests and Resume never bounces 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 1
+    Received: 0
+
+    Call Log:
+    - Timeout 30000ms exceeded while waiting on the predicate
+
+      168 |   await expect(page.locator('#deployment-transition-video')).toBeHidden();
+      169 |   // Wait for deployment loading to complete before the transition hides.
+    > 170 |   await expect.poll(async () => (await lifecycle(page)).matchReadyCount, { timeout: 30_000 }).toBe(1);
+          |                                                                                               ^
+      171 |   // Post-deployment: menu stays in layout but is inert/aria-hidden during
+      172 |   // deployment; transition hides once deploying phase ends.
+      173 |   await expect(page.locator('#menu')).toBeHidden();
+        at startFromMenu (C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\tests\e2e\pass65-menu-lifecycle.spec.ts:170:95)
+        at C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\tests\e2e\pass65-menu-lifecycle.spec.ts:504:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-6a443-ts-and-Resume-never-bounces-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-6a443-ts-and-Resume-never-bounces-chromium\error-context.md
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-6a443-ts-and-Resume-never-bounces-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-6a443-ts-and-Resume-never-bounces-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-6a443-ts-and-Resume-never-bounces-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:582:7 › Pass 65 active-match menu lifecycle › distinguishes focus suspension from a real Escape lock loss 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 1
+    Received: 0
+
+    Call Log:
+    - Timeout 30000ms exceeded while waiting on the predicate
+
+      168 |   await expect(page.locator('#deployment-transition-video')).toBeHidden();
+      169 |   // Wait for deployment loading to complete before the transition hides.
+    > 170 |   await expect.poll(async () => (await lifecycle(page)).matchReadyCount, { timeout: 30_000 }).toBe(1);
+          |                                                                                               ^
+      171 |   // Post-deployment: menu stays in layout but is inert/aria-hidden during
+      172 |   // deployment; transition hides once deploying phase ends.
+      173 |   await expect(page.locator('#menu')).toBeHidden();
+        at startFromMenu (C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\tests\e2e\pass65-menu-lifecycle.spec.ts:170:95)
+        at C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\tests\e2e\pass65-menu-lifecycle.spec.ts:585:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-108ae-rom-a-real-Escape-lock-loss-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-108ae-rom-a-real-Escape-lock-loss-chromium\error-context.md
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-108ae-rom-a-real-Escape-lock-loss-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-108ae-rom-a-real-Escape-lock-loss-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-108ae-rom-a-real-Escape-lock-loss-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:624:7 › Pass 65 active-match menu lifecycle › Escape from active-match Options commits once and returns directly to play 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 1
+    Received: 0
+
+    Call Log:
+    - Timeout 30000ms exceeded while waiting on the predicate
+
+      168 |   await expect(page.locator('#deployment-transition-video')).toBeHidden();
+      169 |   // Wait for deployment loading to complete before the transition hides.
+    > 170 |   await expect.poll(async () => (await lifecycle(page)).matchReadyCount, { timeout: 30_000 }).toBe(1);
+          |                                                                                               ^
+      171 |   // Post-deployment: menu stays in layout but is inert/aria-hidden during
+      172 |   // deployment; transition hides once deploying phase ends.
+      173 |   await expect(page.locator('#menu')).toBeHidden();
+        at startFromMenu (C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\tests\e2e\pass65-menu-lifecycle.spec.ts:170:95)
+        at C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\tests\e2e\pass65-menu-lifecycle.spec.ts:627:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-0d14f-nd-returns-directly-to-play-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-0d14f-nd-returns-directly-to-play-chromium\error-context.md
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-0d14f-nd-returns-directly-to-play-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-0d14f-nd-returns-directly-to-play-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-0d14f-nd-returns-directly-to-play-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6) [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:656:7 › Pass 65 active-match menu lifecycle › restarts all four countdown cues and latches one F press for care capture 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator: locator('.map-card[data-arena-id="rustworks-1v1"]')
+    Expected: "true"
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveAttribute" with timeout 10000ms
+      - waiting for locator('.map-card[data-arena-id="rustworks-1v1"]')
+
+
+      187 | async function selectArena(page: Page, arenaId: ArenaId): Promise<void> {
+      188 |   await page.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.selectArena(id), arenaId);
+    > 189 |   await expect(page.locator(`.map-card[data-arena-id="${arenaId}"]`)).toHaveAttribute('aria-pressed', 'true');
+          |                                                                       ^
+      190 | }
+      191 |
+      192 | function collectUnexpectedBrowserErrors(page: Page, label: string): string[] {
+        at selectArena (C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\tests\e2e\pass65-menu-lifecycle.spec.ts:189:71)
+        at C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\tests\e2e\pass65-menu-lifecycle.spec.ts:662:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-7f4aa-ne-F-press-for-care-capture-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-7f4aa-ne-F-press-for-care-capture-chromium\error-context.md
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-7f4aa-ne-F-press-for-care-capture-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-7f4aa-ne-F-press-for-care-capture-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-7f4aa-ne-F-press-for-care-capture-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  7) [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:735:7 › Pass 65 active-match menu lifecycle › does not skip Atomic Acres countdown cues across a long presentation stall 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator: locator('.map-card[data-arena-id="atomic-acres"]')
+    Expected: "true"
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveAttribute" with timeout 10000ms
+      - waiting for locator('.map-card[data-arena-id="atomic-acres"]')
+
+
+      187 | async function selectArena(page: Page, arenaId: ArenaId): Promise<void> {
+      188 |   await page.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.selectArena(id), arenaId);
+    > 189 |   await expect(page.locator(`.map-card[data-arena-id="${arenaId}"]`)).toHaveAttribute('aria-pressed', 'true');
+          |                                                                       ^
+      190 | }
+      191 |
+      192 | function collectUnexpectedBrowserErrors(page: Page, label: string): string[] {
+        at selectArena (C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\tests\e2e\pass65-menu-lifecycle.spec.ts:189:71)
+        at C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\tests\e2e\pass65-menu-lifecycle.spec.ts:738:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-9d34e-s-a-long-presentation-stall-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-9d34e-s-a-long-presentation-stall-chromium\error-context.md
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-9d34e-s-a-long-presentation-stall-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-9d34e-s-a-long-presentation-stall-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-9d34e-s-a-long-presentation-stall-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  8) [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:757:7 › Pass 65 active-match menu lifecycle › survives twenty all-arena solo starts without an unsolicited menu bounce 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator: locator('.map-card[data-arena-id="atomic-acres"]')
+    Expected: "true"
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveAttribute" with timeout 10000ms
+      - waiting for locator('.map-card[data-arena-id="atomic-acres"]')
+        - waiting for" http://127.0.0.1:4201/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass65-menu-lifecycle&previewTime=0" navigation to finish...
+        - navigated to "http://127.0.0.1:4201/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass65-menu-lifecycle&previewTime=0"
+
+
+      187 | async function selectArena(page: Page, arenaId: ArenaId): Promise<void> {
+      188 |   await page.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.selectArena(id), arenaId);
+    > 189 |   await expect(page.locator(`.map-card[data-arena-id="${arenaId}"]`)).toHaveAttribute('aria-pressed', 'true');
+          |                                                                       ^
+      190 | }
+      191 |
+      192 | function collectUnexpectedBrowserErrors(page: Page, label: string): string[] {
+        at selectArena (C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\tests\e2e\pass65-menu-lifecycle.spec.ts:189:71)
+        at C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\tests\e2e\pass65-menu-lifecycle.spec.ts:769:7
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-9cde0--an-unsolicited-menu-bounce-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-9cde0--an-unsolicited-menu-bounce-chromium\error-context.md
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-9cde0--an-unsolicited-menu-bounce-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-9cde0--an-unsolicited-menu-bounce-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-9cde0--an-unsolicited-menu-bounce-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  9) [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:819:7 › Pass 65 active-match menu lifecycle › keeps synchronized host and guest countdowns hidden until active play and resumes deliberately 
+
+    Error: host foreground match admission failed within 45000ms: page.waitForFunction: TypeError: Cannot read properties of undefined (reading 'snapshot')
+        at eval (eval at predicate (eval at evaluate (:303:30)), <anonymous>:1:37)
+        at predicate (eval at evaluate (:303:30), <anonymous>:7:27)
+        at next (eval at evaluate (:303:30), <anonymous>:29:33)
+        at eval (eval at evaluate (:303:30), <anonymous>:42:13)
+        at UtilityScript.evaluate (<anonymous>:305:16)
+        at UtilityScript.<anonymous> (<anonymous>:1:44)
+        at eval (eval at predicate (eval at evaluate (:303:30)), <anonymous>:1:37)
+        at predicate (eval at evaluate (:303:30), <anonymous>:7:27)
+        at next (eval at evaluate (:303:30), <anonymous>:29:33)
+        at eval (eval at evaluate (:303:30), <anonymous>:42:13)
+        at UtilityScript.evaluate (<anonymous>:305:16)
+        at UtilityScript.<anonymous> (<anonymous>:1:44)
+        at waitForForegroundGameStart (C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\tests\e2e\pass65-menu-lifecycle.spec.ts:342:11)
+        at C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\tests\e2e\pass65-menu-lifecycle.spec.ts:871:7
+
+    attachment #2: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-d095a-ay-and-resumes-deliberately-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-d095a-ay-and-resumes-deliberately-chromium\error-context.md
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-d095a-ay-and-resumes-deliberately-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-d095a-ay-and-resumes-deliberately-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-d095a-ay-and-resumes-deliberately-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  10) [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:952:7 › Pass 65 active-match menu lifecycle › falls back nonfatally with no stale pixels when compositor and canvas readbacks are unavailable 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 1
+    Received: 0
+
+    Call Log:
+    - Timeout 30000ms exceeded while waiting on the predicate
+
+      168 |   await expect(page.locator('#deployment-transition-video')).toBeHidden();
+      169 |   // Wait for deployment loading to complete before the transition hides.
+    > 170 |   await expect.poll(async () => (await lifecycle(page)).matchReadyCount, { timeout: 30_000 }).toBe(1);
+          |                                                                                               ^
+      171 |   // Post-deployment: menu stays in layout but is inert/aria-hidden during
+      172 |   // deployment; transition hides once deploying phase ends.
+      173 |   await expect(page.locator('#menu')).toBeHidden();
+        at startFromMenu (C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\tests\e2e\pass65-menu-lifecycle.spec.ts:170:95)
+        at C:\Users\david\Desktop\stuff\aa-omp-newworld-prime-live\tests\e2e\pass65-menu-lifecycle.spec.ts:956:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-87c14-s-readbacks-are-unavailable-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-87c14-s-readbacks-are-unavailable-chromium\error-context.md
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-87c14-s-readbacks-are-unavailable-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-87c14-s-readbacks-are-unavailable-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace artifacts\pass25a\playwright-results\pass65-menu-lifecycle-Pass-87c14-s-readbacks-are-unavailable-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  10 failed
+    [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:430:7 › Pass 65 active-match menu lifecycle › persists, reloads and deploys the saved Custom 2 without a compensating selection click 
+    [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:488:7 › Pass 65 active-match menu lifecycle › keeps pre-match helo/cat preview ownership and reduced-motion accessibility 
+    [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:501:7 › Pass 65 active-match menu lifecycle › hides once through rejected/transient-null requests and Resume never bounces 
+    [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:582:7 › Pass 65 active-match menu lifecycle › distinguishes focus suspension from a real Escape lock loss 
+    [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:624:7 › Pass 65 active-match menu lifecycle › Escape from active-match Options commits once and returns directly to play 
+    [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:656:7 › Pass 65 active-match menu lifecycle › restarts all four countdown cues and latches one F press for care capture 
+    [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:735:7 › Pass 65 active-match menu lifecycle › does not skip Atomic Acres countdown cues across a long presentation stall 
+    [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:757:7 › Pass 65 active-match menu lifecycle › survives twenty all-arena solo starts without an unsolicited menu bounce 
+    [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:819:7 › Pass 65 active-match menu lifecycle › keeps synchronized host and guest countdowns hidden until active play and resumes deliberately 
+    [chromium] › tests\e2e\pass65-menu-lifecycle.spec.ts:952:7 › Pass 65 active-match menu lifecycle › falls back nonfatally with no stale pixels when compositor and canvas readbacks are unavailable 
+EXIT:1

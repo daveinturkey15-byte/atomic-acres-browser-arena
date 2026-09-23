@@ -1,0 +1,1314 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/technique-lab/group-c/build-source-research.mjs",
+  "generatedAt": "2026-09-12",
+  "scope": {
+    "group": "C",
+    "sourceIds": [
+      35,
+      50
+    ]
+  },
+  "provenance": {
+    "packet": "C:/Users/david/Documents/Codex/2026-09-11/p-le/work/technique-lab-20260912/sources-group-c.json",
+    "packetInventorySha256": "1ff04d79c9908a42dd54f0e0256cbfef8585dfca9d33286face4994750861d5e",
+    "packetRegisterSha256": "30b61cbe85bae1fc8ed59eb6d416bfe4e79608651a86ba7f1fee3d433f160c39",
+    "fetchLedger": "C:/Users/david/Documents/Codex/2026-09-11/p-le/work/technique-lab-20260912/group-c-fetch-attempts.json",
+    "fetchLedgerGeneratedAt": "2026-09-12T15:30:15Z",
+    "fetchAttemptCount": 57,
+    "note": "Every URL record below is the earlier pass's dated fetch, reused with attribution rather than refetched. No URL was fetched while building this report."
+  },
+  "readingRule": "A hash match proves the carrier file has not drifted since the packet was built. It does NOT prove the body was read. `fullBodyReadInRecoveryWindow` is the read claim, and it is false wherever the body was not read end to end on 2026-09-12.",
+  "rows": [
+    {
+      "sourceId": 35,
+      "registerTitle": "gas-station-highway - one-page photoreal-scene brief, all-procedural",
+      "registerLine": 854,
+      "canonical": "Canonical:** `StarKnightt/gas-station-highway` @ `3e1b7cbb1f46bb0b0601b4d06ceef63438ae132c`",
+      "licence": "Licence:** **NO LICENSE FILE at the pinned revision (checked LICENSE/LICENSE.md/LICENSE.txt/license 2026-08-30; all 404)** although the README summary claims MIT. Authority 2b applies: learn the technique, never copy the expression.",
+      "decision": "Decision:** the one-page-brief pattern (atmosphere pin, strict verb whitelist, all-procedural clause, departures appendix) is the template for the owner's Test1/Test2 map briefs. No code reuse.",
+      "urls": [
+        {
+          "url": "https://x.com/prasenx/status/2093762240361173305",
+          "role": "owner-shared-post",
+          "note": "original owner-shared X post",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 174579,
+          "sha256": "59377d24ca5a5657ea2cd00dd10737fb6aa50d30544bae839ade35cfe0301348",
+          "attemptedAt": "2026-09-12T15:28:55Z",
+          "redirected": false,
+          "finalUrl": "https://x.com/prasenx/status/2093762240361173305"
+        },
+        {
+          "url": "https://github.com/StarKnightt/gas-station-highway",
+          "role": "author-owned-repo",
+          "note": "linked GitHub source",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 356217,
+          "sha256": "98afb775ce700e36ed99b202020f492ff9b2c687cb186b53bd463bf5bb81ee2f",
+          "attemptedAt": "2026-09-12T15:28:58Z",
+          "redirected": false,
+          "finalUrl": "https://github.com/StarKnightt/gas-station-highway"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/StarKnightt/gas-station-highway/3e1b7cbb1f46bb0b0601b4d06ceef63438ae132c/PROMPT.md",
+          "role": "pinned-source-file",
+          "note": "the one-page brief itself, at the register pin",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 7308,
+          "sha256": "9bea4813c553be94110516087e193e42aa8347c88787c829fe3de2699f3da882",
+          "attemptedAt": "2026-09-12T15:29:01Z",
+          "redirected": false,
+          "finalUrl": "https://raw.githubusercontent.com/StarKnightt/gas-station-highway/3e1b7cbb1f46bb0b0601b4d06ceef63438ae132c/PROMPT.md"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/StarKnightt/gas-station-highway/3e1b7cbb1f46bb0b0601b4d06ceef63438ae132c/README.md",
+          "role": "pinned-source-file",
+          "note": "README at pin",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 8454,
+          "sha256": "d062b12842409c820dab1c979bc7714c75fb33258f2e80578f43a0887ab4b11b",
+          "attemptedAt": "2026-09-12T15:29:02Z",
+          "redirected": false,
+          "finalUrl": "https://raw.githubusercontent.com/StarKnightt/gas-station-highway/3e1b7cbb1f46bb0b0601b4d06ceef63438ae132c/README.md"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/StarKnightt/gas-station-highway/3e1b7cbb1f46bb0b0601b4d06ceef63438ae132c/LICENSE",
+          "role": "licence-file",
+          "note": "register records 404 at this pin; re-verify",
+          "outcome": "http-error",
+          "httpStatus": 404,
+          "bytes": 14,
+          "sha256": "d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed",
+          "attemptedAt": "2026-09-12T15:29:03Z",
+          "redirected": null,
+          "finalUrl": null
+        }
+      ],
+      "unfetchedPacketUrls": [],
+      "carrierSkills": [
+        {
+          "name": "threejs-game-development",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\software-development\\threejs-game-development\\SKILL.md",
+          "packetSha256": "707888880f11fe498e5233417ba0b2a808f943c27954881fa19ca239798e2ce9",
+          "actualSha256": "707888880f11fe498e5233417ba0b2a808f943c27954881fa19ca239798e2ce9",
+          "driftFromPacket": false,
+          "lines": 131,
+          "fullBodyReadInRecoveryWindow": true,
+          "readAt": "2026-09-12",
+          "coverage": "full body, 131 lines, frontmatter to final line",
+          "specifyingSection": "\"Full-procedural scene & map prompts (register rows 34, 35, 37)\", lines 95-122: the one-page-brief pattern, the three-verb whitelist with an explicit forbidden list, the all-procedural clause, and the fable-test Z-up-centimetres to Y-up-metres conversion with cache-build progress UX."
+        }
+      ],
+      "carrierReadComplete": true,
+      "methodConsumer": "applyBrief() enforces the three-verb whitelist and returns a reason per refusal; the surface is hashed from src/map3/noise.ts with no external asset.",
+      "cpuChecks": [
+        "group-c-demos.test.ts: instantiate, assert metadata agrees with the manifest, assert every position is finite, assert bounded mesh/vertex counts, assert no undeclared light, advance 12 steps, dispose and assert the root is empty.",
+        "whitelist admits exactly pump/door/fridge and refuses the rest with a reason."
+      ],
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel."
+    },
+    {
+      "sourceId": 36,
+      "registerTitle": "Needle Mesh Baker - browser highpoly->lowpoly remesh + texture baking",
+      "registerLine": 863,
+      "canonical": "Canonical:** none - hosted tool at <https://mesh-baker.needle.tools>; no public source repository found 2026-08-30, so there is no commit to pin.",
+      "licence": "Licence:** proprietary hosted webapp (paid). Nothing to copy; usage is a per-asset owner decision.",
+      "decision": "Decision (2026-08-30, direction unchanged and reinforced 2026-09-03):** candidate optimization station for heavy AI-generated GLBs before game import; surface to the owner as an option (paid tool - never auto-purchase). Blender remesh+bake remains the free lane.",
+      "urls": [
+        {
+          "url": "https://x.com/hybridherbst/status/2093299068441092380",
+          "role": "owner-shared-post",
+          "note": "original owner-shared X post",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 558531,
+          "sha256": "1d9c2aaee10dd8265c38890781607a174659aa988d5c466964182fba31b2deaa",
+          "attemptedAt": "2026-09-12T15:29:04Z",
+          "redirected": false,
+          "finalUrl": "https://x.com/hybridherbst/status/2093299068441092380"
+        },
+        {
+          "url": "https://mesh-baker.needle.tools/",
+          "role": "hosted-tool",
+          "note": "hosted SvelteKit app index",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 8366,
+          "sha256": "cd683a2e8fd4c1e3e100cae5cceb087e0382903863f3276efeaa9b77b2f1bff8",
+          "attemptedAt": "2026-09-12T15:29:07Z",
+          "redirected": false,
+          "finalUrl": "https://mesh-baker.needle.tools/"
+        },
+        {
+          "url": "https://engine.needle.tools/docs/products/needle-mesh-baker",
+          "role": "vendor-docs",
+          "note": "product documentation",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 58758,
+          "sha256": "b82a2c8bdd8ae7b9d5c65af212e9dcf451462c2c9efb5b2ef15e4f434f398582",
+          "attemptedAt": "2026-09-12T15:29:08Z",
+          "redirected": false,
+          "finalUrl": "https://engine.needle.tools/docs/products/needle-mesh-baker"
+        },
+        {
+          "url": "https://cloud.needle.tools/pricing?source=baker",
+          "role": "vendor-pricing",
+          "note": "licence/pricing terms",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 80322,
+          "sha256": "9d5869e3e127933a3c9cd1bd2e8d6b3e4a63a4e2b711eb66788d799bc81b8e76",
+          "attemptedAt": "2026-09-12T15:29:10Z",
+          "redirected": false,
+          "finalUrl": "https://cloud.needle.tools/pricing?source=baker"
+        }
+      ],
+      "unfetchedPacketUrls": [
+        "https://mesh-baker.needle.tools",
+        "https://needle.click/mesh-baker-docs",
+        "https://issues.chromium.org/issues/338730587",
+        "https://issues.chromium.org/issues/42251215",
+        "https://needle.tools:443"
+      ],
+      "carrierSkills": [
+        {
+          "name": "ai-3d-asset-generation-loop",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\ai-3d-asset-generation-loop\\SKILL.md",
+          "packetSha256": "c411b9d7d50a1dcc4c5e5b41e1f7f9a99558f6f75b208287182b73aaa8c22bc0",
+          "actualSha256": "c411b9d7d50a1dcc4c5e5b41e1f7f9a99558f6f75b208287182b73aaa8c22bc0",
+          "driftFromPacket": false,
+          "lines": 203,
+          "fullBodyReadInRecoveryWindow": true,
+          "readAt": "2026-09-12",
+          "coverage": "full body, 203 lines, frontmatter to final line",
+          "specifyingSection": "\"Mesh optimization station: Needle Mesh Baker (register row 36)\", lines 168-179 (voxel remesh plus highpoly-to-lowpoly attribute bake), and \"The local native route for the AI-generated-mesh lane (register row 45)\", lines 181-203."
+        }
+      ],
+      "carrierReadComplete": true,
+      "methodConsumer": "voxelRemesh() clusters vertices on a settable grid and averages the highpoly normals into the replacing cell.",
+      "cpuChecks": [
+        "group-c-demos.test.ts: instantiate, assert metadata agrees with the manifest, assert every position is finite, assert bounded mesh/vertex counts, assert no undeclared light, advance 12 steps, dispose and assert the root is empty.",
+        "coarse remesh reduces triangle count; a finer grid keeps more; every baked normal is unit length."
+      ],
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel."
+    },
+    {
+      "sourceId": 37,
+      "registerTitle": "fable-test - WebGPU rebuild of a commercial level from user-owned game data",
+      "registerLine": 879,
+      "canonical": "Canonical:** `SamG-Coder/fable-test` @ `bfa60fb9e0fae613585344b4e5f8b034d2dcd481`",
+      "licence": "Licence:** MIT (LICENSE file read 2026-08-30).",
+      "decision": "Decision:** archive reference only, per the owner's own framing - at-scale WebGPU scene streaming, cache-build UX, coordinate-convention conversion. No integration planned.",
+      "urls": [
+        {
+          "url": "https://x.com/samgcoder/status/2093773310203191312",
+          "role": "owner-shared-post",
+          "note": "original owner-shared X post",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 185016,
+          "sha256": "28a26d26ac0e0c9ee5ce3fe87a4a2ba48b940bdca4efbc48f71a343a3b90a2c1",
+          "attemptedAt": "2026-09-12T15:29:11Z",
+          "redirected": true,
+          "finalUrl": "https://x.com/SamGCoder/status/2093773310203191312"
+        },
+        {
+          "url": "https://github.com/SamG-Coder/fable-test",
+          "role": "author-owned-repo",
+          "note": "linked GitHub source",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 285070,
+          "sha256": "875a3c6e362bfbab3f87e33451d3f1d2ee5e490e3c11bc2f50f88c5150a11401",
+          "attemptedAt": "2026-09-12T15:29:15Z",
+          "redirected": false,
+          "finalUrl": "https://github.com/SamG-Coder/fable-test"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/SamG-Coder/fable-test/bfa60fb9e0fae613585344b4e5f8b034d2dcd481/LICENSE",
+          "role": "licence-file",
+          "note": "MIT claimed by register; read the file",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 1061,
+          "sha256": "59816393d70d7fef8188c88c7c8b88d0cfbab1876afae76123340cff55278ca2",
+          "attemptedAt": "2026-09-12T15:29:16Z",
+          "redirected": false,
+          "finalUrl": "https://raw.githubusercontent.com/SamG-Coder/fable-test/bfa60fb9e0fae613585344b4e5f8b034d2dcd481/LICENSE"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/SamG-Coder/fable-test/bfa60fb9e0fae613585344b4e5f8b034d2dcd481/README.md",
+          "role": "pinned-source-file",
+          "note": "coordinate conventions and cache-build UX",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 3823,
+          "sha256": "f78613e1d5d015b0a25f8d37ee23daf0cc981ed0b80752cac26f39a2b6cbf293",
+          "attemptedAt": "2026-09-12T15:29:17Z",
+          "redirected": false,
+          "finalUrl": "https://raw.githubusercontent.com/SamG-Coder/fable-test/bfa60fb9e0fae613585344b4e5f8b034d2dcd481/README.md"
+        }
+      ],
+      "unfetchedPacketUrls": [],
+      "carrierSkills": [
+        {
+          "name": "threejs-game-development",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\software-development\\threejs-game-development\\SKILL.md",
+          "packetSha256": "707888880f11fe498e5233417ba0b2a808f943c27954881fa19ca239798e2ce9",
+          "actualSha256": "707888880f11fe498e5233417ba0b2a808f943c27954881fa19ca239798e2ce9",
+          "driftFromPacket": false,
+          "lines": 131,
+          "fullBodyReadInRecoveryWindow": true,
+          "readAt": "2026-09-12",
+          "coverage": "full body, 131 lines, frontmatter to final line",
+          "specifyingSection": "\"Full-procedural scene & map prompts (register rows 34, 35, 37)\", lines 95-122: the one-page-brief pattern, the three-verb whitelist with an explicit forbidden list, the all-procedural clause, and the fable-test Z-up-centimetres to Y-up-metres conversion with cache-build progress UX."
+        }
+      ],
+      "carrierReadComplete": true,
+      "methodConsumer": "convertZupCentimetres() is the single ingest boundary; the cache pass reveals a record only as its entry completes.",
+      "cpuChecks": [
+        "group-c-demos.test.ts: instantiate, assert metadata agrees with the manifest, assert every position is finite, assert bounded mesh/vertex counts, assert no undeclared light, advance 12 steps, dispose and assert the root is empty.",
+        "source Z becomes scene Y, handedness preserved by negating source Y, extents follow the same swap."
+      ],
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel."
+    },
+    {
+      "sourceId": 38,
+      "registerTitle": "Procedural forest, foliage and tree editor — the SAME artefact as row 33",
+      "registerLine": 888,
+      "canonical": "Canonical:** `vibe-stack/super-terrain`, default branch `main`, HEAD pushed 2026-08-30T23:33Z. Re-pin before use; row 33's pin `e417c048c29fc0193005df4f3e39dff44cef5d31` predates the forest work.",
+      "licence": "Licence:** **STILL NO LICENCE FILE — re-checked 2026-08-31.** `LICENSE`, `LICENSE.md`, `LICENCE`, `COPYING` and `LICENSE.txt` all return 404 on `main`; GitHub API `license` is `null`. Row 33's 2026-08-26 finding stands unchanged five days later. **Authority 2b applies: inspect and learn the general technique, never copy its expression** — no files, functions, shader bodies, constants tables or distinctive comments, and no vendoring.",
+      "decision": "Decision:** the spline-field-driven scatter and the species/mask separation are the two ideas worth restating into `threejs-procedural-vegetation`; Atomic Acres already ships its own tuft-grass and scatter systems, so this is an upgrade path, not a replacement. The tree editor is the owner's \"editor\" interest (see row 42) and is a product question, not an agent decision. **Do not treat \"30+ tree types\" as a verified count** — it is an author claim in a post.",
+      "urls": [
+        {
+          "url": "https://x.com/alightinastorm/status/2093648383202259325",
+          "role": "owner-shared-post",
+          "note": "original owner-shared X post",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 177941,
+          "sha256": "9d1bf9f6b9599750cd6291712b21b64efe9b82181db2051bd90864ff08d2f850",
+          "attemptedAt": "2026-09-12T15:29:17Z",
+          "redirected": false,
+          "finalUrl": "https://x.com/alightinastorm/status/2093648383202259325"
+        },
+        {
+          "url": "https://x.com/tokengremlin/status/2094265309360185606",
+          "role": "owner-shared-post",
+          "note": "third-party writeup post",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 216662,
+          "sha256": "2a2a2fae9aa5c28c34c79f35c5685c8d52831f15a8690201e07de7f60952effe",
+          "attemptedAt": "2026-09-12T15:29:20Z",
+          "redirected": true,
+          "finalUrl": "https://x.com/TokenGremlin/status/2094265309360185606"
+        },
+        {
+          "url": "https://github.com/vibe-stack/super-terrain",
+          "role": "author-owned-repo",
+          "note": "linked GitHub source",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 330266,
+          "sha256": "bc9c9bd3d4f70dbeff0d394f6363f046097b6cec5d3ddd28d508d9d376ea20e3",
+          "attemptedAt": "2026-09-12T15:29:21Z",
+          "redirected": false,
+          "finalUrl": "https://github.com/vibe-stack/super-terrain"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/vibe-stack/super-terrain/main/LICENSE",
+          "role": "licence-file",
+          "note": "register records no licence file; re-verify",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 1094,
+          "sha256": "907eafb6f2ada8bd8fdba031204dba3c1f947c21ba965c613d053a5dd58cb0d8",
+          "attemptedAt": "2026-09-12T15:29:22Z",
+          "redirected": false,
+          "finalUrl": "https://raw.githubusercontent.com/vibe-stack/super-terrain/main/LICENSE"
+        },
+        {
+          "url": "https://api.github.com/repos/vibe-stack/super-terrain/contents/src/foliage",
+          "role": "repo-tree",
+          "note": "foliage module listing named in the register",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 19219,
+          "sha256": "08c6499c17cd0bf4e1b143b0fb692de508e9869acf5edecfe478709bfc67c96e",
+          "attemptedAt": "2026-09-12T15:29:22Z",
+          "redirected": false,
+          "finalUrl": "https://api.github.com/repos/vibe-stack/super-terrain/contents/src/foliage"
+        }
+      ],
+      "unfetchedPacketUrls": [],
+      "carrierSkills": [
+        {
+          "name": "atomic-acres-procedural-art-authoring",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\atomic-acres-procedural-art-authoring\\SKILL.md",
+          "packetSha256": "19f93b23bdcef5832c246772600c7740631cb3a43b6d424324a58eecfdab9508",
+          "actualSha256": "19f93b23bdcef5832c246772600c7740631cb3a43b6d424324a58eecfdab9508",
+          "driftFromPacket": false,
+          "lines": 152,
+          "fullBodyReadInRecoveryWindow": false,
+          "readAt": null,
+          "coverage": "NOT READ in the 2026-09-12 recovery window",
+          "specifyingSection": null
+        },
+        {
+          "name": "threejs-procedural-vegetation",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\software-development\\threejs-procedural-vegetation\\SKILL.md",
+          "packetSha256": "7aa8c750c461d9741ccd760354664372ff64813b3fa043c0b515202895b9881e",
+          "actualSha256": "7aa8c750c461d9741ccd760354664372ff64813b3fa043c0b515202895b9881e",
+          "driftFromPacket": false,
+          "lines": 444,
+          "fullBodyReadInRecoveryWindow": false,
+          "readAt": null,
+          "coverage": "NOT READ in the 2026-09-12 recovery window",
+          "specifyingSection": null
+        }
+      ],
+      "carrierReadComplete": false,
+      "methodConsumer": "splineDensity() and maskField() are separate functions; the mask decides admissibility before density is consulted.",
+      "cpuChecks": [
+        "group-c-demos.test.ts: instantiate, assert metadata agrees with the manifest, assert every position is finite, assert bounded mesh/vertex counts, assert no undeclared light, advance 12 steps, dispose and assert the root is empty.",
+        "a point dense by the spline field is still refused by the mask."
+      ],
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel."
+    },
+    {
+      "sourceId": 39,
+      "registerTitle": "Engine-native procedural level generation over an MCP bridge (Unreal, Unity)",
+      "registerLine": 901,
+      "canonical": "Canonical:** none for either. No repository, no released bridge, no licence. The Unreal demo runs inside Epic's Electric Dreams sample and uses **Megascans** foliage — i.e. it is explicitly *not* an assets-free technique, which is the opposite of what Map 3 is testing.",
+      "licence": null,
+      "decision": "Decision:** the reusable atom is **the agent drives the engine's own authoring tools through an MCP bridge, instead of generating engine-independent code** — the agent is wired to both the engine API and its docs, and level generation becomes a sequence of editor operations. This is the natural route if Atomic Acres work ever branches into Unreal, Unity or TheForge, and it is genuinely different from our current route (we generate code that the engine runs). Carry the honest caveat: both demos lean on the host engine's asset libraries, so neither is evidence that procedural-from-nothing is faster. Comparator only until a bridge with a licence exists.",
+      "urls": [
+        {
+          "url": "https://x.com/fabianofirmo/status/2094044844804993523",
+          "role": "owner-shared-post",
+          "note": "original owner-shared X post",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 149996,
+          "sha256": "fed7d4535a933f8589e3dcb536fac55dcdb5a329cc728d0262afed20e92394c4",
+          "attemptedAt": "2026-09-12T15:29:23Z",
+          "redirected": true,
+          "finalUrl": "https://x.com/FabianoFirmo/status/2094044844804993523"
+        },
+        {
+          "url": "https://x.com/Stefan_3D_AI",
+          "role": "owner-shared-profile",
+          "note": "second instance of the same pattern",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 265461,
+          "sha256": "89a493fd759ad193b401ee4b33dd8c7a659f2dea68cfdf6dda8c590324ba359e",
+          "attemptedAt": "2026-09-12T15:29:25Z",
+          "redirected": false,
+          "finalUrl": "https://x.com/Stefan_3D_AI"
+        }
+      ],
+      "unfetchedPacketUrls": [],
+      "carrierSkills": [
+        {
+          "name": "ai-3d-asset-generation-loop",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\ai-3d-asset-generation-loop\\SKILL.md",
+          "packetSha256": "c411b9d7d50a1dcc4c5e5b41e1f7f9a99558f6f75b208287182b73aaa8c22bc0",
+          "actualSha256": "c411b9d7d50a1dcc4c5e5b41e1f7f9a99558f6f75b208287182b73aaa8c22bc0",
+          "driftFromPacket": false,
+          "lines": 203,
+          "fullBodyReadInRecoveryWindow": true,
+          "readAt": "2026-09-12",
+          "coverage": "full body, 203 lines, frontmatter to final line",
+          "specifyingSection": "\"Mesh optimization station: Needle Mesh Baker (register row 36)\", lines 168-179 (voxel remesh plus highpoly-to-lowpoly attribute bake), and \"The local native route for the AI-generated-mesh lane (register row 45)\", lines 181-203."
+        }
+      ],
+      "carrierReadComplete": true,
+      "methodConsumer": "replay() walks OPERATION_LOG and rejects an operation whose precondition is unmet instead of reordering it.",
+      "cpuChecks": [
+        "group-c-demos.test.ts: instantiate, assert metadata agrees with the manifest, assert every position is finite, assert bounded mesh/vertex counts, assert no undeclared light, advance 12 steps, dispose and assert the root is empty.",
+        "the scatter that arrives before its terrain is rejected with a reason naming terrain."
+      ],
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel."
+    },
+    {
+      "sourceId": 40,
+      "registerTitle": "Voxel structural failure, topology-derived lighting, and silhouette carving (Voxpolia)",
+      "registerLine": 910,
+      "canonical": "Canonical:** none. Commercial game by Endstreet Studio, free to play in-browser at `endstreet.itch.io/voxpolia`; no public source, nothing to pin, nothing to copy.",
+      "licence": null,
+      "decision": "Decision — three separable atoms, all restatable from the descriptions alone:**",
+      "urls": [
+        {
+          "url": "https://x.com/VoxpoliaGame",
+          "role": "owner-shared-profile",
+          "note": "original owner-shared X profile",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 235076,
+          "sha256": "124bf16ab751dfcbd9e17620567a7399fa24ae9a4f72e656b896f594a4f48389",
+          "attemptedAt": "2026-09-12T15:29:26Z",
+          "redirected": false,
+          "finalUrl": "https://x.com/VoxpoliaGame"
+        },
+        {
+          "url": "https://endstreet.itch.io/voxpolia",
+          "role": "distribution-page",
+          "note": "playable build page; packet URL is malformed as a github.com path",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 37487,
+          "sha256": "48bae992affcaafd3e72769b085d687d924f836f9e0260cbe80495d4fb9aaa33",
+          "attemptedAt": "2026-09-12T15:29:27Z",
+          "redirected": false,
+          "finalUrl": "https://endstreet.itch.io/voxpolia"
+        },
+        {
+          "url": "https://github.com/endstreet.itch.io/voxpolia",
+          "role": "packet-url-as-recorded",
+          "note": "exact malformed URL as recorded in the packet; attempted for the record",
+          "outcome": "http-error",
+          "httpStatus": 404,
+          "bytes": 268712,
+          "sha256": "d4342d1fd9095def68701f99ef615082298815f696d198d8682538d4d5fc402d",
+          "attemptedAt": "2026-09-12T15:29:27Z",
+          "redirected": null,
+          "finalUrl": null
+        }
+      ],
+      "unfetchedPacketUrls": [],
+      "carrierSkills": [
+        {
+          "name": "threejs-game-development",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\software-development\\threejs-game-development\\SKILL.md",
+          "packetSha256": "707888880f11fe498e5233417ba0b2a808f943c27954881fa19ca239798e2ce9",
+          "actualSha256": "707888880f11fe498e5233417ba0b2a808f943c27954881fa19ca239798e2ce9",
+          "driftFromPacket": false,
+          "lines": 131,
+          "fullBodyReadInRecoveryWindow": true,
+          "readAt": "2026-09-12",
+          "coverage": "full body, 131 lines, frontmatter to final line",
+          "specifyingSection": "\"Full-procedural scene & map prompts (register rows 34, 35, 37)\", lines 95-122: the one-page-brief pattern, the three-verb whitelist with an explicit forbidden list, the all-procedural clause, and the fable-test Z-up-centimetres to Y-up-metres conversion with cache-build progress UX."
+        },
+        {
+          "name": "atomic-acres-procedural-art-authoring",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\atomic-acres-procedural-art-authoring\\SKILL.md",
+          "packetSha256": "19f93b23bdcef5832c246772600c7740631cb3a43b6d424324a58eecfdab9508",
+          "actualSha256": "19f93b23bdcef5832c246772600c7740631cb3a43b6d424324a58eecfdab9508",
+          "driftFromPacket": false,
+          "lines": 152,
+          "fullBodyReadInRecoveryWindow": false,
+          "readAt": null,
+          "coverage": "NOT READ in the 2026-09-12 recovery window",
+          "specifyingSection": null
+        }
+      ],
+      "carrierReadComplete": false,
+      "methodConsumer": "litRoomCells() recomputes emission from the live voxel grid; no THREE light object exists in the demo.",
+      "cpuChecks": [
+        "group-c-demos.test.ts: instantiate, assert metadata agrees with the manifest, assert every position is finite, assert bounded mesh/vertex counts, assert no undeclared light, advance 12 steps, dispose and assert the root is empty.",
+        "lit cells fall after the ceiling above them is carved; an empty grid lights nothing."
+      ],
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel."
+    },
+    {
+      "sourceId": 41,
+      "registerTitle": "The technique-demo hub — a portfolio as a catalogue of self-contained sketches",
+      "registerLine": 925,
+      "canonical": "Canonical:** none — hosted portfolio, no repository found, no licence. Nothing to copy.",
+      "licence": null,
+      "decision": "Decision — the reusable object is the FORMAT, not any one sketch.** Each technique is a named, isolated, individually reachable exhibit with a title that states what it is. That is exactly the shape of the owner's \"Map 3 Demo Showcase\" brief — a hub with signed corridors, one technique each — and it is the strongest evidence in this register that the format works as a way to keep techniques discoverable and comparable rather than buried inside one big scene. The sketch **titles** are also a good naming discipline: noun-phrase, technique-first, no cleverness. Adopt the format; independently build any effect the names suggest.",
+      "urls": [
+        {
+          "url": "https://x.com/curllmooha",
+          "role": "owner-shared-profile",
+          "note": "original owner-shared X profile",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 192822,
+          "sha256": "3b63c4d91665a78431ca2d5fdfd25d047defeed39c74b13fd672f9d5f29ba738",
+          "attemptedAt": "2026-09-12T15:29:29Z",
+          "redirected": false,
+          "finalUrl": "https://x.com/curllmooha"
+        },
+        {
+          "url": "https://sketchesbycurllmooha.vercel.app/",
+          "role": "live-site",
+          "note": "the catalogue format itself",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 17869,
+          "sha256": "ca75e8dabc74f9cda321951644bee64c0da95796a997b8886a0c1ce90d1a685f",
+          "attemptedAt": "2026-09-12T15:29:31Z",
+          "redirected": false,
+          "finalUrl": "https://sketchesbycurllmooha.vercel.app/"
+        }
+      ],
+      "unfetchedPacketUrls": [],
+      "carrierSkills": [
+        {
+          "name": "threejs-game-development",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\software-development\\threejs-game-development\\SKILL.md",
+          "packetSha256": "707888880f11fe498e5233417ba0b2a808f943c27954881fa19ca239798e2ce9",
+          "actualSha256": "707888880f11fe498e5233417ba0b2a808f943c27954881fa19ca239798e2ce9",
+          "driftFromPacket": false,
+          "lines": 131,
+          "fullBodyReadInRecoveryWindow": true,
+          "readAt": "2026-09-12",
+          "coverage": "full body, 131 lines, frontmatter to final line",
+          "specifyingSection": "\"Full-procedural scene & map prompts (register rows 34, 35, 37)\", lines 95-122: the one-page-brief pattern, the three-verb whitelist with an explicit forbidden list, the all-procedural clause, and the fable-test Z-up-centimetres to Y-up-metres conversion with cache-build progress UX."
+        },
+        {
+          "name": "atomic-acres-procedural-art-authoring",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\atomic-acres-procedural-art-authoring\\SKILL.md",
+          "packetSha256": "19f93b23bdcef5832c246772600c7740631cb3a43b6d424324a58eecfdab9508",
+          "actualSha256": "19f93b23bdcef5832c246772600c7740631cb3a43b6d424324a58eecfdab9508",
+          "driftFromPacket": false,
+          "lines": 152,
+          "fullBodyReadInRecoveryWindow": false,
+          "readAt": null,
+          "coverage": "NOT READ in the 2026-09-12 recovery window",
+          "specifyingSection": null
+        }
+      ],
+      "carrierReadComplete": false,
+      "methodConsumer": "Each bay is built by index and is resolvable without constructing any other.",
+      "cpuChecks": [
+        "group-c-demos.test.ts: instantiate, assert metadata agrees with the manifest, assert every position is finite, assert bounded mesh/vertex counts, assert no undeclared light, advance 12 steps, dispose and assert the root is empty."
+      ],
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel."
+    },
+    {
+      "sourceId": 42,
+      "registerTitle": "The vibe-stack shelf — six further MIT Three.js tools by the row 10/33/38 author",
+      "registerLine": 933,
+      "canonical": "Canonical:** none single — this row indexes an ORGANISATION, `vibe-stack`, whose repositories are listed in the table above with their own licences. Pin the specific repository at the moment it is adopted; nothing here is pinned by recording it.",
+      "licence": null,
+      "decision": "Decision:** register the shelf so it stops being rediscovered one repo at a time. Nothing is adopted by recording it. Before any use: re-verify the licence file, pin the commit, and run our own silhouette/scale/triangle-count/LOD gates. `vibeviz`'s licence must be file-verified before it moves past this row.",
+      "urls": [
+        {
+          "url": "https://x.com/stefan_3d_ai?s=11",
+          "role": "owner-shared-profile",
+          "note": "original owner-shared X profile",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 265515,
+          "sha256": "4366a323512a5813cba3b81d787eb4d3a2d1715d45c16a7a039e59caef64c677",
+          "attemptedAt": "2026-09-12T15:29:33Z",
+          "redirected": false,
+          "finalUrl": "https://x.com/stefan_3d_ai?s=11"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/vibe-stack/procedural-bank/main/LICENSE",
+          "role": "licence-file",
+          "note": "MIT claimed; read the file",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 1072,
+          "sha256": "aff6c54aef3c746d91c6b66d7de5524998605d96c9bc33c18af51f13db34ac82",
+          "attemptedAt": "2026-09-12T15:29:35Z",
+          "redirected": false,
+          "finalUrl": "https://raw.githubusercontent.com/vibe-stack/procedural-bank/main/LICENSE"
+        },
+        {
+          "url": "https://api.github.com/repos/vibe-stack/procedural-bank/contents/src/grammar",
+          "role": "repo-tree",
+          "note": "shape-grammar module listing",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 10144,
+          "sha256": "ad68e89b2e51961dc0368458d547f452d26f4c6d665caac7af271cc66844a61b",
+          "attemptedAt": "2026-09-12T15:29:36Z",
+          "redirected": false,
+          "finalUrl": "https://api.github.com/repos/vibe-stack/procedural-bank/contents/src/grammar"
+        }
+      ],
+      "unfetchedPacketUrls": [],
+      "carrierSkills": [
+        {
+          "name": "atomic-acres-procedural-art-authoring",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\atomic-acres-procedural-art-authoring\\SKILL.md",
+          "packetSha256": "19f93b23bdcef5832c246772600c7740631cb3a43b6d424324a58eecfdab9508",
+          "actualSha256": "19f93b23bdcef5832c246772600c7740631cb3a43b6d424324a58eecfdab9508",
+          "driftFromPacket": false,
+          "lines": 152,
+          "fullBodyReadInRecoveryWindow": false,
+          "readAt": null,
+          "coverage": "NOT READ in the 2026-09-12 recovery window",
+          "specifyingSection": null
+        },
+        {
+          "name": "ai-3d-asset-generation-loop",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\ai-3d-asset-generation-loop\\SKILL.md",
+          "packetSha256": "c411b9d7d50a1dcc4c5e5b41e1f7f9a99558f6f75b208287182b73aaa8c22bc0",
+          "actualSha256": "c411b9d7d50a1dcc4c5e5b41e1f7f9a99558f6f75b208287182b73aaa8c22bc0",
+          "driftFromPacket": false,
+          "lines": 203,
+          "fullBodyReadInRecoveryWindow": true,
+          "readAt": "2026-09-12",
+          "coverage": "full body, 203 lines, frontmatter to final line",
+          "specifyingSection": "\"Mesh optimization station: Needle Mesh Baker (register row 36)\", lines 168-179 (voxel remesh plus highpoly-to-lowpoly attribute bake), and \"The local native route for the AI-generated-mesh lane (register row 45)\", lines 181-203."
+        }
+      ],
+      "carrierReadComplete": false,
+      "methodConsumer": "deriveBuilding() rewrites a footprint into podium/shaft/crown and derives bay count from face width over bay width.",
+      "cpuChecks": [
+        "group-c-demos.test.ts: instantiate, assert metadata agrees with the manifest, assert every position is finite, assert bounded mesh/vertex counts, assert no undeclared light, advance 12 steps, dispose and assert the root is empty.",
+        "the mass tiles the height exactly; a wider building gets MORE bays of the same width."
+      ],
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel."
+    },
+    {
+      "sourceId": 43,
+      "registerTitle": "Image to engine-native editable scene, with lighting kept as a parameter (Lumera)",
+      "registerLine": 958,
+      "canonical": "Canonical:** none usable. A paper page with no released code or weights; nothing to pin, nothing to licence-check, nothing to run.",
+      "licence": null,
+      "decision": "Decision:** **not adoptable today, and the row exists to stop it being re-evaluated as if it were.** The transferable *principle* is real and free: when reconstructing a scene from a reference image, keep objects separable and keep lighting as engine parameters rather than baked into textures — which is precisely what `img2threejs` already does by generating code instead of baked meshes. Re-check for a code release before any plan depends on it. Note the direct tension with the owner's Map 3 thesis: this is an image-to-asset route, whereas Map 3 is testing whether maths-and-code beats importing assets at all.",
+      "urls": [
+        {
+          "url": "https://x.com/stefan_3d_ai/status/2093937170717585657",
+          "role": "owner-shared-post",
+          "note": "original owner-shared X post",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 199040,
+          "sha256": "0199bb4862cc981d413f6851ad19f5db2a4d31944884079fe2da062025884b02",
+          "attemptedAt": "2026-09-12T15:29:38Z",
+          "redirected": true,
+          "finalUrl": "https://x.com/Stefan_3D_AI/status/2093937170717585657"
+        },
+        {
+          "url": "https://haidilao0328.github.io/Lumera/",
+          "role": "paper-page",
+          "note": "paper page; code and weights marked Soon",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 1087,
+          "sha256": "e8a9cf9d757aff3c60d69d7df37ceec9bd9182a0c391d4ee9cd7238eb3b66347",
+          "attemptedAt": "2026-09-12T15:29:41Z",
+          "redirected": false,
+          "finalUrl": "https://haidilao0328.github.io/Lumera/"
+        }
+      ],
+      "unfetchedPacketUrls": [],
+      "carrierSkills": [
+        {
+          "name": "ai-3d-asset-generation-loop",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\ai-3d-asset-generation-loop\\SKILL.md",
+          "packetSha256": "c411b9d7d50a1dcc4c5e5b41e1f7f9a99558f6f75b208287182b73aaa8c22bc0",
+          "actualSha256": "c411b9d7d50a1dcc4c5e5b41e1f7f9a99558f6f75b208287182b73aaa8c22bc0",
+          "driftFromPacket": false,
+          "lines": 203,
+          "fullBodyReadInRecoveryWindow": true,
+          "readAt": "2026-09-12",
+          "coverage": "full body, 203 lines, frontmatter to final line",
+          "specifyingSection": "\"Mesh optimization station: Needle Mesh Baker (register row 36)\", lines 168-179 (voxel remesh plus highpoly-to-lowpoly attribute bake), and \"The local native route for the AI-generated-mesh lane (register row 45)\", lines 181-203."
+        },
+        {
+          "name": "img2threejs",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\img2threejs\\SKILL.md",
+          "packetSha256": "c0ae7cdb98c991e0f6f08483c955e22f65eea83cf2386222157c58e903e5dc95",
+          "actualSha256": "c0ae7cdb98c991e0f6f08483c955e22f65eea83cf2386222157c58e903e5dc95",
+          "driftFromPacket": false,
+          "lines": 614,
+          "fullBodyReadInRecoveryWindow": false,
+          "readAt": null,
+          "coverage": "NOT READ in the 2026-09-12 recovery window",
+          "specifyingSection": null
+        }
+      ],
+      "carrierReadComplete": false,
+      "methodConsumer": "The same props are built twice: merged with irradiance in vertex colour, and separable under one positioned light that moves in update().",
+      "cpuChecks": [
+        "group-c-demos.test.ts: instantiate, assert metadata agrees with the manifest, assert every position is finite, assert bounded mesh/vertex counts, assert no undeclared light, advance 12 steps, dispose and assert the root is empty."
+      ],
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel."
+    },
+    {
+      "sourceId": 44,
+      "registerTitle": "Thin comparators from the 2026-08-31 sweep",
+      "registerLine": 966,
+      "canonical": "Canonical:** none for either — neither post resolves to a repository, a released tool or a licence, which is the finding rather than a gap in the search.",
+      "licence": null,
+      "decision": null,
+      "urls": [
+        {
+          "url": "https://x.com/lexnlin/status/2093982122197627217",
+          "role": "owner-shared-post",
+          "note": "comparator post 1",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 205605,
+          "sha256": "abe2a891bba2a753da79f2b440cd5158ea65273e3b9215f0a00787daab8db0ce",
+          "attemptedAt": "2026-09-12T15:29:42Z",
+          "redirected": true,
+          "finalUrl": "https://x.com/LexnLin/status/2093982122197627217"
+        },
+        {
+          "url": "https://x.com/Stefan_3D_AI",
+          "role": "owner-shared-profile",
+          "note": "comparator post 2 (loop mode)",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 265461,
+          "sha256": "b27427b7fca40322a377d940701b73f33520f465c76e757aea0db758855035d5",
+          "attemptedAt": "2026-09-12T15:29:46Z",
+          "redirected": false,
+          "finalUrl": "https://x.com/Stefan_3D_AI"
+        }
+      ],
+      "unfetchedPacketUrls": [],
+      "carrierSkills": [
+        {
+          "name": "ai-3d-asset-generation-loop",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\ai-3d-asset-generation-loop\\SKILL.md",
+          "packetSha256": "c411b9d7d50a1dcc4c5e5b41e1f7f9a99558f6f75b208287182b73aaa8c22bc0",
+          "actualSha256": "c411b9d7d50a1dcc4c5e5b41e1f7f9a99558f6f75b208287182b73aaa8c22bc0",
+          "driftFromPacket": false,
+          "lines": 203,
+          "fullBodyReadInRecoveryWindow": true,
+          "readAt": "2026-09-12",
+          "coverage": "full body, 203 lines, frontmatter to final line",
+          "specifyingSection": "\"Mesh optimization station: Needle Mesh Baker (register row 36)\", lines 168-179 (voxel remesh plus highpoly-to-lowpoly attribute bake), and \"The local native route for the AI-generated-mesh lane (register row 45)\", lines 181-203."
+        },
+        {
+          "name": "visual-gauntlet-loop",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\quality\\visual-gauntlet-loop\\SKILL.md",
+          "packetSha256": "6b546fc4d1e367ce1f2d892b874521a4d77484921f3c49a216b19c5774b22434",
+          "actualSha256": "6b546fc4d1e367ce1f2d892b874521a4d77484921f3c49a216b19c5774b22434",
+          "driftFromPacket": false,
+          "lines": 84,
+          "fullBodyReadInRecoveryWindow": false,
+          "readAt": null,
+          "coverage": "NOT READ in the 2026-09-12 recovery window",
+          "specifyingSection": null
+        }
+      ],
+      "carrierReadComplete": false,
+      "methodConsumer": "None. Blocked: no factory is exported and the manifest entry carries no createDemo.",
+      "cpuChecks": [
+        "group-c-demos.test.ts: instantiate, assert metadata agrees with the manifest, assert every position is finite, assert bounded mesh/vertex counts, assert no undeclared light, advance 12 steps, dispose and assert the root is empty."
+      ],
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel."
+    },
+    {
+      "sourceId": 45,
+      "registerTitle": "Trellis.2 and Pixal3D as CORE ComfyUI nodes - local image-to-3D with a full PBR bake",
+      "registerLine": 976,
+      "canonical": "Canonical:** `comfyanonymous/ComfyUI` @ `0e65cb907193cf1013bda474593eb48d8c53d848` (the merge commit of PR #14718 \"feat: Support Pixal3d and TRELLIS2\", merged 2026-08-22T00:32Z into `master`; shipped in release **v0.34.0**, which is the version installed here). Upstream generators: `microsoft/TRELLIS.2` @ `75fbf0183001ed9876c8dbb35de6b68552ee08bd` and `TencentARC/Pixal3D` @ `f7cf38429b0bd264f1995f0f8743a88b1c728b94` (SIGGRAPH 2026, \"Pixel-Aligned 3D Generation from Images\").",
+      "licence": "Licence:** CLEAR for the generators, with one **observed-vs-claimed discrepancy that the announcement's own wording hides**. Read as files on 2026-09-02, not from SPDX fields: `microsoft/TRELLIS.2/LICENSE` is MIT (c) Microsoft Corporation; `TencentARC/Pixal3D/LICENSE` (GitHub `master`, and a real `LICENSE` file in the HF weights repo too) is MIT (c) 2026 Tencent with **no non-commercial or jurisdiction clause**; that repo's `NOTICE` names dinov2 (Apache-2.0), TRELLIS.2 (MIT, Microsoft), Direct3D-S2 (MIT, DreamTech) and MoGe (MIT, Microsoft). MoGe's Comfy-Org repackage carries a real MIT+Apache-2.0 `LICENSE` file. **The discrepancy:** the three Comfy-Org repackaged repos actually used by the workflow - `Comfy-Org/TRELLIS.2` @ `463441b1c32829ee876e4f297dcfff533cb357a7`, `Comfy-Org/Pixal3D` @ `b35ffffa61fa02a86c377d94b755d9fe65d185d9`, `Comfy-Org/BiRefNet` @ `5a1bd8ae750548f8cd42e3c8afa854fd3eba0fb1` - contain **no LICENSE file whatsoever**; MIT is only a model-card metadata field, i.e. a claim about a bundle. And the required image encoder `dino_v3_L_naf_fp32.safetensors` is a **DINOv3** backbone (Meta's custom DINOv3 License: commercial use permitted, but with an attribution condition and redistribution terms, and explicitly not Apache/MIT - DINOv2 was Apache-2.0, DINOv3 is not) with a NAF upsampler vendored from `valeoai/NAF` (Apache-2.0, credited in `comfy/image_encoders/naf.py`). So \"no non-commercial license traps\" is TRUE; \"it's all MIT\" is NOT. If anything generated by this route ships publicly, clear the DINOv3 attribution condition with the owner first.",
+      "decision": "Decision:** ADOPT as the executable form of the \"AI-generated mesh\" supply route in `ai-3d-asset-generation-loop` - free, local, commercially usable, no paid API, one bounded prop at a time. It does **not** relax any existing boundary: image-to-3D still invents hidden geometry and still produces an unrigged shell, so it is for **static hero props only**, never characters, never first-person arms, never rigged or deforming geometry, and never in preference to a procedural rebuild for terrain, architecture, repeated dressing or anything needing colliders and destruction groups. Atomic Acres remains procedural-art-first: a generated mesh is a per-asset owner exception carried by `assets.manifest.json` and `qa:asset-provenance`, not a general licence to import geometry. ComfyUI's own `Preview3D` is never acceptance evidence. Do not update, restart or queue work on the owner's ComfyUI beyond a single authorised bounded test with an idle queue.",
+      "urls": [
+        {
+          "url": "https://x.com/comfyui/status/2094561833638404449",
+          "role": "owner-shared-post",
+          "note": "original owner-shared X post",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 192824,
+          "sha256": "d45fa14fb825f253f458aa45e8ce2a89d5732785189d0ecade87b114799c0c01",
+          "attemptedAt": "2026-09-12T15:29:47Z",
+          "redirected": true,
+          "finalUrl": "https://x.com/ComfyUI/status/2094561833638404449"
+        },
+        {
+          "url": "https://blog.comfy.org/p/trellis2-and-pixal3d-are-now-native",
+          "role": "vendor-blog",
+          "note": "announcement",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 220753,
+          "sha256": "ecc64683ee1a33d15f733a98febe17f86d4aae215541ddfa5da48ce09d3078c4",
+          "attemptedAt": "2026-09-12T15:29:50Z",
+          "redirected": false,
+          "finalUrl": "https://blog.comfy.org/p/trellis2-and-pixal3d-are-now-native"
+        },
+        {
+          "url": "https://docs.comfy.org/tutorials/3d/trellis2",
+          "role": "vendor-docs",
+          "note": "node chain tutorial",
+          "outcome": "error",
+          "httpStatus": null,
+          "bytes": null,
+          "sha256": null,
+          "attemptedAt": "2026-09-12T15:29:52Z",
+          "redirected": null,
+          "finalUrl": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/comfyanonymous/ComfyUI/0e65cb907193cf1013bda474593eb48d8c53d848/comfy_extras/nodes_mesh_postprocess.py",
+          "role": "pinned-source-file",
+          "note": "the actual mesh post-processing node implementations at the register pin",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 149326,
+          "sha256": "ac1cc63b9bd5efa1beac4c274c3b76dc5938faf48fc4d648f77b4a4372d80a27",
+          "attemptedAt": "2026-09-12T15:29:52Z",
+          "redirected": false,
+          "finalUrl": "https://raw.githubusercontent.com/comfyanonymous/ComfyUI/0e65cb907193cf1013bda474593eb48d8c53d848/comfy_extras/nodes_mesh_postprocess.py"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/microsoft/TRELLIS.2/75fbf0183001ed9876c8dbb35de6b68552ee08bd/LICENSE",
+          "role": "licence-file",
+          "note": "MIT claimed; read the file at pin",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 1140,
+          "sha256": "d9a1b1e30d633d5732ea18e3cba9538d293ebc53e1a9e4e96ab739e0c5c4f1cb",
+          "attemptedAt": "2026-09-12T15:29:53Z",
+          "redirected": false,
+          "finalUrl": "https://raw.githubusercontent.com/microsoft/TRELLIS.2/75fbf0183001ed9876c8dbb35de6b68552ee08bd/LICENSE"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/TencentARC/Pixal3D/f7cf38429b0bd264f1995f0f8743a88b1c728b94/LICENSE",
+          "role": "licence-file",
+          "note": "MIT claimed; read the file at pin",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 1065,
+          "sha256": "8e28d8efae5a9ac269c3b7c5df67a5ea4b5f1ae02543d6407dc35ea4b8346ab7",
+          "attemptedAt": "2026-09-12T15:29:53Z",
+          "redirected": false,
+          "finalUrl": "https://raw.githubusercontent.com/TencentARC/Pixal3D/f7cf38429b0bd264f1995f0f8743a88b1c728b94/LICENSE"
+        },
+        {
+          "url": "https://x.com/philippsieben/status/2095440655170294085",
+          "role": "owner-shared-post",
+          "note": "second owner share",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 235690,
+          "sha256": "80b26f09a60060ba082d152feb3a81e7512c3325ae3530913ed6bddb40c7e177",
+          "attemptedAt": "2026-09-12T15:29:54Z",
+          "redirected": false,
+          "finalUrl": "https://x.com/philippsieben/status/2095440655170294085"
+        }
+      ],
+      "unfetchedPacketUrls": [
+        "https://github.com/comfyanonymous/ComfyUI",
+        "https://github.com/microsoft/TRELLIS.2",
+        "https://github.com/TencentARC/Pixal3D"
+      ],
+      "carrierSkills": [
+        {
+          "name": "ai-3d-asset-generation-loop",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\ai-3d-asset-generation-loop\\SKILL.md",
+          "packetSha256": "c411b9d7d50a1dcc4c5e5b41e1f7f9a99558f6f75b208287182b73aaa8c22bc0",
+          "actualSha256": "c411b9d7d50a1dcc4c5e5b41e1f7f9a99558f6f75b208287182b73aaa8c22bc0",
+          "driftFromPacket": false,
+          "lines": 203,
+          "fullBodyReadInRecoveryWindow": true,
+          "readAt": "2026-09-12",
+          "coverage": "full body, 203 lines, frontmatter to final line",
+          "specifyingSection": "\"Mesh optimization station: Needle Mesh Baker (register row 36)\", lines 168-179 (voxel remesh plus highpoly-to-lowpoly attribute bake), and \"The local native route for the AI-generated-mesh lane (register row 45)\", lines 181-203."
+        },
+        {
+          "name": "comfyui-3d-native-pipeline",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\comfyui-3d-native-pipeline\\SKILL.md",
+          "packetSha256": "61202ad0e934552e86c435213da16490015a77ef9497225eabfdb66b2c53f52a",
+          "actualSha256": "61202ad0e934552e86c435213da16490015a77ef9497225eabfdb66b2c53f52a",
+          "driftFromPacket": false,
+          "lines": 247,
+          "fullBodyReadInRecoveryWindow": true,
+          "readAt": "2026-09-12",
+          "coverage": "full body, 247 lines, frontmatter to final line",
+          "specifyingSection": "\"The node chain, in execution order\" step 6, lines 70-72, plus the licence-reality section at 195-210 (the DINOv3 backbone under Meta's custom licence inside a bundle whose model card says MIT)."
+        }
+      ],
+      "carrierReadComplete": true,
+      "methodConsumer": "voxelToMesh() -> weldVertices() -> fillHoles() -> averaged normals, in that order, with the order itself asserted by the CPU check.",
+      "cpuChecks": [
+        "group-c-demos.test.ts: instantiate, assert metadata agrees with the manifest, assert every position is finite, assert bounded mesh/vertex counts, assert no undeclared light, advance 12 steps, dispose and assert the root is empty.",
+        "weld strictly reduces vertices without changing triangle count, and after fill no edge is used by exactly one triangle."
+      ],
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel."
+    },
+    {
+      "sourceId": 46,
+      "registerTitle": "Physically-based FFT ocean, and bubble backscatter as the missing colour term (Three.js Water Pro)",
+      "registerLine": 991,
+      "canonical": "Canonical:** **none available, and that is the finding.** `dgreenheck/webgpu-water` (the",
+      "licence": "Licence:** the shipped library is **Commercial Software License Agreement v2.2 (14 Aug",
+      "decision": "Decision - what we may do, and what is out of bounds.**",
+      "urls": [
+        {
+          "url": "https://x.com/dangreenheck/status/2095028187063280085",
+          "role": "owner-shared-post",
+          "note": "original owner-shared X post",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 210622,
+          "sha256": "a0bb3004f76de4ba9ba1040473db49b0cf190d0f25937e614acf016d6349a175",
+          "attemptedAt": "2026-09-12T15:29:56Z",
+          "redirected": false,
+          "finalUrl": "https://x.com/dangreenheck/status/2095028187063280085"
+        },
+        {
+          "url": "https://docs.threejswaterpro.com/license.html",
+          "role": "licence-page",
+          "note": "commercial licence text - read terms, never the product source",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 42143,
+          "sha256": "eda1019227ccf0367445dc8e847c68eeca5cc0d0a7e6b05b48670a49ad10939c",
+          "attemptedAt": "2026-09-12T15:29:58Z",
+          "redirected": false,
+          "finalUrl": "https://docs.threejswaterpro.com/license.html"
+        },
+        {
+          "url": "https://github.com/dgreenheck/webgpu-water",
+          "role": "author-owned-repo",
+          "note": "register records 404; re-verify",
+          "outcome": "http-error",
+          "httpStatus": 404,
+          "bytes": 268674,
+          "sha256": "359756979766b1ee491532df977744d8c5672bb6e2d98eaf361da348360e8a09",
+          "attemptedAt": "2026-09-12T15:29:58Z",
+          "redirected": null,
+          "finalUrl": null
+        },
+        {
+          "url": "https://api.github.com/users/dgreenheck/repos?per_page=100",
+          "role": "author-owned-repo",
+          "note": "enumerate author repos for any public water source",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 234865,
+          "sha256": "49d3c646d97bfac01a4ab12f665f5a137d727d5d6050fe474d70613a19f71ce1",
+          "attemptedAt": "2026-09-12T15:29:59Z",
+          "redirected": false,
+          "finalUrl": "https://api.github.com/users/dgreenheck/repos?per_page=100"
+        }
+      ],
+      "unfetchedPacketUrls": [],
+      "carrierSkills": [
+        {
+          "name": "threejs-webgpu-water",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\threejs-webgpu-water\\SKILL.md",
+          "packetSha256": "11eeed4772af20f42e78535dc505168f794b8c35928f1920ae8e98e8dde290b0",
+          "actualSha256": "11eeed4772af20f42e78535dc505168f794b8c35928f1920ae8e98e8dde290b0",
+          "driftFromPacket": false,
+          "lines": 343,
+          "fullBodyReadInRecoveryWindow": true,
+          "readAt": "2026-09-12",
+          "coverage": "full body, 343 lines, frontmatter to final line",
+          "specifyingSection": "\"1. Beer-Lambert absorption first\", lines 90-106, and \"2. Broadband backscatter\", lines 108-131: the bubble term is scattering injected UPSTREAM of the absorption integral, flat-in/red-filtered-out gives the green shift, and it must be zero in calm water. Restated by the gotcha at line 333 and the acceptance line at 313-314."
+        }
+      ],
+      "carrierReadComplete": true,
+      "methodConsumer": "shadeCorrect() injects the bubble term inside the absorption integral; shadeTintedAfter() adds the same energy afterwards, and the test asserts only the first produces a green shift.",
+      "cpuChecks": [
+        "group-c-demos.test.ts: instantiate, assert metadata agrees with the manifest, assert every position is finite, assert bounded mesh/vertex counts, assert no undeclared light, advance 12 steps, dispose and assert the root is empty.",
+        "scatter-inside is green-shifted and tint-after is not; both agree exactly at zero turbulence."
+      ],
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel."
+    },
+    {
+      "sourceId": 47,
+      "registerTitle": "GTA-style open-world city art - a bar, not a pipeline (the loop is already rows 13 and 34)",
+      "registerLine": 1126,
+      "canonical": "Canonical:** **none for the city build.** The only canonical artefact in this author's",
+      "licence": "Licence:** article prose **copyrighted, marketing** - restate, never copy. Video",
+      "decision": "Decision:** the honest finding is that **HF-419 is not a new technique**. The method it",
+      "urls": [
+        {
+          "url": "https://x.com/mattshumer_/status/2095187868746383758",
+          "role": "owner-shared-post",
+          "note": "original owner-shared X post",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 259550,
+          "sha256": "0fff550daced1539489e2db9ce9e0dc95326ad880988dbe1016a2f19b798c6f0",
+          "attemptedAt": "2026-09-12T15:30:00Z",
+          "redirected": false,
+          "finalUrl": "https://x.com/mattshumer_/status/2095187868746383758"
+        },
+        {
+          "url": "https://somethingbig.ai/gauntlet-loop",
+          "role": "method-article",
+          "note": "the only linked method article in this author's orbit",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 73735,
+          "sha256": "3594a5d4bf3abf36f386aa7ce5ab292dd052846155599c4a98c16b94dea3553f",
+          "attemptedAt": "2026-09-12T15:30:02Z",
+          "redirected": false,
+          "finalUrl": "https://somethingbig.ai/gauntlet-loop"
+        }
+      ],
+      "unfetchedPacketUrls": [],
+      "carrierSkills": [
+        {
+          "name": "open-world-city-art-loop",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\open-world-city-art-loop\\SKILL.md",
+          "packetSha256": "e1c7a3ce04900355f67221906b8fde166bd747844742390d89b2a39e48eadbbc",
+          "actualSha256": "e1c7a3ce04900355f67221906b8fde166bd747844742390d89b2a39e48eadbbc",
+          "driftFromPacket": false,
+          "lines": 285,
+          "fullBodyReadInRecoveryWindow": false,
+          "readAt": null,
+          "coverage": "NOT READ in the 2026-09-12 recovery window",
+          "specifyingSection": null
+        }
+      ],
+      "carrierReadComplete": false,
+      "methodConsumer": "The cell is authored road first, then paving and kerb, then instanced facade bays, then furniture.",
+      "cpuChecks": [
+        "group-c-demos.test.ts: instantiate, assert metadata agrees with the manifest, assert every position is finite, assert bounded mesh/vertex counts, assert no undeclared light, advance 12 steps, dispose and assert the root is empty."
+      ],
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel."
+    },
+    {
+      "sourceId": 48,
+      "registerTitle": "The dark-interior look bought with no lighting technology at all (browser subway FPS)",
+      "registerLine": 1189,
+      "canonical": "Canonical:** none - the game is not published and runs on the author's `localhost:8080`.",
+      "licence": "Licence: UNKNOWN, therefore all-rights-reserved.** No licence is stated and no code exists",
+      "decision": "Decision:** ADOPT the *method*, and record loudly that **the look is not bought with",
+      "urls": [
+        {
+          "url": "https://x.com/bijanbowen/status/2094931925513261273",
+          "role": "owner-shared-post",
+          "note": "original owner-shared X post",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 193837,
+          "sha256": "fa5f11a2d3aff2b81842bf975bcecb8fa73f8fe446b1ffe3b2f579def493e0a8",
+          "attemptedAt": "2026-09-12T15:30:03Z",
+          "redirected": false,
+          "finalUrl": "https://x.com/bijanbowen/status/2094931925513261273"
+        },
+        {
+          "url": "https://api.fxtwitter.com/bijanbowen/status/2094931925513261273",
+          "role": "recorded-mirror",
+          "note": "the exact mirror URL recorded in the packet for this row",
+          "outcome": "error",
+          "httpStatus": null,
+          "bytes": null,
+          "sha256": null,
+          "attemptedAt": "2026-09-12T15:30:04Z",
+          "redirected": null,
+          "finalUrl": null
+        }
+      ],
+      "unfetchedPacketUrls": [],
+      "carrierSkills": [
+        {
+          "name": "threejs-webgpu-interior-lighting-look",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\threejs-webgpu-interior-lighting-look\\SKILL.md",
+          "packetSha256": "f0a9ebbe4aba8dc2ab8c1912e3a4936eeff726b51fd63ee4320c974b409ee732",
+          "actualSha256": "f0a9ebbe4aba8dc2ab8c1912e3a4936eeff726b51fd63ee4320c974b409ee732",
+          "driftFromPacket": false,
+          "lines": 202,
+          "fullBodyReadInRecoveryWindow": false,
+          "readAt": null,
+          "coverage": "NOT READ in the 2026-09-12 recovery window",
+          "specifyingSection": null
+        }
+      ],
+      "carrierReadComplete": false,
+      "methodConsumer": "A narrow desaturated value band, emissive fixtures, two declared short-range lights on visible fixtures, and per-vertex distance darkening.",
+      "cpuChecks": [
+        "group-c-demos.test.ts: instantiate, assert metadata agrees with the manifest, assert every position is finite, assert bounded mesh/vertex counts, assert no undeclared light, advance 12 steps, dispose and assert the root is empty."
+      ],
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel."
+    },
+    {
+      "sourceId": 49,
+      "registerTitle": "MotionBricks - a realtime motion PLANNER, with Kimodo as its authoring input (motion-bricks.cpp)",
+      "registerLine": 1274,
+      "canonical": "Canonical:** `localai-org/motion-bricks.cpp` @ `6fdb75e15ddb7f97dd1a4abb8017a57b936bc7a3`",
+      "licence": "Licence:** **CLEAR, on the same terms row 16 already cleared, all files read as file bodies on",
+      "decision": "Decision:** **ADOPT AS A COMPLEMENT TO ROW 16, OFFLINE ONLY, AND NOT YET.**",
+      "urls": [
+        {
+          "url": "https://x.com/jichiep/status/2095157236658315288",
+          "role": "owner-shared-post",
+          "note": "original owner-shared X post",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 287686,
+          "sha256": "3d949b932e0c2bf98ad7de926364a89188d58b9b8918bae3eac4f65d151eb470",
+          "attemptedAt": "2026-09-12T15:30:04Z",
+          "redirected": false,
+          "finalUrl": "https://x.com/jichiep/status/2095157236658315288"
+        },
+        {
+          "url": "https://github.com/localai-org/motion-bricks.cpp",
+          "role": "author-owned-repo",
+          "note": "linked GitHub source",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 323385,
+          "sha256": "d846db92d5f61383843006ea35b02aa855577504cd116f3e41b0e3cb5fe7ff37",
+          "attemptedAt": "2026-09-12T15:30:07Z",
+          "redirected": false,
+          "finalUrl": "https://github.com/localai-org/motion-bricks.cpp"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/localai-org/motion-bricks.cpp/6fdb75e15ddb7f97dd1a4abb8017a57b936bc7a3/LICENSE",
+          "role": "licence-file",
+          "note": "Apache-2.0 claimed; read the file at pin",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 11357,
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "attemptedAt": "2026-09-12T15:30:08Z",
+          "redirected": false,
+          "finalUrl": "https://raw.githubusercontent.com/localai-org/motion-bricks.cpp/6fdb75e15ddb7f97dd1a4abb8017a57b936bc7a3/LICENSE"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/localai-org/motion-bricks.cpp/6fdb75e15ddb7f97dd1a4abb8017a57b936bc7a3/docs/IMPLEMENTATION.md",
+          "role": "pinned-source-file",
+          "note": "planner contract and the explicit WebAssembly deferral",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 39254,
+          "sha256": "128ed53888942f957a34f24c2ecbe5c7ad1d51b5d21931382b7413e2ac2a8906",
+          "attemptedAt": "2026-09-12T15:30:10Z",
+          "redirected": false,
+          "finalUrl": "https://raw.githubusercontent.com/localai-org/motion-bricks.cpp/6fdb75e15ddb7f97dd1a4abb8017a57b936bc7a3/docs/IMPLEMENTATION.md"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/localai-org/motion-bricks.cpp/6fdb75e15ddb7f97dd1a4abb8017a57b936bc7a3/docs/DEMO.md",
+          "role": "pinned-source-file",
+          "note": "G1-only skeleton statement",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 5370,
+          "sha256": "cbecfaff7b536a672d3d2744accb4819f2912260e1e2309b483f512edcf1c948",
+          "attemptedAt": "2026-09-12T15:30:11Z",
+          "redirected": false,
+          "finalUrl": "https://raw.githubusercontent.com/localai-org/motion-bricks.cpp/6fdb75e15ddb7f97dd1a4abb8017a57b936bc7a3/docs/DEMO.md"
+        }
+      ],
+      "unfetchedPacketUrls": [],
+      "carrierSkills": [
+        {
+          "name": "game-animation-asset-pipeline",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\game-animation-asset-pipeline\\SKILL.md",
+          "packetSha256": "f6dafcfe8063b2c85c8cf82a0664a7998ac62a7a30a11bbbd029f54a5fbb902d",
+          "actualSha256": "f6dafcfe8063b2c85c8cf82a0664a7998ac62a7a30a11bbbd029f54a5fbb902d",
+          "driftFromPacket": false,
+          "lines": 362,
+          "fullBodyReadInRecoveryWindow": false,
+          "readAt": null,
+          "coverage": "NOT READ in the 2026-09-12 recovery window",
+          "specifyingSection": null
+        }
+      ],
+      "carrierReadComplete": false,
+      "methodConsumer": "stepCriticallyDamped() places each constraint; the last four produced frames are retained as the next window's context.",
+      "cpuChecks": [
+        "group-c-demos.test.ts: instantiate, assert metadata agrees with the manifest, assert every position is finite, assert bounded mesh/vertex counts, assert no undeclared light, advance 12 steps, dispose and assert the root is empty.",
+        "converges to the target with overshoot below 1e-3."
+      ],
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel."
+    },
+    {
+      "sourceId": 50,
+      "registerTitle": "fable51-worlds - agent-swarm-built explorable cities, and a world QA harness that is mechanical",
+      "registerLine": 1375,
+      "canonical": "Canonical:** `PhiloLabs/fable51-worlds` @ `1dcc255adc5600cfec8a7e3e38c896074668dd1e` (merge of PR #1 \"Add Higashiyama, Kyoto\", 2026-09-03T06:09:40Z), default branch `main`.",
+      "licence": "Licence:** **MIT, read as a FILE not an API field** - `LICENSE` fetched raw (HTTP 200, 1,066 B), \"MIT License / Copyright (c) 2026 PhiloLabs\". The README adds layered terms an SPDX field would have hidden: **code and generated assets MIT; geometry derived from OpenStreetMap is ODbL; USGS 3DEP elevation is public domain; reference photographs are deliberately not redistributed** (provenance recorded per sector in each world's `refs/*/SOURCES.md`); brand names and logos belong to their owners. So the SF world's *shape* carries an ODbL share-alike obligation the MIT header does not describe - relevant only if we ever derive from real-world geometry, which we do not.",
+      "decision": "Decision: INGEST THE QA HARNESS PATTERN ONLY. No code reuse, no vendoring, no port.** The repository is WebGL / three 0.180 with no TSL and no WebGPU, so nothing in it drops into our renderer, and its art direction is not ours. What transfers is atom 1 (with 2), which is engine-agnostic and is exactly the class of gate this project keeps re-learning it needs: a green gate that never asked the real question. Recorded against the standing lesson in `gotcha-hardcoded-gate-rosters` and `gotcha-gate-drives-debug-backdoor`.",
+      "urls": [
+        {
+          "url": "https://github.com/PhiloLabs/fable51-worlds",
+          "role": "owner-shared-repo",
+          "note": "owner-shared GitHub source",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 297788,
+          "sha256": "8aba666b890814c9e126cf569b7701ad971d8c7a6d0b1ca822900a92390583db",
+          "attemptedAt": "2026-09-12T15:30:11Z",
+          "redirected": false,
+          "finalUrl": "https://github.com/PhiloLabs/fable51-worlds"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/PhiloLabs/fable51-worlds/1dcc255adc5600cfec8a7e3e38c896074668dd1e/LICENSE",
+          "role": "licence-file",
+          "note": "MIT claimed; read the file at pin",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 1066,
+          "sha256": "f0ea75bb97656ba4f13dc19fc74ac65e5b57909b2ea0a008fbcb8dbb1a37fcbb",
+          "attemptedAt": "2026-09-12T15:30:12Z",
+          "redirected": false,
+          "finalUrl": "https://raw.githubusercontent.com/PhiloLabs/fable51-worlds/1dcc255adc5600cfec8a7e3e38c896074668dd1e/LICENSE"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/PhiloLabs/fable51-worlds/1dcc255adc5600cfec8a7e3e38c896074668dd1e/kyoto-higashiyama/tools/passability.mjs",
+          "role": "pinned-source-file",
+          "note": "the passability sweep implementation itself",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 4880,
+          "sha256": "6184e5409feb4d8971fbd2a2c7a51c331558aabe695485f81c6e7af09eb87922",
+          "attemptedAt": "2026-09-12T15:30:13Z",
+          "redirected": false,
+          "finalUrl": "https://raw.githubusercontent.com/PhiloLabs/fable51-worlds/1dcc255adc5600cfec8a7e3e38c896074668dd1e/kyoto-higashiyama/tools/passability.mjs"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/PhiloLabs/fable51-worlds/1dcc255adc5600cfec8a7e3e38c896074668dd1e/kyoto-higashiyama/tools/perf.mjs",
+          "role": "pinned-source-file",
+          "note": "draw-calls-before-milliseconds ordering",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 5700,
+          "sha256": "239193c2768a8a5d43a543054236e106acc760d59def3b3619e371c518328e7f",
+          "attemptedAt": "2026-09-12T15:30:13Z",
+          "redirected": false,
+          "finalUrl": "https://raw.githubusercontent.com/PhiloLabs/fable51-worlds/1dcc255adc5600cfec8a7e3e38c896074668dd1e/kyoto-higashiyama/tools/perf.mjs"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/PhiloLabs/fable51-worlds/1dcc255adc5600cfec8a7e3e38c896074668dd1e/README.md",
+          "role": "pinned-source-file",
+          "note": "layered licence terms the SPDX field hides",
+          "outcome": "ok",
+          "httpStatus": 200,
+          "bytes": 5256,
+          "sha256": "b19ab7ff6bf1f7ad8636b836182c9349f58bd03295ae6530165a46c1f495ca72",
+          "attemptedAt": "2026-09-12T15:30:14Z",
+          "redirected": false,
+          "finalUrl": "https://raw.githubusercontent.com/PhiloLabs/fable51-worlds/1dcc255adc5600cfec8a7e3e38c896074668dd1e/README.md"
+        }
+      ],
+      "unfetchedPacketUrls": [
+        "https://x.com/superalesha/status/2089126766854238421",
+        "https://x.com/cdngdev/status/2097339677128982873",
+        "https://x.com/chooi_jeq/status/2096064315115839904",
+        "https://x.com/robbyant_brain"
+      ],
+      "carrierSkills": [
+        {
+          "name": "realtime-browser-qa",
+          "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\software-development\\realtime-browser-qa\\SKILL.md",
+          "packetSha256": "60088cf29e2f499a641d4a6a70cd00b60545bebc8764ff5f73ebfbdd9edabadf",
+          "actualSha256": "60088cf29e2f499a641d4a6a70cd00b60545bebc8764ff5f73ebfbdd9edabadf",
+          "driftFromPacket": false,
+          "lines": 216,
+          "fullBodyReadInRecoveryWindow": true,
+          "readAt": "2026-09-12",
+          "coverage": "full body, 216 lines, frontmatter to final line",
+          "specifyingSection": "\"10. Sweep the whole artifact mechanically when it is too large to audit by playing it\", lines 91-138, and the gotcha at line 142 which cites register row 50 by name: step the centreline at a fixed interval, sweep the full width, require a player-radius disc to fit, collapse blocked stations into runs, exit non-zero. Its \"build the probe out of the product's own runtime, not a re-implementation\" rule is the limitation this row declares against itself."
+        }
+      ],
+      "carrierReadComplete": true,
+      "methodConsumer": "sweepCorridor() walks the centreline every 1.5 m and admits a 0.34 m disc or records a blocked run; the companion script exits non-zero on any survivor.",
+      "cpuChecks": [
+        "group-c-demos.test.ts: instantiate, assert metadata agrees with the manifest, assert every position is finite, assert bounded mesh/vertex counts, assert no undeclared light, advance 12 steps, dispose and assert the root is empty.",
+        "the defective corridor reports blocked runs, the cleared one reports none, and a corridor narrower than the disc fails at every station."
+      ],
+      "renderedAcceptance": "OPEN — root owns the serialized browser pass; nothing here inspects a pixel."
+    }
+  ]
+}

@@ -19,6 +19,8 @@ import {
   chooseBotIntent,
   chooseTacticalWaypoint,
   createSpawnFlipHysteresis,
+  BOT_AIM_ORIGIN_HEIGHT_M,
+  operatorPitchToward,
   operatorYawToward,
   respawnBotState,
   scoreBotSpawn,
@@ -165,6 +167,24 @@ describe('tactical bot scoring', () => {
     expect(operatorYawToward({ x: 0, z: 0 }, { x: 0, z: -5 })).toBeCloseTo(0);
     expect(operatorYawToward({ x: 0, z: 0 }, { x: 5, z: 0 })).toBeCloseTo(-Math.PI / 2);
     expect(Math.abs(operatorYawToward({ x: 0, z: 0 }, { x: 0, z: 5 }))).toBeCloseTo(Math.PI);
+  });
+
+  it('pitches a bot toward a target above or below its own eye line, positive up', () => {
+    // HF-375: every bot poseOperator call passed a literal 0 here, so a bot
+    // firing up a stairwell or down off a superstructure stood perfectly level.
+    // Positive is up, matching the camera and protocol convention where an aim
+    // ray is built as Euler(pitch, yaw, 0, 'YXZ') and its Y is sin(pitch).
+    const from = { x: 0, y: 0, z: 0 };
+    // A target at the shooter's own eye height is dead level whatever the range.
+    expect(operatorPitchToward(from, { x: 0, y: BOT_AIM_ORIGIN_HEIGHT_M, z: -12 })).toBeCloseTo(0, 9);
+    // Ten metres up a stairwell at ten metres out is a clear upward angle.
+    const up = operatorPitchToward(from, { x: 0, y: BOT_AIM_ORIGIN_HEIGHT_M + 10, z: -10 });
+    expect(up).toBeCloseTo(Math.PI / 4, 6);
+    const down = operatorPitchToward(from, { x: 0, y: BOT_AIM_ORIGIN_HEIGHT_M - 10, z: -10 });
+    expect(down).toBeCloseTo(-Math.PI / 4, 6);
+    // Directly overhead degrades to straight up rather than to NaN.
+    expect(operatorPitchToward(from, { x: 0, y: 40, z: 0 })).toBeCloseTo(Math.PI / 2, 9);
+    expect(Number.isFinite(operatorPitchToward(from, { x: 0, y: BOT_AIM_ORIGIN_HEIGHT_M, z: 0 }))).toBe(true);
   });
 
   it('chooses only from the least-exposed farthest pool and avoids the last spawn', () => {

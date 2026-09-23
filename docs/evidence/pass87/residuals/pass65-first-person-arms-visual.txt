@@ -1,0 +1,10 @@
+file:///C:/Users/david/projects/aa-claude-residuals/scripts/qa/verify-pass65-first-person-arms-visual.mjs:694
+  if (violations.length > 0) throw new Error(`Pass 65 first-person arms visual gate failed:\n- ${violations.join('\n- ')}`);
+                                   ^
+
+Error: Pass 65 first-person arms visual gate failed:
+- contact/m4a1/prone-wall-floor-hip/left: sleeve entry [0.10942475521479438,-0.6906989175270046,0.9848210991770688] does not continue below frame
+- contact/m4a1/prone-wall-floor-ads/left: sleeve entry [-0.024952569546658306,-0.9000264403030639,0.9842892020766265] does not continue below frame
+    at file:///C:/Users/david/projects/aa-claude-residuals/scripts/qa/verify-pass65-first-person-arms-visual.mjs:694:36
+
+Node.js v24.12.0

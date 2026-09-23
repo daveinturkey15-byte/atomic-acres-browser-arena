@@ -1,0 +1,938 @@
+#menu-meta-actions {
+  position: fixed;
+  z-index: 26;
+  top: 13px;
+  right: 18px;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  max-width: calc(100vw - 36px);
+}
+
+#menu-meta-actions > button {
+  position: static;
+  inset: auto;
+  min-height: 34px;
+  /* Pass 79 reskin: cold blue-black plate + old-gold edge -> warm graphite
+     plate + warm hairline, sitting on the dark command header as before. */
+  border: 1px solid rgb(255 208 150 / 0.30);
+  background: linear-gradient(135deg, rgb(24 18 13 / 0.94), rgb(34 26 18 / 0.88));
+  color: #cbbba4;
+  padding: 9px 12px;
+  font: 800 10px/1 'Barlow Condensed', sans-serif;
+  letter-spacing: .1em;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .28);
+  transition: transform .15s ease, border-color .15s ease, color .15s ease;
+}
+
+#menu-meta-actions > button:hover,
+#menu-meta-actions > button:focus-visible {
+  transform: translateY(-1px);
+  border-color: #e8781f;
+  color: #f7efe2;
+}
+
+/*
+ * HF-370: this button sat in the command header as gold-on-gold - the gold
+ * text was drawn over a gold-tinted plate and was effectively unreadable in
+ * every captured review frame. It now uses the Pass 77 chrome accent on the
+ * dark header sheet. The !important flags are retained because this sheet is
+ * imported from the shell module and therefore lands after every bootstrap
+ * sheet; dropping them would let the generic #menu-meta-actions rule win.
+ */
+#project-map-btn {
+  /* Pass 79 reskin: this chip now wears the Pass 77 chrome accent family
+     (#e8781f ramp) instead of cold cyan-on-teal. !important retained for the
+     same cascade reason documented above - this sheet lands last. */
+  color: #ffc48a !important;
+  border-color: rgb(232 120 31 / 0.40) !important;
+  background: rgb(232 120 31 / 0.14) !important;
+}
+
+#project-map-btn:hover:not(:disabled) {
+  color: #ffd9ae !important;
+  border-color: #e8781f !important;
+  background: rgb(232 120 31 / 0.26) !important;
+}
+
+#menu.hidden ~ #menu-meta-actions,
+#menu.private-lobby-active ~ #menu-meta-actions {
+  display: none !important;
+}
+
+#project-map-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 28;
+  background: rgb(12 8 5 / 0.78);
+  backdrop-filter: blur(5px);
+}
+
+#project-map-panel {
+  position: fixed;
+  z-index: 29;
+  top: 50%;
+  left: 50%;
+  width: min(980px, calc(100vw - 36px));
+  max-height: min(82vh, 780px);
+  overflow: auto;
+  transform: translate(-50%, -50%);
+  padding: 22px 22px 18px;
+  border: 1px solid rgb(255 196 128 / 0.22);
+  background:
+    linear-gradient(145deg, rgb(32 25 18 / 0.985), rgb(16 12 9 / 0.99)),
+    repeating-linear-gradient(90deg, transparent 0 34px, rgb(255 236 212 / 0.014) 35px);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, .72), inset 0 0 0 1px rgb(255 236 212 / 0.04);
+  color: #e9dfd0;
+}
+
+.project-map-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.project-map-header small,
+.project-map-header strong {
+  display: block;
+}
+
+.project-map-header small {
+  color: #a89680;
+  font: 800 9px/1 Inter, sans-serif;
+  letter-spacing: .18em;
+}
+
+.project-map-header strong {
+  margin-top: 5px;
+  color: #fdf7ec;
+  font: 900 31px/.9 'Barlow Condensed', sans-serif;
+  letter-spacing: .09em;
+}
+
+#project-map-close {
+  border: 1px solid rgb(255 236 212 / 0.20);
+  background: rgb(255 236 212 / 0.05);
+  color: #f2e9da;
+}
+
+#project-map-close:hover,
+#project-map-close:focus-visible {
+  border-color: #e8781f;
+  color: #e8781f;
+}
+
+.project-map-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 14px 0 12px;
+  color: #b3a494;
+  font: 700 10px/1 Inter, sans-serif;
+  letter-spacing: .08em;
+}
+
+.project-map-meta span,
+.project-map-meta i {
+  padding: 5px 7px;
+  border: 1px solid rgb(232 120 31 / 0.30);
+  background: rgb(232 120 31 / 0.06);
+  color: #ffb374;
+}
+
+.project-map-meta i {
+  border-color: rgb(255 196 128 / 0.32);
+  color: #ffca7a;
+}
+
+#project-map-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  margin-bottom: 14px;
+}
+
+#project-map-tabs button {
+  border: 1px solid rgb(255 236 212 / 0.13);
+  background: rgb(255 236 212 / 0.035);
+  color: #a08d75;
+  padding: 9px 8px;
+  font: 800 10px/1 Inter, sans-serif;
+  letter-spacing: .12em;
+}
+
+#project-map-tabs button[aria-selected="true"] {
+  border-color: rgb(232 120 31 / 0.55);
+  background: rgb(232 120 31 / 0.10);
+  color: #ffcf9e;
+}
+
+.project-map-pages {
+  min-height: 390px;
+}
+
+.project-map-intro {
+  display: grid;
+  grid-template-columns: 126px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 17px;
+  border: 1px solid rgb(255 196 128 / 0.20);
+  border-left: 3px solid #e8781f;
+  background: linear-gradient(120deg, rgb(232 120 31 / 0.06), rgb(0 0 0 / 0.16));
+}
+
+.project-map-intro span small,
+.project-map-intro span strong {
+  display: block;
+}
+
+.project-map-intro span small {
+  color: #a89680;
+  font: 800 9px/1 Inter, sans-serif;
+  letter-spacing: .17em;
+}
+
+.project-map-intro span strong {
+  margin-top: 6px;
+  color: #e8781f;
+  font: 900 27px/.9 'Barlow Condensed', sans-serif;
+  letter-spacing: .08em;
+}
+
+.project-map-intro p,
+.project-page-lede {
+  margin: 0;
+  color: #d6cab6;
+  font: 600 12px/1.55 Inter, sans-serif;
+}
+
+.project-map-pages h3 {
+  margin: 19px 0 9px;
+  color: #a89680;
+  font: 800 9px/1 Inter, sans-serif;
+  letter-spacing: .18em;
+}
+
+.project-channel-state {
+  display: flex;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.project-channel-state span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px;
+  border: 1px solid rgb(255 236 212 / 0.09);
+  background: rgb(255 236 212 / 0.03);
+}
+
+.project-channel-state small {
+  color: #a08d75;
+  font: 800 9px/1 Inter, sans-serif;
+  letter-spacing: .13em;
+}
+
+.project-channel-state b {
+  color: #efe6d6;
+  font: 800 10px/1 Inter, sans-serif;
+  letter-spacing: .08em;
+}
+
+.project-boundaries {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project-boundaries li {
+  position: relative;
+  padding: 9px 10px 9px 19px;
+  border: 1px solid rgb(255 236 212 / 0.08);
+  background: rgb(255 236 212 / 0.025);
+  color: #c4b7a1;
+  font: 600 11px/1.45 Inter, sans-serif;
+}
+
+.project-boundaries li::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: 8px;
+  width: 4px;
+  height: 4px;
+  background: #e8781f;
+  box-shadow: 0 0 8px rgb(232 120 31 / 0.65);
+}
+
+.project-downloads {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.project-downloads button {
+  flex: 1;
+  border: 1px solid rgb(232 120 31 / 0.40);
+  background: rgb(232 120 31 / 0.08);
+  color: #ffb374;
+  padding: 11px;
+  font: 800 10px/1 Inter, sans-serif;
+  letter-spacing: .1em;
+}
+
+.project-downloads button:hover,
+.project-downloads button:focus-visible {
+  border-color: #e8781f;
+  background: rgb(232 120 31 / 0.15);
+}
+
+.project-tree,
+.project-tree ul,
+.project-change-list,
+.project-archive-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.project-tree {
+  display: grid;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.project-tree .project-tree {
+  margin: 9px 0 0 17px;
+  border-left: 1px solid rgb(255 196 128 / 0.20);
+  padding-left: 12px;
+}
+
+.project-tree > li {
+  padding: 11px;
+  border: 1px solid rgb(255 236 212 / 0.10);
+  background: rgb(255 236 212 / 0.03);
+}
+
+.project-node-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-node-heading strong {
+  color: #f7efe2;
+  font: 800 15px/1 'Barlow Condensed', sans-serif;
+  letter-spacing: .06em;
+}
+
+.project-node-heading span {
+  color: #a89680;
+  font: 800 9px/1 Inter, sans-serif;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.project-tree p,
+.project-tree small {
+  display: block;
+  margin: 6px 0 0;
+  color: #c4b7a1;
+  font: 600 10px/1.45 Inter, sans-serif;
+}
+
+.project-tree small {
+  color: #97866f;
+}
+
+.project-node-paths {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.project-node-paths code {
+  padding: 4px 6px;
+  border: 1px solid rgb(255 208 150 / 0.14);
+  background: rgba(0, 0, 0, .21);
+  color: #cfb694;
+  font: 600 9px/1 ui-monospace, Consolas, monospace;
+}
+
+.project-change-list,
+.project-archive-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.project-change-list li,
+.project-archive-list li {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+  gap: 7px 12px;
+  align-items: start;
+  padding: 11px;
+  border: 1px solid rgb(255 236 212 / 0.09);
+  background: rgb(255 236 212 / 0.03);
+}
+
+.project-change-list span,
+.project-archive-list span {
+  color: #e8781f;
+  font: 800 9px/1 Inter, sans-serif;
+  letter-spacing: .1em;
+}
+
+.project-change-list strong,
+.project-archive-list strong {
+  color: #f4ecdd;
+  font: 800 14px/1 'Barlow Condensed', sans-serif;
+  letter-spacing: .04em;
+}
+
+.project-change-list p {
+  grid-column: 2 / -1;
+  margin: 0;
+  color: #bdb09a;
+  font: 600 10px/1.45 Inter, sans-serif;
+}
+
+.project-change-list div {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.project-change-list i,
+.project-archive-list time {
+  color: #a08d75;
+  font: 700 9px/1 Inter, sans-serif;
+  font-style: normal;
+  letter-spacing: .08em;
+}
+
+@media (max-width: 700px) {
+  #menu-meta-actions {
+    top: 10px;
+    right: 10px;
+    gap: 5px;
+    max-width: calc(100vw - 20px);
+  }
+
+  #menu-meta-actions > button {
+    padding: 8px 9px;
+    font-size: 9px;
+    letter-spacing: .07em;
+  }
+
+  #project-map-panel {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+    padding: 17px 14px 14px;
+  }
+
+  #project-map-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .project-map-intro,
+  .project-boundaries {
+    grid-template-columns: 1fr;
+  }
+
+  .project-downloads {
+    display: grid;
+  }
+
+  .project-channel-state {
+    display: grid;
+  }
+
+  .project-change-list li,
+  .project-archive-list li {
+    grid-template-columns: 68px minmax(0, 1fr);
+  }
+
+  .project-archive-list time {
+    grid-column: 2;
+  }
+}
+
+/*
+ * HF-375 - touch targets for the two header meta buttons.
+ *
+ * This sheet is imported from project-map-dialog.ts and therefore lands after
+ * every sheet in bootstrap.ts, so its `min-height: 34px` is the last word on
+ * these buttons and the deck-wide 44px touch floor could not reach them. The
+ * floor is restated here, gated on a coarse pointer so the mouse deck keeps the
+ * compact 34px chip it was designed with.
+ */
+@media (pointer: coarse) {
+  #menu-meta-actions > button {
+    min-height: 44px;
+  }
+}
+#advanced-graphics .advanced-graphics-catalog {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+/* Owner HITL: an unmissable SAVE control near the top of Graphics that commits
+   whatever settings were just chosen, in the map or in the menu.
+   Pass 79 reskin: this was the last teal gradient button on the deck. It now
+   wears the Pass 77 accent ramp (#e8781f -> #b4531c) with dark warm ink text,
+   matching the #resume treatment in pass77-command-shell.css. Geometry is
+   untouched - only colour changed. The var() fallbacks keep the values correct
+   if this markup is ever mounted outside #menu.pass64-command-deck, where the
+   --p77-* tokens are not defined. */
+#graphics-save {
+  margin-left: auto;
+  padding: 9px 22px;
+  border: 1px solid var(--p77-accent, #b4531c);
+  background: linear-gradient(180deg, var(--p77-accent-lit, #e8781f) 0%, var(--p77-accent, #b4531c) 100%);
+  color: #241205;
+  font: 900 13px/1 Inter, system-ui, sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28), 0 2px 10px rgb(180 83 28 / 0.35);
+}
+
+#graphics-save:hover {
+  background: linear-gradient(180deg, #f28a2e 0%, #c05e20 100%);
+}
+
+#graphics-save:active {
+  transform: translateY(1px);
+}
+
+/* Clickable hard refresh (mobile-friendly Ctrl+Shift+R equivalent). */
+.game-refresh-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+}
+.game-refresh-row p {
+  flex: 1 1 320px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  /* Pass 79 reskin: this row sits directly on the dark instrument sheet of the
+     Options panel, so it takes the sheet's soft warm ink. The old declaration
+     mixed an UNDEFINED token (--ui-ink) whose fallback was pale cold white. */
+  color: var(--p77-dark-ink-soft, #b3a494);
+}
+/* Pass 79 reskin: HARD REFRESH was a second loud amber-gradient button one
+   section below the SAVE action. PART 6 of pass77-command-shell.css allows one
+   decisive action per deck, so this becomes the quiet dark-sheet secondary:
+   warm hairline edge, faint warm wash, light ink, accent on hover. */
+#hard-refresh-button {
+  padding: 12px 26px;
+  border: 1px solid rgb(255 208 150 / 0.30);
+  background: rgb(255 236 212 / 0.06);
+  color: var(--p77-dark-ink, #f7efe2);
+  font: 900 13px/1 Inter, system-ui, sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+#hard-refresh-button:hover {
+  border-color: var(--p77-accent-lit, #e8781f);
+  color: #ffd9ae;
+}
+#hard-refresh-button:active {
+  transform: translateY(1px);
+}
+#hard-refresh-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+#advanced-graphics .advanced-graphics-category {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  /* Pass 79 reskin: the category edge read teal via --ui-cyan; it now uses the
+     dark sheet's warm hairline, and the field is a faint warm wash instead of
+     solid cold bone so it sits IN the dark Options surface. */
+  border: 1px solid var(--p77-dark-hair, rgb(255 196 128 / 0.18));
+  background: rgb(255 236 212 / 0.05);
+}
+
+#advanced-graphics .advanced-graphics-category > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#advanced-graphics .advanced-graphics-category > header b {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+
+#advanced-graphics .advanced-graphics-category > header small {
+  /* Pass 79 reskin: was var(--ui-accent-readable, #0b6b78), and that token is
+     defined nowhere, so every category note rendered fallback TEAL on a dark
+     sheet at ~1.8:1. The lit accent is the deck's eyebrow colour on dark. */
+  color: var(--p77-accent-lit, #e8781f);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+#advanced-graphics .advanced-graphics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px;
+}
+
+#advanced-graphics .advanced-graphics-control,
+#advanced-graphics .advanced-graphics-unavailable {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "label input"
+    "help input";
+  align-items: center;
+  gap: 3px 10px;
+  min-width: 0;
+  min-height: 58px;
+  padding: 8px 9px;
+  border: 1px solid rgb(255 208 150 / 0.20);
+  background: rgb(255 244 228 / 0.07);
+}
+
+#advanced-graphics .advanced-graphics-control > span:first-child,
+#advanced-graphics .advanced-graphics-unavailable > span {
+  grid-area: label;
+  min-width: 0;
+  /* Owner HITL: control names must read regardless of inherited theme colour.
+     The cells are now translucent warm over the DARK Options instrument sheet,
+     so the forced ink is the sheet's bright warm ink, not near-black - the old
+     #1a1613 label on this ground measured ~1.6:1 and vanished. */
+  color: var(--p77-dark-ink, #f7efe2);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+#advanced-graphics .advanced-graphics-control > small,
+#advanced-graphics .advanced-graphics-unavailable > small {
+  grid-area: help;
+  max-width: 48ch;
+  /* Pass 79 reskin: help text sits on a translucent warm cell over the dark
+     sheet now, so it takes the sheet's soft warm ink rather than the old
+     paper-panel muted ink. */
+  color: var(--p77-dark-ink-soft, #b3a494);
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+#advanced-graphics .advanced-graphics-control > input,
+#advanced-graphics .advanced-graphics-control > select,
+#advanced-graphics .advanced-graphics-range {
+  grid-area: input;
+  justify-self: end;
+  min-width: 88px;
+  max-width: 145px;
+}
+
+#advanced-graphics .advanced-graphics-range {
+  display: grid;
+  gap: 2px;
+  width: 130px;
+}
+
+#advanced-graphics .advanced-graphics-range input {
+  width: 100%;
+}
+
+#advanced-graphics .advanced-graphics-range output {
+  min-height: 12px;
+  /* Pass 79 reskin: same broken-teal-fallback story as the header notes above;
+     the value readout now uses the readable accent for type. */
+  color: var(--p77-accent, #b4531c);
+  font-size: 9px;
+  font-weight: 800;
+  text-align: right;
+}
+
+#advanced-graphics .advanced-graphics-toggle input {
+  width: 18px;
+  height: 18px;
+}
+
+#advanced-graphics .advanced-graphics-unavailable {
+  opacity: 0.7;
+  border-style: dashed;
+}
+
+#advanced-graphics .advanced-graphics-unavailable b {
+  grid-area: input;
+  /* Pass 79 reskin: --ui-amber now resolves to a dark print amber (#9c5200)
+     that drowns on the dark sheet; the capability note takes the HUD caution
+     tone instead. */
+  color: var(--hud-amber, #f2b74f);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+#advanced-graphics .advanced-graphics-unavailable em {
+  grid-column: 1 / -1;
+  color: rgb(242 183 79 / 0.78);
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 760px) {
+  #advanced-graphics .advanced-graphics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #advanced-graphics .advanced-graphics-category > header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+}
+
+/*
+ * Pass 79 reskin: the <details> wrapper itself kept its cold blue-black wash
+ * from pass66-readability.css (`#menu-panel-options .advanced-settings`,
+ * background rgba(232, 250, 247, 0.055)), which outranks this sheet's earlier
+ * sibling selectors on specificity. Restating at that specificity here - this
+ * module is imported last - warms the wrapper to the same sheet as its cells.
+ */
+#menu #menu-panel-options .advanced-settings {
+  border-color: var(--p77-dark-hair, rgb(255 196 128 / 0.18));
+  background: rgb(255 236 212 / 0.04);
+}
+
+/*
+ * HF-375 - touch ergonomics for the advanced graphics controls.
+ *
+ * Every select and range in this panel was 18px tall and every toggle an 18px
+ * box, which is a mouse target, not a finger target. The mobile audit at
+ * 390x844 counted 40 of them under the 44px minimum in this panel alone.
+ *
+ * Gated on `pointer: coarse` rather than on width: the sizes are correct for a
+ * pointer and stay exactly as authored on the desktop review viewports, which
+ * report a fine pointer. These rules live here rather than in the command-shell
+ * sheet because this stylesheet is imported from pass64-shell.ts and therefore
+ * lands after it - an override written anywhere else loses the tie.
+ */
+@media (pointer: coarse) {
+  #advanced-graphics .advanced-graphics-control > select,
+  #advanced-graphics .advanced-graphics-control > input {
+    min-height: 44px;
+  }
+
+  #advanced-graphics .advanced-graphics-range input {
+    height: 44px;
+  }
+
+  #advanced-graphics .advanced-graphics-toggle input {
+    width: 24px;
+    height: 24px;
+  }
+
+  /* The whole row toggles the control, so the row carries the 44px target. */
+  #advanced-graphics .advanced-graphics-control,
+  #advanced-graphics .advanced-graphics-unavailable {
+    min-height: 60px;
+  }
+}
+/*
+ * HF-405 - the crossbow's 1.5x compact optic sight picture.
+ *
+ * WHY THIS IS NOT #sniper-scope. The sniper's optic replaces the world with a
+ * black tunnel and removes the viewmodel; at 3x, standing off at range, that
+ * reads correctly. The crossbow is a close-to-mid range launcher at 1.5x, and
+ * blacking out its periphery would cost the player exactly the awareness that
+ * weapon is used for. So this sheet never blacks anything out: the housing is
+ * a graded frame that leaves the centre of the frame completely clear, and the
+ * crossbow itself stays in shot underneath it.
+ *
+ * WHY THE GLASS IS SMALL. It is not a decoration sized to taste - it is drawn
+ * at the on-screen size of the AUTHORED ocular, which the ADS pose has already
+ * centred on the aim point and which weapon-presentation grows to eye scale.
+ * The drawn rim lands on the physical rim, so the reticle inside it reads as
+ * being in that glass rather than painted on the screen. `vh` is the right
+ * unit for exactly that reason: at a fixed vertical field of view, the
+ * apparent size of a fixed object scales with viewport height.
+ */
+
+#compact-optic {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  pointer-events: none;
+  opacity: var(--compact-optic-blend, 0);
+  /* Outer housing diameter of the authored optic at settled ADS. */
+  --compact-optic-glass: clamp(58px, 11.8vh, 148px);
+  --compact-optic-color: #ff7048;
+}
+
+#compact-optic[hidden] { display: none; }
+
+/*
+ * The housing. Fully clear across the middle of the frame, then a graded warm
+ * shade into the corners: enough to say "you are behind an optic" without
+ * taking a single pixel of usable close-range awareness.
+ */
+#compact-optic .compact-optic-housing {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 92% 92% at 50% 50%,
+    rgba(4, 8, 10, 0) 0 42%,
+    rgba(4, 8, 10, 0.22) 60%,
+    rgba(4, 8, 10, 0.5) 80%,
+    rgba(3, 6, 7, 0.7) 100%
+  );
+}
+
+/* A faint warm bloom off the glass, the way a coated lens spills onto its housing. */
+#compact-optic .compact-optic-bloom {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--compact-optic-glass) * 3.2);
+  height: calc(var(--compact-optic-glass) * 3.2);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    color-mix(in srgb, var(--compact-optic-color) 9%, transparent) 0 18%,
+    transparent 62%
+  );
+}
+
+/* The glass itself: rim, coating sheen and the shaded inner edge of the tube. */
+#compact-optic .compact-optic-glass {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--compact-optic-glass);
+  height: var(--compact-optic-glass);
+  /* The glass settles the last of the way in as the aim blend completes, so it
+     arrives with the physical optic instead of popping on over a hip frame. */
+  transform: translate(-50%, -50%) scale(calc(0.82 + 0.18 * var(--compact-optic-blend, 0)));
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px rgba(8, 13, 15, 0.92),
+    0 0 0 2px color-mix(in srgb, var(--compact-optic-color) 46%, transparent),
+    0 0 12px 2px rgba(0, 0, 0, 0.5),
+    inset 0 0 14px 5px rgba(3, 7, 9, 0.5);
+}
+
+#compact-optic .compact-optic-glass::before {
+  content: '';
+  position: absolute;
+  inset: 5%;
+  border-radius: 50%;
+  background: linear-gradient(128deg, rgba(196, 240, 255, 0.18) 0 20%, rgba(196, 240, 255, 0) 44% 100%);
+}
+
+/*
+ * The illuminated reticle. The authored glass already carries an etched cross;
+ * what it has never had is illumination, which is the whole reason a 1.5x
+ * optic beats irons in a dark arena. This is the lit centre and its stadia,
+ * clipped to the glass so it cannot escape onto the screen.
+ */
+#compact-optic .compact-optic-reticle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  /* Sized to the glass, not the viewport: everything in here is inside the
+     tube, and `overflow: hidden` is what guarantees it. An earlier revision
+     sized this box to the overlay and the holdover post ran a third of the way
+     down the screen - the exact "floating on the screen centre" failure this
+     overlay exists to avoid. */
+  width: calc(var(--compact-optic-glass) * 0.9);
+  height: calc(var(--compact-optic-glass) * 0.9);
+  transform: translate(-50%, -50%) scale(calc(0.82 + 0.18 * var(--compact-optic-blend, 0)));
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+#compact-optic .compact-optic-reticle i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--compact-optic-color);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.85),
+    0 0 6px 1px var(--compact-optic-color),
+    0 0 14px 3px color-mix(in srgb, var(--compact-optic-color) 45%, transparent);
+}
+
+/* Stadia: three short lit ticks off the centre, the mark the etched cross lacks. */
+#compact-optic .compact-optic-reticle span,
+#compact-optic .compact-optic-reticle em,
+#compact-optic .compact-optic-reticle b {
+  position: absolute;
+  background: color-mix(in srgb, var(--compact-optic-color) 82%, transparent);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--compact-optic-color) 60%, transparent);
+}
+
+#compact-optic .compact-optic-reticle span,
+#compact-optic .compact-optic-reticle em {
+  top: 50%;
+  width: 16%;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+#compact-optic .compact-optic-reticle span { left: 12%; }
+#compact-optic .compact-optic-reticle em { right: 12%; }
+
+/* Holdover post: a projectile that arcs needs somewhere to hold under. */
+#compact-optic .compact-optic-reticle b {
+  left: 50%;
+  top: 62%;
+  width: 1px;
+  height: 22%;
+  transform: translateX(-50%);
+}
+
+#compact-optic > small {
+  position: absolute;
+  left: 50%;
+  /* Above the glass, like #sniper-scope's own legend. Below it would land on
+     the crossbow's receiver, which is the one part of the frame the optic
+     presentation must not add clutter to. */
+  top: calc(50% - var(--compact-optic-glass) * 0.98);
+  transform: translateX(-50%);
+  font: 900 11px/1 Inter, system-ui, sans-serif;
+  letter-spacing: 0.22em;
+  color: color-mix(in srgb, var(--compact-optic-color) 76%, #f2f7f5);
+  text-shadow: 0 1px 3px #000, 0 0 6px rgba(0, 0, 0, 0.9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #compact-optic .compact-optic-glass,
+  #compact-optic .compact-optic-reticle { transform: translate(-50%, -50%); }
+}

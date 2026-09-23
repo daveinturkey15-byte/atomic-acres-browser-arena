@@ -46,6 +46,9 @@ const weaponFixture = JSON.parse(readFileSync(fixturePath, 'utf8')) as { weapons
 const migratedWeaponFixture = { weapons: weaponFixture.weapons.map((weapon) => ({
   ...weapon,
   effects: { ...weapon.effects, muzzleFlashScale: 1, reportGain: 1, flashlight: null },
+  // HF-368: the B1 oracle predates the per-weapon wallbang term. Fill the
+  // documented 1.0 default rather than editing the independent fixture.
+  penetration: { ...weapon.penetration, wallPenetrationMultiplier: 1 },
 })) };
 const ELIGIBILITY = createLoadoutItemEligibility(migratedWeaponFixture.weapons);
 const decisionReceiptPath = fileURLToPath(new URL('../docs/PASS65_DECISION_RECEIPTS.json', import.meta.url));

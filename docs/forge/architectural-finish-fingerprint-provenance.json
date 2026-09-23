@@ -1,0 +1,61 @@
+{
+  "contract": "architectural-finish-fingerprint-provenance/1",
+  "baselineCommit": "c710fc3deff03438ba487b9c995c6959ed741b58",
+  "candidateCommit": "82370d84ebc9d3afb6f402a6b962827f2ac068f9",
+  "method": "Independent git-archive source/shared reconstructions with identical locked dependencies; full authored records and geometry attribute/index details compared exactly within each runtime.",
+  "runtimeResults": [
+    {
+      "node": "v22.19.0",
+      "v8": "12.4.254.21-node.29",
+      "baselineAndCandidateEqual": true,
+      "digests": {
+        "authority": "90887b6cbcbf8f57d81999580a84e869f40e9ec9cb60806343adca957ac66724",
+        "sourceGeometry": "60128e066793dce27b67ded206c6f2c391213997d07088403bacb3d345e90292",
+        "renderedTriangles": {
+          "count": 148028,
+          "digest": "02464c9c1efe450342ad1506de2fcf6b47f354e490ebaec4bcd6b10fbf390db6"
+        },
+        "instances": "f7f8c9ad5c56db234cf1f354c0e3ea6b2cf97c035786630e5ecbb7fb43a03acb",
+        "materialNames": "ea587261b5171ce432280ad3b5a17eef8f3d88e55afaaf8ee4e84d6ca7df5e7b"
+      },
+      "baselineCaptureSha256": "90527e287efd5228239c4f6e1cabc2c87f91ddfd4ba4905d9412c8c3920df9b5",
+      "candidateCaptureSha256": "90527e287efd5228239c4f6e1cabc2c87f91ddfd4ba4905d9412c8c3920df9b5"
+    },
+    {
+      "node": "v24.12.0",
+      "v8": "13.6.233.17-node.37",
+      "baselineAndCandidateEqual": true,
+      "digests": {
+        "authority": "90887b6cbcbf8f57d81999580a84e869f40e9ec9cb60806343adca957ac66724",
+        "sourceGeometry": "ef31bd11a86f973dd62c8a1dab77c8bdf14564c28d8583289e07d3da5f5254d9",
+        "renderedTriangles": {
+          "count": 148028,
+          "digest": "02464c9c1efe450342ad1506de2fcf6b47f354e490ebaec4bcd6b10fbf390db6"
+        },
+        "instances": "f7f8c9ad5c56db234cf1f354c0e3ea6b2cf97c035786630e5ecbb7fb43a03acb",
+        "materialNames": "ea587261b5171ce432280ad3b5a17eef8f3d88e55afaaf8ee4e84d6ca7df5e7b"
+      },
+      "baselineCaptureSha256": "957a301eb5174e64aabde6cb3518e6adb965788168af3848b81e3bdd3d69f8f2",
+      "candidateCaptureSha256": "957a301eb5174e64aabde6cb3518e6adb965788168af3848b81e3bdd3d69f8f2"
+    }
+  ],
+  "crossRuntimeDifference": {
+    "location": "userData on nuketown-mountain-foothills, nuketown-mountain-ridge, nuketown-mountain-far-range",
+    "changedNumericLeaves": 748,
+    "crestColors": 708,
+    "crestHeights": 20,
+    "crestUndisturbed": 20,
+    "maximumAbsoluteDifference": 7.105427357601002e-15,
+    "geometryAttributeIndexTransformDifferences": 0
+  },
+  "causalProbe": {
+    "operation": "Math.pow",
+    "node22RecordedCalls": 18808,
+    "uniqueArgumentPairs": 3149,
+    "pairsDifferingOnNode24": 331,
+    "node24ReplayMissingInputs": 0,
+    "node24WithNode22PowSourceGeometry": "60128e066793dce27b67ded206c6f2c391213997d07088403bacb3d345e90292",
+    "scope": "Diagnostic process only; no product math replacement."
+  },
+  "guardPolicy": "Choose exactly one independently reconstructed full sourceGeometry baseline for the active Node major. Unsupported majors fail; future minor/V8 drift also fails unless it exactly matches the existing baseline. All geometry, authority, triangle, instance, material, count and semantic assertions are retained."
+}

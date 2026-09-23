@@ -1,0 +1,53 @@
+{
+  "rule": "PNGs over 600 KB are halved before tracking",
+  "halved": [
+    {
+      "file": "map3-explore-hud.png",
+      "before": 627880,
+      "after": 238358,
+      "size": "640x360"
+    },
+    {
+      "file": "map3-hub-off-plinth.png",
+      "before": 636200,
+      "after": 242357,
+      "size": "640x360"
+    },
+    {
+      "file": "map3-hub-on-plinth.png",
+      "before": 673386,
+      "after": 273606,
+      "size": "640x360"
+    },
+    {
+      "file": "map3-motion-t0.png",
+      "before": 805786,
+      "after": 387202,
+      "size": "640x360"
+    },
+    {
+      "file": "map3-motion-t5.png",
+      "before": 796675,
+      "after": 381113,
+      "size": "640x360"
+    },
+    {
+      "file": "map3-view-seasons.png",
+      "before": 801058,
+      "after": 384194,
+      "size": "640x360"
+    },
+    {
+      "file": "map3-view-shoreline.png",
+      "before": 716265,
+      "after": 354588,
+      "size": "640x360"
+    },
+    {
+      "file": "map3-view-vegetation.png",
+      "before": 943106,
+      "after": 398135,
+      "size": "640x360"
+    }
+  ]
+}

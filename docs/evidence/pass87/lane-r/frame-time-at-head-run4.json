@@ -1,0 +1,55 @@
+{
+  "generatedAt": "2026-09-02T23:35:10.489Z",
+  "renderer": "webgpu",
+  "viewport": [
+    1600,
+    900
+  ],
+  "seconds": 20,
+  "rows": [
+    {
+      "arena": "atomic-acres",
+      "admittedMs": 60542,
+      "frames": 1309,
+      "meanFrameMs": 15.29,
+      "meanFps": 65.4,
+      "p50FrameMs": 14.4,
+      "p95FrameMs": 22.5,
+      "p99FrameMs": 26,
+      "worstFrameMs": 90.6,
+      "longFrames": 4,
+      "longFramePercent": 0.31,
+      "pipelinesDuringSample": 0,
+      "meshes": 161,
+      "instancedMeshes": 36,
+      "instances": 27133,
+      "triangles": 538735,
+      "transparent": 36,
+      "shadowCasters": 64,
+      "alwaysDrawn": 14,
+      "distinctMaterials": 110
+    },
+    {
+      "arena": "farcrysis",
+      "admittedMs": 61988,
+      "frames": 725,
+      "meanFrameMs": 27.57,
+      "meanFps": 36.3,
+      "p50FrameMs": 27.2,
+      "p95FrameMs": 37.1,
+      "p99FrameMs": 43.3,
+      "worstFrameMs": 75.8,
+      "longFrames": 82,
+      "longFramePercent": 11.31,
+      "pipelinesDuringSample": 0,
+      "meshes": 253,
+      "instancedMeshes": 109,
+      "instances": 93194,
+      "triangles": 866727,
+      "transparent": 48,
+      "shadowCasters": 99,
+      "alwaysDrawn": 15,
+      "distinctMaterials": 222
+    }
+  ]
+}

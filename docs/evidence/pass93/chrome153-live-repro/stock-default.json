@@ -1,0 +1,338 @@
+{
+  "schemaVersion": 1,
+  "runLabel": "stock",
+  "profile": "default",
+  "requestedPreset": null,
+  "baseUrl": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/",
+  "browser": {
+    "channel": "chrome",
+    "headless": true,
+    "args": [
+      "--mute-audio",
+      "--disable-background-timer-throttling",
+      "--disable-renderer-backgrounding",
+      "--disable-backgrounding-occluded-windows",
+      "--window-position=-32000,-32000",
+      "--window-size=2640,1520"
+    ],
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "deviceScaleFactor": 1
+  },
+  "startedAt": "2026-09-04T06:16:21.190Z",
+  "finishedAt": "2026-09-04T06:17:24.774Z",
+  "deployClickedAt": "2026-09-04T06:16:24.587Z",
+  "ok": false,
+  "liveFrame": false,
+  "fatalError": "page.waitForFunction: Timeout 60000ms exceeded.",
+  "initialMarker": {
+    "url": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/?release=latest",
+    "title": "Nuke Town — Browser Arena FPS",
+    "releaseText": "PASS 92",
+    "releaseFooter": "PASS 92",
+    "documentData": {
+      "uiContract": "pass64-command-v2",
+      "renderProfile": "blender",
+      "graphicsPreset": "high",
+      "graphicsLiveProfile": "blender",
+      "graphicsFrameRateLimit": "uncapped",
+      "graphicsAntialiasSamples": "4",
+      "graphicsToneMapping": "aces",
+      "reducedSensory": "false",
+      "reducedMotion": "false",
+      "tintSwizzleShim": "true",
+      "tslNodeBuildErrors": "0",
+      "renderBackend": "webgpu",
+      "webglShadowSampler": "pcf-soft",
+      "atomicSignalRenderer": "hardware",
+      "atomicSignal": "tsl-hdr",
+      "webglContext": "ready",
+      "adaptiveShadows": "on",
+      "arenaId": "atomic-acres",
+      "inputScheme": "keyboard",
+      "graphicsRegistryCount": "41",
+      "menuLifecycle": "pre-match",
+      "pointerLockLifecycle": "unlocked",
+      "menuPreview": "prerecorded-video",
+      "gameplayArena": "deferred-until-deployment"
+    },
+    "menuVisible": true,
+    "selectedArena": "atomic-acres",
+    "graphicsPreset": "high"
+  },
+  "finalMarker": {
+    "url": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/?release=latest",
+    "documentData": {
+      "uiContract": "pass64-command-v2",
+      "renderProfile": "blender",
+      "graphicsPreset": "high",
+      "graphicsLiveProfile": "blender",
+      "graphicsFrameRateLimit": "uncapped",
+      "graphicsAntialiasSamples": "4",
+      "graphicsToneMapping": "aces",
+      "reducedSensory": "false",
+      "reducedMotion": "false",
+      "tintSwizzleShim": "true",
+      "tslNodeBuildErrors": "0",
+      "renderBackend": "webgpu",
+      "webglShadowSampler": "pcf-soft",
+      "atomicSignalRenderer": "hardware",
+      "atomicSignal": "tsl-hdr",
+      "webglContext": "ready",
+      "adaptiveShadows": "on",
+      "arenaId": "nuketown2",
+      "inputScheme": "keyboard",
+      "graphicsRegistryCount": "41",
+      "menuLifecycle": "pre-match",
+      "pointerLockLifecycle": "unlocked",
+      "menuPreview": "prerecorded-video",
+      "gameplayArena": "deferred-until-deployment",
+      "menuArenaId": "nuketown2",
+      "killstreakPossession": "none",
+      "combatAudioPrewarm": "ready",
+      "glassImpactAudioPrewarm": "ready",
+      "grenadeEffectsAudioPrewarm": "ready",
+      "rayTracedLayer": "reflections",
+      "tintPipelineRepairs": "1",
+      "tintPipelineLastPurge": "1",
+      "tintAdmissionSweeps": "4",
+      "tintAdmissionLastPurge": "0"
+    },
+    "menuHidden": false,
+    "transitionHidden": true,
+    "hudHidden": true,
+    "snapshot": {
+      "gameStarted": false,
+      "matchPhase": "warmup",
+      "presentedGameplayFrame": 0
+    }
+  },
+  "consoleMessages": [
+    {
+      "at": "2026-09-04T06:16:22.979Z",
+      "type": "warning",
+      "text": "The powerPreference option is currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127",
+      "location": {
+        "url": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/webgpu-tint-swizzle-shim-Dz5rrnev.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "at": "2026-09-04T06:16:43.847Z",
+      "type": "error",
+      "text": "THREE.WebGPURenderer: Render pipeline creation failed (renderPipeline_RenderPipeline_25): An error occurred while generating Tint IR\nerror: swizzle view instruction still has usages after lowering\n - While initializing [RenderPipeline \"renderPipeline_RenderPipeline_25\"]\n - While calling [Device].CreateRenderPipeline([RenderPipelineDescriptor \"\"renderPipeline_RenderPipeline_25\"\"]).\n",
+      "location": {
+        "url": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js",
+        "line": 704,
+        "column": 301694,
+        "lineNumber": 704,
+        "columnNumber": 301694
+      }
+    },
+    {
+      "at": "2026-09-04T06:16:44.216Z",
+      "type": "error",
+      "text": "THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid RenderPipeline \"renderPipeline_RenderPipeline_25\"] is invalid due to a previous error.\n - While encoding [RenderPassEncoder (unlabeled)].SetPipeline([Invalid RenderPipeline \"renderPipeline_RenderPipeline_25\"]).\n - While finishing [CommandEncoder \"renderContext_3\"].\n",
+      "location": {
+        "url": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js",
+        "line": 704,
+        "column": 301694,
+        "lineNumber": 704,
+        "columnNumber": 301694
+      }
+    },
+    {
+      "at": "2026-09-04T06:16:44.217Z",
+      "type": "warning",
+      "text": "[Invalid RenderPipeline \"renderPipeline_RenderPipeline_25\"] is invalid due to a previous error.\n - While encoding [RenderPassEncoder (unlabeled)].SetPipeline([Invalid RenderPipeline \"renderPipeline_RenderPipeline_25\"]).\n - While finishing [CommandEncoder \"renderContext_3\"].\n",
+      "location": {
+        "url": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/?release=latest",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "at": "2026-09-04T06:16:44.217Z",
+      "type": "error",
+      "text": "THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder \"renderContext_3\"] is invalid due to a previous error.\n - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder \"renderContext_3\"]])\n",
+      "location": {
+        "url": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js",
+        "line": 704,
+        "column": 301694,
+        "lineNumber": 704,
+        "columnNumber": 301694
+      }
+    },
+    {
+      "at": "2026-09-04T06:16:44.217Z",
+      "type": "warning",
+      "text": "[Invalid CommandBuffer from CommandEncoder \"renderContext_3\"] is invalid due to a previous error.\n - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder \"renderContext_3\"]])\n",
+      "location": {
+        "url": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/?release=latest",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "at": "2026-09-04T06:16:44.313Z",
+      "type": "warning",
+      "text": "[atomic-acres:webgpu] recovered 1 errored pipeline(s), sweep 1",
+      "location": {
+        "url": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js",
+        "line": 753,
+        "column": 220712,
+        "lineNumber": 753,
+        "columnNumber": 220712
+      }
+    },
+    {
+      "at": "2026-09-04T06:16:46.209Z",
+      "type": "error",
+      "text": "[Nuke Town Rebuild map selection failed] Error: WebGPU queue completion failed: WebGPU uncaptured error: GPUError: [Invalid CommandBuffer from CommandEncoder \"renderContext_3\"] is invalid due to a previous error.\n - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder \"renderContext_3\"]])\n\n    at Qre (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:27:53298)\n    at async e.waitForSubmittedWork (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:27:72969)\n    at async https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:27:70441\n    at async u2 (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:754:353026)",
+      "location": {
+        "url": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js",
+        "line": 704,
+        "column": 301694,
+        "lineNumber": 704,
+        "columnNumber": 301694
+      }
+    },
+    {
+      "at": "2026-09-04T06:16:51.150Z",
+      "type": "error",
+      "text": "[Nuke Town Rebuild map selection failed] Error: WebGPU uncaptured error: GPUError: [Invalid CommandBuffer from CommandEncoder \"renderContext_3\"] is invalid due to a previous error.\n - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder \"renderContext_3\"]])\n\n    at e.submitFrame (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:27:70896)\n    at LB (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:754:218311)\n    at RB (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:754:218508)\n    at async WTe (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:758:25564)\n    at async e3 (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:754:459769)",
+      "location": {
+        "url": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js",
+        "line": 704,
+        "column": 301694,
+        "lineNumber": 704,
+        "columnNumber": 301694
+      }
+    },
+    {
+      "at": "2026-09-04T06:16:53.075Z",
+      "type": "error",
+      "text": "[Nuke Town Rebuild map selection failed] Error: WebGPU uncaptured error: GPUError: [Invalid CommandBuffer from CommandEncoder \"renderContext_3\"] is invalid due to a previous error.\n - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder \"renderContext_3\"]])\n\n    at e.submitFrame (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:27:70896)\n    at LB (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:754:218311)\n    at RB (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:754:218508)\n    at async WTe (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:758:25564)\n    at async e3 (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:754:459769)",
+      "location": {
+        "url": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js",
+        "line": 704,
+        "column": 301694,
+        "lineNumber": 704,
+        "columnNumber": 301694
+      }
+    },
+    {
+      "at": "2026-09-04T06:16:54.926Z",
+      "type": "error",
+      "text": "[Nuke Town Rebuild map selection failed] Error: WebGPU uncaptured error: GPUError: [Invalid CommandBuffer from CommandEncoder \"renderContext_3\"] is invalid due to a previous error.\n - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder \"renderContext_3\"]])\n\n    at e.submitFrame (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:27:70896)\n    at LB (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:754:218311)\n    at RB (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:754:218508)\n    at async WTe (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:758:25564)\n    at async e3 (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:754:459769)",
+      "location": {
+        "url": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js",
+        "line": 704,
+        "column": 301694,
+        "lineNumber": 704,
+        "columnNumber": 301694
+      }
+    },
+    {
+      "at": "2026-09-04T06:16:56.828Z",
+      "type": "error",
+      "text": "[Nuke Town Rebuild map selection failed] Error: WebGPU uncaptured error: GPUError: [Invalid CommandBuffer from CommandEncoder \"renderContext_3\"] is invalid due to a previous error.\n - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder \"renderContext_3\"]])\n\n    at e.submitFrame (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:27:70896)\n    at LB (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:754:218311)\n    at RB (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:754:218508)\n    at async WTe (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:758:25564)\n    at async e3 (https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js:754:459769)",
+      "location": {
+        "url": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/legacy-main-DavbKrzs.js",
+        "line": 704,
+        "column": 301694,
+        "lineNumber": 704,
+        "columnNumber": 301694
+      }
+    }
+  ],
+  "pageErrors": [],
+  "failedRequests": [
+    {
+      "at": "2026-09-04T06:16:24.560Z",
+      "method": "GET",
+      "url": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/assets/original/menu-previews/atomic-acres.webm?v=pass66-runtime-preview-v15",
+      "failure": {
+        "errorText": "net::ERR_ABORTED"
+      }
+    }
+  ],
+  "badResponses": [],
+  "steps": [
+    {
+      "at": "2026-09-04T06:16:21.191Z",
+      "action": "goto-root"
+    },
+    {
+      "at": "2026-09-04T06:16:21.602Z",
+      "action": "click-latest-release"
+    },
+    {
+      "at": "2026-09-04T06:16:24.488Z",
+      "action": "menu-ready",
+      "marker": {
+        "url": "https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass92/?release=latest",
+        "title": "Nuke Town — Browser Arena FPS",
+        "releaseText": "PASS 92",
+        "releaseFooter": "PASS 92",
+        "documentData": {
+          "uiContract": "pass64-command-v2",
+          "renderProfile": "blender",
+          "graphicsPreset": "high",
+          "graphicsLiveProfile": "blender",
+          "graphicsFrameRateLimit": "uncapped",
+          "graphicsAntialiasSamples": "4",
+          "graphicsToneMapping": "aces",
+          "reducedSensory": "false",
+          "reducedMotion": "false",
+          "tintSwizzleShim": "true",
+          "tslNodeBuildErrors": "0",
+          "renderBackend": "webgpu",
+          "webglShadowSampler": "pcf-soft",
+          "atomicSignalRenderer": "hardware",
+          "atomicSignal": "tsl-hdr",
+          "webglContext": "ready",
+          "adaptiveShadows": "on",
+          "arenaId": "atomic-acres",
+          "inputScheme": "keyboard",
+          "graphicsRegistryCount": "41",
+          "menuLifecycle": "pre-match",
+          "pointerLockLifecycle": "unlocked",
+          "menuPreview": "prerecorded-video",
+          "gameplayArena": "deferred-until-deployment"
+        },
+        "menuVisible": true,
+        "selectedArena": "atomic-acres",
+        "graphicsPreset": "high"
+      }
+    },
+    {
+      "at": "2026-09-04T06:16:24.581Z",
+      "action": "select-nuketown2-card"
+    },
+    {
+      "at": "2026-09-04T06:16:24.587Z",
+      "action": "visitor-callsign-observed",
+      "value": "OPERATOR"
+    },
+    {
+      "at": "2026-09-04T06:16:24.587Z",
+      "action": "click-deploy",
+      "selector": "#solo"
+    },
+    {
+      "at": "2026-09-04T06:17:24.731Z",
+      "action": "probe-failed",
+      "error": "page.waitForFunction: Timeout 60000ms exceeded."
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+
+=== atomic-acres: 15 fall-through floor(s) [44 walkable visuals censused, 29 fully supported, 406 colliders, 819 visible meshes]
+  FALL-THROUGH garage-pitched-roof @ [-2.33,5.12,-12.5] span [6.1,7.1] area 43.33 m2 — 90% unsupported (726/810 samples), largest contiguous hole 38.84 m2 [share+hole], hole [-5.36,0.71,-16.03,-8.97], drop 1.05 m to 3.29
+  FALL-THROUGH garage-pitched-roof @ [2.33,5.12,12.5] span [6.1,7.1] area 43.33 m2 — 90% unsupported (726/810 samples), largest contiguous hole 38.84 m2 [share+hole], hole [-0.71,5.36,8.97,16.03], drop 1.05 m to 3.29
+  FALL-THROUGH garage-pitched-roof @ [-7.87,5.12,-12.5] span [6.1,7.1] area 43.33 m2 — 82% unsupported (661/810 samples), largest contiguous hole 23.38 m2 [share+hole], hole [-10.91,-4.84,-16.03,-8.97], drop 1.05 m to 3.26
+  FALL-THROUGH garage-pitched-roof @ [7.87,5.12,12.5] span [6.1,7.1] area 43.33 m2 — 82% unsupported (661/810 samples), largest contiguous hole 23.38 m2 [share+hole], hole [4.84,10.91,8.97,16.03], drop 1.05 m to 3.26
+  FALL-THROUGH barrier-cap @ [27,2.26,-13] span [2.98,4.58] area 13.65 m2 — 24% unsupported (62/260 samples), largest contiguous hole 3.25 m2 [share+hole], hole [25.53,28.47,-15.27,-10.73], drop 0.2 m to 2.06
+  FALL-THROUGH barrier-cap @ [-27,2.26,13] span [2.98,4.58] area 13.65 m2 — 24% unsupported (62/260 samples), largest contiguous hole 3.25 m2 [share+hole], hole [-28.47,-25.53,10.73,15.27], drop 0.2 m to 2.06
+  FALL-THROUGH barrier-cap @ [-9,2.26,-26] span [3.18,2.38] area 7.57 m2 — 28% unsupported (43/154 samples), largest contiguous hole 1.67 m2 [share+hole], hole [-10.57,-7.43,-27.17,-24.83], drop 0.2 m to 2.06
+  FALL-THROUGH barrier-cap @ [9,2.26,26] span [3.18,2.38] area 7.57 m2 — 28% unsupported (43/154 samples), largest contiguous hole 1.67 m2 [share+hole], hole [7.43,10.57,24.83,27.17], drop 0.2 m to 2.06
+  FALL-THROUGH barrier-cap @ [-10.1,0.81,-1.3] span [1.88,2.38] area 4.47 m2 — 36% unsupported (36/99 samples), largest contiguous hole 1.63 m2 [share+hole], hole [-11.02,-9.18,-2.47,-0.13], drop 0.2 m to 0.61
+  FALL-THROUGH barrier-cap @ [10.1,0.81,1.3] span [1.88,2.38] area 4.47 m2 — 36% unsupported (36/99 samples), largest contiguous hole 1.63 m2 [share+hole], hole [9.18,11.02,0.13,2.47], drop 0.2 m to 0.61
+  FALL-THROUGH barrier-cap @ [-8.1,1.56,-1.6] span [1.88,2.38] area 4.47 m2 — 36% unsupported (36/99 samples), largest contiguous hole 1.63 m2 [share+hole], hole [-9.02,-7.18,-2.77,-0.43], drop 0.2 m to 1.36
+  FALL-THROUGH barrier-cap @ [8.1,1.56,1.6] span [1.88,2.38] area 4.47 m2 — 36% unsupported (36/99 samples), largest contiguous hole 1.63 m2 [share+hole], hole [7.18,9.02,0.43,2.77], drop 0.2 m to 1.36
+  FALL-THROUGH cargo-crate @ [-8.05,1.21,-26] span [1.72,1.78] area 3.06 m2 — 25% unsupported (18/72 samples), largest contiguous hole 0.77 m2 [share+hole], hole [-7.45,-7.21,-26.87,-25.13], drop 1.21 m to nothing
+  FALL-THROUGH coach-deck @ [-5.2,2.25,0.1] span [2.3,5.12] area 11.18 m2 — 6% unsupported (13/220 samples), largest contiguous hole 0.36 m2 [share], hole [-6.33,-4.07,-2.39,2.36], drop 2.25 m to nothing
+  FALL-THROUGH coach-deck @ [5.2,2.25,-0.1] span [2.3,5.12] area 11.18 m2 — 6% unsupported (13/220 samples), largest contiguous hole 0.36 m2 [share], hole [4.07,6.33,-2.36,2.39], drop 2.25 m to nothing
+  rule-excluded horizontal meshes: instanced mesh over the 512-instance audit cap=2, soft foliage=211, no standing clearance above (ceiling/soffit/shelf)=11, terrain shell outside the playfield=2, no flat top face (rounded/sculpted cap)=342
+
+=== rustworks-1v1: 1 fall-through floor(s) [25 walkable visuals censused, 24 fully supported, 126 colliders, 104 visible meshes]
+  FALL-THROUGH rustworks-derrick-service-platform @ [0,11.32,0] span [4.3,4.3] area 18.49 m2 — 100% unsupported (361/361 samples), largest contiguous hole 18.49 m2 [share+hole], hole [-2.13,2.13,-2.13,2.13], drop 3.05 m to 8.27
+  rule-excluded horizontal meshes: no standing clearance above (ceiling/soffit/shelf)=4, no flat top face (rounded/sculpted cap)=7
+
+=== gun-range: 1 fall-through floor(s) [16 walkable visuals censused, 15 fully supported, 73 colliders, 237 visible meshes]
+  FALL-THROUGH gun-range-ceiling @ [0,7.32,-14.5] span [42,70] area 2940 m2 — 91% unsupported (3734/4096 samples), largest contiguous hole 2680.17 m2 [share+hole], hole [-19.65,20.98,-48.37,19.37], drop 7.32 m to nothing
+  rule-excluded horizontal meshes: no standing clearance above (ceiling/soffit/shelf)=2, no flat top face (rounded/sculpted cap)=9
+
+=== skyline-terminal: 8 fall-through floor(s) [56 walkable visuals censused, 48 fully supported, 308 colliders, 277 visible meshes]
+  FALL-THROUGH skyline-presentation-batch-32 @ [0,5.57,-6] span [3.6,12] area 43.2 m2 — 86% unsupported (672/784 samples), largest contiguous hole 37.03 m2 [share+hole], hole [-1.54,1.54,-11.98,-0.27], drop 2.3 m to 3.27
+  FALL-THROUGH skyline-quality-wing-port @ [-0.25,2.96,12] span [5.9,16.8] area 99.12 m2 — 22% unsupported (352/1600 samples), largest contiguous hole 13.88 m2 [share+hole], hole [-3.18,2.68,5.75,20.38], drop 0.2 m to 2.76
+  FALL-THROUGH skyline-quality-wing-starboard @ [-0.25,2.96,-8] span [5.9,16.8] area 99.12 m2 — 22% unsupported (352/1600 samples), largest contiguous hole 13.88 m2 [share+hole], hole [-3.18,2.68,-16.38,-1.75], drop 0.2 m to 2.76
+  FALL-THROUGH skyline-quality-uld--20-18 @ [-20,2.66,18] span [4.62,2.72] area 12.57 m2 — 38% unsupported (90/240 samples), largest contiguous hole 4.72 m2 [share+hole], hole [-22.29,-17.71,16.66,19.34], drop 0.2 m to 2.46
+  FALL-THROUGH skyline-quality-uld-20-18 @ [20,2.66,18] span [4.62,2.72] area 12.57 m2 — 38% unsupported (90/240 samples), largest contiguous hole 4.72 m2 [share+hole], hole [17.71,22.29,16.66,19.34], drop 0.2 m to 2.46
+  FALL-THROUGH skyline-quality-uld--12-26 @ [-12,2.66,26] span [4.62,2.72] area 12.57 m2 — 38% unsupported (90/240 samples), largest contiguous hole 4.72 m2 [share+hole], hole [-14.29,-9.71,24.66,27.34], drop 0.2 m to 2.46
+  FALL-THROUGH skyline-quality-uld-12-26 @ [12,2.66,26] span [4.62,2.72] area 12.57 m2 — 38% unsupported (90/240 samples), largest contiguous hole 4.72 m2 [share+hole], hole [9.71,14.29,24.66,27.34], drop 0.2 m to 2.46
+  FALL-THROUGH skyline-quality-uld-0-28 @ [0,2.66,28] span [4.62,2.72] area 12.57 m2 — 38% unsupported (90/240 samples), largest contiguous hole 4.72 m2 [share+hole], hole [-2.29,2.29,26.66,29.34], drop 0.2 m to 2.46
+  rule-excluded horizontal meshes: soft foliage=1, no flat top face (rounded/sculpted cap)=17, no standing clearance above (ceiling/soffit/shelf)=6
+
+=== farcrysis: 8 fall-through floor(s) [26 walkable visuals censused, 18 fully supported, 6279 colliders, 541 visible meshes]
+  FALL-THROUGH farcrysis-art-tower-platform @ [-8.5,4.89,-8.5] span [3,3] area 9 m2 — 98% unsupported (165/169 samples), largest contiguous hole 8.79 m2 [share+hole], hole [-9.98,-7.02,-9.98,-7.02], drop 4.95 m to -0.06
+  FALL-THROUGH farcrysis-art-cave-arch-top @ [52,3.18,32] span [2.68,4.05] area 5.32 m2 — 100% unsupported (119/119 samples), largest contiguous hole 5.32 m2 [share+hole], hole [50.68,53.32,30,34], drop 3 m to 0.18
+  FALL-THROUGH (unnamed Mesh) @ [47.66,1.55,-47.71] span [5.02,4.49] area 6.44 m2 — 67% unsupported (96/144 samples), largest contiguous hole 4.02 m2 [share+hole], hole [45.17,50.14,-49.93,-45.5], drop 0.25 m to 1.26
+  FALL-THROUGH farcrysis-art-tower-dish @ [-8.5,6.23,-8.5] span [1.6,1.6] area 2.56 m2 — 100% unsupported (64/64 samples), largest contiguous hole 2.56 m2 [share+hole], hole [-9.28,-7.72,-9.28,-7.72], drop 6.3 m to -0.07
+  FALL-THROUGH farcrysis-crate-ne-stack-top @ [27.43,3.5,-30.34] span [2.06,2.06] area 2.4 m2 — 100% unsupported (64/64 samples), largest contiguous hole 2.4 m2 [share+hole], hole [26.43,28.43,-31.34,-29.34], drop 0.9 m to 2.6
+  FALL-THROUGH farcrysis-crate-sw-stack-top @ [-27.43,6.3,30.34] span [2.06,2.06] area 2.4 m2 — 100% unsupported (64/64 samples), largest contiguous hole 2.4 m2 [share+hole], hole [-28.43,-26.43,29.34,31.34], drop 0.9 m to 5.4
+  FALL-THROUGH farcrysis-crate-se-stack-top @ [30.34,6.15,27.43] span [2.06,2.06] area 2.4 m2 — 100% unsupported (64/64 samples), largest contiguous hole 2.4 m2 [share+hole], hole [29.34,31.34,26.43,28.43], drop 0.9 m to 5.25
+  FALL-THROUGH farcrysis-crate-nw-stack-top @ [-30.34,6.56,-27.43] span [2.06,2.06] area 2.4 m2 — 94% unsupported (60/64 samples), largest contiguous hole 2.25 m2 [share+hole], hole [-31.34,-29.34,-28.25,-26.43], drop 0.9 m to 5.66
+  rule-excluded horizontal meshes: instanced mesh over the 512-instance audit cap=17, no flat top face (rounded/sculpted cap)=276, no standing clearance above (ceiling/soffit/shelf)=1, soft foliage=368
+
+=== high-seas: 3 fall-through floor(s) [46 walkable visuals censused, 43 fully supported, 426 colliders, 260 visible meshes]
+  FALL-THROUGH high-seas-bow-upper-chart-table-top @ [6.6,6.98,-18] span [1.1,1.9] area 2.09 m2 — 100% unsupported (54/54 samples), largest contiguous hole 2.09 m2 [share+hole], hole [6.07,7.13,-18.93,-17.07], drop 0.8 m to 6.18
+  FALL-THROUGH high-seas-stern-upper-chart-table-top @ [6.6,6.98,18] span [1.1,1.9] area 2.09 m2 — 100% unsupported (54/54 samples), largest contiguous hole 2.09 m2 [share+hole], hole [6.07,7.13,17.07,18.93], drop 0.8 m to 6.18
+  FALL-THROUGH high-seas-cabana-table @ [6.55,4.03,0] span [1.8,1.15] area 2.07 m2 — 100% unsupported (54/54 samples), largest contiguous hole 2.07 m2 [share+hole], hole [5.67,7.43,-0.55,0.55], drop 0.85 m to 3.18
+  rule-excluded horizontal meshes: no flat top face (rounded/sculpted cap)=17, no standing clearance above (ceiling/soffit/shelf)=3, soft foliage=2
+
+=== test1: 0 fall-through floor(s) [48 walkable visuals censused, 48 fully supported, 244 colliders, 296 visible meshes]
+  rule-excluded horizontal meshes: no standing clearance above (ceiling/soffit/shelf)=2, terrain shell outside the playfield=4, soft foliage=38
+
+=== test2: 0 fall-through floor(s) [33 walkable visuals censused, 33 fully supported, 614 colliders, 401 visible meshes]
+  rule-excluded horizontal meshes: no standing clearance above (ceiling/soffit/shelf)=2, terrain shell outside the playfield=2, soft foliage=103
+
+=== map3: 0 fall-through floor(s) [52 walkable visuals censused, 52 fully supported, 604 colliders, 302 visible meshes]
+
+Gate: any elevated walkable visual without movement authority under its top face fails the run (exit 1).

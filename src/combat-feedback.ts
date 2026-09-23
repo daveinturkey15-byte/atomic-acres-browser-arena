@@ -1,4 +1,4 @@
-import { HOUSE_LAYOUT } from './arena-layout';
+import { HOUSE_LAYOUT, STREET_HALF_WIDTH } from './arena-layout';
 
 export type ImpactSurface = 'metal' | 'concrete' | 'wood' | 'soil' | 'glass';
 export type FootstepSurface = 'asphalt' | 'concrete' | 'wood' | 'soil';
@@ -73,8 +73,9 @@ export function classifyFootstepSurface(point: Point3): FootstepSurface {
     const deckZ = house.z - house.facing * 10.2;
     if (localX <= 5 && Math.abs(point.z - deckZ) <= 1.8 && point.y < 1.4) return 'wood';
   }
-  const roadDistance = Math.abs(point.x);
-  if (roadDistance <= 9.5) return 'asphalt';
-  if (roadDistance <= 14.2) return 'concrete';
+  // The street runs along X, so distance from the carriageway is measured on Z.
+  const roadDistance = Math.abs(point.z);
+  if (roadDistance <= STREET_HALF_WIDTH) return 'asphalt';
+  if (roadDistance <= 8.8) return 'concrete';
   return 'soil';
 }

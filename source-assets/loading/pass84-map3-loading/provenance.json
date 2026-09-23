@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "familyId": "pass84-map3-loading-backdrop",
+  "generatedAt": "2026-09-02",
+  "note": "Deployment loading backdrop for Map 3 (HF-405), derived from the arena's own authoritative WebGPU runtime capture. Map 3 never shipped a placeholder: this is its first backdrop. The six Lane I backdrops, the pass79 pair, and all masters are untouched.",
+  "encode": {
+    "captureSize": [
+      2560,
+      1440
+    ],
+    "outputSize": [
+      1536,
+      864
+    ],
+    "resampler": "PIL.Image.LANCZOS",
+    "format": "WEBP",
+    "qualityCeiling": 88,
+    "qualityUsed": {
+      "map3": 88
+    },
+    "method": 6,
+    "maximumBytes": 239202,
+    "minimumPsnrDb": 40.0,
+    "psnrDb": {
+      "map3": 43.49
+    },
+    "lowerByteBoundSubstitution": "The shipped family's 169,200 byte lower bound is not asserted here. At the family's own ceiling quality of 88 this content encodes to roughly 61 KB because a stone gallery at raking light carries very little high-frequency detail, and raising quality above the family ceiling purely to reach a byte count would put this file outside the family it claims to join. The byte floor was a proxy for fidelity, so fidelity is measured directly instead: PSNR against the file's own PNG master, floored at 40.0 dB, which noise cannot satisfy. The family's UPPER bound is kept as a hard assert.",
+    "inheritedFrom": "scripts/art-gen/finalize_lane_i.py"
+  },
+  "finalizer": {
+    "path": "scripts/assets/finalize_pass84_map3_loading_backdrop.py",
+    "sha256": "92ec1b50a569dddeab16fe4b6d369465f1fe1c1126788731346b5733730a27b1"
+  },
+  "generator": {
+    "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+    "sha256": "89fffa1c039894029619367042227b4165038ed1ece308d62852b180bddf4509"
+  },
+  "arenas": [
+    {
+      "arenaId": "map3",
+      "replaces": null,
+      "previousSha256": "e7521ac356635b804f8095e75cfede10bcbe07d802d6ffc2d073f45a514c534b",
+      "capture": {
+        "source": "authoritative-runtime-arena",
+        "backendRequired": "webgpu",
+        "backendUsed": "webgpu",
+        "softwareAdapter": false,
+        "receiptPath": "artifacts/pass65/menu-preview-rotor-review/runtime-capture-receipt.json",
+        "inputsStable": true,
+        "driftedInputPaths": [],
+        "capturedFrames": 240,
+        "frameSetSha256": "614a50d65384eeb404da9e1716987a2471dc5c8ead63504786803ff771b6d8c1",
+        "sourceFrame": 210,
+        "sourceFrameSha256": "cc21865c44da965ce4dc679d8eabe70210c5ff1f69194f6fa34cb6c2e8937a04",
+        "reviewNote": "The paved hub centred with one full bay running away from it, both pier lines legible down the lane with the 1.8 m gaps and the corner-court cross-connections readable, planters and the central medallion in frame. Deliberately not the poster frame (60), which looks across the gallery rather than down it."
+      },
+      "master": {
+        "path": "source-assets/loading/pass84-map3-loading/map3-loading-master.png",
+        "sha256": "7f7bfaeafff0d209651f802edef656aaacfcd533711a8c22e53b93573fad017e"
+      },
+      "encodeQuality": 88,
+      "psnrDb": 43.49,
+      "runtimeFile": {
+        "path": "public/assets/original/loading/map3-loading.webp",
+        "sha256": "89ec16a2d2b6fe88954921b55ee67b88a2a37ef0343661578e089635b5aab40c",
+        "bytes": 60858
+      }
+    }
+  ]
+}

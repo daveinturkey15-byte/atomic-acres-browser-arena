@@ -3,7 +3,10 @@ import type { SmokeCorridor, SmokeVolume, Vec3 } from './combat/ordnance';
 export const SMOKE_AUTHORITY_SCHEMA_VERSION = 2;
 export const SMOKE_VOLUME_MIN_LIFETIME_MS = 5_000;
 export const SMOKE_VOLUME_LIFETIME_MS = 10_000;
-export const SMOKE_VOLUME_RADIUS_M = 4.2;
+export const SMOKE_ORIGINAL_RADIUS_M = 4.2;
+// HF563/564 use the ORIGINAL circular footprint: area scales with radius squared.
+export const EXPLOSION_RESIDUE_SMOKE_RADIUS_M = SMOKE_ORIGINAL_RADIUS_M / Math.sqrt(2);
+export const SMOKE_VOLUME_RADIUS_M = SMOKE_ORIGINAL_RADIUS_M * Math.sqrt(3);
 /**
  * Each smoke grenade picks one of these deterministically from its action hash,
  * so every deployment reads as a visibly distinct coloured cloud while staying

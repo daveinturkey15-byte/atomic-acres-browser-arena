@@ -1,0 +1,39 @@
+
+Running 1 test using 1 worker
+
+
+(node:7108) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1/1] [chromium] › tests\e2e\pass65-operator-visual-gate.spec.ts:127:5 › renders the canonical opaque PBR operator in Quality and authored Performance LODs
+  1) [chromium] › tests\e2e\pass65-operator-visual-gate.spec.ts:127:5 › renders the canonical opaque PBR operator in Quality and authored Performance LODs 
+
+    TimeoutError: page.waitForFunction: Timeout 60000ms exceeded.
+
+      65 |    * says which of the two things went wrong.
+      66 |    */
+    > 67 |   await page.waitForFunction(
+         |              ^
+      68 |     () => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active',
+      69 |     undefined,
+      70 |     { timeout: 60_000 },
+        at stageOperator (C:\Users\david\projects\aa-claude-residuals\tests\e2e\pass65-operator-visual-gate.spec.ts:67:14)
+        at C:\Users\david\projects\aa-claude-residuals\tests\e2e\pass65-operator-visual-gate.spec.ts:134:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-operator-visual-gat-fed31-d-authored-Performance-LODs-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass65-operator-visual-gat-fed31-d-authored-Performance-LODs-chromium\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass65-operator-visual-gat-fed31-d-authored-Performance-LODs-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace artifacts\pass25a\playwright-results\pass65-operator-visual-gat-fed31-d-authored-Performance-LODs-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  1 failed
+    [chromium] › tests\e2e\pass65-operator-visual-gate.spec.ts:127:5 › renders the canonical opaque PBR operator in Quality and authored Performance LODs 

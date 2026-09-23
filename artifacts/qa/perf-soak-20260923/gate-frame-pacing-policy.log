@@ -1,0 +1,8 @@
+$ npm run qa:pass65:frame-pacing-policy
+
+> atomic-acres-browser-arena@1.0.0 qa:pass65:frame-pacing-policy
+> node .agents/skills/atomic-acres-webgpu-frame-pacing/scripts/verify-webgpu-frame-pacing-policy.mjs --self-test
+
+FAIL webgpu-frame-pacing-policy self-test escaped=1
+- repository source audit failed: match admission must not regress to a raw whole-scene WebGL2 compile
+EXIT:1

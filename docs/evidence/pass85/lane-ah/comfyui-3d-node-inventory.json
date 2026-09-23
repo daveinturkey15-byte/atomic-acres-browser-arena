@@ -1,0 +1,1571 @@
+{
+ "captured_at": "2026-09-02 (Lane AH, PASS 85 sweep; owner's ComfyUI queue idle, not restarted)",
+ "source": "GET http://127.0.0.1:8188/object_info on the owner's running ComfyUI",
+ "comfyui_version": "0.34.0",
+ "custom_node_packs_contributing": [
+  "comfy_api_nodes",
+  "comfy_extras"
+ ],
+ "total_nodes_on_server": 955,
+ "matched_3d_nodes": 106,
+ "nodes": {
+  "ApplyTextureToMesh": {
+   "category": "3d/texturing",
+   "display_name": "Apply Texture to Mesh",
+   "python_module": "comfy_extras.nodes_mesh_postprocess",
+   "required_inputs": [
+    "mesh",
+    "base_color"
+   ],
+   "outputs": [
+    "mesh"
+   ]
+  },
+  "BakeAmbientOcclusion": {
+   "category": "3d/texturing",
+   "display_name": "Bake Ambient Occlusion",
+   "python_module": "comfy_extras.nodes_mesh_postprocess",
+   "required_inputs": [
+    "low_poly",
+    "high_poly",
+    "resolution",
+    "samples",
+    "max_distance",
+    "strength",
+    "bias"
+   ],
+   "outputs": [
+    "occlusion"
+   ]
+  },
+  "BakeNormalMapFromMesh": {
+   "category": "3d/texturing",
+   "display_name": "Bake Normal Map from Mesh",
+   "python_module": "comfy_extras.nodes_mesh_postprocess",
+   "required_inputs": [
+    "low_poly",
+    "high_poly",
+    "resolution",
+    "cage_distance",
+    "ignore_backfaces"
+   ],
+   "outputs": [
+    "normal_map"
+   ]
+  },
+  "BakeTextureFromVoxel": {
+   "category": "3d/texturing",
+   "display_name": "Bake Texture From Voxel",
+   "python_module": "comfy_extras.nodes_mesh_postprocess",
+   "required_inputs": [
+    "mesh",
+    "voxel_colors",
+    "texture_size"
+   ],
+   "outputs": [
+    "base_color",
+    "metallic",
+    "roughness"
+   ]
+  },
+  "BuildPoseFile": {
+   "category": "3d",
+   "display_name": "Create 3D Animation File",
+   "python_module": "comfy_extras.nodes_sam3d_body",
+   "required_inputs": [
+    "pose_data",
+    "format",
+    "fps",
+    "camera_translation",
+    "track_index"
+   ],
+   "outputs": [
+    "model_3d"
+   ]
+  },
+  "CreateCameraInfo": {
+   "category": "3d",
+   "display_name": "Create Camera Info",
+   "python_module": "comfy_extras.nodes_gaussian_splat",
+   "required_inputs": [
+    "mode",
+    "target_x",
+    "target_y",
+    "target_z",
+    "roll",
+    "fov",
+    "zoom",
+    "camera_type"
+   ],
+   "outputs": [
+    "camera_info"
+   ]
+  },
+  "DA3GeometryToMesh": {
+   "category": "image/geometry estimation",
+   "display_name": "Convert DA3 Geometry to Mesh",
+   "python_module": "comfy_extras.nodes_depth_anything_3",
+   "required_inputs": [
+    "da3_geometry",
+    "batch_index",
+    "decimation",
+    "discontinuity_threshold",
+    "confidence_threshold",
+    "use_sky_mask",
+    "texture"
+   ],
+   "outputs": [
+    "MESH"
+   ]
+  },
+  "DecimateMesh": {
+   "category": "3d/mesh",
+   "display_name": "Decimate Mesh",
+   "python_module": "comfy_extras.nodes_mesh_postprocess",
+   "required_inputs": [
+    "mesh",
+    "target_face_count",
+    "placement_mode"
+   ],
+   "outputs": [
+    "mesh"
+   ]
+  },
+  "EmptyLatentHunyuan3Dv2": {
+   "category": "model/latent/hunyuan 3d",
+   "display_name": null,
+   "python_module": "comfy_extras.nodes_hunyuan3d",
+   "required_inputs": [
+    "resolution",
+    "batch_size"
+   ],
+   "outputs": [
+    "LATENT"
+   ]
+  },
+  "EmptyTrellis2LatentStructure": {
+   "category": "model/latent/trellis",
+   "display_name": null,
+   "python_module": "comfy_extras.nodes_trellis2",
+   "required_inputs": [
+    "batch_size"
+   ],
+   "outputs": [
+    "LATENT"
+   ]
+  },
+  "File3DToSplat": {
+   "category": "3d/splat",
+   "display_name": "Get Splat",
+   "python_module": "comfy_extras.nodes_gaussian_splat",
+   "required_inputs": [
+    "model_3d"
+   ],
+   "outputs": [
+    "splat"
+   ]
+  },
+  "FillHoles": {
+   "category": "3d/mesh",
+   "display_name": "Fill Holes",
+   "python_module": "comfy_extras.nodes_mesh_postprocess",
+   "required_inputs": [
+    "mesh",
+    "max_perimeter",
+    "weld_epsilon_rel",
+    "max_vertices",
+    "fill_chains"
+   ],
+   "outputs": [
+    "mesh"
+   ]
+  },
+  "Get3DComponents": {
+   "category": "3d",
+   "display_name": "Get 3D Components",
+   "python_module": "comfy_extras.nodes_mesh_io",
+   "required_inputs": [
+    "model_3d"
+   ],
+   "outputs": [
+    "mesh"
+   ]
+  },
+  "GetMeshInfo": {
+   "category": "3d/mesh",
+   "display_name": "Get Mesh Info",
+   "python_module": "comfy_extras.nodes_save_3d",
+   "required_inputs": [
+    "mesh"
+   ],
+   "outputs": [
+    "mesh",
+    "info"
+   ]
+  },
+  "GetSplatCount": {
+   "category": "3d/splat",
+   "display_name": "Get Splat Count",
+   "python_module": "comfy_extras.nodes_gaussian_splat",
+   "required_inputs": [
+    "splat"
+   ],
+   "outputs": [
+    "splat",
+    "count"
+   ]
+  },
+  "Hunyuan3Dv2Conditioning": {
+   "category": "model/conditioning/hunyuan 3d",
+   "display_name": null,
+   "python_module": "comfy_extras.nodes_hunyuan3d",
+   "required_inputs": [
+    "clip_vision_output"
+   ],
+   "outputs": [
+    "positive",
+    "negative"
+   ]
+  },
+  "Hunyuan3Dv2ConditioningMultiView": {
+   "category": "model/conditioning/hunyuan 3d",
+   "display_name": null,
+   "python_module": "comfy_extras.nodes_hunyuan3d",
+   "required_inputs": [],
+   "outputs": [
+    "positive",
+    "negative"
+   ]
+  },
+  "Load3D": {
+   "category": "3d",
+   "display_name": "Load 3D & Animation",
+   "python_module": "comfy_extras.nodes_load_3d",
+   "required_inputs": [
+    "model_file",
+    "image",
+    "width",
+    "height"
+   ],
+   "outputs": [
+    "image",
+    "mask",
+    "mesh_path",
+    "normal",
+    "camera_info",
+    "recording_video",
+    "model_3d",
+    "model_3d_info"
+   ]
+  },
+  "Load3DAdvanced": {
+   "category": "3d",
+   "display_name": "Load 3D (Advanced)",
+   "python_module": "comfy_extras.nodes_load_3d",
+   "required_inputs": [
+    "model_file",
+    "viewport_state",
+    "width",
+    "height"
+   ],
+   "outputs": [
+    "model_3d",
+    "model_3d_info",
+    "camera_info",
+    "width",
+    "height"
+   ]
+  },
+  "LoadMoGeModel": {
+   "category": "model/loaders",
+   "display_name": "Load MoGe Model",
+   "python_module": "comfy_extras.nodes_moge",
+   "required_inputs": [
+    "model_name"
+   ],
+   "outputs": [
+    "MOGE_MODEL"
+   ]
+  },
+  "MediaPipeFaceMeshVisualize": {
+   "category": "image/detection",
+   "display_name": "Visualize Face Landmarks (MediaPipe)",
+   "python_module": "comfy_extras.nodes_mediapipe",
+   "required_inputs": [
+    "face_landmarks",
+    "connections",
+    "color",
+    "thickness",
+    "point_size"
+   ],
+   "outputs": [
+    "IMAGE"
+   ]
+  },
+  "MergeMeshes": {
+   "category": "3d/mesh",
+   "display_name": "Merge Meshes",
+   "python_module": "comfy_extras.nodes_save_3d",
+   "required_inputs": [
+    "meshes"
+   ],
+   "outputs": [
+    "mesh"
+   ]
+  },
+  "MergeSplat": {
+   "category": "3d/splat",
+   "display_name": "Merge Splats",
+   "python_module": "comfy_extras.nodes_gaussian_splat",
+   "required_inputs": [
+    "splats"
+   ],
+   "outputs": [
+    "splat"
+   ]
+  },
+  "MeshSmoothNormals": {
+   "category": "3d/mesh",
+   "display_name": "Smooth Mesh Normals",
+   "python_module": "comfy_extras.nodes_mesh_postprocess",
+   "required_inputs": [
+    "mesh",
+    "crease_angle"
+   ],
+   "outputs": [
+    "mesh"
+   ]
+  },
+  "MeshTextureToImage": {
+   "category": "3d/texturing",
+   "display_name": "Mesh Texture to Image",
+   "python_module": "comfy_extras.nodes_mesh_postprocess",
+   "required_inputs": [
+    "mesh"
+   ],
+   "outputs": [
+    "base_color",
+    "metallic",
+    "roughness",
+    "occlusion",
+    "normal_map"
+   ]
+  },
+  "MeshToFile3D": {
+   "category": "3d",
+   "display_name": "Create 3D File (from Mesh)",
+   "python_module": "comfy_extras.nodes_save_3d",
+   "required_inputs": [
+    "mesh"
+   ],
+   "outputs": [
+    "model_3d"
+   ]
+  },
+  "MeshyAnimateModelNode": {
+   "category": "partner/3d/Meshy",
+   "display_name": "Meshy: Animate Model",
+   "python_module": "comfy_api_nodes.nodes_meshy",
+   "required_inputs": [
+    "rig_task_id",
+    "action_id"
+   ],
+   "outputs": [
+    "model_file",
+    "GLB",
+    "FBX"
+   ]
+  },
+  "MeshyImageToModelNode": {
+   "category": "partner/3d/Meshy",
+   "display_name": "Meshy: Image to Model",
+   "python_module": "comfy_api_nodes.nodes_meshy",
+   "required_inputs": [
+    "model",
+    "image",
+    "should_remesh",
+    "symmetry_mode",
+    "should_texture",
+    "pose_mode",
+    "seed",
+    "ultra_mode"
+   ],
+   "outputs": [
+    "model_file",
+    "meshy_task_id",
+    "GLB",
+    "FBX"
+   ]
+  },
+  "MeshyMultiImageToModelNode": {
+   "category": "partner/3d/Meshy",
+   "display_name": "Meshy: Multi-Image to Model",
+   "python_module": "comfy_api_nodes.nodes_meshy",
+   "required_inputs": [
+    "model",
+    "images",
+    "should_remesh",
+    "symmetry_mode",
+    "should_texture",
+    "pose_mode",
+    "seed"
+   ],
+   "outputs": [
+    "model_file",
+    "meshy_task_id",
+    "GLB",
+    "FBX"
+   ]
+  },
+  "MeshyRefineNode": {
+   "category": "partner/3d/Meshy",
+   "display_name": "Meshy: Refine Draft Model",
+   "python_module": "comfy_api_nodes.nodes_meshy",
+   "required_inputs": [
+    "model",
+    "meshy_task_id",
+    "enable_pbr",
+    "texture_prompt",
+    "texture_resolution"
+   ],
+   "outputs": [
+    "model_file",
+    "meshy_task_id",
+    "GLB",
+    "FBX"
+   ]
+  },
+  "MeshyRigModelNode": {
+   "category": "partner/3d/Meshy",
+   "display_name": "Meshy: Rig Model",
+   "python_module": "comfy_api_nodes.nodes_meshy",
+   "required_inputs": [
+    "meshy_task_id",
+    "height_meters"
+   ],
+   "outputs": [
+    "model_file",
+    "rig_task_id",
+    "GLB",
+    "FBX"
+   ]
+  },
+  "MeshyTextToModelNode": {
+   "category": "partner/3d/Meshy",
+   "display_name": "Meshy: Text to Model",
+   "python_module": "comfy_api_nodes.nodes_meshy",
+   "required_inputs": [
+    "model",
+    "prompt",
+    "style",
+    "should_remesh",
+    "symmetry_mode",
+    "pose_mode",
+    "seed",
+    "ultra_mode"
+   ],
+   "outputs": [
+    "model_file",
+    "meshy_task_id",
+    "GLB",
+    "FBX"
+   ]
+  },
+  "MeshyTextureMultiViewNode": {
+   "category": "partner/3d/Meshy",
+   "display_name": "Meshy: Texture Model (Multi-View)",
+   "python_module": "comfy_api_nodes.nodes_meshy",
+   "required_inputs": [
+    "model",
+    "meshy_task_id",
+    "multiview_images",
+    "enable_original_uv",
+    "pbr",
+    "texture_resolution"
+   ],
+   "outputs": [
+    "model_file",
+    "meshy_task_id",
+    "GLB",
+    "FBX"
+   ]
+  },
+  "MeshyTextureNode": {
+   "category": "partner/3d/Meshy",
+   "display_name": "Meshy: Texture Model",
+   "python_module": "comfy_api_nodes.nodes_meshy",
+   "required_inputs": [
+    "model",
+    "meshy_task_id",
+    "enable_original_uv",
+    "pbr",
+    "text_style_prompt",
+    "texture_resolution"
+   ],
+   "outputs": [
+    "model_file",
+    "meshy_task_id",
+    "GLB",
+    "FBX"
+   ]
+  },
+  "MoGeGeometryToFOV": {
+   "category": "image/geometry estimation",
+   "display_name": "Get FoV from MoGe Geometry",
+   "python_module": "comfy_extras.nodes_moge",
+   "required_inputs": [
+    "moge_geometry",
+    "axis",
+    "unit"
+   ],
+   "outputs": [
+    "fov",
+    "focal_pixels"
+   ]
+  },
+  "MoGeInference": {
+   "category": "image/geometry estimation",
+   "display_name": "Run MoGe Inference",
+   "python_module": "comfy_extras.nodes_moge",
+   "required_inputs": [
+    "moge_model",
+    "image",
+    "resolution_level",
+    "fov_x_degrees",
+    "batch_size",
+    "force_projection",
+    "apply_mask"
+   ],
+   "outputs": [
+    "moge_geometry"
+   ]
+  },
+  "MoGePanoramaInference": {
+   "category": "image/geometry estimation",
+   "display_name": "Run MoGe Panorama Inference",
+   "python_module": "comfy_extras.nodes_moge",
+   "required_inputs": [
+    "moge_model",
+    "image",
+    "resolution_level",
+    "split_resolution",
+    "merge_resolution",
+    "batch_size"
+   ],
+   "outputs": [
+    "moge_geometry"
+   ]
+  },
+  "MoGePointMapToMesh": {
+   "category": "image/geometry estimation",
+   "display_name": "Convert MoGe Point Map to Mesh",
+   "python_module": "comfy_extras.nodes_moge",
+   "required_inputs": [
+    "moge_geometry",
+    "batch_index",
+    "decimation",
+    "discontinuity_threshold",
+    "texture"
+   ],
+   "outputs": [
+    "MESH"
+   ]
+  },
+  "MoGeRender": {
+   "category": "image/geometry estimation",
+   "display_name": "Render MoGe Geometry",
+   "python_module": "comfy_extras.nodes_moge",
+   "required_inputs": [
+    "moge_geometry",
+    "output"
+   ],
+   "outputs": [
+    "IMAGE"
+   ]
+  },
+  "PaintMesh": {
+   "category": "3d/mesh",
+   "display_name": "Paint Mesh",
+   "python_module": "comfy_extras.nodes_mesh_postprocess",
+   "required_inputs": [
+    "mesh",
+    "voxel_colors"
+   ],
+   "outputs": [
+    "mesh"
+   ]
+  },
+  "Pixal3DConditioning": {
+   "category": "model/conditioning/trellis2",
+   "display_name": null,
+   "python_module": "comfy_extras.nodes_trellis2",
+   "required_inputs": [
+    "clip_vision_model",
+    "image",
+    "camera_angle_x"
+   ],
+   "outputs": [
+    "positive",
+    "negative"
+   ]
+  },
+  "Preview3D": {
+   "category": "3d",
+   "display_name": "Preview 3D & Animation",
+   "python_module": "comfy_extras.nodes_load_3d",
+   "required_inputs": [
+    "model_file"
+   ],
+   "outputs": []
+  },
+  "Preview3DAdvanced": {
+   "category": "3d",
+   "display_name": "Preview 3D (Advanced)",
+   "python_module": "comfy_extras.nodes_load_3d",
+   "required_inputs": [
+    "model_3d",
+    "viewport_state",
+    "width",
+    "height"
+   ],
+   "outputs": [
+    "model_3d",
+    "model_3d_info",
+    "camera_info",
+    "width",
+    "height"
+   ]
+  },
+  "PreviewGaussianSplat": {
+   "category": "3d",
+   "display_name": "Preview Splat",
+   "python_module": "comfy_extras.nodes_load_3d",
+   "required_inputs": [
+    "model_3d",
+    "viewport_state",
+    "width",
+    "height"
+   ],
+   "outputs": [
+    "model_3d",
+    "model_3d_info",
+    "camera_info",
+    "width",
+    "height"
+   ]
+  },
+  "PreviewPointCloud": {
+   "category": "3d",
+   "display_name": "Preview Point Cloud",
+   "python_module": "comfy_extras.nodes_load_3d",
+   "required_inputs": [
+    "model_3d",
+    "viewport_state",
+    "width",
+    "height"
+   ],
+   "outputs": [
+    "model_3d",
+    "model_3d_info",
+    "camera_info",
+    "width",
+    "height"
+   ]
+  },
+  "RecraftStyleV3DigitalIllustration": {
+   "category": "partner/image/Recraft",
+   "display_name": "Recraft Style - Digital Illustration",
+   "python_module": "comfy_api_nodes.nodes_recraft",
+   "required_inputs": [
+    "substyle"
+   ],
+   "outputs": [
+    "recraft_style"
+   ]
+  },
+  "RemeshMesh": {
+   "category": "3d/mesh",
+   "display_name": "Remesh Mesh (Narrow-Band DC)",
+   "python_module": "comfy_extras.nodes_mesh_postprocess",
+   "required_inputs": [
+    "mesh",
+    "resolution",
+    "sign_mode",
+    "band",
+    "project_back",
+    "fix_poles",
+    "smooth_iters",
+    "drop_small_components",
+    "precluster_max_verts"
+   ],
+   "outputs": [
+    "mesh"
+   ]
+  },
+  "RenderMesh": {
+   "category": "3d/mesh",
+   "display_name": "Render Mesh",
+   "python_module": "comfy_extras.nodes_mesh_postprocess",
+   "required_inputs": [
+    "mesh",
+    "mode",
+    "width",
+    "height",
+    "background"
+   ],
+   "outputs": [
+    "image",
+    "mask"
+   ]
+  },
+  "RenderSplat": {
+   "category": "3d/splat",
+   "display_name": "Render Splat",
+   "python_module": "comfy_extras.nodes_gaussian_splat",
+   "required_inputs": [
+    "splat",
+    "width",
+    "height",
+    "frames",
+    "splat_scale",
+    "sharpen",
+    "headlight_shading",
+    "opacity_threshold",
+    "render_style",
+    "background"
+   ],
+   "outputs": [
+    "image",
+    "mask"
+   ]
+  },
+  "RenderUVAtlas": {
+   "category": "3d/texturing",
+   "display_name": "Render UV Atlas",
+   "python_module": "comfy_extras.nodes_mesh_postprocess",
+   "required_inputs": [
+    "mesh",
+    "resolution"
+   ],
+   "outputs": [
+    "image"
+   ]
+  },
+  "Rodin3D_Detail": {
+   "category": "partner/3d/Rodin",
+   "display_name": "Rodin 3D Generate - Detail Generate",
+   "python_module": "comfy_api_nodes.nodes_rodin",
+   "required_inputs": [
+    "Images"
+   ],
+   "outputs": [
+    "3D Model Path",
+    "GLB"
+   ]
+  },
+  "Rodin3D_Gen2": {
+   "category": "partner/3d/Rodin",
+   "display_name": "Rodin 3D Generate - Gen-2 Generate",
+   "python_module": "comfy_api_nodes.nodes_rodin",
+   "required_inputs": [
+    "Images",
+    "TAPose"
+   ],
+   "outputs": [
+    "3D Model Path",
+    "GLB"
+   ]
+  },
+  "Rodin3D_Gen25_Image": {
+   "category": "partner/3d/Rodin",
+   "display_name": "Rodin 3D Gen-2.5 - Image to 3D",
+   "python_module": "comfy_api_nodes.nodes_rodin",
+   "required_inputs": [
+    "images",
+    "mode",
+    "material",
+    "geometry_file_format"
+   ],
+   "outputs": [
+    "model_file"
+   ]
+  },
+  "Rodin3D_Gen25_Text": {
+   "category": "partner/3d/Rodin",
+   "display_name": "Rodin 3D Gen-2.5 - Text to 3D",
+   "python_module": "comfy_api_nodes.nodes_rodin",
+   "required_inputs": [
+    "prompt",
+    "mode",
+    "material",
+    "geometry_file_format"
+   ],
+   "outputs": [
+    "model_file"
+   ]
+  },
+  "Rodin3D_Regular": {
+   "category": "partner/3d/Rodin",
+   "display_name": "Rodin 3D Generate - Regular Generate",
+   "python_module": "comfy_api_nodes.nodes_rodin",
+   "required_inputs": [
+    "Images"
+   ],
+   "outputs": [
+    "3D Model Path",
+    "GLB"
+   ]
+  },
+  "Rodin3D_Sketch": {
+   "category": "partner/3d/Rodin",
+   "display_name": "Rodin 3D Generate - Sketch Generate",
+   "python_module": "comfy_api_nodes.nodes_rodin",
+   "required_inputs": [
+    "Images"
+   ],
+   "outputs": [
+    "3D Model Path",
+    "GLB"
+   ]
+  },
+  "Rodin3D_Smooth": {
+   "category": "partner/3d/Rodin",
+   "display_name": "Rodin 3D Generate - Smooth Generate",
+   "python_module": "comfy_api_nodes.nodes_rodin",
+   "required_inputs": [
+    "Images"
+   ],
+   "outputs": [
+    "3D Model Path",
+    "GLB"
+   ]
+  },
+  "RotateMesh": {
+   "category": "3d/mesh",
+   "display_name": "Rotate Mesh",
+   "python_module": "comfy_extras.nodes_save_3d",
+   "required_inputs": [
+    "mesh",
+    "mode"
+   ],
+   "outputs": [
+    "mesh"
+   ]
+  },
+  "SAM3DBody_FaceExpression": {
+   "category": "image/detection",
+   "display_name": "Face Expression to SAM3D Body",
+   "python_module": "comfy_extras.nodes_sam3d_body",
+   "required_inputs": [
+    "sam3d_body_model",
+    "mhr_pose_data",
+    "image",
+    "strength",
+    "mouth_strength",
+    "eye_strength",
+    "brow_strength",
+    "input_threshold",
+    "blendshape_smooth_window"
+   ],
+   "outputs": [
+    "mhr_pose_data"
+   ]
+  },
+  "SAM3DBody_Loader": {
+   "category": "image/detection",
+   "display_name": "Load SAM3D Body Model",
+   "python_module": "comfy_extras.nodes_sam3d_body",
+   "required_inputs": [
+    "model_file"
+   ],
+   "outputs": [
+    "sam3d_body_model"
+   ]
+  },
+  "SAM3DBody_Predict": {
+   "category": "image/detection",
+   "display_name": "Run SAM3D Body Prediction",
+   "python_module": "comfy_extras.nodes_sam3d_body",
+   "required_inputs": [
+    "sam3d_body_model",
+    "image",
+    "run_hand_refinement",
+    "fov",
+    "batch_size"
+   ],
+   "outputs": [
+    "mhr_pose_data"
+   ]
+  },
+  "SAM3DBody_Render": {
+   "category": "image/detection",
+   "display_name": "Render 3D Body Pose",
+   "python_module": "comfy_extras.nodes_sam3d_body",
+   "required_inputs": [
+    "pose_data",
+    "width",
+    "height",
+    "render_style"
+   ],
+   "outputs": [
+    "image"
+   ]
+  },
+  "SAM3DBody_Smooth": {
+   "category": "image/detection",
+   "display_name": "Smooth SAM3D Body Pose Data",
+   "python_module": "comfy_extras.nodes_sam3d_body",
+   "required_inputs": [
+    "mhr_pose_data",
+    "strength",
+    "method",
+    "window",
+    "rotation_threshold_degrees"
+   ],
+   "outputs": [
+    "mhr_pose_data"
+   ]
+  },
+  "SV3D_Conditioning": {
+   "category": "model/conditioning/stable video 3d",
+   "display_name": null,
+   "python_module": "comfy_extras.nodes_stable3d",
+   "required_inputs": [
+    "clip_vision",
+    "init_image",
+    "vae",
+    "width",
+    "height",
+    "video_frames",
+    "elevation"
+   ],
+   "outputs": [
+    "positive",
+    "negative",
+    "latent"
+   ]
+  },
+  "Save3DAdvanced": {
+   "category": "3d",
+   "display_name": "Save 3D (Advanced)",
+   "python_module": "comfy_extras.nodes_save_3d",
+   "required_inputs": [
+    "model_3d",
+    "filename_prefix",
+    "viewport_state",
+    "width",
+    "height"
+   ],
+   "outputs": [
+    "model_3d",
+    "model_3d_info",
+    "camera_info",
+    "width",
+    "height"
+   ]
+  },
+  "SaveGLB": {
+   "category": "3d",
+   "display_name": "Save 3D Model",
+   "python_module": "comfy_extras.nodes_save_3d",
+   "required_inputs": [
+    "mesh",
+    "filename_prefix"
+   ],
+   "outputs": []
+  },
+  "SaveGaussianSplat": {
+   "category": "3d",
+   "display_name": "Save Splat",
+   "python_module": "comfy_extras.nodes_save_3d",
+   "required_inputs": [
+    "model_3d",
+    "filename_prefix",
+    "viewport_state",
+    "width",
+    "height"
+   ],
+   "outputs": [
+    "model_3d",
+    "model_3d_info",
+    "camera_info",
+    "width",
+    "height"
+   ]
+  },
+  "SavePointCloud": {
+   "category": "3d",
+   "display_name": "Save Point Cloud",
+   "python_module": "comfy_extras.nodes_save_3d",
+   "required_inputs": [
+    "model_3d",
+    "filename_prefix",
+    "viewport_state",
+    "width",
+    "height"
+   ],
+   "outputs": [
+    "model_3d",
+    "model_3d_info",
+    "camera_info",
+    "width",
+    "height"
+   ]
+  },
+  "SplatToFile3D": {
+   "category": "3d/splat",
+   "display_name": "Create 3D File (from Splat)",
+   "python_module": "comfy_extras.nodes_gaussian_splat",
+   "required_inputs": [
+    "splat",
+    "format"
+   ],
+   "outputs": [
+    "model_3d"
+   ]
+  },
+  "SplatToMesh": {
+   "category": "3d/splat",
+   "display_name": "Extract Mesh from Splat",
+   "python_module": "comfy_extras.nodes_gaussian_splat",
+   "required_inputs": [
+    "splat",
+    "resolution",
+    "kernel",
+    "smooth",
+    "level",
+    "min_component",
+    "min_opacity",
+    "color_sharpen"
+   ],
+   "outputs": [
+    "mesh"
+   ]
+  },
+  "StableZero123_Conditioning": {
+   "category": "model/conditioning/stable zero123",
+   "display_name": null,
+   "python_module": "comfy_extras.nodes_stable3d",
+   "required_inputs": [
+    "clip_vision",
+    "init_image",
+    "vae",
+    "width",
+    "height",
+    "batch_size",
+    "elevation",
+    "azimuth"
+   ],
+   "outputs": [
+    "positive",
+    "negative",
+    "latent"
+   ]
+  },
+  "StableZero123_Conditioning_Batched": {
+   "category": "model/conditioning/stable zero123",
+   "display_name": null,
+   "python_module": "comfy_extras.nodes_stable3d",
+   "required_inputs": [
+    "clip_vision",
+    "init_image",
+    "vae",
+    "width",
+    "height",
+    "batch_size",
+    "elevation",
+    "azimuth",
+    "elevation_batch_increment",
+    "azimuth_batch_increment"
+   ],
+   "outputs": [
+    "positive",
+    "negative",
+    "latent"
+   ]
+  },
+  "Tencent3DPartNode": {
+   "category": "partner/3d/Tencent",
+   "display_name": "Hunyuan3D: 3D Part",
+   "python_module": "comfy_api_nodes.nodes_hunyuan3d",
+   "required_inputs": [
+    "model_3d",
+    "seed"
+   ],
+   "outputs": [
+    "FBX"
+   ]
+  },
+  "Tencent3DTextureEditNode": {
+   "category": "partner/3d/Tencent",
+   "display_name": "Hunyuan3D: 3D Texture Edit",
+   "python_module": "comfy_api_nodes.nodes_hunyuan3d",
+   "required_inputs": [
+    "model_3d",
+    "prompt",
+    "seed"
+   ],
+   "outputs": [
+    "GLB",
+    "OBJ",
+    "texture_image"
+   ]
+  },
+  "TencentImageToModelNode": {
+   "category": "partner/3d/Tencent",
+   "display_name": "Hunyuan3D: Image(s) to Model",
+   "python_module": "comfy_api_nodes.nodes_hunyuan3d",
+   "required_inputs": [
+    "model",
+    "image",
+    "face_count",
+    "generate_type",
+    "seed"
+   ],
+   "outputs": [
+    "model_file",
+    "GLB",
+    "OBJ",
+    "texture_image",
+    "optional_metallic",
+    "optional_normal",
+    "optional_roughness"
+   ]
+  },
+  "TencentModelTo3DUVNode": {
+   "category": "partner/3d/Tencent",
+   "display_name": "Hunyuan3D: Model to UV",
+   "python_module": "comfy_api_nodes.nodes_hunyuan3d",
+   "required_inputs": [
+    "model_3d",
+    "seed"
+   ],
+   "outputs": [
+    "OBJ",
+    "FBX",
+    "uv_image"
+   ]
+  },
+  "TencentSmartTopologyNode": {
+   "category": "partner/3d/Tencent",
+   "display_name": "Hunyuan3D: Smart Topology",
+   "python_module": "comfy_api_nodes.nodes_hunyuan3d",
+   "required_inputs": [
+    "model_3d",
+    "polygon_type",
+    "face_level",
+    "seed"
+   ],
+   "outputs": [
+    "OBJ"
+   ]
+  },
+  "TencentTextToModelNode": {
+   "category": "partner/3d/Tencent",
+   "display_name": "Hunyuan3D: Text to Model",
+   "python_module": "comfy_api_nodes.nodes_hunyuan3d",
+   "required_inputs": [
+    "model",
+    "prompt",
+    "face_count",
+    "generate_type",
+    "seed"
+   ],
+   "outputs": [
+    "model_file",
+    "GLB",
+    "OBJ",
+    "texture_image"
+   ]
+  },
+  "TransformSplat": {
+   "category": "3d/splat",
+   "display_name": "Transform Splat",
+   "python_module": "comfy_extras.nodes_gaussian_splat",
+   "required_inputs": [
+    "splat",
+    "translate_x",
+    "translate_y",
+    "translate_z",
+    "rotate_x",
+    "rotate_y",
+    "rotate_z",
+    "scale_x",
+    "scale_y",
+    "scale_z"
+   ],
+   "outputs": [
+    "splat"
+   ]
+  },
+  "Trellis2Conditioning": {
+   "category": "model/conditioning/trellis2",
+   "display_name": null,
+   "python_module": "comfy_extras.nodes_trellis2",
+   "required_inputs": [
+    "clip_vision_model",
+    "image"
+   ],
+   "outputs": [
+    "positive",
+    "negative"
+   ]
+  },
+  "Trellis2ShapeStage": {
+   "category": "model/conditioning/trellis2",
+   "display_name": null,
+   "python_module": "comfy_extras.nodes_trellis2",
+   "required_inputs": [
+    "positive",
+    "negative",
+    "voxel"
+   ],
+   "outputs": [
+    "positive",
+    "negative",
+    "LATENT"
+   ]
+  },
+  "Trellis2TextureStage": {
+   "category": "model/conditioning/trellis2",
+   "display_name": null,
+   "python_module": "comfy_extras.nodes_trellis2",
+   "required_inputs": [
+    "positive",
+    "negative",
+    "shape_latent"
+   ],
+   "outputs": [
+    "positive",
+    "negative",
+    "LATENT"
+   ]
+  },
+  "Trellis2UpsampleStage": {
+   "category": "model/conditioning/trellis2",
+   "display_name": "Trellis2 Upsample Stage",
+   "python_module": "comfy_extras.nodes_trellis2",
+   "required_inputs": [
+    "positive",
+    "negative",
+    "shape_latent",
+    "vae",
+    "target_resolution"
+   ],
+   "outputs": [
+    "positive",
+    "negative",
+    "LATENT"
+   ]
+  },
+  "TripoConversionNode": {
+   "category": "partner/3d/Tripo",
+   "display_name": "Tripo: Convert model",
+   "python_module": "comfy_api_nodes.nodes_tripo",
+   "required_inputs": [
+    "original_model_task_id",
+    "format"
+   ],
+   "outputs": []
+  },
+  "TripoImageToModelNode": {
+   "category": "partner/3d/Tripo",
+   "display_name": "Tripo: Image to Model",
+   "python_module": "comfy_api_nodes.nodes_tripo",
+   "required_inputs": [
+    "image"
+   ],
+   "outputs": [
+    "model_file",
+    "model task_id",
+    "GLB"
+   ]
+  },
+  "TripoImportModelNode": {
+   "category": "partner/3d/Tripo",
+   "display_name": "Tripo: Import Model",
+   "python_module": "comfy_api_nodes.nodes_tripo",
+   "required_inputs": [
+    "model_3d"
+   ],
+   "outputs": [
+    "model task_id"
+   ]
+  },
+  "TripoMultiviewToModelNode": {
+   "category": "partner/3d/Tripo",
+   "display_name": "Tripo: Multiview to Model",
+   "python_module": "comfy_api_nodes.nodes_tripo",
+   "required_inputs": [
+    "image"
+   ],
+   "outputs": [
+    "model_file",
+    "model task_id",
+    "GLB"
+   ]
+  },
+  "TripoP1ImageToModelNode": {
+   "category": "partner/3d/Tripo",
+   "display_name": "Tripo P1: Image to Model",
+   "python_module": "comfy_api_nodes.nodes_tripo",
+   "required_inputs": [
+    "image",
+    "output_mode"
+   ],
+   "outputs": [
+    "model_file",
+    "model task_id",
+    "GLB"
+   ]
+  },
+  "TripoP1MultiviewToModelNode": {
+   "category": "partner/3d/Tripo",
+   "display_name": "Tripo P1: Multiview to Model",
+   "python_module": "comfy_api_nodes.nodes_tripo",
+   "required_inputs": [
+    "image",
+    "output_mode"
+   ],
+   "outputs": [
+    "model_file",
+    "model task_id",
+    "GLB"
+   ]
+  },
+  "TripoP1TextToModelNode": {
+   "category": "partner/3d/Tripo",
+   "display_name": "Tripo P1: Text to Model",
+   "python_module": "comfy_api_nodes.nodes_tripo",
+   "required_inputs": [
+    "prompt",
+    "output_mode"
+   ],
+   "outputs": [
+    "model_file",
+    "model task_id",
+    "GLB"
+   ]
+  },
+  "TripoRetargetNode": {
+   "category": "partner/3d/Tripo",
+   "display_name": "Tripo: Retarget rigged model",
+   "python_module": "comfy_api_nodes.nodes_tripo",
+   "required_inputs": [
+    "original_model_task_id",
+    "animation"
+   ],
+   "outputs": [
+    "model_file",
+    "retarget task_id",
+    "GLB"
+   ]
+  },
+  "TripoRigNode": {
+   "category": "partner/3d/Tripo",
+   "display_name": "Tripo: Rig model",
+   "python_module": "comfy_api_nodes.nodes_tripo",
+   "required_inputs": [
+    "original_model_task_id"
+   ],
+   "outputs": [
+    "model_file",
+    "rig task_id",
+    "GLB"
+   ]
+  },
+  "TripoSplatConditioning": {
+   "category": "model/conditioning/triposplat",
+   "display_name": "TripoSplat Conditioning",
+   "python_module": "comfy_extras.nodes_triposplat",
+   "required_inputs": [
+    "clip_vision",
+    "vae",
+    "image"
+   ],
+   "outputs": [
+    "positive",
+    "negative",
+    "latent"
+   ]
+  },
+  "TripoSplatPreprocessImage": {
+   "category": "model/conditioning/triposplat",
+   "display_name": "TripoSplat Preprocess Image",
+   "python_module": "comfy_extras.nodes_triposplat",
+   "required_inputs": [
+    "image",
+    "mask",
+    "erode_radius",
+    "size"
+   ],
+   "outputs": [
+    "image"
+   ]
+  },
+  "TripoSplatSamplingPreview": {
+   "category": "model/latent/triposplat",
+   "display_name": "TripoSplat Sampling Preview",
+   "python_module": "comfy_extras.nodes_triposplat",
+   "required_inputs": [
+    "model",
+    "vae",
+    "octree_level",
+    "num_gaussians",
+    "yaw",
+    "pitch",
+    "point_size"
+   ],
+   "outputs": [
+    "MODEL"
+   ]
+  },
+  "TripoTextToModelNode": {
+   "category": "partner/3d/Tripo",
+   "display_name": "Tripo: Text to Model",
+   "python_module": "comfy_api_nodes.nodes_tripo",
+   "required_inputs": [
+    "prompt"
+   ],
+   "outputs": [
+    "model_file",
+    "model task_id",
+    "GLB"
+   ]
+  },
+  "TripoTextureNode": {
+   "category": "partner/3d/Tripo",
+   "display_name": "Tripo: Texture model",
+   "python_module": "comfy_api_nodes.nodes_tripo",
+   "required_inputs": [
+    "model_task_id"
+   ],
+   "outputs": [
+    "model_file",
+    "model task_id",
+    "GLB"
+   ]
+  },
+  "UnwrapMesh": {
+   "category": "3d/texturing",
+   "display_name": "Unwrap Mesh UVs",
+   "python_module": "comfy_extras.nodes_mesh_postprocess",
+   "required_inputs": [
+    "mesh",
+    "segmenter",
+    "resolution",
+    "padding",
+    "weld_distance"
+   ],
+   "outputs": [
+    "mesh"
+   ]
+  },
+  "VAEDecodeHunyuan3D": {
+   "category": "model/latent/hunyuan 3d",
+   "display_name": null,
+   "python_module": "comfy_extras.nodes_hunyuan3d",
+   "required_inputs": [
+    "samples",
+    "vae",
+    "num_chunks",
+    "octree_resolution"
+   ],
+   "outputs": [
+    "VOXEL"
+   ]
+  },
+  "VAEDecodeTripoSplat": {
+   "category": "model/latent/triposplat",
+   "display_name": "TripoSplat Decode",
+   "python_module": "comfy_extras.nodes_triposplat",
+   "required_inputs": [
+    "samples",
+    "vae",
+    "num_gaussians",
+    "seed"
+   ],
+   "outputs": [
+    "splat"
+   ]
+  },
+  "VaeDecodeShapeTrellis": {
+   "category": "model/latent/trellis",
+   "display_name": null,
+   "python_module": "comfy_extras.nodes_trellis2",
+   "required_inputs": [
+    "samples",
+    "vae"
+   ],
+   "outputs": [
+    "mesh",
+    "shape_subdivides"
+   ]
+  },
+  "VaeDecodeStructureTrellis2": {
+   "category": "model/latent/trellis",
+   "display_name": null,
+   "python_module": "comfy_extras.nodes_trellis2",
+   "required_inputs": [
+    "samples",
+    "vae",
+    "resolution"
+   ],
+   "outputs": [
+    "voxel"
+   ]
+  },
+  "VaeDecodeTextureTrellis": {
+   "category": "model/latent/trellis",
+   "display_name": null,
+   "python_module": "comfy_extras.nodes_trellis2",
+   "required_inputs": [
+    "samples",
+    "vae",
+    "shape_subdivides"
+   ],
+   "outputs": [
+    "voxel_colors"
+   ]
+  },
+  "VoxelToMesh": {
+   "category": "3d",
+   "display_name": "Voxel to Mesh",
+   "python_module": "comfy_extras.nodes_hunyuan3d",
+   "required_inputs": [
+    "voxel",
+    "algorithm",
+    "threshold"
+   ],
+   "outputs": [
+    "MESH"
+   ]
+  },
+  "VoxelToMeshBasic": {
+   "category": "3d",
+   "display_name": "Voxel to Mesh (Basic) (DEPRECATED)",
+   "python_module": "comfy_extras.nodes_hunyuan3d",
+   "required_inputs": [
+    "voxel",
+    "threshold"
+   ],
+   "outputs": [
+    "MESH"
+   ]
+  },
+  "WeldVertices": {
+   "category": "3d/mesh",
+   "display_name": "Weld Vertices",
+   "python_module": "comfy_extras.nodes_mesh_postprocess",
+   "required_inputs": [
+    "mesh",
+    "epsilon_rel",
+    "epsilon_abs"
+   ],
+   "outputs": [
+    "mesh"
+   ]
+  }
+ },
+ "no_custom_node_packs": "Every matched node's python_module is comfy_extras.* or comfy_api_nodes.* - both are core ComfyUI. No third-party pack contributes any 3D node on this install."
+}

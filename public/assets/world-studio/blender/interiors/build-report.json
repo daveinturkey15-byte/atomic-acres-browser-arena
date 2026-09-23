@@ -1,0 +1,264 @@
+{
+  "seed": 20260912,
+  "blender": "5.1.2",
+  "groundFloorY": 0.08,
+  "anchors": {
+    "sofa": {
+      "lx": 5.4,
+      "lz": -4.4,
+      "yaw": -1.5707963267948966,
+      "footprint": [
+        2.2,
+        0.9
+      ]
+    },
+    "coffee-table": {
+      "lx": 3.6,
+      "lz": -4.4,
+      "yaw": 0.0,
+      "footprint": [
+        1.2,
+        0.6
+      ]
+    },
+    "tv-unit": {
+      "lx": 1.0,
+      "lz": -4.4,
+      "yaw": 1.5707963267948966,
+      "footprint": [
+        1.6,
+        0.5
+      ]
+    },
+    "dining-table": {
+      "lx": -3.4,
+      "lz": -3.4,
+      "yaw": 0.0,
+      "footprint": [
+        1.6,
+        1.0
+      ]
+    },
+    "kitchen-run": {
+      "lx": -6.2,
+      "lz": 5.2,
+      "yaw": 1.5707963267948966,
+      "footprint": [
+        4.4,
+        0.65
+      ]
+    }
+  },
+  "exports": [
+    {
+      "id": "interior-hero-teal-living-kitchen",
+      "objects": 182,
+      "vertices": 16956,
+      "triangles": 33184,
+      "materials": [
+        "IntApplianceEnamel",
+        "IntAreaRug",
+        "IntBacksplashTile",
+        "IntBerberCarpet",
+        "IntBrass",
+        "IntCabinetOchre",
+        "IntCeramicCream",
+        "IntChrome",
+        "IntDarkCast",
+        "IntFoliage",
+        "IntLaminateCounter",
+        "IntLampShade",
+        "IntPaperStack",
+        "IntSageUpholstery",
+        "IntScreenGlass",
+        "IntTeakLight",
+        "IntVinylAvocado",
+        "IntVinylRust",
+        "IntWalnut"
+      ],
+      "file": "interior-hero-teal-living-kitchen.glb",
+      "bytes": 4603156,
+      "sha256": "ded7d8cd183276805cff23f221d653269a4606564c2882189c4a261788c5132e"
+    },
+    {
+      "id": "interior-prop-sofa",
+      "objects": 16,
+      "vertices": 1888,
+      "triangles": 3712,
+      "materials": [
+        "IntSageUpholstery",
+        "IntWalnut"
+      ],
+      "file": "interior-prop-sofa.glb",
+      "bytes": 1185944,
+      "sha256": "8e3eb48e5913d37915f3baa40fab3d2393082c289eb371091925fa08472575c7"
+    },
+    {
+      "id": "interior-prop-coffee-table",
+      "objects": 10,
+      "vertices": 1006,
+      "triangles": 1972,
+      "materials": [
+        "IntBrass",
+        "IntPaperStack",
+        "IntVinylRust",
+        "IntWalnut"
+      ],
+      "file": "interior-prop-coffee-table.glb",
+      "bytes": 590796,
+      "sha256": "3840a2733a24830f69d1acbd20e2259a16196e53f6d00bc58c4e9bebc07526e8"
+    },
+    {
+      "id": "interior-prop-credenza",
+      "objects": 14,
+      "vertices": 1240,
+      "triangles": 2424,
+      "materials": [
+        "IntBrass",
+        "IntDarkCast",
+        "IntScreenGlass",
+        "IntTeakLight",
+        "IntWalnut"
+      ],
+      "file": "interior-prop-credenza.glb",
+      "bytes": 627744,
+      "sha256": "f2440a734dd5fb0049730f9f581ddd6c78cffdf17f627fb701798130a1069cd8"
+    },
+    {
+      "id": "interior-prop-armchair",
+      "objects": 12,
+      "vertices": 1168,
+      "triangles": 2288,
+      "materials": [
+        "IntVinylRust",
+        "IntWalnut"
+      ],
+      "file": "interior-prop-armchair.glb",
+      "bytes": 624944,
+      "sha256": "08cae114c71283d2bd50704a2a980a2db1614618ebc5744b7a59c22dcab78369"
+    },
+    {
+      "id": "interior-prop-kitchen-run",
+      "objects": 35,
+      "vertices": 3044,
+      "triangles": 5948,
+      "materials": [
+        "IntBacksplashTile",
+        "IntCabinetOchre",
+        "IntChrome",
+        "IntDarkCast",
+        "IntLaminateCounter"
+      ],
+      "file": "interior-prop-kitchen-run.glb",
+      "bytes": 966432,
+      "sha256": "3749ea5f4ef1a27485729a7e0b7f9bca1b8de42c2ad9e950874485feb46624c9"
+    },
+    {
+      "id": "interior-prop-fridge",
+      "objects": 5,
+      "vertices": 600,
+      "triangles": 1180,
+      "materials": [
+        "IntApplianceEnamel",
+        "IntBrass",
+        "IntChrome",
+        "IntDarkCast"
+      ],
+      "file": "interior-prop-fridge.glb",
+      "bytes": 85824,
+      "sha256": "ccecbce36d9c890d394a7be6637392988127722cfd064b9b4386d12d09e2eba0"
+    },
+    {
+      "id": "interior-prop-dinette",
+      "objects": 48,
+      "vertices": 4198,
+      "triangles": 8204,
+      "materials": [
+        "IntBrass",
+        "IntCeramicCream",
+        "IntChrome",
+        "IntLaminateCounter",
+        "IntVinylAvocado"
+      ],
+      "file": "interior-prop-dinette.glb",
+      "bytes": 910816,
+      "sha256": "af18cb87a90e1c6d33efe70592e8de09bcbd66c62dd2b14439a98dffa145038b"
+    },
+    {
+      "id": "interior-prop-area-rug",
+      "objects": 2,
+      "vertices": 152,
+      "triangles": 296,
+      "materials": [
+        "IntAreaRug",
+        "IntBerberCarpet"
+      ],
+      "file": "interior-prop-area-rug.glb",
+      "bytes": 1036024,
+      "sha256": "45e60576c5d46fdb785a1d0b27dca0f2070abb9ccbef62bbc9770c6f6f447f5b"
+    },
+    {
+      "id": "interior-prop-accents",
+      "objects": 40,
+      "vertices": 3660,
+      "triangles": 7160,
+      "materials": [
+        "IntBrass",
+        "IntCeramicCream",
+        "IntDarkCast",
+        "IntFoliage",
+        "IntLampShade",
+        "IntPaperStack",
+        "IntVinylAvocado",
+        "IntVinylRust",
+        "IntWalnut"
+      ],
+      "file": "interior-prop-accents.glb",
+      "bytes": 940140,
+      "sha256": "16a5fae4f1119ac40bc08b7943325ac4476c4c9c3b7206b86563ff1f63fa7cc5"
+    }
+  ],
+  "thumbnails": {
+    "interior-hero-teal-living-kitchen": "thumb-interior-hero-teal.png"
+  },
+  "textures": [
+    "interior-carpet-albedo.png",
+    "interior-carpet-roughness.png",
+    "interior-counter-albedo.png",
+    "interior-counter-roughness.png",
+    "interior-rug-albedo.png",
+    "interior-rug-roughness.png",
+    "interior-sage-weave-albedo.png",
+    "interior-sage-weave-roughness.png",
+    "interior-tile-albedo.png",
+    "interior-tile-roughness.png",
+    "interior-walnut-albedo.png",
+    "interior-walnut-roughness.png"
+  ],
+  "texturePins": {
+    "carpet": {
+      "albedo": "c70d9c8945c4af637fe821b734fbe6828a1ba6d177361b826aaaf4019f7d207a",
+      "roughness": "146f6abd407350e65c8b96fa49f73c9d0aebff5c9c5816152fd965848e466bd8"
+    },
+    "counter": {
+      "albedo": "20b68ae55f6af1ec4cb224db7a1edf0fb8e52e7ef1517b42868d1c05b68b7437",
+      "roughness": "29f409697255e0a867548f407ef18fb5afdf65db040187d5f9d0060d3d47ddfe"
+    },
+    "rug": {
+      "albedo": "ba8b4020ac34c25618673e8ed3c4a7ae31ffc77a6ef7391e73b855db741b5fdc",
+      "roughness": "eb871e8967e11c7b0d3c33aa43f20de72e3599e3d8fb24845934e0fddc87a2af"
+    },
+    "sage-weave": {
+      "albedo": "e5a905942c6f8ab629d374d56e732af4a0a8916ea039afbb475c95b0feea3db1",
+      "roughness": "528aa93ba9d9f4ed3fabc4fb8dcb8f400380e504261573fdbd762e5fb071c91d"
+    },
+    "tile": {
+      "albedo": "00e9a0aa5f176bf4e8958c83575034295b8f6a7dfb03db5208edff3c971c7e35",
+      "roughness": "8ee501f4a1f92a72f4f9ce9b35d9b231a700cba6988deb53622a8ce5950bcaa2"
+    },
+    "walnut": {
+      "albedo": "cf4b7d08b74e936cf05dddc78d2a371230fd6577c005e3478ed0a8a73eeb33ed",
+      "roughness": "a12ff091bea9b8a4f5c19fe8e9dccdcef1e33ba1a9ab62bf5858a6b2cf55cb3f"
+    }
+  }
+}

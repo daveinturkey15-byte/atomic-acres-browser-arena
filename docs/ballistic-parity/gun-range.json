@@ -1,0 +1,402 @@
+{
+ "arena": "gun-range",
+ "contract": "every substantial visible mesh is rated for gunfire, excluded by a stated rule, or accepted below with a reason; unrated is the honest remainder",
+ "completionPercent": 100,
+ "ratchet": {
+  "unratedAfterLedger": 0,
+  "ceiling": 0,
+  "withinCeiling": true
+ },
+ "census": {
+  "total": 97,
+  "ratedDirect": 39,
+  "ratedByFootprint": 6,
+  "dynamicTargets": 21,
+  "excludedByRule": 30,
+  "unrated": 1,
+  "acceptedByLedger": 1,
+  "unratedAfterLedger": 0
+ },
+ "shotSurfaceStats": {
+  "total": 45,
+  "byMaterial": {
+   "concrete": 4,
+   "interior-wall": 7,
+   "structural-metal": 23,
+   "glass": 2,
+   "wood": 7,
+   "thin-metal": 1,
+   "brick": 1
+  },
+  "byClassification": {
+   "explicit": 27,
+   "rule": 18
+  }
+ },
+ "excludedByRule": {
+  "soft foliage": 21,
+  "above the standing combat volume (canopy/eaves/overhead dressing)": 9
+ },
+ "footprintExplained": [
+  {
+   "name": "gun-range-test-bay-corridor-north-skin",
+   "centre": [
+    35.75,
+    2.55,
+    8.02
+   ],
+   "surfaceId": "Acres Indoor Gun Range arena:8:gun-range-test-bay-corridor-north-wall",
+   "surfaceMaterial": "structural-metal",
+   "share": 0.38
+  },
+  {
+   "name": "gun-range-test-bay-corridor-south-skin",
+   "centre": [
+    35.75,
+    2.55,
+    15.99
+   ],
+   "surfaceId": "Acres Indoor Gun Range arena:9:gun-range-test-bay-corridor-south-wall",
+   "surfaceMaterial": "structural-metal",
+   "share": 0.38
+  },
+  {
+   "name": "gun-range-test-bay-east-wall-skin",
+   "centre": [
+    99.99,
+    13.15,
+    6
+   ],
+   "surfaceId": "Acres Indoor Gun Range arena:13:gun-range-test-bay-east-wall",
+   "surfaceMaterial": "structural-metal",
+   "share": 0.38
+  },
+  {
+   "name": "gun-range-test-bay-north-wall-skin",
+   "centre": [
+    75.75,
+    13.15,
+    -25.98
+   ],
+   "surfaceId": "Acres Indoor Gun Range arena:14:gun-range-test-bay-north-wall",
+   "surfaceMaterial": "structural-metal",
+   "share": 0.38
+  },
+  {
+   "name": "gun-range-test-bay-south-wall-skin",
+   "centre": [
+    75.75,
+    13.15,
+    37.99
+   ],
+   "surfaceId": "Acres Indoor Gun Range arena:15:gun-range-test-bay-south-wall",
+   "surfaceMaterial": "structural-metal",
+   "share": 0.38
+  },
+  {
+   "name": "gun-range-presentation-batch-6",
+   "centre": [
+    0,
+    3.4,
+    -14
+   ],
+   "surfaceId": "Acres Indoor Gun Range arena:25:gun-range-ready-lockers",
+   "surfaceMaterial": "structural-metal",
+   "share": 0.01
+  }
+ ],
+ "acceptedShootThrough": [
+  {
+   "name": "gun-range-presentation-batch-0",
+   "path": "Acres Indoor Gun Range arena/gun-range-presentation-batch-0",
+   "centre": [
+    75.7,
+    12.54,
+    6.32
+   ],
+   "size": [
+    38.2,
+    25.08,
+    50.95
+   ],
+   "vertices": 504,
+   "instanced": false,
+   "bestSurfaceShare": 0,
+   "acceptedReason": "merged presentation batch; every source structure wall is individually registered with an authored family"
+  }
+ ],
+ "unratedMeshes": [],
+ "staleLedgerRows": [],
+ "shotSurfaces": [
+  {
+   "id": "Acres Indoor Gun Range arena:0:floor",
+   "name": "gun-range-concrete-lanes",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:1:gun-range-backstop",
+   "name": "gun-range-backstop",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:2:gun-range-left-wall",
+   "name": "gun-range-left-wall",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:3:gun-range-right-wall",
+   "name": "gun-range-right-wall",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:4:gun-range-right-wall",
+   "name": "gun-range-right-wall",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:5:gun-range-rear-wall",
+   "name": "gun-range-rear-wall",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:6:gun-range-ceiling",
+   "name": "gun-range-ceiling",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:7:gun-range-test-bay-corridor-floor",
+   "name": "gun-range-test-bay-corridor-floor",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:8:gun-range-test-bay-corridor-north-wall",
+   "name": "gun-range-test-bay-corridor-north-wall",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:9:gun-range-test-bay-corridor-south-wall",
+   "name": "gun-range-test-bay-corridor-south-wall",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:10:gun-range-test-bay-corridor-ceiling",
+   "name": "gun-range-test-bay-corridor-ceiling",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:11:gun-range-test-bay-floor",
+   "name": "gun-range-test-bay-floor",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:12:gun-range-test-bay-ceiling",
+   "name": "gun-range-test-bay-ceiling",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:13:gun-range-test-bay-east-wall",
+   "name": "gun-range-test-bay-east-wall",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:14:gun-range-test-bay-north-wall",
+   "name": "gun-range-test-bay-north-wall",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:15:gun-range-test-bay-south-wall",
+   "name": "gun-range-test-bay-south-wall",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:16:gun-range-test-bay-west-wall-north",
+   "name": "gun-range-test-bay-west-wall-north",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:17:gun-range-test-bay-west-wall-south",
+   "name": "gun-range-test-bay-west-wall-south",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:18:gun-range-test-bay-door-jamb-north",
+   "name": "gun-range-test-bay-door-jamb-north",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:19:gun-range-test-bay-door-jamb-south",
+   "name": "gun-range-test-bay-door-jamb-south",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:20:gun-range-test-bay-door-frame-top",
+   "name": "gun-range-test-bay-door-frame-top",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:21:gun-range-test-bay-door-bulkhead",
+   "name": "gun-range-test-bay-door-bulkhead",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:22:gun-range-control-room",
+   "name": "gun-range-control-room",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:23:gun-range-control-window",
+   "name": "gun-range-control-window",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:24:gun-range-ready-bench",
+   "name": "gun-range-ready-bench",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:25:gun-range-ready-lockers",
+   "name": "gun-range-ready-lockers",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:26:gun-range-booth-divider",
+   "name": "gun-range-booth-divider",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:27:gun-range-booth-divider",
+   "name": "gun-range-booth-divider",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:28:gun-range-booth-divider",
+   "name": "gun-range-booth-divider",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:29:gun-range-booth-divider",
+   "name": "gun-range-booth-divider",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:30:gun-range-booth-divider",
+   "name": "gun-range-booth-divider",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:31:gun-range-booth-divider",
+   "name": "gun-range-booth-divider",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:32:gun-range-wallbang-panel-glass",
+   "name": "gun-range-wallbang-panel-glass",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:33:gun-range-wallbang-panel-thin-metal",
+   "name": "gun-range-wallbang-panel-thin-metal",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:34:gun-range-wallbang-panel-wood",
+   "name": "gun-range-wallbang-panel-wood",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:35:gun-range-wallbang-panel-interior-wall",
+   "name": "gun-range-wallbang-panel-interior-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:36:gun-range-wallbang-panel-structural-metal",
+   "name": "gun-range-wallbang-panel-structural-metal",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:37:gun-range-wallbang-panel-brick",
+   "name": "gun-range-wallbang-panel-brick",
+   "material": "brick",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:38:gun-range-wallbang-lab-left",
+   "name": "gun-range-wallbang-lab-left",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:39:gun-range-wallbang-lab-right",
+   "name": "gun-range-wallbang-lab-right",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:40:gun-range-weapon-bench",
+   "name": "gun-range-weapon-bench",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:41:gun-range-weapon-bench",
+   "name": "gun-range-weapon-bench",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:42:gun-range-weapon-bench",
+   "name": "gun-range-weapon-bench",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:43:gun-range-weapon-bench",
+   "name": "gun-range-weapon-bench",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Acres Indoor Gun Range arena:44:gun-range-weapon-bench",
+   "name": "gun-range-weapon-bench",
+   "material": "wood",
+   "classification": "rule"
+  }
+ ]
+}

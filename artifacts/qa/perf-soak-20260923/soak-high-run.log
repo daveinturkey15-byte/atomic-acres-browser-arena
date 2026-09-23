@@ -1,0 +1,17 @@
+[soak soak-high] active+60s fps~120 heap~303.4MB over50=1 seg=0
+[soak soak-high] active+120s fps~47 heap~270.7MB over50=1 seg=0
+[soak soak-high] active+180s fps~54 heap~284.9MB over50=1 seg=0
+[soak soak-high] active+240s fps~50 heap~273.4MB over50=1 seg=0
+[soak soak-high] deploy attempt 1 failed: TimeoutError: page.waitForFunction: Timeout 180000ms exceeded.
+[soak soak-high] recovery #1 ok (attempt 2), resuming
+[soak soak-high] active+300s fps~59 heap~353.1MB over50=1 seg=1
+[soak soak-high] active+360s fps~54 heap~266.4MB over50=1 seg=1
+[soak soak-high] active+420s fps~48 heap~292.5MB over50=1 seg=1
+[soak soak-high] active+480s fps~51 heap~281.9MB over50=1 seg=1
+[soak soak-high] deploy attempt 1 failed: TimeoutError: page.waitForFunction: Timeout 180000ms exceeded.
+[soak soak-high] recovery #2 ok (attempt 2), resuming
+[soak soak-high] active+540s fps~30 heap~456.4MB over50=1 seg=2
+[soak soak-high] active+600s fps~85 heap~290.1MB over50=1 seg=2
+[soak soak-high] active+660s fps~60 heap~285.1MB over50=1 seg=2
+[soak soak-high] status=complete activeSamples=660
+EXIT:0

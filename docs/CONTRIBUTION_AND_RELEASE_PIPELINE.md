@@ -41,15 +41,26 @@ The machine name identifies where the bytes originated; the harness identifies w
    ```bash
    npx --yes npm@10.9.8 ci --ignore-scripts
    npm run qa:lockfile
-   npm run pipeline:preflight -- --machine <machine> --harness <harness>
+   npm run pipeline:preflight -- --machine <machine> --harness <harness> --project atomic-acres-browser-arena --lane <lane-id>
    ```
+
+   `--project` and `--lane` (added 2026-09-11) bind the run to the committed project identity
+   and to a lane in this machine's routing registry; the guard then refuses a wrong worktree,
+   branch, Git database, stale base/head, expired lane, protected checkout or out-of-scope
+   change. Omitting them is a **legacy** call: accepted with a stderr warning and a
+   `routing.mode: "legacy"` receipt stamp while enforcement is `warn`, refused once root sets
+   enforcement to `refuse` or `ATOMIC_ACRES_ROUTING_REQUIRED=1`. A legacy receipt proves
+   nothing about routing. Registry install, readback, lane closure and the root cutover steps
+   are in `docs/PROJECT_ROUTING.md`.
 
 4. Implement one bounded outcome. Do not share the worktree with another task.
 5. Run focused checks, then the relevant repository gates. Rendering changes require browser evidence.
 6. For `release-shell` or `runtime` work targeting Pass 62 or later, add exactly one `acceptance/pass-<number>.json`. Translate every item of Dave's feedback into a numbered requirement with an expected result, falsifier, acceptance type, and concrete evidence. A passing test not named by a requirement is not evidence that the feedback was covered.
 7. Commit intentionally, rerun the preflight, push only the contribution branch, and open a PR with the repository template. CI builds the exact PR head and uploads `pr-preview-<pr>-<head-sha>`.
 8. Dave normally tests that immutable preview. Record its exact source SHA and timestamp in the manifest, add Dave's approval, and push only the manifest/process update. If Dave explicitly orders publication before public-build HITL, the manifest may instead bind a structured standing-publication authorization to the exact preview while truthfully recording that preview inspection was not performed and deferring human public HITL. Any later runtime or release-shell change invalidates either form of authorization and requires a new preview.
-9. Stop at handoff. The contributor does not merge or deploy.
+9. Before claiming final candidate handoff, rebind the required adopted capability records and raw evidence to the final committed HEAD, then run `npm run pipeline:handoff -- --machine <machine> --harness <harness> --project atomic-acres-browser-arena --lane <lane-id>`. Attach its exact-HEAD receipt to the handoff. Ordinary contribution preflight cannot replace this gate. A failed gate leaves the candidate unaccepted; it does not prevent saving, pushing the contribution branch, or backup. Stop at handoff. The contributor does not merge or deploy.
+
+The native `handoff` mode runs the existing contribution routing, clean-tree and ancestry checks plus a live, hash-pinned capability checker. Normal execution of `scripts/orchestration/publish_pass96.py` independently reruns the same capability check at publication HEAD before mutation; a premerge receipt is insufficient after a merge changes HEAD. Its dry-run and rollback paths remain independent, and GitHub release CI has no private vault dependency. Neither gate grants Dave's approval or relaxes product acceptance, CI, preview, or release requirements. See [capability handoff configuration](CAPABILITY_HANDOFF.md).
 
 Pass 66 was the first historical use of that narrow standing conditional publication path. Dave instructed the release owner to publish Version 66 as **The Big One** when the frozen candidate was genuinely green, without another subjective HITL feedback round, while keeping byte-exact Pass 63 Stable and never publishing Pass 65. For every pass using this path, the immutable preview, exact-SHA gates and acceptance manifest remain mandatory; the process-only acceptance update must bind the standing instruction to the exact preview, explicitly state that Dave did not inspect or test it, and retain a deferred human public-HITL requirement. Any later runtime or release-shell drift invalidates the binding.
 
@@ -101,6 +112,15 @@ matrix. Do not add a reconciliation short-circuit to `change-impact.mjs`: for a 
 bypassed CI, this is the first time the tree faces the required checks, and that is the
 point of doing it.
 
+### Lane closure
+
+A contribution lane ends in exactly one of two recorded outcomes — `integrated` (its head is
+reachable from `origin/main`) or `rejected` (its unique commits are preserved in a verified ref
+or bundle). `npm run pipeline:lane-close -- --project atomic-acres-browser-arena --lane <id>`
+verifies the closure record in the routing registry, refuses a dirty tree, records
+`grantsAcceptance: false` and `removedAnything: false`, and deletes nothing. Only after that
+receipt may the worktree be retired, following §1 of `docs/MULTI_AGENT_REPO_DISCIPLINE.md`.
+
 ### Bounded divergence
 
 An `integration/*` or gauntlet line is cut from exact `origin/main` and merges back to
@@ -136,7 +156,27 @@ One integrator owns the queue at a time.
 
 ## Release-owner flow
 
-Only the `release-production` GitHub Actions workflow may publish production.
+Only `scripts/orchestration/publish_pass<N>.py`, run from the canonical checkout, may publish production. The `release-production` workflow verifies a candidate and cannot publish.
+
+### Pass 95 cut ritual — REQUIRED
+
+Before any Pass 95 publish, the release owner must run the real multiplayer soak gate
+from the candidate checkout:
+
+```powershell
+$env:PASS73_NATIVE_WEBGPU = '1'
+npm run qa:mp-soak
+```
+
+This gate is release-blocking. It starts the built candidate on ports 4227-4228, uses
+three headless installed-Chrome peers with stock flags and muted audio, runs three
+minutes of scripted play through the HF-504 audit scenario engine, and applies a
+seeded 120 ms RTT / 1% loss impairment. The required table must pass position
+replication for every directed peer pair within 1.5 m, guest-B leave/rejoin plus
+damage within one RTT, reload-after-death, respawn loadout/ammo reset, stair firing,
+zero page/console errors, and final scoreboard agreement. A failed row remains a
+finding and stops the cut; the verifier must not be loosened. Retain the JSON bundle
+and table under `artifacts/qa/mp-soak-gate/` with the release evidence.
 
 1. Wait for the merge commit's five required checks to succeed, including `requirements-acceptance`.
 2. Confirm the player-facing changelog is truthful. A new top entry may use `PENDING_PRODUCTION` through `resolveProductionReleasedAt`; the protected workflow injects one immutable production-build timestamp and records the same value in its receipt. A publicly selectable fallback may never retain that sentinel: if its pinned historical Pages bytes predate timestamp injection, rebuild its exact approved source with the immutable timestamp of the pinned Pages publication, record `rebuiltFromSource: true`, and verify every live channel shows a real UK-local day/date/time. At the start of the next substantive pass, freeze the previous entry from that receipt. Do not create a post-release metadata PR or second deployment solely to learn a timestamp.
@@ -144,7 +184,7 @@ Only the `release-production` GitHub Actions workflow may publish production.
    ```ts
    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE)
    ```
-3. Dispatch `release-production` with the exact full `main` SHA and release pass.
+3. Dispatch `release-production` with the exact full `main` SHA and release pass to produce the verification receipt, then publish with `python scripts/orchestration/publish_pass<N>.py` (dry-run first).
 4. The workflow refuses a non-tip SHA, requires successful checks, builds from a clean checkout, serializes Pages publication, preserves the historical review tree, and records source/Pages identities.
 5. The workflow revalidates the accepted manifest against the exact source SHA. Pass 62 and later cannot publish without approval parity; older rollback passes are marked legacy-exempt.
 6. Wait for the workflow receipt and exact Pages build to succeed.

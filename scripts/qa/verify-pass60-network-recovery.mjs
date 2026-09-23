@@ -4,7 +4,7 @@ const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4182/';
 const peerPort = Number(process.env.QA_PEER_PORT ?? 9001);
 const browser = await chromium.launch({
   headless: true,
-  args: [
+  args: ['--mute-audio', 
     '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
     '--allow-loopback-in-peer-connection', '--disable-features=WebRtcHideLocalIpsWithMdns',
   ],

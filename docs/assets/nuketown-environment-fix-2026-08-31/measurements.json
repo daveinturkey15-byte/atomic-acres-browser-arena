@@ -1,0 +1,219 @@
+{
+ "pass": "Nuke Town environment fix, 2026-08-31",
+ "arena": "atomic-acres (Nuke Town)",
+ "capturedOn": "dave-gaming-pc, installed Chrome (channel:\"chrome\", --mute-audio), WebGPU backend",
+ "determinism": "Every frame is taken through setCaptureCameraPose with a FIXED visual clock (42000 ms) and seed (82031) and with bots cleared, so the sky, clouds, wind and lighting are identical pose-to-pose and run-to-run and the before/after sets are pixel-comparable.",
+ "ownerReport": "\"trees/grass/mountains still feel poor on nuketown?\"",
+ "rootCauseFound": {
+  "headline": "The mountains were not mis-coloured - their colour was being DELETED at runtime.",
+  "detail": "legacy-main.ts::batchSelectedArenaPresentation runs batchPresentationRootOnce(neighbourhoodLifeRoot, \"palette-lit\") over the whole pass31-neighbourhood-life group long after nuketown-mountain-backdrop.ts has added itself to it. In palette-lit mode art-kit.ts::batchStaticMeshes keys the batch on the source material colour - 0xffffff for a vertexColors material - builds a fresh flat MeshLambertMaterial at that colour, and deletes every geometry attribute outside {position, normal}, the vertex COLOUR attribute with it. The shipped massif was therefore one merged, flat, PURE WHITE Lambert batch drawn from pass31-neighbourhood-life-render-batches, while nuketown-mountain-ridge / -foothills / -far-range sat at visible=false. Every altitude band, every tonal break-up and the snow lerp were all irrelevant: the shader never saw them. The fix is one line - group.userData.dynamic = true, the documented batchStaticMeshes opt-out that rain-presentation and the pass31 flower beds already use.",
+  "howItWasFound": "A scene-graph probe found the three ridge meshes at visible=false while pale mountains were plainly on screen, and a mesh with world radius 133 m at y 15 sitting under pass31-neighbourhood-life-render-batches. Detaching the backdrop group changed nothing, because the backdrop group was not what was being drawn.",
+  "secondCause": "Runtime fog was also inverting the ridge. The arena fog is 0xb1c0be (relative luminance 0.73) while the sunset sky measures 85-155/255 behind the massif, and at 96-132 m the linear fog factor is 0.58-0.82 - a floor above the sky that no albedo could get under. Measured both ways at the same poses: fog on gives ridge/sky 0.74 and 0.67, fog off with the haze baked per vertex gives 0.49 and 0.42."
+ },
+ "ridgeSkyLuminance": {
+  "2-horizon": {
+   "allCoveredPixels": {
+    "pixels": 29691,
+    "coveragePercent": 3.22,
+    "skyLuminance": 104.5,
+    "beforeRidgeLuminance": 102.21,
+    "afterRidgeLuminance": 92.41,
+    "beforeRatio": 0.978,
+    "afterRatio": 0.884
+   },
+   "ridgeSurfacePixels": {
+    "pixels": 8486,
+    "coveragePercent": 0.92,
+    "skyLuminance": 115.22,
+    "beforeRidgeLuminance": 108.88,
+    "afterRidgeLuminance": 75.02,
+    "beforeRatio": 0.945,
+    "afterRatio": 0.651
+   }
+  },
+  "6-ridge-meter": {
+   "allCoveredPixels": {
+    "pixels": 157108,
+    "coveragePercent": 17.05,
+    "skyLuminance": 141.65,
+    "beforeRidgeLuminance": 134.75,
+    "afterRidgeLuminance": 69.36,
+    "beforeRatio": 0.951,
+    "afterRatio": 0.49
+   },
+   "ridgeSurfacePixels": {
+    "pixels": 131277,
+    "coveragePercent": 14.24,
+    "skyLuminance": 151.8,
+    "beforeRidgeLuminance": 143.73,
+    "afterRidgeLuminance": 65.34,
+    "beforeRatio": 0.947,
+    "afterRatio": 0.43
+   }
+  },
+  "7-ridge-meter-south": {
+   "allCoveredPixels": {
+    "pixels": 145526,
+    "coveragePercent": 15.79,
+    "skyLuminance": 155.45,
+    "beforeRidgeLuminance": 126.7,
+    "afterRidgeLuminance": 65.37,
+    "beforeRatio": 0.815,
+    "afterRatio": 0.421
+   },
+   "ridgeSurfacePixels": {
+    "pixels": 120226,
+    "coveragePercent": 13.05,
+    "skyLuminance": 168.35,
+    "beforeRidgeLuminance": 133.72,
+    "afterRidgeLuminance": 59.31,
+    "beforeRatio": 0.794,
+    "afterRatio": 0.352
+   }
+  }
+ },
+ "ridgeSkyMethod": "Two masks, both derived from the after build at a FIXED camera pose, fixed visual time (42000 ms) and fixed seed (82031), so before and after frames are pixel-comparable.\n  covered   = pixels that change when the nuketown-mountain-backdrop group is DETACHED from the scene. Detaching is the only removal that survives a frame here; setting .visible=false is overwritten by a per-frame presentation pass.\n  ridgeSurface = covered AND repainted between before and after, i.e. the subset where the ridge is the VISIBLE surface rather than sitting behind the forest ring. This is the honest ridge-against-sky measurement; the wider \"covered\" set is diluted by the identical forest pixels in front of the massif and understates the before ratio.\nsky = the same pixels in the backdrop-detached frame. ratio = ridge / sky.\nThe ridge GEOMETRY is unchanged between the two builds (same seed, same radii, same heights); only vertex colours, the material and the ground skirt moved, so one mask is valid for both.",
+ "renderCost": {
+  "method": "__ATOMIC_ACRES_DEBUG__.renderAudit() (visible draw list) plus a scene walk that expands InstancedMesh counts, taken on the same pose in both builds.",
+  "drawCalls": {
+   "before": 139,
+   "after": 148,
+   "delta": 9,
+   "budget": 560
+  },
+  "renderedTriangles": {
+   "before": 527566,
+   "after": 537455,
+   "delta": 9889,
+   "budget": 1600000
+  },
+  "uniqueGeometryTrianglesSubmitted": {
+   "before": 89060,
+   "after": 87647,
+   "delta": -1413,
+   "note": "Net NEGATIVE: the removed Quality sphere-trees outweigh everything added."
+  },
+  "qualityGlbFoliageBatch": {
+   "before": 6384,
+   "after": 1008,
+   "note": "BLD_BATCH_MAT_foliage_military triangles; the delta is the eight deleted sphere-trees."
+  },
+  "perLayer": {
+   "before": {
+    "nuketown-mountain-backdrop": {
+     "found": true,
+     "drawCalls": 4,
+     "triangles": 3024,
+     "instances": 0
+    },
+    "nuketown-forest-surround": {
+     "found": true,
+     "drawCalls": 4,
+     "triangles": 57372,
+     "instances": 938
+    },
+    "nuketown-lawn": {
+     "found": true,
+     "drawCalls": 4,
+     "triangles": 370980,
+     "instances": 24732
+    },
+    "nuketown-yard-vegetation": {
+     "found": false
+    }
+   },
+   "after": {
+    "nuketown-mountain-backdrop": {
+     "found": true,
+     "drawCalls": 4,
+     "triangles": 5280,
+     "instances": 0
+    },
+    "nuketown-forest-surround": {
+     "found": true,
+     "drawCalls": 5,
+     "triangles": 61953,
+     "instances": 1447
+    },
+    "nuketown-lawn": {
+     "found": true,
+     "drawCalls": 4,
+     "triangles": 370980,
+     "instances": 24732
+    },
+    "nuketown-yard-vegetation": {
+     "found": true,
+     "drawCalls": 6,
+     "triangles": 8716,
+     "instances": 81
+    }
+   }
+  }
+ },
+ "frameCostOfWhatThisPassADDED": {
+  "method": "meanMs per 280-frame sample, 6 interleaved pairs per pose; interleaved A/B/A/B because the same session drifts 4.6 ms on its own.",
+  "detached": [
+   "nuketown-yard-vegetation",
+   "forest-contact-skirts"
+  ],
+  "lanePoseMedianDeltaMs": 0.092,
+  "yardTreePoseMedianDeltaMs": 0.207,
+  "verdict": "Under 0.25 ms at the worst pose (standing at a new yard tree with all eight trees, 53 understory clumps and 509 forest contact skirts in frame) and indistinguishable from zero down the lane. Well inside the 1 ms the brief asked to be justified."
+ },
+ "framePacing": {
+  "before": {
+   "1-lane": {
+    "frames": 570,
+    "meanMs": 9.152,
+    "medianMs": 9.099999964237213,
+    "p95Ms": 11.699999988079071,
+    "fps": 109.3
+   },
+   "2-horizon": {
+    "frames": 570,
+    "meanMs": 7.373,
+    "medianMs": 7.199999988079071,
+    "p95Ms": 13,
+    "fps": 135.6
+   }
+  },
+  "after": {
+   "1-lane": {
+    "frames": 570,
+    "meanMs": 8.759,
+    "medianMs": 8.5,
+    "p95Ms": 12.600000023841858,
+    "fps": 114.2
+   },
+   "2-horizon": {
+    "frames": 570,
+    "meanMs": 8.235,
+    "medianMs": 7.600000023841858,
+    "p95Ms": 15,
+    "fps": 121.4
+   }
+  },
+  "caveat": "Chrome launched with --disable-gpu-vsync; without it every sample reads 16.7 ms and the question cannot be answered. Cross-run pacing drifts by several ms on this machine, so the interleaved A/B above is the load-bearing number, not this pair."
+ },
+ "gameplaySafety": {
+  "inFencePlantingMaxHeightM": 0.403,
+  "ceilingM": 0.45,
+  "rationale": "Nothing added inside the boundary reaches the 0.5 m that quality-composition-parity calls substantial, and nothing reaches a crouched player's ~1.1 m eye height: the new planting cannot read as cover and cannot hide a collider. The eight yard boles sit strictly inside the authored [0.68*scale, 4*scale, 0.68*scale] trunk colliders; branches and canopy start above a standing player. No colliders, shot surfaces or raycast meshes were added anywhere.",
+  "understoryClumps": 49
+ },
+ "frames": {
+  "sideBySide": [
+   "sbs-1-lane.png",
+   "sbs-2-horizon.png",
+   "sbs-3-grass.png",
+   "sbs-4-tree.png",
+   "sbs-4b-tree-side.png",
+   "sbs-5-forest-contact.png",
+   "sbs-6-ridge-meter.png",
+   "sbs-7-ridge-meter-south.png"
+  ],
+  "before": "before-*.png",
+  "after": "after-*.png",
+  "ridgeMasks": "*-no-backdrop.png (backdrop group detached; the mask for the luminance measurement)"
+ }
+}

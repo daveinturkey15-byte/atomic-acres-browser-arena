@@ -1,0 +1,5882 @@
+[
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "flat-wall",
+  "siteLabel": "long perimeter wall x=-37, faced head-on",
+  "standoffRequestedM": 0.4,
+  "weapon": "carbine",
+  "stance": "stand",
+  "ok": true,
+  "eye": [
+   -36.59989929199219,
+   1.8400982546806337,
+   23.000019073486328
+  ],
+  "forward": [
+   -1,
+   0,
+   -2.220446049250313e-16
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.4001007080078125,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.88887061175579,
+   1.8006304240705835,
+   22.68848371777463
+  ],
+  "muzzleForwardM": 1.2889713197636041,
+  "weaponFwdMaxM": 1.4676431173782092,
+  "weaponFwdPart": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+  "armsFwdMaxM": 2.113522969519643,
+  "vmMeshes": 11,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "carbine-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.34010796603692695,
+   -0.5367000121223333,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.8199999999999994,
+   0.04000000000015693,
+   0.08999999999989909
+  ],
+  "rootScale": 0.7338774180751115,
+  "diag": {
+   "retreat": 0.78,
+   "nearestForwardMeters": 0.255,
+   "probeLengthMeters": 1.65,
+   "probePaddingMeters": 0.1456,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "carbine",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.8888706117557916,
+  "weaponPenetrationM": 1.0675424093703967,
+  "screenshot": "before-atomic-acres-flat-wall-carbine-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "flat-wall",
+  "siteLabel": "long perimeter wall x=-37, faced head-on",
+  "standoffRequestedM": 0.4,
+  "weapon": "carbine",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -36.599998474121094,
+   1.3000999999046328,
+   23
+  ],
+  "forward": [
+   -1,
+   0,
+   -2.220446049250313e-16
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.40000152587890625,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.8889697938847,
+   1.2964902347378162,
+   22.688031851275255
+  ],
+  "muzzleForwardM": 1.2889713197636041,
+  "weaponFwdMaxM": 1.4676431173782305,
+  "weaponFwdPart": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+  "armsFwdMaxM": 2.113522969519785,
+  "vmMeshes": 11,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "carbine-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.34054075904987546,
+   -0.5008419466791028,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.8199999999999994,
+   0.04,
+   0.08999999999999993
+  ],
+  "rootScale": 0.7338774180751115,
+  "diag": {
+   "retreat": 0.78,
+   "nearestForwardMeters": 0.254,
+   "probeLengthMeters": 1.65,
+   "probePaddingMeters": 0.1456,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "carbine",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.8889697938846979,
+  "weaponPenetrationM": 1.0676415914993242,
+  "screenshot": "before-atomic-acres-flat-wall-carbine-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "flat-wall",
+  "siteLabel": "long perimeter wall x=-37, faced head-on",
+  "standoffRequestedM": 0.4,
+  "weapon": "carbine",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36.599998474121094,
+   0.7500994753837585,
+   23.000009536743164
+  ],
+  "forward": [
+   -1,
+   0,
+   -2.220446049250313e-16
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.40000152587890625,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.8889697938847,
+   1.2234589112295966,
+   22.689052609066433
+  ],
+  "muzzleForwardM": 1.2889713197636041,
+  "weaponFwdMaxM": 1.4676431173782305,
+  "weaponFwdPart": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+  "armsFwdMaxM": 2.113522969519785,
+  "vmMeshes": 11,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "carbine-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3395295380018638,
+   -0.023872745666448092,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.8199999999999994,
+   0.04,
+   0.08999999999999993
+  ],
+  "rootScale": 0.7338774180751115,
+  "diag": {
+   "retreat": 0.78,
+   "nearestForwardMeters": 0.254,
+   "probeLengthMeters": 1.65,
+   "probePaddingMeters": 0.1456,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "carbine",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.8889697938846979,
+  "weaponPenetrationM": 1.0676415914993242,
+  "screenshot": "before-atomic-acres-flat-wall-carbine-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "flat-wall",
+  "siteLabel": "long perimeter wall x=-37, faced head-on",
+  "standoffRequestedM": 0.4,
+  "weapon": "sniper",
+  "stance": "stand",
+  "ok": true,
+  "eye": [
+   -36.59989929199219,
+   1.8400982546806337,
+   23.000019073486328
+  ],
+  "forward": [
+   -1,
+   0,
+   -2.220446049250313e-16
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.4001007080078125,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.936870960742425,
+   1.8069067354606994,
+   22.618671664974205
+  ],
+  "muzzleForwardM": 1.3369716687502375,
+  "weaponFwdMaxM": 1.7224434693549426,
+  "weaponFwdPart": "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+  "armsFwdMaxM": 2.1560280547414195,
+  "vmMeshes": 12,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "sniper-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3401621448769465,
+   -0.5568135286654328,
+   -0.9999999999999997
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.0699999999998767,
+   0.09999999999998883
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0.218,
+   "probeLengthMeters": 1.95,
+   "probePaddingMeters": 0.182,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "sniper",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.936870960742425,
+  "weaponPenetrationM": 1.3223427613471301,
+  "screenshot": "before-atomic-acres-flat-wall-sniper-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "flat-wall",
+  "siteLabel": "long perimeter wall x=-37, faced head-on",
+  "standoffRequestedM": 0.4,
+  "weapon": "sniper",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -36.599998474121094,
+   1.3000999999046328,
+   23
+  ],
+  "forward": [
+   -1,
+   0,
+   -2.220446049250313e-16
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.40000152587890625,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.936870960742425,
+   1.8069067354606994,
+   22.618671664974205
+  ],
+  "muzzleForwardM": 1.3368724866213313,
+  "weaponFwdMaxM": 1.7224434693549426,
+  "weaponFwdPart": "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+  "armsFwdMaxM": 2.156028054741469,
+  "vmMeshes": 12,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "sniper-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.34054880204749355,
+   -0.5212984952651334,
+   -0.9999999999999997
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.06999999999999995,
+   0.09999999999999999
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0.218,
+   "probeLengthMeters": 1.95,
+   "probePaddingMeters": 0.182,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "sniper",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.936870960742425,
+  "weaponPenetrationM": 1.3224419434760364,
+  "screenshot": "before-atomic-acres-flat-wall-sniper-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "flat-wall",
+  "siteLabel": "long perimeter wall x=-37, faced head-on",
+  "standoffRequestedM": 0.4,
+  "weapon": "sniper",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36.599998474121094,
+   0.7500994753837585,
+   23.000009536743164
+  ],
+  "forward": [
+   -1,
+   0,
+   -2.220446049250313e-16
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.40000152587890625,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.936870960742425,
+   1.8069067354606994,
+   22.618671664974205
+  ],
+  "muzzleForwardM": 1.3368724866213313,
+  "weaponFwdMaxM": 1.7224434693549426,
+  "weaponFwdPart": "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+  "armsFwdMaxM": 2.156028054741469,
+  "vmMeshes": 12,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "sniper-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3395517701193308,
+   -0.016167886424080825,
+   -0.9999999999999997
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.06999999999999995,
+   0.09999999999999999
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0.218,
+   "probeLengthMeters": 1.95,
+   "probePaddingMeters": 0.182,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "sniper",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.936870960742425,
+  "weaponPenetrationM": 1.3224419434760364,
+  "screenshot": "before-atomic-acres-flat-wall-sniper-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "flat-wall",
+  "siteLabel": "long perimeter wall x=-37, faced head-on",
+  "standoffRequestedM": 0.4,
+  "weapon": "explosive-crossbow",
+  "stance": "stand",
+  "ok": true,
+  "eye": [
+   -36.59989929199219,
+   1.8400982546806337,
+   23.000019073486328
+  ],
+  "forward": [
+   -1,
+   0,
+   -2.220446049250313e-16
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.4001007080078125,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.936870960742425,
+   1.8069067354606994,
+   22.618671664974205
+  ],
+  "muzzleForwardM": 1.3369716687502375,
+  "weaponFwdMaxM": 1.3006001543020744,
+  "weaponFwdPart": "Crossbow_ExplosiveTip_FP_LOD0",
+  "armsFwdMaxM": 2.187068912654688,
+  "vmMeshes": 56,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "explosive-crossbow-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3401660810280593,
+   -0.5464611411948339,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.7800000000000005,
+   -0.03000000000003612,
+   0.08500000000001356
+  ],
+  "rootScale": 0.7431670056456826,
+  "diag": {
+   "retreat": 0.86,
+   "nearestForwardMeters": 0.234,
+   "probeLengthMeters": 1.75,
+   "probePaddingMeters": 0.16640000000000002,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "explosive-crossbow",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.936870960742425,
+  "weaponPenetrationM": 0.9004994462942619,
+  "screenshot": "before-atomic-acres-flat-wall-explosive-crossbow-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "flat-wall",
+  "siteLabel": "long perimeter wall x=-37, faced head-on",
+  "standoffRequestedM": 0.4,
+  "weapon": "explosive-crossbow",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -36.599998474121094,
+   1.3000999999046328,
+   23
+  ],
+  "forward": [
+   -1,
+   0,
+   -2.220446049250313e-16
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.40000152587890625,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.936870960742425,
+   1.8069067354606994,
+   22.618671664974205
+  ],
+  "muzzleForwardM": 1.3368724866213313,
+  "weaponFwdMaxM": 1.3006001543020744,
+  "weaponFwdPart": "Crossbow_ExplosiveTip_FP_LOD0",
+  "armsFwdMaxM": 2.1870689126546665,
+  "vmMeshes": 56,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "explosive-crossbow-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3404990491170582,
+   -0.5113341676068384,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.7800000000000005,
+   -0.030000000000000023,
+   0.08500000000000009
+  ],
+  "rootScale": 0.7431670056456826,
+  "diag": {
+   "retreat": 0.86,
+   "nearestForwardMeters": 0.234,
+   "probeLengthMeters": 1.75,
+   "probePaddingMeters": 0.16640000000000002,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "explosive-crossbow",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.936870960742425,
+  "weaponPenetrationM": 0.9005986284231682,
+  "screenshot": "before-atomic-acres-flat-wall-explosive-crossbow-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "flat-wall",
+  "siteLabel": "long perimeter wall x=-37, faced head-on",
+  "standoffRequestedM": 0.4,
+  "weapon": "explosive-crossbow",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36.599998474121094,
+   0.7500994753837585,
+   23.000009536743164
+  ],
+  "forward": [
+   -1,
+   0,
+   -2.220446049250313e-16
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.40000152587890625,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.936870960742425,
+   1.8069067354606994,
+   22.618671664974205
+  ],
+  "muzzleForwardM": 1.3368724866213313,
+  "weaponFwdMaxM": 1.3006001543020744,
+  "weaponFwdPart": "Crossbow_ExplosiveTip_FP_LOD0",
+  "armsFwdMaxM": 2.1870689126546665,
+  "vmMeshes": 56,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "explosive-crossbow-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.339479178220293,
+   -0.03389209722753217,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.7800000000000005,
+   -0.030000000000000023,
+   0.08500000000000009
+  ],
+  "rootScale": 0.7431670056456826,
+  "diag": {
+   "retreat": 0.86,
+   "nearestForwardMeters": 0.234,
+   "probeLengthMeters": 1.75,
+   "probePaddingMeters": 0.16640000000000002,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "explosive-crossbow",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.936870960742425,
+  "weaponPenetrationM": 0.9005986284231682,
+  "screenshot": "before-atomic-acres-flat-wall-explosive-crossbow-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "flat-wall",
+  "siteLabel": "long perimeter wall x=-37, faced head-on",
+  "standoffRequestedM": 0.4,
+  "weapon": "flamethrower",
+  "stance": "stand",
+  "ok": true,
+  "eye": [
+   -36.59989929199219,
+   1.8400982546806337,
+   23.000019073486328
+  ],
+  "forward": [
+   -1,
+   0,
+   -2.220446049250313e-16
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.4001007080078125,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.936870960742425,
+   1.8069067354606994,
+   22.618671664974205
+  ],
+  "muzzleForwardM": 1.3369716687502375,
+  "weaponFwdMaxM": 1.4123407376706183,
+  "weaponFwdPart": "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Primary_PBR",
+  "armsFwdMaxM": 2.025322899825092,
+  "vmMeshes": 16,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "flamethrower-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.34025091907655025,
+   -0.5018313649610628,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.07999999999995944,
+   0.10999999999997973
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0.203,
+   "probeLengthMeters": 1.9,
+   "probePaddingMeters": 0.1976,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "flamethrower",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.936870960742425,
+  "weaponPenetrationM": 1.0122400296628058,
+  "screenshot": "before-atomic-acres-flat-wall-flamethrower-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "flat-wall",
+  "siteLabel": "long perimeter wall x=-37, faced head-on",
+  "standoffRequestedM": 0.4,
+  "weapon": "flamethrower",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -36.599998474121094,
+   1.3000999999046328,
+   23
+  ],
+  "forward": [
+   -1,
+   0,
+   -2.220446049250313e-16
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.40000152587890625,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.936870960742425,
+   1.8069067354606994,
+   22.618671664974205
+  ],
+  "muzzleForwardM": 1.3368724866213313,
+  "weaponFwdMaxM": 1.4123407376706183,
+  "weaponFwdPart": "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Primary_PBR",
+  "armsFwdMaxM": 2.025322899825113,
+  "vmMeshes": 16,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "flamethrower-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3404662120602396,
+   -0.46648613349599516,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.07999999999999988,
+   0.10999999999999992
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0.202,
+   "probeLengthMeters": 1.9,
+   "probePaddingMeters": 0.1976,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "flamethrower",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.936870960742425,
+  "weaponPenetrationM": 1.012339211791712,
+  "screenshot": "before-atomic-acres-flat-wall-flamethrower-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "flat-wall",
+  "siteLabel": "long perimeter wall x=-37, faced head-on",
+  "standoffRequestedM": 0.4,
+  "weapon": "flamethrower",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36.599998474121094,
+   0.7500994753837585,
+   23.000009536743164
+  ],
+  "forward": [
+   -1,
+   0,
+   -2.220446049250313e-16
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.40000152587890625,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.936870960742425,
+   1.8069067354606994,
+   22.618671664974205
+  ],
+  "muzzleForwardM": 1.3368724866213313,
+  "weaponFwdMaxM": 1.4123407376706183,
+  "weaponFwdPart": "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Primary_PBR",
+  "armsFwdMaxM": 2.025322899825113,
+  "vmMeshes": 16,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "flamethrower-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.33944349665048285,
+   0.04789514873164963,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.07999999999999988,
+   0.10999999999999992
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0.202,
+   "probeLengthMeters": 1.9,
+   "probePaddingMeters": 0.1976,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "flamethrower",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.936870960742425,
+  "weaponPenetrationM": 1.012339211791712,
+  "screenshot": "before-atomic-acres-flat-wall-flamethrower-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "post",
+  "siteLabel": "0.61 m square post (crate scale)",
+  "standoffRequestedM": 0.4,
+  "weapon": "carbine",
+  "stance": "stand",
+  "ok": true,
+  "eye": [
+   -34.499996185302734,
+   1.8400988507270815,
+   10.706100463867188
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.40010046386718656,
+  "surfaceKind": {
+   "id": "atomic-acres:187:authored-tree-trunk-collider-6",
+   "name": "authored-tree-trunk-collider-6",
+   "bounds": {
+    "minX": -34.806,
+    "maxX": -34.194,
+    "minZ": 9.693999999999999,
+    "maxZ": 10.306000000000001,
+    "minY": 0,
+    "maxY": 3.6
+   },
+   "material": "wood",
+   "classification": "explicit"
+  },
+  "muzzleWorld": [
+   -34.188263039039164,
+   1.800348940063168,
+   9.417129144103578
+  ],
+  "muzzleForwardM": 1.2889713197636095,
+  "weaponFwdMaxM": 1.4676431173782376,
+  "weaponFwdPart": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+  "armsFwdMaxM": 2.113522969519849,
+  "vmMeshes": 11,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "carbine-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.34030575658864365,
+   -0.5369820921762016,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.82,
+   0.03999999999991274,
+   0.09000000000001453
+  ],
+  "rootScale": 0.7338774180751115,
+  "diag": {
+   "retreat": 0.78,
+   "nearestForwardMeters": 0.255,
+   "probeLengthMeters": 1.65,
+   "probePaddingMeters": 0.1456,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "carbine",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.8888708558964229,
+  "weaponPenetrationM": 1.067542653511051,
+  "screenshot": "before-atomic-acres-post-carbine-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "post",
+  "siteLabel": "0.61 m square post (crate scale)",
+  "standoffRequestedM": 0.4,
+  "weapon": "carbine",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -34.5,
+   1.3000986886024477,
+   10.705984115600586
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.399984115600585,
+  "surfaceKind": {
+   "id": "atomic-acres:187:authored-tree-trunk-collider-6",
+   "name": "authored-tree-trunk-collider-6",
+   "bounds": {
+    "minX": -34.806,
+    "maxX": -34.194,
+    "minZ": 9.693999999999999,
+    "maxZ": 10.306000000000001,
+    "minY": 0,
+    "maxY": 3.6
+   },
+   "material": "wood",
+   "classification": "explicit"
+  },
+  "muzzleWorld": [
+   -34.18818249952344,
+   1.2960396206056788,
+   9.417012795836978
+  ],
+  "muzzleForwardM": 1.2889713197636077,
+  "weaponFwdMaxM": 1.4676431173782323,
+  "weaponFwdPart": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+  "armsFwdMaxM": 2.113522969519792,
+  "vmMeshes": 11,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "carbine-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3403901108016884,
+   -0.5012912495090555,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.82,
+   0.03999999999999994,
+   0.09000000000000005
+  ],
+  "rootScale": 0.7338774180751115,
+  "diag": {
+   "retreat": 0.78,
+   "nearestForwardMeters": 0.254,
+   "probeLengthMeters": 1.65,
+   "probePaddingMeters": 0.1456,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "carbine",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.8889872041630227,
+  "weaponPenetrationM": 1.0676590017776473,
+  "screenshot": "before-atomic-acres-post-carbine-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "post",
+  "siteLabel": "0.61 m square post (crate scale)",
+  "standoffRequestedM": 0.4,
+  "weapon": "carbine",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -34.5,
+   0.7500978660583496,
+   10.705979347229004
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.39997934722900297,
+  "surfaceKind": {
+   "id": "atomic-acres:187:authored-tree-trunk-collider-6",
+   "name": "authored-tree-trunk-collider-6",
+   "bounds": {
+    "minX": -34.806,
+    "maxX": -34.194,
+    "minZ": 9.693999999999999,
+    "maxZ": 10.306000000000001,
+    "minY": 0,
+    "maxY": 3.6
+   },
+   "material": "wood",
+   "classification": "explicit"
+  },
+  "muzzleWorld": [
+   -34.18916670795154,
+   1.2234241639607883,
+   9.417008027465396
+  ],
+  "muzzleForwardM": 1.2889713197636077,
+  "weaponFwdMaxM": 1.4676431173782323,
+  "weaponFwdPart": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+  "armsFwdMaxM": 2.113522969519792,
+  "vmMeshes": 11,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "carbine-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3394059023735856,
+   -0.02390588360984767,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.82,
+   0.03999999999999994,
+   0.09000000000000005
+  ],
+  "rootScale": 0.7338774180751115,
+  "diag": {
+   "retreat": 0.78,
+   "nearestForwardMeters": 0.254,
+   "probeLengthMeters": 1.65,
+   "probePaddingMeters": 0.1456,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "carbine",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.8889919725346047,
+  "weaponPenetrationM": 1.0676637701492293,
+  "screenshot": "before-atomic-acres-post-carbine-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "post",
+  "siteLabel": "0.61 m square post (crate scale)",
+  "standoffRequestedM": 0.4,
+  "weapon": "sniper",
+  "stance": "stand",
+  "ok": true,
+  "eye": [
+   -34.499996185302734,
+   1.8400988507270815,
+   10.706100463867188
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.40010046386718656,
+  "surfaceKind": {
+   "id": "atomic-acres:187:authored-tree-trunk-collider-6",
+   "name": "authored-tree-trunk-collider-6",
+   "bounds": {
+    "minX": -34.806,
+    "maxX": -34.194,
+    "minZ": 9.693999999999999,
+    "maxZ": 10.306000000000001,
+    "minY": 0,
+    "maxY": 3.6
+   },
+   "material": "wood",
+   "classification": "explicit"
+  },
+  "muzzleWorld": [
+   -34.118495842178454,
+   1.8069776917797054,
+   9.36912879511695
+  ],
+  "muzzleForwardM": 1.3369716687502375,
+  "weaponFwdMaxM": 1.722443469354939,
+  "weaponFwdPart": "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+  "armsFwdMaxM": 2.1560280547414177,
+  "vmMeshes": 12,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "sniper-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.34031507948910955,
+   -0.5567431683928752,
+   -0.9999999999999997
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.06999999999986259,
+   0.09999999999998756
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0.218,
+   "probeLengthMeters": 1.95,
+   "probePaddingMeters": 0.182,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "sniper",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.936871204883051,
+  "weaponPenetrationM": 1.3223430054877525,
+  "screenshot": "before-atomic-acres-post-sniper-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "post",
+  "siteLabel": "0.61 m square post (crate scale)",
+  "standoffRequestedM": 0.4,
+  "weapon": "sniper",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -34.5,
+   1.3000986886024477,
+   10.705984115600586
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.399984115600585,
+  "surfaceKind": {
+   "id": "atomic-acres:187:authored-tree-trunk-collider-6",
+   "name": "authored-tree-trunk-collider-6",
+   "bounds": {
+    "minX": -34.806,
+    "maxX": -34.194,
+    "minZ": 9.693999999999999,
+    "maxZ": 10.306000000000001,
+    "minY": 0,
+    "maxY": 3.6
+   },
+   "material": "wood",
+   "classification": "explicit"
+  },
+  "muzzleWorld": [
+   -34.118495842178454,
+   1.8069776917797054,
+   9.36912879511695
+  ],
+  "muzzleForwardM": 1.336855320483636,
+  "weaponFwdMaxM": 1.7224434693549444,
+  "weaponFwdPart": "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+  "armsFwdMaxM": 2.1560280547414745,
+  "vmMeshes": 12,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "sniper-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.34037563304478197,
+   -0.5215488783835767,
+   -0.9999999999999997
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.06999999999999995,
+   0.09999999999999999
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0.218,
+   "probeLengthMeters": 1.95,
+   "probePaddingMeters": 0.182,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "sniper",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.936871204883051,
+  "weaponPenetrationM": 1.3224593537543594,
+  "screenshot": "before-atomic-acres-post-sniper-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "post",
+  "siteLabel": "0.61 m square post (crate scale)",
+  "standoffRequestedM": 0.4,
+  "weapon": "sniper",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -34.5,
+   0.7500978660583496,
+   10.705979347229004
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.39997934722900297,
+  "surfaceKind": {
+   "id": "atomic-acres:187:authored-tree-trunk-collider-6",
+   "name": "authored-tree-trunk-collider-6",
+   "bounds": {
+    "minX": -34.806,
+    "maxX": -34.194,
+    "minZ": 9.693999999999999,
+    "maxZ": 10.306000000000001,
+    "minY": 0,
+    "maxY": 3.6
+   },
+   "material": "wood",
+   "classification": "explicit"
+  },
+  "muzzleWorld": [
+   -34.118495842178454,
+   1.8069776917797054,
+   9.36912879511695
+  ],
+  "muzzleForwardM": 1.336850552112054,
+  "weaponFwdMaxM": 1.7224434693549444,
+  "weaponFwdPart": "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+  "armsFwdMaxM": 2.1560280547414745,
+  "vmMeshes": 12,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "sniper-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3393900735256225,
+   -0.01627568650359241,
+   -0.9999999999999997
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.06999999999999995,
+   0.09999999999999999
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0.218,
+   "probeLengthMeters": 1.95,
+   "probePaddingMeters": 0.182,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "sniper",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.936871204883051,
+  "weaponPenetrationM": 1.3224641221259414,
+  "screenshot": "before-atomic-acres-post-sniper-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "post",
+  "siteLabel": "0.61 m square post (crate scale)",
+  "standoffRequestedM": 0.4,
+  "weapon": "explosive-crossbow",
+  "stance": "stand",
+  "ok": true,
+  "eye": [
+   -34.499996185302734,
+   1.8400988507270815,
+   10.706100463867188
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.40010046386718656,
+  "surfaceKind": {
+   "id": "atomic-acres:187:authored-tree-trunk-collider-6",
+   "name": "authored-tree-trunk-collider-6",
+   "bounds": {
+    "minX": -34.806,
+    "maxX": -34.194,
+    "minZ": 9.693999999999999,
+    "maxZ": 10.306000000000001,
+    "minY": 0,
+    "maxY": 3.6
+   },
+   "material": "wood",
+   "classification": "explicit"
+  },
+  "muzzleWorld": [
+   -34.118495842178454,
+   1.8069776917797054,
+   9.36912879511695
+  ],
+  "muzzleForwardM": 1.3369716687502375,
+  "weaponFwdMaxM": 1.3006001543020798,
+  "weaponFwdPart": "Crossbow_ExplosiveTip_FP_LOD0",
+  "armsFwdMaxM": 2.187068912654695,
+  "vmMeshes": 56,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "explosive-crossbow-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3403292487508317,
+   -0.54643518800406,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.7800000000000005,
+   -0.030000000000044855,
+   0.08500000000001684
+  ],
+  "rootScale": 0.7431670056456826,
+  "diag": {
+   "retreat": 0.86,
+   "nearestForwardMeters": 0.234,
+   "probeLengthMeters": 1.75,
+   "probePaddingMeters": 0.16640000000000002,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "explosive-crossbow",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.936871204883051,
+  "weaponPenetrationM": 0.9004996904348932,
+  "screenshot": "before-atomic-acres-post-explosive-crossbow-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "post",
+  "siteLabel": "0.61 m square post (crate scale)",
+  "standoffRequestedM": 0.4,
+  "weapon": "explosive-crossbow",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -34.5,
+   1.3000986886024477,
+   10.705984115600586
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.399984115600585,
+  "surfaceKind": {
+   "id": "atomic-acres:187:authored-tree-trunk-collider-6",
+   "name": "authored-tree-trunk-collider-6",
+   "bounds": {
+    "minX": -34.806,
+    "maxX": -34.194,
+    "minZ": 9.693999999999999,
+    "maxZ": 10.306000000000001,
+    "minY": 0,
+    "maxY": 3.6
+   },
+   "material": "wood",
+   "classification": "explicit"
+  },
+  "muzzleWorld": [
+   -34.118495842178454,
+   1.8069776917797054,
+   9.36912879511695
+  ],
+  "muzzleForwardM": 1.336855320483636,
+  "weaponFwdMaxM": 1.3006001543020815,
+  "weaponFwdPart": "Crossbow_ExplosiveTip_FP_LOD0",
+  "armsFwdMaxM": 2.187068912654663,
+  "vmMeshes": 56,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "explosive-crossbow-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.34035138499046474,
+   -0.5119495445206984,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.7800000000000005,
+   -0.030000000000000023,
+   0.08500000000000009
+  ],
+  "rootScale": 0.7431670056456826,
+  "diag": {
+   "retreat": 0.86,
+   "nearestForwardMeters": 0.234,
+   "probeLengthMeters": 1.75,
+   "probePaddingMeters": 0.16640000000000002,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "explosive-crossbow",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.936871204883051,
+  "weaponPenetrationM": 0.9006160387014965,
+  "screenshot": "before-atomic-acres-post-explosive-crossbow-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "post",
+  "siteLabel": "0.61 m square post (crate scale)",
+  "standoffRequestedM": 0.4,
+  "weapon": "explosive-crossbow",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -34.5,
+   0.7500978660583496,
+   10.705979347229004
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.39997934722900297,
+  "surfaceKind": {
+   "id": "atomic-acres:187:authored-tree-trunk-collider-6",
+   "name": "authored-tree-trunk-collider-6",
+   "bounds": {
+    "minX": -34.806,
+    "maxX": -34.194,
+    "minZ": 9.693999999999999,
+    "maxZ": 10.306000000000001,
+    "minY": 0,
+    "maxY": 3.6
+   },
+   "material": "wood",
+   "classification": "explicit"
+  },
+  "muzzleWorld": [
+   -34.118495842178454,
+   1.8069776917797054,
+   9.36912879511695
+  ],
+  "muzzleForwardM": 1.336850552112054,
+  "weaponFwdMaxM": 1.3006001543020815,
+  "weaponFwdPart": "Crossbow_ExplosiveTip_FP_LOD0",
+  "armsFwdMaxM": 2.187068912654663,
+  "vmMeshes": 56,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "explosive-crossbow-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.33937598980307787,
+   -0.033754639725088784,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.7800000000000005,
+   -0.030000000000000023,
+   0.08500000000000009
+  ],
+  "rootScale": 0.7431670056456826,
+  "diag": {
+   "retreat": 0.86,
+   "nearestForwardMeters": 0.234,
+   "probeLengthMeters": 1.75,
+   "probePaddingMeters": 0.16640000000000002,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "explosive-crossbow",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.936871204883051,
+  "weaponPenetrationM": 0.9006208070730786,
+  "screenshot": "before-atomic-acres-post-explosive-crossbow-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "post",
+  "siteLabel": "0.61 m square post (crate scale)",
+  "standoffRequestedM": 0.4,
+  "weapon": "flamethrower",
+  "stance": "stand",
+  "ok": true,
+  "eye": [
+   -34.499996185302734,
+   1.8400988507270815,
+   10.706100463867188
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.40010046386718656,
+  "surfaceKind": {
+   "id": "atomic-acres:187:authored-tree-trunk-collider-6",
+   "name": "authored-tree-trunk-collider-6",
+   "bounds": {
+    "minX": -34.806,
+    "maxX": -34.194,
+    "minZ": 9.693999999999999,
+    "maxZ": 10.306000000000001,
+    "minY": 0,
+    "maxY": 3.6
+   },
+   "material": "wood",
+   "classification": "explicit"
+  },
+  "muzzleWorld": [
+   -34.118495842178454,
+   1.8069776917797054,
+   9.36912879511695
+  ],
+  "muzzleForwardM": 1.3369716687502375,
+  "weaponFwdMaxM": 1.4123407376706165,
+  "weaponFwdPart": "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Primary_PBR",
+  "armsFwdMaxM": 2.0253228998250776,
+  "vmMeshes": 16,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "flamethrower-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.34035954814960545,
+   -0.5013078369502456,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.07999999999994388,
+   0.10999999999997195
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0.203,
+   "probeLengthMeters": 1.9,
+   "probePaddingMeters": 0.1976,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "flamethrower",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.936871204883051,
+  "weaponPenetrationM": 1.01224027380343,
+  "screenshot": "before-atomic-acres-post-flamethrower-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "post",
+  "siteLabel": "0.61 m square post (crate scale)",
+  "standoffRequestedM": 0.4,
+  "weapon": "flamethrower",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -34.5,
+   1.3000986886024477,
+   10.705984115600586
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.399984115600585,
+  "surfaceKind": {
+   "id": "atomic-acres:187:authored-tree-trunk-collider-6",
+   "name": "authored-tree-trunk-collider-6",
+   "bounds": {
+    "minX": -34.806,
+    "maxX": -34.194,
+    "minZ": 9.693999999999999,
+    "maxZ": 10.306000000000001,
+    "minY": 0,
+    "maxY": 3.6
+   },
+   "material": "wood",
+   "classification": "explicit"
+  },
+  "muzzleWorld": [
+   -34.118495842178454,
+   1.8069776917797054,
+   9.36912879511695
+  ],
+  "muzzleForwardM": 1.336855320483636,
+  "weaponFwdMaxM": 1.4123407376706183,
+  "weaponFwdPart": "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Primary_PBR",
+  "armsFwdMaxM": 2.025322899825113,
+  "vmMeshes": 16,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "flamethrower-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.34033963766451586,
+   -0.4673407000768964,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.07999999999999988,
+   0.10999999999999992
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0.202,
+   "probeLengthMeters": 1.9,
+   "probePaddingMeters": 0.1976,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "flamethrower",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.936871204883051,
+  "weaponPenetrationM": 1.0123566220700333,
+  "screenshot": "before-atomic-acres-post-flamethrower-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "post",
+  "siteLabel": "0.61 m square post (crate scale)",
+  "standoffRequestedM": 0.4,
+  "weapon": "flamethrower",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -34.5,
+   0.7500978660583496,
+   10.705979347229004
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.39997934722900297,
+  "surfaceKind": {
+   "id": "atomic-acres:187:authored-tree-trunk-collider-6",
+   "name": "authored-tree-trunk-collider-6",
+   "bounds": {
+    "minX": -34.806,
+    "maxX": -34.194,
+    "minZ": 9.693999999999999,
+    "maxZ": 10.306000000000001,
+    "minY": 0,
+    "maxY": 3.6
+   },
+   "material": "wood",
+   "classification": "explicit"
+  },
+  "muzzleWorld": [
+   -34.118495842178454,
+   1.8069776917797054,
+   9.36912879511695
+  ],
+  "muzzleForwardM": 1.336850552112054,
+  "weaponFwdMaxM": 1.4123407376706183,
+  "weaponFwdPart": "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Primary_PBR",
+  "armsFwdMaxM": 2.025322899825113,
+  "vmMeshes": 16,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "flamethrower-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3393469556109386,
+   0.04805884144042358,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.07999999999999988,
+   0.10999999999999992
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0.202,
+   "probeLengthMeters": 1.9,
+   "probePaddingMeters": 0.1976,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "flamethrower",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.936871204883051,
+  "weaponPenetrationM": 1.0123613904416153,
+  "screenshot": "before-atomic-acres-post-flamethrower-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "corner",
+  "siteLabel": "inside corner of the x=-37 and z=30 walls",
+  "standoffRequestedM": 0.4,
+  "weapon": "carbine",
+  "stance": "stand",
+  "ok": true,
+  "eye": [
+   -36.71710205078125,
+   1.840100042819977,
+   29.716590881347656
+  ],
+  "forward": [
+   -0.7072442931458979,
+   0,
+   0.7069692424798687
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.4000003279777484,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.84919622979323,
+   1.8004162596114541,
+   30.40729161203411
+  ],
+  "muzzleForwardM": 1.2889713197636075,
+  "weaponFwdMaxM": 1.4676431173782358,
+  "weaponFwdPart": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+  "armsFwdMaxM": 2.1135229695198703,
+  "vmMeshes": 11,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "carbine-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3404342244273231,
+   -0.5369159647208116,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.82,
+   0.03999999999987924,
+   0.0900000000000201
+  ],
+  "rootScale": 0.7338774180751115,
+  "diag": {
+   "retreat": 0.78,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.65,
+   "probePaddingMeters": 0.1456,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "carbine",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.888970991785859,
+  "weaponPenetrationM": 1.0676427894004874,
+  "screenshot": "before-atomic-acres-corner-carbine-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "corner",
+  "siteLabel": "inside corner of the x=-37 and z=30 walls",
+  "standoffRequestedM": 0.4,
+  "weapon": "carbine",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -36.71710205078125,
+   1.3000999999046328,
+   29.71649169921875
+  ],
+  "forward": [
+   -0.7072442931458979,
+   0,
+   0.7069692424798687
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.4000003279777484,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.849115104055386,
+   1.2951408979377106,
+   30.407273587205506
+  ],
+  "muzzleForwardM": 1.288971319763606,
+  "weaponFwdMaxM": 1.4676431173782292,
+  "weaponFwdPart": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+  "armsFwdMaxM": 2.113522969519788,
+  "vmMeshes": 11,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "carbine-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.34031947298848964,
+   -0.5021912834792087,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.82,
+   0.03999999999999994,
+   0.09000000000000005
+  ],
+  "rootScale": 0.7338774180751115,
+  "diag": {
+   "retreat": 0.78,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.65,
+   "probePaddingMeters": 0.1456,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "carbine",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.8889709917858575,
+  "weaponPenetrationM": 1.0676427894004807,
+  "screenshot": "before-atomic-acres-corner-carbine-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "corner",
+  "siteLabel": "inside corner of the x=-37 and z=30 walls",
+  "standoffRequestedM": 0.4,
+  "weapon": "carbine",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36.717002868652344,
+   0.7500999820232391,
+   29.71649169921875
+  ],
+  "forward": [
+   -0.7072442931458979,
+   0,
+   0.7069692424798687
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.4001405654174386,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.84834113948203,
+   1.2236847181116806,
+   30.407948632178147
+  ],
+  "muzzleForwardM": 1.2889713197636028,
+  "weaponFwdMaxM": 1.467643117378226,
+  "weaponFwdPart": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+  "armsFwdMaxM": 2.113522969519785,
+  "vmMeshes": 11,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "carbine-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.33936500085038146,
+   -0.02364744542384495,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.82,
+   0.03999999999999994,
+   0.09000000000000005
+  ],
+  "rootScale": 0.7338774180751115,
+  "diag": {
+   "retreat": 0.78,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.65,
+   "probePaddingMeters": 0.1456,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "carbine",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.8888307543461642,
+  "weaponPenetrationM": 1.0675025519607875,
+  "screenshot": "before-atomic-acres-corner-carbine-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "corner",
+  "siteLabel": "inside corner of the x=-37 and z=30 walls",
+  "standoffRequestedM": 0.4,
+  "weapon": "sniper",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36.71492004394531,
+   0.7757697057723999,
+   29.714210510253906
+  ],
+  "forward": [
+   -0.7072442931458979,
+   0,
+   0.7069692424798687
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.4030855516509317,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.92941140617595,
+   1.2921206691774576,
+   30.390377951514612
+  ],
+  "muzzleForwardM": 1.336971668750239,
+  "weaponFwdMaxM": 1.72244346935494,
+  "weaponFwdPart": "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+  "armsFwdMaxM": 2.156028054741431,
+  "vmMeshes": 12,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "sniper-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.33920721067664433,
+   -0.007271046040440085,
+   -0.9999999999999997
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.06999999999990072,
+   0.09999999999999101
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.95,
+   "probePaddingMeters": 0.182,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "sniper",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.9338861170993074,
+  "weaponPenetrationM": 1.3193579177040082,
+  "screenshot": "before-atomic-acres-corner-sniper-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "corner",
+  "siteLabel": "inside corner of the x=-37 and z=30 walls",
+  "standoffRequestedM": 0.4,
+  "weapon": "sniper",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36.71710205078125,
+   0.7895833206176758,
+   29.716590881347656
+  ],
+  "forward": [
+   -0.7072442931458979,
+   0,
+   0.7069692424798687
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.4000003279777484,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.92941140617595,
+   1.2921206691774576,
+   30.390377951514612
+  ],
+  "muzzleForwardM": 1.3337456077189476,
+  "weaponFwdMaxM": 1.7224434693549435,
+  "weaponFwdPart": "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+  "armsFwdMaxM": 2.1560280547414754,
+  "vmMeshes": 12,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "sniper-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.33992141252803754,
+   -0.010240033215106172,
+   -0.9999999999999997
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.06999999999999995,
+   0.09999999999999999
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.95,
+   "probePaddingMeters": 0.182,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "sniper",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.9337452797411991,
+  "weaponPenetrationM": 1.322443141377195,
+  "screenshot": "before-atomic-acres-corner-sniper-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "corner",
+  "siteLabel": "inside corner of the x=-37 and z=30 walls",
+  "standoffRequestedM": 0.4,
+  "weapon": "sniper",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36.717002868652344,
+   0.7500999820232391,
+   29.71649169921875
+  ],
+  "forward": [
+   -0.7072442931458979,
+   0,
+   0.7069692424798687
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.4001405654174386,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.92941140617595,
+   1.2921206691774576,
+   30.390377951514612
+  ],
+  "muzzleForwardM": 1.333885872428139,
+  "weaponFwdMaxM": 1.7224434693549435,
+  "weaponFwdPart": "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+  "armsFwdMaxM": 2.156028054741475,
+  "vmMeshes": 12,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "sniper-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3407195297562378,
+   -0.015835657496205465,
+   -0.9999999999999997
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.06999999999999995,
+   0.09999999999999999
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.95,
+   "probePaddingMeters": 0.182,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "sniper",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.9337453070107005,
+  "weaponPenetrationM": 1.322302903937505,
+  "screenshot": "before-atomic-acres-corner-sniper-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "corner",
+  "siteLabel": "inside corner of the x=-37 and z=30 walls",
+  "standoffRequestedM": 0.4,
+  "weapon": "explosive-crossbow",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36.71492004394531,
+   0.7757697057723999,
+   29.714210510253906
+  ],
+  "forward": [
+   -0.7072442931458979,
+   0,
+   0.7069692424798687
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.4030855516509317,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.92941140617595,
+   1.2921206691774576,
+   30.390377951514612
+  ],
+  "muzzleForwardM": 1.336971668750239,
+  "weaponFwdMaxM": 1.300600154302079,
+  "weaponFwdPart": "Crossbow_ExplosiveTip_FP_LOD0",
+  "armsFwdMaxM": 2.1870689126546945,
+  "vmMeshes": 56,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "explosive-crossbow-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3407297685061347,
+   -0.02452808622997425,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.7800000000000005,
+   -0.030000000000044855,
+   0.08500000000001684
+  ],
+  "rootScale": 0.7431670056456826,
+  "diag": {
+   "retreat": 0.86,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.75,
+   "probePaddingMeters": 0.16640000000000002,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "explosive-crossbow",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.9338861170993074,
+  "weaponPenetrationM": 0.8975146026511474,
+  "screenshot": "before-atomic-acres-corner-explosive-crossbow-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "corner",
+  "siteLabel": "inside corner of the x=-37 and z=30 walls",
+  "standoffRequestedM": 0.4,
+  "weapon": "explosive-crossbow",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36.71710205078125,
+   0.7895833206176758,
+   29.716590881347656
+  ],
+  "forward": [
+   -0.7072442931458979,
+   0,
+   0.7069692424798687
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.4000003279777484,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.92941140617595,
+   1.2921206691774576,
+   30.390377951514612
+  ],
+  "muzzleForwardM": 1.3337456077189476,
+  "weaponFwdMaxM": 1.3006001543020775,
+  "weaponFwdPart": "Crossbow_ExplosiveTip_FP_LOD0",
+  "armsFwdMaxM": 2.1870689126546576,
+  "vmMeshes": 56,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "explosive-crossbow-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3399600429423909,
+   -0.02886673266141242,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.7800000000000005,
+   -0.030000000000000023,
+   0.08500000000000009
+  ],
+  "rootScale": 0.7431670056456826,
+  "diag": {
+   "retreat": 0.86,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.75,
+   "probePaddingMeters": 0.16640000000000002,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "explosive-crossbow",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.9337452797411991,
+  "weaponPenetrationM": 0.9005998263243291,
+  "screenshot": "before-atomic-acres-corner-explosive-crossbow-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "corner",
+  "siteLabel": "inside corner of the x=-37 and z=30 walls",
+  "standoffRequestedM": 0.4,
+  "weapon": "explosive-crossbow",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36.717002868652344,
+   0.7500999820232391,
+   29.71649169921875
+  ],
+  "forward": [
+   -0.7072442931458979,
+   0,
+   0.7069692424798687
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.4001405654174386,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.92941140617595,
+   1.2921206691774576,
+   30.390377951514612
+  ],
+  "muzzleForwardM": 1.333885872428139,
+  "weaponFwdMaxM": 1.3006001543020809,
+  "weaponFwdPart": "Crossbow_ExplosiveTip_FP_LOD0",
+  "armsFwdMaxM": 2.187068912654661,
+  "vmMeshes": 56,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "explosive-crossbow-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.33922586061332927,
+   -0.03287795142325167,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.7800000000000005,
+   -0.030000000000000023,
+   0.08500000000000009
+  ],
+  "rootScale": 0.7431670056456826,
+  "diag": {
+   "retreat": 0.86,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.75,
+   "probePaddingMeters": 0.16640000000000002,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "explosive-crossbow",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.9337453070107005,
+  "weaponPenetrationM": 0.9004595888846423,
+  "screenshot": "before-atomic-acres-corner-explosive-crossbow-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "corner",
+  "siteLabel": "inside corner of the x=-37 and z=30 walls",
+  "standoffRequestedM": 0.4,
+  "weapon": "flamethrower",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36.71492004394531,
+   0.7757697057723999,
+   29.714210510253906
+  ],
+  "forward": [
+   -0.7072442931458979,
+   0,
+   0.7069692424798687
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.4030855516509317,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.92941140617595,
+   1.2921206691774576,
+   30.390377951514612
+  ],
+  "muzzleForwardM": 1.336971668750239,
+  "weaponFwdMaxM": 1.4123407376706099,
+  "weaponFwdPart": "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Primary_PBR",
+  "armsFwdMaxM": 2.0253228998250785,
+  "vmMeshes": 16,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "flamethrower-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3393439664226368,
+   0.05772466568050999,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.07999999999994964,
+   0.10999999999997483
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.9,
+   "probePaddingMeters": 0.1976,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "flamethrower",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.9338861170993074,
+  "weaponPenetrationM": 1.0092551860196781,
+  "screenshot": "before-atomic-acres-corner-flamethrower-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "corner",
+  "siteLabel": "inside corner of the x=-37 and z=30 walls",
+  "standoffRequestedM": 0.4,
+  "weapon": "flamethrower",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36.71710205078125,
+   0.7895833206176758,
+   29.716590881347656
+  ],
+  "forward": [
+   -0.7072442931458979,
+   0,
+   0.7069692424798687
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.4000003279777484,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.92941140617595,
+   1.2921206691774576,
+   30.390377951514612
+  ],
+  "muzzleForwardM": 1.3337456077189476,
+  "weaponFwdMaxM": 1.4123407376706134,
+  "weaponFwdPart": "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Primary_PBR",
+  "armsFwdMaxM": 2.025322899825115,
+  "vmMeshes": 16,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "flamethrower-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3401858085502887,
+   0.05242530975315191,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.07999999999999988,
+   0.10999999999999992
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.9,
+   "probePaddingMeters": 0.1976,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "flamethrower",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.9337452797411991,
+  "weaponPenetrationM": 1.012340409692865,
+  "screenshot": "before-atomic-acres-corner-flamethrower-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "corner",
+  "siteLabel": "inside corner of the x=-37 and z=30 walls",
+  "standoffRequestedM": 0.4,
+  "weapon": "flamethrower",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36.717002868652344,
+   0.7500999820232391,
+   29.71649169921875
+  ],
+  "forward": [
+   -0.7072442931458979,
+   0,
+   0.7069692424798687
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.4001405654174386,
+  "surfaceKind": {
+   "id": "atomic-acres:217:west fence",
+   "name": "west fence",
+   "bounds": {
+    "minX": -37.599999999999994,
+    "maxX": -37,
+    "minZ": -30.8,
+    "maxZ": 30.8,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -37.92941140617595,
+   1.2921206691774576,
+   30.390377951514612
+  ],
+  "muzzleForwardM": 1.333885872428139,
+  "weaponFwdMaxM": 1.4123407376706165,
+  "weaponFwdPart": "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Primary_PBR",
+  "armsFwdMaxM": 2.0253228998251176,
+  "vmMeshes": 16,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "flamethrower-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3408205497608539,
+   0.04939435141661996,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.07999999999999988,
+   0.10999999999999992
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.9,
+   "probePaddingMeters": 0.1976,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "flamethrower",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.9337453070107005,
+  "weaponPenetrationM": 1.012200172253178,
+  "screenshot": "before-atomic-acres-corner-flamethrower-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "carbine",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -18.041000366210938,
+   0.7757864248752594,
+   20.003000259399414
+  ],
+  "forward": [
+   0.36235772706326996,
+   -0.9320390859672265,
+   0.00014095005517744677
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.8046872832824228,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -17.127702191623612,
+   -0.28425763725205444,
+   20.309335287251685
+  ],
+  "muzzleForwardM": 1.3189863273637028,
+  "weaponFwdMaxM": 1.4908247126374827,
+  "weaponFwdPart": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+  "armsFwdMaxM": 2.1498329856565612,
+  "vmMeshes": 11,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "carbine-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3405626270590906,
+   -0.016198139489921673,
+   -0.860077375016445
+  ],
+  "rootRot": [
+   0.7724079531397335,
+   0.048575784842752406,
+   0.084486995458179
+  ],
+  "rootScale": 0.7451864812045024,
+  "diag": {
+   "retreat": 0.74,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.65,
+   "probePaddingMeters": 0.1456,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "carbine",
+    "obstructionBlend": 0.9420289855072463,
+    "highReadyBlend": 0.9420289855072463,
+    "fireBlocked": true,
+    "blockReason": "high-ready",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.51429904408128,
+  "weaponPenetrationM": 0.68613742935506,
+  "screenshot": "before-atomic-acres-floor-down-carbine-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "carbine",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -18.040979385375977,
+   1.3000976157188417,
+   20.002994537353516
+  ],
+  "forward": [
+   0.36235772706326996,
+   -0.9320390859672265,
+   0.00014095005517744677
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 1.3947912910228661,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -17.602479428899077,
+   -0.21587698154278312,
+   20.245005349035797
+  ],
+  "muzzleForwardM": 1.5718755369648316,
+  "weaponFwdMaxM": 1.6669471870244787,
+  "weaponFwdPart": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+  "armsFwdMaxM": 2.5506911464334525,
+  "vmMeshes": 11,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "carbine-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3391870205289757,
+   -0.40339554144463075,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.3143333333333335,
+   0.12633333333326996,
+   0.03450000000004073
+  ],
+  "rootScale": 0.8541775771140063,
+  "diag": {
+   "retreat": 0.299,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.65,
+   "probePaddingMeters": 0.1456,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "carbine",
+    "obstructionBlend": 0.3833333333333333,
+    "highReadyBlend": 0.3833333333333333,
+    "fireBlocked": false,
+    "blockReason": "open-space",
+    "spreadPenaltyRadians": 0.0059629629629629624,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.17708424594196548,
+  "weaponPenetrationM": 0.2721558960016126,
+  "screenshot": "before-atomic-acres-floor-down-carbine-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "carbine",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -18.041000366210938,
+   0.7500987303256988,
+   20.003015518188477
+  ],
+  "forward": [
+   0.36235772706326996,
+   -0.9320390859672265,
+   0.00014095005517744677
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.8046872832824228,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -17.134149574880368,
+   -0.31235245980050325,
+   20.308591137295807
+  ],
+  "muzzleForwardM": 1.3188934985624645,
+  "weaponFwdMaxM": 1.490784600454469,
+  "weaponFwdPart": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+  "armsFwdMaxM": 2.150173801883804,
+  "vmMeshes": 11,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "carbine-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3395071186581143,
+   -0.0231158069809209,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.7724637681159419,
+   0.04811594202905609,
+   0.08478260869560678
+  ],
+  "rootScale": 0.7451864812045024,
+  "diag": {
+   "retreat": 0.74,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.65,
+   "probePaddingMeters": 0.1456,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "carbine",
+    "obstructionBlend": 0.9420289855072463,
+    "highReadyBlend": 0.9420289855072463,
+    "fireBlocked": true,
+    "blockReason": "high-ready",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.5142062152800417,
+  "weaponPenetrationM": 0.6860973171720461,
+  "screenshot": "before-atomic-acres-floor-down-carbine-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "sniper",
+  "stance": "stand",
+  "ok": true,
+  "eye": [
+   -18.041000366210938,
+   1.8400998044013979,
+   20.002992630004883
+  ],
+  "forward": [
+   0.36235772706326996,
+   -0.9320390859672265,
+   0.00014095005517744677
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 1.9741661349862107,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -17.61484385725758,
+   -0.024197627700756397,
+   20.2763505941426
+  ],
+  "muzzleForwardM": 1.8920577083652246,
+  "weaponFwdMaxM": 2.0865152793109862,
+  "weaponFwdPart": "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+  "armsFwdMaxM": 2.8080034336601045,
+  "vmMeshes": 12,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "sniper-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.34071344054168845,
+   -0.38723345388013447,
+   -1.0909999999999993
+  ],
+  "rootRot": [
+   0.09600000000000003,
+   0.08299999999996852,
+   0.010000000000067517
+  ],
+  "rootScale": 0.9057347881306755,
+  "diag": {
+   "retreat": 0.098,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.95,
+   "probePaddingMeters": 0.182,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "sniper",
+    "obstructionBlend": 0.1,
+    "highReadyBlend": 0.1,
+    "fireBlocked": false,
+    "blockReason": "open-space",
+    "spreadPenaltyRadians": 0.0015555555555555557,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": -0.08210842662098616,
+  "weaponPenetrationM": 0.1123491443247755,
+  "screenshot": "before-atomic-acres-floor-down-sniper-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "sniper",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -18.040979385375977,
+   1.3000976157188417,
+   20.002994537353516
+  ],
+  "forward": [
+   0.36235772706326996,
+   -0.9320390859672265,
+   0.00014095005517744677
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 1.3947912910228661,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -17.61484385725758,
+   -0.024197627700756397,
+   20.2763505941426
+  ],
+  "muzzleForwardM": 1.388746959168724,
+  "weaponFwdMaxM": 1.9120436959046014,
+  "weaponFwdPart": "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+  "armsFwdMaxM": 2.4870125023126723,
+  "vmMeshes": 12,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "sniper-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3391722623323554,
+   -0.44449152397575836,
+   -1.0000000000000007
+  ],
+  "rootRot": [
+   0.5417142857142855,
+   0.004071428571465757,
+   0.05642857142854954
+  ],
+  "rootScale": 0.797909218115119,
+  "diag": {
+   "retreat": 0.553,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.95,
+   "probePaddingMeters": 0.182,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "sniper",
+    "obstructionBlend": 0.5642857142857144,
+    "highReadyBlend": 0.5642857142857144,
+    "fireBlocked": false,
+    "blockReason": "open-space",
+    "spreadPenaltyRadians": 0.00877777777777778,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": -0.006044331854142104,
+  "weaponPenetrationM": 0.5172524048817353,
+  "screenshot": "before-atomic-acres-floor-down-sniper-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "sniper",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -18.041000366210938,
+   0.7500987303256988,
+   20.003015518188477
+  ],
+  "forward": [
+   0.36235772706326996,
+   -0.9320390859672265,
+   0.00014095005517744677
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.8046872832824228,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -17.61484385725758,
+   -0.024197627700756397,
+   20.2763505941426
+  ],
+  "muzzleForwardM": 0.8761341003543244,
+  "weaponFwdMaxM": 1.7224434693549402,
+  "weaponFwdPart": "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+  "armsFwdMaxM": 2.156028054741423,
+  "vmMeshes": 12,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "sniper-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3395632071756216,
+   -0.013405993031235875,
+   -1.0000000000000007
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.06999999999992548,
+   0.09999999999995621
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.95,
+   "probePaddingMeters": 0.182,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "sniper",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.07144681707190159,
+  "weaponPenetrationM": 0.9177561860725174,
+  "screenshot": "before-atomic-acres-floor-down-sniper-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "explosive-crossbow",
+  "stance": "stand",
+  "ok": true,
+  "eye": [
+   -18.041000366210938,
+   1.8400998044013979,
+   20.002992630004883
+  ],
+  "forward": [
+   0.36235772706326996,
+   -0.9320390859672265,
+   0.00014095005517744677
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 1.9741661349862107,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -17.61484385725758,
+   -0.024197627700756397,
+   20.2763505941426
+  ],
+  "muzzleForwardM": 1.8920577083652246,
+  "weaponFwdMaxM": 2.044124215796006,
+  "weaponFwdPart": "Crossbow_ExplosiveTip_FP_LOD0",
+  "armsFwdMaxM": 2.8673782502296827,
+  "vmMeshes": 56,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "explosive-crossbow-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3406750994559508,
+   -0.37868207818035243,
+   -1.1399999999999995
+  ],
+  "rootRot": [
+   3.975424858440858e-21,
+   0.09999999999984659,
+   9.027476541347596e-14
+  ],
+  "rootScale": 0.9289587570571032,
+  "diag": {
+   "retreat": 0,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.75,
+   "probePaddingMeters": 0.16640000000000002,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "explosive-crossbow",
+    "obstructionBlend": 0,
+    "highReadyBlend": 0,
+    "fireBlocked": false,
+    "blockReason": "open-space",
+    "spreadPenaltyRadians": 0,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": -0.08210842662098616,
+  "weaponPenetrationM": 0.06995808080979526,
+  "screenshot": "before-atomic-acres-floor-down-explosive-crossbow-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "explosive-crossbow",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -18.040979385375977,
+   1.3000976157188417,
+   20.002994537353516
+  ],
+  "forward": [
+   0.36235772706326996,
+   -0.9320390859672265,
+   0.00014095005517744677
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 1.3947912910228661,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -17.61484385725758,
+   -0.024197627700756397,
+   20.2763505941426
+  ],
+  "muzzleForwardM": 1.388746959168724,
+  "weaponFwdMaxM": 1.591146113544428,
+  "weaponFwdPart": "Crossbow_ExplosiveTip_FP_LOD0",
+  "armsFwdMaxM": 2.4640650808696116,
+  "vmMeshes": 56,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "explosive-crossbow-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3391723130849895,
+   -0.42515867098162674,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.3519069767441859,
+   0.04134883720936806,
+   0.0383488372092593
+  ],
+  "rootScale": 0.8451364320017181,
+  "diag": {
+   "retreat": 0.388,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.75,
+   "probePaddingMeters": 0.16640000000000002,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "explosive-crossbow",
+    "obstructionBlend": 0.45116279069767445,
+    "highReadyBlend": 0.45116279069767445,
+    "fireBlocked": false,
+    "blockReason": "open-space",
+    "spreadPenaltyRadians": 0.007018087855297159,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": -0.006044331854142104,
+  "weaponPenetrationM": 0.1963548225215619,
+  "screenshot": "before-atomic-acres-floor-down-explosive-crossbow-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "explosive-crossbow",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -18.041000366210938,
+   0.7500987303256988,
+   20.003015518188477
+  ],
+  "forward": [
+   0.36235772706326996,
+   -0.9320390859672265,
+   0.00014095005517744677
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.8046872832824228,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -17.61484385725758,
+   -0.024197627700756397,
+   20.2763505941426
+  ],
+  "muzzleForwardM": 0.8761341003543244,
+  "weaponFwdMaxM": 1.313069593400034,
+  "weaponFwdPart": "Crossbow_ExplosiveTip_FP_LOD0",
+  "armsFwdMaxM": 2.2011380409503576,
+  "vmMeshes": 56,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "explosive-crossbow-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.33957093176894476,
+   -0.03143072189215212,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.7627792207792203,
+   -0.027129870129793354,
+   0.0831233766233264
+  ],
+  "rootScale": 0.7472689014560646,
+  "diag": {
+   "retreat": 0.843,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.75,
+   "probePaddingMeters": 0.16640000000000002,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "explosive-crossbow",
+    "obstructionBlend": 0.9779220779220779,
+    "highReadyBlend": 0.9779220779220779,
+    "fireBlocked": true,
+    "blockReason": "high-ready",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.07144681707190159,
+  "weaponPenetrationM": 0.5083823101176113,
+  "screenshot": "before-atomic-acres-floor-down-explosive-crossbow-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "flamethrower",
+  "stance": "stand",
+  "ok": true,
+  "eye": [
+   -18.041000366210938,
+   1.8400998044013979,
+   20.002992630004883
+  ],
+  "forward": [
+   0.36235772706326996,
+   -0.9320390859672265,
+   0.00014095005517744677
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 1.9741661349862107,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -17.61484385725758,
+   -0.024197627700756397,
+   20.2763505941426
+  ],
+  "muzzleForwardM": 1.8920577083652246,
+  "weaponFwdMaxM": 2.121991693926475,
+  "weaponFwdPart": "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Gunmetal",
+  "armsFwdMaxM": 2.801728489847675,
+  "vmMeshes": 16,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "flamethrower-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3406617628454359,
+   -0.32042566980654413,
+   -1.0789999999999995
+  ],
+  "rootRot": [
+   0.059755102040816355,
+   0.08879591836724232,
+   0.006846938775579065
+  ],
+  "rootScale": 0.9145030212967759,
+  "diag": {
+   "retreat": 0.061,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.9,
+   "probePaddingMeters": 0.1976,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "flamethrower",
+    "obstructionBlend": 0.06224489795918367,
+    "highReadyBlend": 0.06224489795918367,
+    "fireBlocked": false,
+    "blockReason": "open-space",
+    "spreadPenaltyRadians": 0.0009682539682539683,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": -0.08210842662098616,
+  "weaponPenetrationM": 0.14782555894026417,
+  "screenshot": "before-atomic-acres-floor-down-flamethrower-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "flamethrower",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -18.040979385375977,
+   1.3000976157188417,
+   20.002994537353516
+  ],
+  "forward": [
+   0.36235772706326996,
+   -0.9320390859672265,
+   0.00014095005517744677
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 1.3947912910228661,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -17.61484385725758,
+   -0.024197627700756397,
+   20.2763505941426
+  ],
+  "muzzleForwardM": 1.388746959168724,
+  "weaponFwdMaxM": 1.707806500043019,
+  "weaponFwdPart": "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Gunmetal",
+  "armsFwdMaxM": 2.3655775493731808,
+  "vmMeshes": 16,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "flamethrower-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3391613453674163,
+   -0.38296666550739616,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.517224489795918,
+   0.0030204081633347897,
+   0.05926530612240652
+  ],
+  "rootScale": 0.8038336999841056,
+  "diag": {
+   "retreat": 0.528,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.9,
+   "probePaddingMeters": 0.1976,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "flamethrower",
+    "obstructionBlend": 0.5387755102040817,
+    "highReadyBlend": 0.5387755102040817,
+    "fireBlocked": false,
+    "blockReason": "open-space",
+    "spreadPenaltyRadians": 0.008380952380952381,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": -0.006044331854142104,
+  "weaponPenetrationM": 0.3130152090201528,
+  "screenshot": "before-atomic-acres-floor-down-flamethrower-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "atomic-acres",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "flamethrower",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -18.041000366210938,
+   0.7500987303256988,
+   20.003015518188477
+  ],
+  "forward": [
+   0.36235772706326996,
+   -0.9320390859672265,
+   0.00014095005517744677
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.8046872832824228,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -17.61484385725758,
+   -0.024197627700756397,
+   20.2763505941426
+  ],
+  "muzzleForwardM": 0.8761341003543244,
+  "weaponFwdMaxM": 1.4123407376706143,
+  "weaponFwdPart": "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Primary_PBR",
+  "armsFwdMaxM": 2.025322899825062,
+  "vmMeshes": 16,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "flamethrower-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.33961658639811676,
+   0.05113387013760343,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.07999999999992498,
+   0.10999999999995418
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.9,
+   "probePaddingMeters": 0.1976,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "flamethrower",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.07144681707190159,
+  "weaponPenetrationM": 0.6076534543881915,
+  "screenshot": "before-atomic-acres-floor-down-flamethrower-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "flat-wall",
+  "siteLabel": "nearest structural wall found by sweep",
+  "standoffRequestedM": 0.4,
+  "weapon": "carbine",
+  "stance": "stand",
+  "ok": true,
+  "eye": [
+   -36,
+   1.8400000262260439,
+   -29.600000381469727
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.39999961853027344,
+  "surfaceKind": {
+   "id": "atomic-acres:219:north fence",
+   "name": "north fence",
+   "bounds": {
+    "minX": -37.5,
+    "maxX": 37.5,
+    "minZ": -30.6,
+    "maxZ": -30,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -35.68797560775398,
+   1.8749025194193338,
+   -30.88897170123333
+  ],
+  "muzzleForwardM": 1.2889713197636041,
+  "weaponFwdMaxM": 1.4676431173782198,
+  "weaponFwdPart": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+  "armsFwdMaxM": 2.113522969519707,
+  "vmMeshes": 11,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "carbine-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3405970025711971,
+   -0.4623296883189951,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.8199999999999994,
+   0.04000000000006033,
+   0.08999999999990946
+  ],
+  "rootScale": 0.7338774180751115,
+  "diag": {
+   "retreat": 0.78,
+   "nearestForwardMeters": 0.254,
+   "probeLengthMeters": 1.65,
+   "probePaddingMeters": 0.1456,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "carbine",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.8889717012333307,
+  "weaponPenetrationM": 1.0676434988479464,
+  "screenshot": "before-test2-flat-wall-carbine-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "flat-wall",
+  "siteLabel": "nearest structural wall found by sweep",
+  "standoffRequestedM": 0.4,
+  "weapon": "carbine",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -35.9999885559082,
+   1.3000999999046328,
+   -29.600099563598633
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.3999004364013672,
+  "surfaceKind": {
+   "id": "atomic-acres:219:north fence",
+   "name": "north fence",
+   "bounds": {
+    "minX": -37.5,
+    "maxX": 37.5,
+    "minZ": -30.6,
+    "maxZ": -30,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -35.6894080783117,
+   1.5700010351428613,
+   -30.88907088336224
+  ],
+  "muzzleForwardM": 1.2889713197636077,
+  "weaponFwdMaxM": 1.467643117378227,
+  "weaponFwdPart": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+  "armsFwdMaxM": 2.113522969519792,
+  "vmMeshes": 11,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "carbine-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.33915308792162874,
+   -0.22733114627405773,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.8199999999999994,
+   0.04,
+   0.08999999999999993
+  ],
+  "rootScale": 0.7338774180751115,
+  "diag": {
+   "retreat": 0.78,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.65,
+   "probePaddingMeters": 0.1456,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "carbine",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.8890708833622405,
+  "weaponPenetrationM": 1.0677426809768598,
+  "screenshot": "before-test2-flat-wall-carbine-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "flat-wall",
+  "siteLabel": "nearest structural wall found by sweep",
+  "standoffRequestedM": 0.4,
+  "weapon": "carbine",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36,
+   0.750100280046463,
+   -29.85
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0,
+  "surfaceKind": {
+   "id": "atomic-acres:171:terrain-mound-west-verge-collider",
+   "name": "terrain-mound-west-verge-collider",
+   "bounds": {
+    "minX": -37,
+    "maxX": -35.400000000000006,
+    "minZ": -29.900000000000002,
+    "maxZ": -27.7,
+    "minY": 0,
+    "maxY": 1.1
+   },
+   "material": "earth",
+   "classification": "explicit"
+  },
+  "muzzleWorld": [
+   -35.68888937007997,
+   1.228753110365263,
+   -31.13897131976361
+  ],
+  "muzzleForwardM": 1.2889713197636077,
+  "weaponFwdMaxM": 1.467643117378227,
+  "weaponFwdPart": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+  "armsFwdMaxM": 2.113522969519792,
+  "vmMeshes": 11,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "carbine-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3396832402451552,
+   -0.0185793511934864,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.8199999999999994,
+   0.04,
+   0.08999999999999993
+  ],
+  "rootScale": 0.7338774180751115,
+  "diag": {
+   "retreat": 0.78,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.65,
+   "probePaddingMeters": 0.1456,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "carbine",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 1.2889713197636077,
+  "weaponPenetrationM": 1.467643117378227,
+  "screenshot": "before-test2-flat-wall-carbine-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "flat-wall",
+  "siteLabel": "nearest structural wall found by sweep",
+  "standoffRequestedM": 0.4,
+  "weapon": "sniper",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36,
+   1.8401000452041627,
+   -29.600000381469727
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.39999961853027344,
+  "surfaceKind": {
+   "id": "atomic-acres:219:north fence",
+   "name": "north fence",
+   "bounds": {
+    "minX": -37.5,
+    "maxX": 37.5,
+    "minZ": -30.6,
+    "maxZ": -30,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -35.61826375422144,
+   2.3486356914213657,
+   -30.936972050219964
+  ],
+  "muzzleForwardM": 1.3369716687502375,
+  "weaponFwdMaxM": 1.722443469354939,
+  "weaponFwdPart": "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+  "armsFwdMaxM": 2.15602805474143,
+  "vmMeshes": 12,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "sniper-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3405509821433709,
+   -0.015086363228294444,
+   -0.9999999999999997
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.06999999999990072,
+   0.09999999999999101
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0.218,
+   "probeLengthMeters": 1.95,
+   "probePaddingMeters": 0.182,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "sniper",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.9369720502199641,
+  "weaponPenetrationM": 1.3224438508246656,
+  "screenshot": "before-test2-flat-wall-sniper-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "flat-wall",
+  "siteLabel": "nearest structural wall found by sweep",
+  "standoffRequestedM": 0.4,
+  "weapon": "sniper",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -35.9999885559082,
+   1.3000999999046328,
+   -29.600099563598633
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.3999004364013672,
+  "surfaceKind": {
+   "id": "atomic-acres:219:north fence",
+   "name": "north fence",
+   "bounds": {
+    "minX": -37.5,
+    "maxX": 37.5,
+    "minZ": -30.6,
+    "maxZ": -30,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -35.61826375422144,
+   2.3486356914213657,
+   -30.936972050219964
+  ],
+  "muzzleForwardM": 1.3368724866213313,
+  "weaponFwdMaxM": 1.7224434693549426,
+  "weaponFwdPart": "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+  "armsFwdMaxM": 2.1560280547414727,
+  "vmMeshes": 12,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "sniper-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3403794643825536,
+   -0.2194756773168848,
+   -0.9999999999999997
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.06999999999999995,
+   0.09999999999999999
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.95,
+   "probePaddingMeters": 0.182,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "sniper",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.9369720502199641,
+  "weaponPenetrationM": 1.3225430329535754,
+  "screenshot": "before-test2-flat-wall-sniper-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "flat-wall",
+  "siteLabel": "nearest structural wall found by sweep",
+  "standoffRequestedM": 0.4,
+  "weapon": "sniper",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36,
+   0.750100280046463,
+   -29.85
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0,
+  "surfaceKind": {
+   "id": "atomic-acres:171:terrain-mound-west-verge-collider",
+   "name": "terrain-mound-west-verge-collider",
+   "bounds": {
+    "minX": -37,
+    "maxX": -35.400000000000006,
+    "minZ": -29.900000000000002,
+    "maxZ": -27.7,
+    "minY": 0,
+    "maxY": 1.1
+   },
+   "material": "earth",
+   "classification": "explicit"
+  },
+  "muzzleWorld": [
+   -35.61826375422144,
+   2.3486356914213657,
+   -30.936972050219964
+  ],
+  "muzzleForwardM": 1.0869720502199627,
+  "weaponFwdMaxM": 1.7224434693549426,
+  "weaponFwdPart": "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+  "armsFwdMaxM": 2.156028054741469,
+  "vmMeshes": 12,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "sniper-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3393995403117046,
+   -0.013324633419671278,
+   -0.9999999999999997
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.06999999999999995,
+   0.09999999999999999
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.95,
+   "probePaddingMeters": 0.182,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "sniper",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 1.0869720502199627,
+  "weaponPenetrationM": 1.7224434693549426,
+  "screenshot": "before-test2-flat-wall-sniper-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "flat-wall",
+  "siteLabel": "nearest structural wall found by sweep",
+  "standoffRequestedM": 0.4,
+  "weapon": "explosive-crossbow",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36,
+   1.8401000452041627,
+   -29.600000381469727
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.39999961853027344,
+  "surfaceKind": {
+   "id": "atomic-acres:219:north fence",
+   "name": "north fence",
+   "bounds": {
+    "minX": -37.5,
+    "maxX": 37.5,
+    "minZ": -30.6,
+    "maxZ": -30,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -35.61826375422144,
+   2.3486356914213657,
+   -30.936972050219964
+  ],
+  "muzzleForwardM": 1.3369716687502375,
+  "weaponFwdMaxM": 1.3006001543020815,
+  "weaponFwdPart": "Crossbow_ExplosiveTip_FP_LOD0",
+  "armsFwdMaxM": 2.187068912654695,
+  "vmMeshes": 56,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "explosive-crossbow-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.339186711998724,
+   -0.030546716064433863,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.7800000000000005,
+   -0.030000000000044855,
+   0.08500000000001684
+  ],
+  "rootScale": 0.7431670056456826,
+  "diag": {
+   "retreat": 0.86,
+   "nearestForwardMeters": 0.234,
+   "probeLengthMeters": 1.75,
+   "probePaddingMeters": 0.16640000000000002,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "explosive-crossbow",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.9369720502199641,
+  "weaponPenetrationM": 0.9006005357718081,
+  "screenshot": "before-test2-flat-wall-explosive-crossbow-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "flat-wall",
+  "siteLabel": "nearest structural wall found by sweep",
+  "standoffRequestedM": 0.4,
+  "weapon": "explosive-crossbow",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -35.9999885559082,
+   1.3000999999046328,
+   -29.600099563598633
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.3999004364013672,
+  "surfaceKind": {
+   "id": "atomic-acres:219:north fence",
+   "name": "north fence",
+   "bounds": {
+    "minX": -37.5,
+    "maxX": 37.5,
+    "minZ": -30.6,
+    "maxZ": -30,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -35.61826375422144,
+   2.3486356914213657,
+   -30.936972050219964
+  ],
+  "muzzleForwardM": 1.3368724866213313,
+  "weaponFwdMaxM": 1.300600154302078,
+  "weaponFwdPart": "Crossbow_ExplosiveTip_FP_LOD0",
+  "armsFwdMaxM": 2.187068912654663,
+  "vmMeshes": 56,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "explosive-crossbow-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3405585175315679,
+   -0.23782305781196753,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.7800000000000005,
+   -0.030000000000000023,
+   0.08500000000000009
+  ],
+  "rootScale": 0.7431670056456826,
+  "diag": {
+   "retreat": 0.86,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.75,
+   "probePaddingMeters": 0.16640000000000002,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "explosive-crossbow",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.9369720502199641,
+  "weaponPenetrationM": 0.9006997179007108,
+  "screenshot": "before-test2-flat-wall-explosive-crossbow-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "flat-wall",
+  "siteLabel": "nearest structural wall found by sweep",
+  "standoffRequestedM": 0.4,
+  "weapon": "explosive-crossbow",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36,
+   0.750100280046463,
+   -29.85
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0,
+  "surfaceKind": {
+   "id": "atomic-acres:171:terrain-mound-west-verge-collider",
+   "name": "terrain-mound-west-verge-collider",
+   "bounds": {
+    "minX": -37,
+    "maxX": -35.400000000000006,
+    "minZ": -29.900000000000002,
+    "maxZ": -27.7,
+    "minY": 0,
+    "maxY": 1.1
+   },
+   "material": "earth",
+   "classification": "explicit"
+  },
+  "muzzleWorld": [
+   -35.61826375422144,
+   2.3486356914213657,
+   -30.936972050219964
+  ],
+  "muzzleForwardM": 1.0869720502199627,
+  "weaponFwdMaxM": 1.300600154302078,
+  "weaponFwdPart": "Crossbow_ExplosiveTip_FP_LOD0",
+  "armsFwdMaxM": 2.1870689126546594,
+  "vmMeshes": 56,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "explosive-crossbow-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3407793590424472,
+   -0.029754157009270112,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.7800000000000005,
+   -0.030000000000000023,
+   0.08500000000000009
+  ],
+  "rootScale": 0.7431670056456826,
+  "diag": {
+   "retreat": 0.86,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.75,
+   "probePaddingMeters": 0.16640000000000002,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "explosive-crossbow",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 1.0869720502199627,
+  "weaponPenetrationM": 1.300600154302078,
+  "screenshot": "before-test2-flat-wall-explosive-crossbow-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "flat-wall",
+  "siteLabel": "nearest structural wall found by sweep",
+  "standoffRequestedM": 0.4,
+  "weapon": "flamethrower",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36,
+   1.8401000452041627,
+   -29.600000381469727
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.39999961853027344,
+  "surfaceKind": {
+   "id": "atomic-acres:219:north fence",
+   "name": "north fence",
+   "bounds": {
+    "minX": -37.5,
+    "maxX": 37.5,
+    "minZ": -30.6,
+    "maxZ": -30,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -35.61826375422144,
+   2.3486356914213657,
+   -30.936972050219964
+  ],
+  "muzzleForwardM": 1.3369716687502375,
+  "weaponFwdMaxM": 1.4123407376706112,
+  "weaponFwdPart": "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Primary_PBR",
+  "armsFwdMaxM": 2.0253228998250776,
+  "vmMeshes": 16,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "flamethrower-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.34006870429730657,
+   0.05131462144222265,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.07999999999994388,
+   0.10999999999997195
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0.202,
+   "probeLengthMeters": 1.9,
+   "probePaddingMeters": 0.1976,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "flamethrower",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.9369720502199641,
+  "weaponPenetrationM": 1.0123411191403378,
+  "screenshot": "before-test2-flat-wall-flamethrower-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "flat-wall",
+  "siteLabel": "nearest structural wall found by sweep",
+  "standoffRequestedM": 0.4,
+  "weapon": "flamethrower",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -35.9999885559082,
+   1.3000999999046328,
+   -29.600099563598633
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.3999004364013672,
+  "surfaceKind": {
+   "id": "atomic-acres:219:north fence",
+   "name": "north fence",
+   "bounds": {
+    "minX": -37.5,
+    "maxX": 37.5,
+    "minZ": -30.6,
+    "maxZ": -30,
+    "minY": 0,
+    "maxY": 3
+   },
+   "material": "fence",
+   "classification": "rule"
+  },
+  "muzzleWorld": [
+   -35.61826375422144,
+   2.3486356914213657,
+   -30.936972050219964
+  ],
+  "muzzleForwardM": 1.3368724866213313,
+  "weaponFwdMaxM": 1.4123407376706147,
+  "weaponFwdPart": "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Primary_PBR",
+  "armsFwdMaxM": 2.025322899825113,
+  "vmMeshes": 16,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "flamethrower-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3391982991204237,
+   -0.15561784075171453,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.07999999999999988,
+   0.10999999999999992
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.9,
+   "probePaddingMeters": 0.1976,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "flamethrower",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.9369720502199641,
+  "weaponPenetrationM": 1.0124403012692476,
+  "screenshot": "before-test2-flat-wall-flamethrower-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "flat-wall",
+  "siteLabel": "nearest structural wall found by sweep",
+  "standoffRequestedM": 0.4,
+  "weapon": "flamethrower",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36,
+   0.750100280046463,
+   -29.85
+  ],
+  "forward": [
+   0,
+   0,
+   -1
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0,
+  "surfaceKind": {
+   "id": "atomic-acres:171:terrain-mound-west-verge-collider",
+   "name": "terrain-mound-west-verge-collider",
+   "bounds": {
+    "minX": -37,
+    "maxX": -35.400000000000006,
+    "minZ": -29.900000000000002,
+    "maxZ": -27.7,
+    "minY": 0,
+    "maxY": 1.1
+   },
+   "material": "earth",
+   "classification": "explicit"
+  },
+  "muzzleWorld": [
+   -35.61826375422144,
+   2.3486356914213657,
+   -30.936972050219964
+  ],
+  "muzzleForwardM": 1.0869720502199627,
+  "weaponFwdMaxM": 1.4123407376706147,
+  "weaponFwdPart": "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Primary_PBR",
+  "armsFwdMaxM": 2.025322899825113,
+  "vmMeshes": 16,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "flamethrower-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.34001997276670903,
+   0.05064950172540612,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.07999999999999988,
+   0.10999999999999992
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": 0,
+   "probeLengthMeters": 1.9,
+   "probePaddingMeters": 0.1976,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "flamethrower",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 1.0869720502199627,
+  "weaponPenetrationM": 1.4123407376706147,
+  "screenshot": "before-test2-flat-wall-flamethrower-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "carbine",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36,
+   0.7751319658756256,
+   -21.5
+  ],
+  "forward": [
+   0,
+   -0.9320390859672264,
+   -0.3623577544766735
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.8046872832824229,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -35.69381858423458,
+   -0.28765133517351443,
+   -22.406371525971505
+  ],
+  "muzzleForwardM": 1.3189863273637026,
+  "weaponFwdMaxM": 1.4908247126374823,
+  "weaponFwdPart": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+  "armsFwdMaxM": 2.149832985656561,
+  "vmMeshes": 11,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "carbine-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3407642932136975,
+   -0.023757627007394984,
+   -0.860077375016445
+  ],
+  "rootRot": [
+   0.7724079531397335,
+   0.048575784842752406,
+   0.084486995458179
+  ],
+  "rootScale": 0.7451864812045024,
+  "diag": {
+   "retreat": 0.74,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.65,
+   "probePaddingMeters": 0.1456,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "carbine",
+    "obstructionBlend": 0.9420289855072463,
+    "highReadyBlend": 0.9420289855072463,
+    "fireBlocked": true,
+    "blockReason": "high-ready",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.5142990440812797,
+  "weaponPenetrationM": 0.6861374293550594,
+  "screenshot": "before-test2-floor-down-carbine-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "carbine",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -36,
+   1.3000993442535402,
+   -21.500011444091797
+  ],
+  "forward": [
+   0,
+   -0.9320390859672264,
+   -0.3623577544766735
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 1.3947912910228664,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -35.75730989305502,
+   -0.21381318928079807,
+   -21.94390944541224
+  ],
+  "muzzleForwardM": 1.5718755369648314,
+  "weaponFwdMaxM": 1.6669471870244783,
+  "weaponFwdPart": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+  "armsFwdMaxM": 2.5506911464334516,
+  "vmMeshes": 11,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "carbine-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3400369019779406,
+   -0.3977048567502604,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.3143333333333335,
+   0.12633333333326996,
+   0.03450000000004073
+  ],
+  "rootScale": 0.8541775771140063,
+  "diag": {
+   "retreat": 0.299,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.65,
+   "probePaddingMeters": 0.1456,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "carbine",
+    "obstructionBlend": 0.3833333333333333,
+    "highReadyBlend": 0.3833333333333333,
+    "fireBlocked": false,
+    "blockReason": "open-space",
+    "spreadPenaltyRadians": 0.0059629629629629624,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.17708424594196503,
+  "weaponPenetrationM": 0.27215589600161194,
+  "screenshot": "before-test2-floor-down-carbine-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "carbine",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36,
+   0.7500975680351257,
+   -21.49997901916504
+  ],
+  "forward": [
+   0,
+   -0.9320390859672264,
+   -0.3623577544766735
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.8046872832824229,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -35.695076652359376,
+   -0.31282084706382945,
+   -22.405746831337055
+  ],
+  "muzzleForwardM": 1.3188934985624643,
+  "weaponFwdMaxM": 1.490784600454471,
+  "weaponFwdPart": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+  "armsFwdMaxM": 2.150173801883828,
+  "vmMeshes": 11,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "carbine-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3392076174698397,
+   -0.024405209420858803,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.7724637681159419,
+   0.04811594202903126,
+   0.08478260869562274
+  ],
+  "rootScale": 0.7451864812045024,
+  "diag": {
+   "retreat": 0.74,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.65,
+   "probePaddingMeters": 0.1456,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "carbine",
+    "obstructionBlend": 0.9420289855072463,
+    "highReadyBlend": 0.9420289855072463,
+    "fireBlocked": true,
+    "blockReason": "high-ready",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.5142062152800414,
+  "weaponPenetrationM": 0.686097317172048,
+  "screenshot": "before-test2-floor-down-carbine-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "sniper",
+  "stance": "stand",
+  "ok": true,
+  "eye": [
+   -36,
+   1.840100042819977,
+   -21.5
+  ],
+  "forward": [
+   0,
+   -0.9320390859672264,
+   -0.3623577544766735
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 1.974166134986211,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -35.726913303154575,
+   -0.026753059671433488,
+   -21.91968923585942
+  ],
+  "muzzleForwardM": 1.892057708365225,
+  "weaponFwdMaxM": 2.086515279310986,
+  "weaponFwdPart": "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+  "armsFwdMaxM": 2.808003433660098,
+  "vmMeshes": 12,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "sniper-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3406079604483151,
+   -0.3942863466571809,
+   -1.0909999999999993
+  ],
+  "rootRot": [
+   0.09600000000000003,
+   0.08299999999996088,
+   0.01000000000008385
+  ],
+  "rootScale": 0.9057347881306755,
+  "diag": {
+   "retreat": 0.098,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.95,
+   "probePaddingMeters": 0.182,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "sniper",
+    "obstructionBlend": 0.1,
+    "highReadyBlend": 0.1,
+    "fireBlocked": false,
+    "blockReason": "open-space",
+    "spreadPenaltyRadians": 0.0015555555555555557,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": -0.08210842662098594,
+  "weaponPenetrationM": 0.11234914432477483,
+  "screenshot": "before-test2-floor-down-sniper-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "sniper",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -36,
+   1.3000993442535402,
+   -21.500011444091797
+  ],
+  "forward": [
+   0,
+   -0.9320390859672264,
+   -0.3623577544766735
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 1.3947912910228664,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -35.726913303154575,
+   -0.026753059671433488,
+   -21.91968923585942
+  ],
+  "muzzleForwardM": 1.388751803996294,
+  "weaponFwdMaxM": 1.9120436959045948,
+  "weaponFwdPart": "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+  "armsFwdMaxM": 2.4870125023126217,
+  "vmMeshes": 12,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "sniper-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.34008123592704503,
+   -0.43899632004379124,
+   -1.0000000000000007
+  ],
+  "rootRot": [
+   0.5417142857142855,
+   0.004071428571517051,
+   0.05642857142851937
+  ],
+  "rootScale": 0.797909218115119,
+  "diag": {
+   "retreat": 0.553,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.95,
+   "probePaddingMeters": 0.182,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "sniper",
+    "obstructionBlend": 0.5642857142857144,
+    "highReadyBlend": 0.5642857142857144,
+    "fireBlocked": false,
+    "blockReason": "open-space",
+    "spreadPenaltyRadians": 0.00877777777777778,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": -0.00603948702657231,
+  "weaponPenetrationM": 0.5172524048817284,
+  "screenshot": "before-test2-floor-down-sniper-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "sniper",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36,
+   0.7500975680351257,
+   -21.49997901916504
+  ],
+  "forward": [
+   0,
+   -0.9320390859672264,
+   -0.3623577544766735
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.8046872832824229,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -35.726913303154575,
+   -0.026753059671433488,
+   -21.91968923585942
+  ],
+  "muzzleForwardM": 0.8761404006329812,
+  "weaponFwdMaxM": 1.7224434693549406,
+  "weaponFwdPart": "sniper_FP_LOD0_Runtime_static_MAT_Pass65_sniper_Gunmetal",
+  "armsFwdMaxM": 2.1560280547414283,
+  "vmMeshes": 12,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "sniper-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.33922746683196464,
+   -0.015370164791166421,
+   -1.0000000000000007
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.06999999999993313,
+   0.0999999999999607
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.95,
+   "probePaddingMeters": 0.182,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "sniper",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.07145311735055826,
+  "weaponPenetrationM": 0.9177561860725177,
+  "screenshot": "before-test2-floor-down-sniper-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "explosive-crossbow",
+  "stance": "stand",
+  "ok": true,
+  "eye": [
+   -36,
+   1.840100042819977,
+   -21.5
+  ],
+  "forward": [
+   0,
+   -0.9320390859672264,
+   -0.3623577544766735
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 1.974166134986211,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -35.726913303154575,
+   -0.026753059671433488,
+   -21.91968923585942
+  ],
+  "muzzleForwardM": 1.892057708365225,
+  "weaponFwdMaxM": 2.044124215796009,
+  "weaponFwdPart": "Crossbow_ExplosiveTip_FP_LOD0",
+  "armsFwdMaxM": 2.867378250229653,
+  "vmMeshes": 56,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "explosive-crossbow-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3405619206042771,
+   -0.3845151286787404,
+   -1.1399999999999995
+  ],
+  "rootRot": [
+   5.736207580365219e-21,
+   0.09999999999980946,
+   1.1211494450583282e-13
+  ],
+  "rootScale": 0.9289587570571032,
+  "diag": {
+   "retreat": 0,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.75,
+   "probePaddingMeters": 0.16640000000000002,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "explosive-crossbow",
+    "obstructionBlend": 0,
+    "highReadyBlend": 0,
+    "fireBlocked": false,
+    "blockReason": "open-space",
+    "spreadPenaltyRadians": 0,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": -0.08210842662098594,
+  "weaponPenetrationM": 0.06995808080979815,
+  "screenshot": "before-test2-floor-down-explosive-crossbow-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "explosive-crossbow",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -36,
+   1.3000993442535402,
+   -21.500011444091797
+  ],
+  "forward": [
+   0,
+   -0.9320390859672264,
+   -0.3623577544766735
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 1.3947912910228664,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -35.726913303154575,
+   -0.026753059671433488,
+   -21.91968923585942
+  ],
+  "muzzleForwardM": 1.388751803996294,
+  "weaponFwdMaxM": 1.591146113544428,
+  "weaponFwdPart": "Crossbow_ExplosiveTip_FP_LOD0",
+  "armsFwdMaxM": 2.464065080869593,
+  "vmMeshes": 56,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "explosive-crossbow-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.34014350983258507,
+   -0.41951963457634966,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.3519069767441859,
+   0.041348837209349815,
+   0.03834883720927123
+  ],
+  "rootScale": 0.8451364320017181,
+  "diag": {
+   "retreat": 0.388,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.75,
+   "probePaddingMeters": 0.16640000000000002,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "explosive-crossbow",
+    "obstructionBlend": 0.45116279069767445,
+    "highReadyBlend": 0.45116279069767445,
+    "fireBlocked": false,
+    "blockReason": "open-space",
+    "spreadPenaltyRadians": 0.007018087855297159,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": -0.00603948702657231,
+  "weaponPenetrationM": 0.19635482252156167,
+  "screenshot": "before-test2-floor-down-explosive-crossbow-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "explosive-crossbow",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36,
+   0.7500975680351257,
+   -21.49997901916504
+  ],
+  "forward": [
+   0,
+   -0.9320390859672264,
+   -0.3623577544766735
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.8046872832824229,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -35.726913303154575,
+   -0.026753059671433488,
+   -21.91968923585942
+  ],
+  "muzzleForwardM": 0.8761404006329812,
+  "weaponFwdMaxM": 1.313069593400033,
+  "weaponFwdPart": "Crossbow_ExplosiveTip_FP_LOD0",
+  "armsFwdMaxM": 2.2011380409503567,
+  "vmMeshes": 56,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "explosive-crossbow-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3392618996934457,
+   -0.03447401159026006,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.7627792207792203,
+   -0.027129870129793354,
+   0.0831233766233264
+  ],
+  "rootScale": 0.7472689014560646,
+  "diag": {
+   "retreat": 0.843,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.75,
+   "probePaddingMeters": 0.16640000000000002,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "explosive-crossbow",
+    "obstructionBlend": 0.9779220779220779,
+    "highReadyBlend": 0.9779220779220779,
+    "fireBlocked": true,
+    "blockReason": "high-ready",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.07145311735055826,
+  "weaponPenetrationM": 0.50838231011761,
+  "screenshot": "before-test2-floor-down-explosive-crossbow-prone.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "flamethrower",
+  "stance": "stand",
+  "ok": true,
+  "eye": [
+   -36,
+   1.840100042819977,
+   -21.5
+  ],
+  "forward": [
+   0,
+   -0.9320390859672264,
+   -0.3623577544766735
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 1.974166134986211,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -35.726913303154575,
+   -0.026753059671433488,
+   -21.91968923585942
+  ],
+  "muzzleForwardM": 1.892057708365225,
+  "weaponFwdMaxM": 2.121991693926475,
+  "weaponFwdPart": "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Gunmetal",
+  "armsFwdMaxM": 2.801728489847675,
+  "vmMeshes": 16,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "flamethrower-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3405324695913986,
+   -0.3254514907178643,
+   -1.0789999999999995
+  ],
+  "rootRot": [
+   0.059755102040816355,
+   0.08879591836724232,
+   0.006846938775579065
+  ],
+  "rootScale": 0.9145030212967759,
+  "diag": {
+   "retreat": 0.061,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.9,
+   "probePaddingMeters": 0.1976,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "flamethrower",
+    "obstructionBlend": 0.06224489795918367,
+    "highReadyBlend": 0.06224489795918367,
+    "fireBlocked": false,
+    "blockReason": "open-space",
+    "spreadPenaltyRadians": 0.0009682539682539683,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": -0.08210842662098594,
+  "weaponPenetrationM": 0.14782555894026395,
+  "screenshot": "before-test2-floor-down-flamethrower-stand.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "flamethrower",
+  "stance": "crouch",
+  "ok": true,
+  "eye": [
+   -36,
+   1.3000993442535402,
+   -21.500011444091797
+  ],
+  "forward": [
+   0,
+   -0.9320390859672264,
+   -0.3623577544766735
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 1.3947912910228664,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -35.726913303154575,
+   -0.026753059671433488,
+   -21.91968923585942
+  ],
+  "muzzleForwardM": 1.388751803996294,
+  "weaponFwdMaxM": 1.7078065000430156,
+  "weaponFwdPart": "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Gunmetal",
+  "armsFwdMaxM": 2.3655775493731537,
+  "vmMeshes": 16,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "flamethrower-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.3401475681739286,
+   -0.37791008339203036,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.517224489795918,
+   0.0030204081633614737,
+   0.05926530612239021
+  ],
+  "rootScale": 0.8038336999841056,
+  "diag": {
+   "retreat": 0.528,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.9,
+   "probePaddingMeters": 0.1976,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "flamethrower",
+    "obstructionBlend": 0.5387755102040817,
+    "highReadyBlend": 0.5387755102040817,
+    "fireBlocked": false,
+    "blockReason": "open-space",
+    "spreadPenaltyRadians": 0.008380952380952381,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": -0.00603948702657231,
+  "weaponPenetrationM": 0.31301520902014923,
+  "screenshot": "before-test2-floor-down-flamethrower-crouch.png"
+ },
+ {
+  "tag": "before",
+  "arena": "test2",
+  "site": "floor-down",
+  "siteLabel": "open ground, steep down-pitch (no wall)",
+  "standoffRequestedM": 0.4,
+  "weapon": "flamethrower",
+  "stance": "prone",
+  "ok": true,
+  "eye": [
+   -36,
+   0.7500975680351257,
+   -21.49997901916504
+  ],
+  "forward": [
+   0,
+   -0.9320390859672264,
+   -0.3623577544766735
+  ],
+  "cameraNear": 0.08,
+  "fov": 82,
+  "surfaceDistanceM": 0.8046872832824229,
+  "surfaceKind": "stance-ground-plane",
+  "muzzleWorld": [
+   -35.726913303154575,
+   -0.026753059671433488,
+   -21.91968923585942
+  ],
+  "muzzleForwardM": 0.8761404006329812,
+  "weaponFwdMaxM": 1.4123407376706145,
+  "weaponFwdPart": "flamethrower_FP_LOD0_Runtime_static_MAT_Pass65_flamethrower_Primary_PBR",
+  "armsFwdMaxM": 2.0253228998250656,
+  "vmMeshes": 16,
+  "mountedModels": [
+   "first-person-viewmodel-fill",
+   "first-person-muzzle-light",
+   "first-person-arms",
+   "flamethrower-pass65-first-person-model"
+  ],
+  "rootLocal": [
+   0.33924172314177165,
+   0.048171060122196865,
+   -0.8600000000000004
+  ],
+  "rootRot": [
+   0.9599999999999995,
+   -0.07999999999993268,
+   0.10999999999995888
+  ],
+  "rootScale": 0.6967190677928274,
+  "diag": {
+   "retreat": 0.98,
+   "nearestForwardMeters": null,
+   "probeLengthMeters": 1.9,
+   "probePaddingMeters": 0.1976,
+   "fireAdmission": {
+    "contract": "viewmodel-fire-admission-hf343-v1",
+    "weapon": "flamethrower",
+    "obstructionBlend": 1,
+    "highReadyBlend": 1,
+    "fireBlocked": true,
+    "blockReason": "full-stow",
+    "spreadPenaltyRadians": 0.014,
+    "policy": "block-full-stow-graduate-partial-v1",
+    "aimAuthority": "camera-forward-unchanged"
+   },
+   "dressingBoxCount": null
+  },
+  "presentation": null,
+  "penetrationM": 0.07145311735055826,
+  "weaponPenetrationM": 0.6076534543881916,
+  "screenshot": "before-test2-floor-down-flamethrower-prone.png"
+ }
+]

@@ -75,9 +75,14 @@ describe('field support rewards', () => {
   });
 
   it('cycles every support for standard-gamepad selection', () => {
-    expect(cycleFieldSupportSelection('scout-sweep', -1)).toBe('nuke');
-    expect(cycleFieldSupportSelection('tri-pass', 1)).toBe('chopper');
-    expect(cycleFieldSupportSelection('chopper', 1)).toBe('nuke');
+    // The cycle walks the EQUIPPED five-slot loadout (DEFAULT_KILLSTREAK_LOADOUT:
+    // care-package, piloted-drone, carpet-bomber, chopper, drone-swarm), per the
+    // HF-334 reward-authority split. Ids that are not equipped anchor at slot 0:
+    // -1 wraps to the last slot, +1 advances into slot 1.
+    expect(cycleFieldSupportSelection('scout-sweep', -1)).toBe('drone-swarm');
+    expect(cycleFieldSupportSelection('tri-pass', 1)).toBe('piloted-drone');
+    expect(cycleFieldSupportSelection('chopper', 1)).toBe('drone-swarm');
+    expect(cycleFieldSupportSelection('drone-swarm', -1)).toBe('chopper');
   });
 
   it('assigns exactly five deterministic hostile Hunter Swarm targets and excludes friendlies/dead targets', () => {

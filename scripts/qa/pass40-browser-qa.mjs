@@ -6,7 +6,7 @@ const base = process.env.BASE_URL || 'http://127.0.0.1:4173';
 const outDir = path.resolve('artifacts/pass40');
 await mkdir(outDir, { recursive: true });
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ args: ['--mute-audio'], headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const pageErrors = [];
 const consoleErrors = [];

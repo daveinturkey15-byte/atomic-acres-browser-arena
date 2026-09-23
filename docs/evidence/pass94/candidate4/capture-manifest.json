@@ -1,0 +1,123 @@
+{
+  "contract": "arena-viewpoint-regression-capture-v1",
+  "verdict": "FAIL",
+  "label": "pass94-candidate4",
+  "sha": "3e4b568d",
+  "url": "http://127.0.0.1:4300",
+  "renderer": "webgpu",
+  "backend": "webgpu",
+  "adapter": {
+    "gpu": true,
+    "adapter": true,
+    "device": true,
+    "vendor": "nvidia",
+    "architecture": "blackwell"
+  },
+  "bundleAtStart": "/legacy-main-CY9mr4UI.js",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "seed": "viewpoint",
+  "settleMs": 5000,
+  "samples": 1,
+  "capturedAt": "2026-09-04T15:37:02.699Z",
+  "environmentInvalid": null,
+  "arenas": [
+    {
+      "arena": "nuketown2",
+      "ok": false,
+      "shots": [
+        {
+          "cameraId": "nuketown2-overhead",
+          "ok": false,
+          "error": "setArenaReviewCamera returned false - authored camera missing"
+        },
+        {
+          "cameraId": "nuketown2-north-yard",
+          "ok": false,
+          "error": "setArenaReviewCamera returned false - authored camera missing"
+        },
+        {
+          "cameraId": "nuketown2-south-yard",
+          "ok": false,
+          "error": "setArenaReviewCamera returned false - authored camera missing"
+        },
+        {
+          "cameraId": "nuketown2-street-centre",
+          "ok": false,
+          "error": "setArenaReviewCamera returned false - authored camera missing"
+        },
+        {
+          "cameraId": "nuketown2-north-upper-window",
+          "ok": false,
+          "error": "setArenaReviewCamera returned false - authored camera missing"
+        },
+        {
+          "cameraId": "nuketown2-south-upper-window",
+          "ok": false,
+          "error": "setArenaReviewCamera returned false - authored camera missing"
+        },
+        {
+          "cameraId": "nuketown2-into-sun-street",
+          "ok": false,
+          "error": "setArenaReviewCamera returned false - authored camera missing"
+        },
+        {
+          "cameraId": "nuketown2-north-interior",
+          "ok": false,
+          "error": "setArenaReviewCamera returned false - authored camera missing"
+        },
+        {
+          "cameraId": "nuketown2-south-interior",
+          "ok": false,
+          "error": "setArenaReviewCamera returned false - authored camera missing"
+        },
+        {
+          "cameraId": "nuketown2-garage",
+          "ok": false,
+          "error": "setArenaReviewCamera returned false - authored camera missing"
+        },
+        {
+          "cameraId": "nuketown2-north-balcony",
+          "ok": false,
+          "error": "setArenaReviewCamera returned false - authored camera missing"
+        },
+        {
+          "cameraId": "nuketown2-front-porch",
+          "ok": false,
+          "error": "setArenaReviewCamera returned false - authored camera missing"
+        },
+        {
+          "cameraId": "nuketown2-vehicle-near",
+          "ok": false,
+          "error": "setArenaReviewCamera returned false - authored camera missing"
+        },
+        {
+          "cameraId": "nuketown2-vehicle-mid",
+          "ok": false,
+          "error": "setArenaReviewCamera returned false - authored camera missing"
+        },
+        {
+          "cameraId": "nuketown2-vehicle-far",
+          "ok": false,
+          "error": "setArenaReviewCamera returned false - authored camera missing"
+        },
+        {
+          "cameraId": "nuketown2-coach-elevation",
+          "ok": false,
+          "error": "setArenaReviewCamera returned false - authored camera missing"
+        },
+        {
+          "cameraId": "nuketown2-truck-cab-near",
+          "ok": false,
+          "error": "setArenaReviewCamera returned false - authored camera missing"
+        }
+      ],
+      "ms": 109044,
+      "errors": [
+        "[Nuke Town Rebuild map selection failed] Error: WebGPU queue completion exceeded 12000 ms for submission 1 (completed 0, mode serialized, in-flight 1, pending 12001 ms, probes 1, prior latency none, fenced draws 568)\n    at http://127.0.0.1"
+      ]
+    }
+  ]
+}

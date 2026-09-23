@@ -1,0 +1,178 @@
+/* Owner 2026-09-12: dark menus, restrained neon accents, no map previews or
+   leaderboard surfaces. Supersedes the earlier bright-deck art direction.
+   Menu presentation only: combat HUD, input and match authority are unchanged. */
+:is(#menu, [role='dialog'], #deployment-transition) {
+  color-scheme: dark;
+  --menu-ground: #0b1018;
+  --menu-panel: #121b28;
+  --menu-raised: #192536;
+  --menu-line: #334458;
+  --menu-text: #edf4ff;
+  --menu-muted: #b0c1d6;
+  --menu-blue: #58d8ff;
+  --menu-green: #6aefb0;
+  --menu-purple: #bfa0ff;
+  --menu-orange: #ffb06b;
+  --menu-yellow: #f7dd72;
+  --menu-red: #ff7e92;
+}
+#menu.pass64-command-deck {
+  --p77-ink: var(--menu-text); --p77-ink-soft: var(--menu-muted); --p77-ink-quiet: #a0b2c9;
+  --p77-paper: var(--menu-ground); --p77-paper-lit: var(--menu-panel);
+  --p77-accent: var(--menu-blue); --p77-accent-lit: var(--menu-blue);
+  --p77-accent-wash: #58d8ff12; --p77-accent-line: #58d8ff66;
+  --p77-data: var(--menu-green); --p77-hair: #334458; --p77-hair-strong: #455a73;
+  --p77-dark-top: #152131; --p77-dark-bottom: #0c121c;
+  --p77-dark-ink: var(--menu-text); --p77-dark-ink-soft: var(--menu-muted);
+  --p77-offset: 3px 3px 0 #0005; --p77-offset-tight: 2px 2px 0 #0005;
+  --p75-deck-ink: var(--menu-text); --p75-deck-ink-soft: var(--menu-muted);
+  --p75-deck-line: #334458; --p75-deck-line-strong: #455a73; --p75-deck-tick: #58d8ff66;
+  --p74-ink: var(--menu-text); --p74-accent: var(--menu-blue); --p74-accent-bright: var(--menu-blue);
+  --aqua: var(--menu-blue); --coral: var(--menu-red); --gold: var(--menu-yellow);
+  color: var(--menu-text) !important;
+  background: var(--menu-ground) !important;
+  border-color: var(--menu-line) !important;
+}
+#menu :is(.command-header,.command-rail,.command-workspace,.menu-panel,.arena-command,.deployment-manifest) {
+  background: var(--menu-ground) !important;
+  border-color: var(--menu-line) !important;
+  box-shadow: none !important;
+}
+#menu :is(.manifest-heading,.map-selector,.settings-section,.selected-kit-summary,.loadout-manager,.kit-heading,
+  .operator-group,.operator-preview-panel,.advanced-settings,.killstreak-preview-rail,#private-lobby,.controls) {
+  background: var(--menu-panel) !important;
+  border-color: var(--menu-line) !important;
+  box-shadow: none !important;
+}
+#menu :is(h1,h2,h3,h4,strong,b,label,summary,span,em) { color: var(--menu-text) !important; }
+#menu :is(p,small,.lede,.legal,.controls) { color: var(--menu-muted) !important; }
+#menu :is(input,select,textarea,button,.kit-card,.operator-skin-card,.operator-anim-card,.killstreak-slot-card) {
+  color: var(--menu-text) !important;
+  background: var(--menu-raised) !important;
+  border-color: var(--menu-line) !important;
+  box-shadow: none !important;
+  accent-color: var(--menu-blue);
+}
+#menu :is(input,textarea)::placeholder { color: #9aaec8 !important; }
+#menu :is(button,a,input,select,textarea):focus-visible { outline: 2px solid var(--menu-blue) !important; outline-offset: 3px; }
+#menu :is(button,a):hover { border-color: var(--menu-blue) !important; }
+#menu :is(button.active,button.selected,[aria-selected='true'],[aria-pressed='true']) {
+  background: #173449 !important; border-color: var(--menu-blue) !important;
+}
+#menu :is(.command-brand strong,#arena-title span,.eyebrow,.map-selector-heading>span) { color: var(--menu-blue) !important; }
+#menu .menu-actions :is(.primary,#solo,#resume), #menu #lobby-start {
+  background: #6aefb0 !important; color: #071c15 !important; border-color: #6aefb0 !important;
+}
+#menu #host, #menu #join { border-color: var(--menu-blue) !important; color: var(--menu-blue) !important; }
+#menu #menu-tab-kit :is(span,i), #menu .kit-heading b { color: var(--menu-purple) !important; }
+#menu #menu-tab-streaks :is(span,i) { color: var(--menu-orange) !important; }
+#menu #menu-tab-options :is(span,i) { color: var(--menu-yellow) !important; }
+#menu :is(.input-error,[data-kind='error'],#lobby-leave) { color: var(--menu-red) !important; }
+#menu :is(#network-status[data-kind='ok'],#lobby-ready) { color: var(--menu-green) !important; }
+#menu :is(#menu-showcase,#high-score-card,#privacy-settings),
+#deployment-transition :is(img,video,.preview-cockpit-hud) { display: none !important; }
+#menu .map-card-grid { grid-template-columns: repeat(2,minmax(0,220px)); align-items: stretch; }
+#menu :is(.map-card,.technique-card) {
+  box-sizing: border-box; display: flex; flex-direction: column; gap: 12px;
+  width: 100%; min-height: 0; aspect-ratio: 1; padding: 18px; text-align: left;
+  background: var(--menu-panel) !important; color: var(--menu-text) !important;
+  border: 1px solid var(--menu-line); border-radius: 3px; text-decoration: none;
+  box-shadow: none !important; clip-path: none; overflow: hidden;
+}
+#menu :is(.map-card,.technique-card) .map-index { font: 700 12px/1 Inter,sans-serif; color: var(--menu-blue); }
+#menu :is(.map-card,.technique-card)>span { font: 800 19px/1.15 Inter,sans-serif; }
+#menu :is(.map-card,.technique-card)>strong { font: 500 12px/1.4 Inter,sans-serif; color: var(--menu-muted) !important; }
+#menu :is(.map-card,.technique-card)>small { margin-top: auto; font: 700 10px/1.3 Inter,sans-serif; }
+#menu :is(.map-card,.technique-card)::before { display: none; }
+#menu .map-card :is(.map-authoring,.map-prototype) { display: none; }
+#menu .technique-card { border-color: #bfa0ff88; }
+#menu .technique-card :is(.map-index,span) { color: var(--menu-purple) !important; }
+body:has(#menu:not(.hidden)), #app:has(#menu:not(.hidden)) { background: #0b1018 !important; }
+#menu :is(.arena-brief .eyebrow,.map-selector-heading>span,.manifest-heading small) {
+  background: transparent !important; border-color: #58d8ff44 !important; box-shadow: none !important;
+}
+#menu :is(#network-status,.settings-grid,.settings-grid label,.weapon-menu-presentation,.weapon-menu-stat-deck) {
+  background: var(--menu-panel) !important; border-color: var(--menu-line) !important;
+}
+#menu .weapon-menu-dps { background: #ffb06b12 !important; border-color: #ffb06b66 !important; }
+#menu .arena-brief h1 { min-width: 0; font-size: clamp(28px,2.5vw,40px); line-height: 1.1; white-space: normal; overflow-wrap: anywhere; }
+#menu .arena-brief h1 span { display: block; white-space: normal; }
+:is([role='dialog'],#deployment-transition) { color: var(--menu-text) !important; background-color: var(--menu-ground) !important; }
+[role='dialog'] :is(section,header,article,.panel,button,input,select) { background-color: var(--menu-panel) !important; color: var(--menu-text) !important; border-color: var(--menu-line) !important; }
+[role='dialog'] :is(p,small,label) { color: var(--menu-muted) !important; }
+@media(max-width:600px) {
+  #menu .map-card-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  #menu :is(.map-card,.technique-card) { padding: 12px; gap: 8px; }
+  #menu :is(.map-card,.technique-card)>span { font-size: 14px; }
+  #menu :is(.map-card,.technique-card)>strong { display: none; }
+}
+
+/* Colour conveys the destination/action; body copy remains neutral. */
+#menu #menu-panel-deploy { --section-accent: var(--menu-blue); }
+#menu #menu-panel-kit { --section-accent: var(--menu-purple); }
+#menu #menu-panel-streaks { --section-accent: var(--menu-orange); }
+#menu #menu-panel-operator { --section-accent: var(--menu-green); }
+#menu #menu-panel-options { --section-accent: var(--menu-yellow); }
+#menu .menu-panel :is(h2,h3,h4,.kit-heading b,.settings-section>summary,.advanced-settings>summary,
+  .manifest-heading strong,.operator-group>h3,.loadout-manager>strong) { color: var(--section-accent) !important; }
+#menu .menu-panel :is(label>span:first-child,.settings-section>label,.settings-grid>label) { color: var(--section-accent) !important; }
+#menu .menu-panel :is([aria-pressed='true'],[aria-selected='true']) { border-color: var(--section-accent) !important; }
+#menu #menu-tab-operator :is(i,span), #menu .manifest-heading strong { color: var(--menu-green) !important; }
+#menu .menu-tabs button { border-left: 3px solid transparent !important; }
+#menu #menu-tab-deploy.active { border-left-color: var(--menu-blue) !important; }
+#menu #menu-tab-kit.active { border-left-color: var(--menu-purple) !important; }
+#menu #menu-tab-streaks.active { border-left-color: var(--menu-orange) !important; }
+#menu #menu-tab-operator.active { border-left-color: var(--menu-green) !important; }
+#menu #menu-tab-options.active { border-left-color: var(--menu-yellow) !important; }
+#menu .map-card.active>span { color: var(--menu-blue) !important; }
+#menu .controls b { color: var(--menu-yellow) !important; }
+#menu :is(.killstreak-loadout-status,.operator-appearance-status) { color: var(--menu-green) !important; }
+#menu .command-header { min-height: 46px; padding: 8px 20px; justify-content: flex-end; overflow: visible; }
+#menu.pass64-command-deck > .command-header {
+  /* The shell and body are both z-index: 1 in pass77-command-shell.css. Keep
+     the hover-only build report above the workspace while retaining the
+     shell's intentional outer clipping and the header's visible overflow. */
+  position: relative;
+  z-index: 3;
+}
+#menu-meta-actions, #text-chat { display: none !important; }
+#menu .build-stamp { position: relative; margin-left: auto; z-index: 20; }
+#menu .build-stamp>button { display: flex; align-items: center; gap: 14px; min-height: 30px; padding: 6px 10px; border: 0; background: transparent !important; font: 500 12px/1.4 Inter,sans-serif; }
+#menu .build-stamp b { color: var(--menu-blue) !important; }
+#menu .build-stamp time { color: var(--menu-muted); }
+#menu #build-changes { display: none; position: absolute; top: 100%; right: 0; width: min(320px,80vw); padding: 18px; background: var(--menu-panel); border: 1px solid var(--menu-line); border-radius: 8px; box-shadow: 0 12px 32px #0008; font: 400 13px/1.6 Inter,sans-serif; }
+#menu .build-stamp:is(:hover,:focus-within) #build-changes { display: block; }
+#menu #build-changes strong { color: var(--menu-blue) !important; }
+#menu #build-changes ul { padding-left: 18px; margin: 8px 0 0; }
+#menu #menu-panel-streaks .killstreak-loadout-layout { display: block; }
+#menu #menu-panel-streaks .kit-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+#menu #menu-panel-streaks .kit-heading>div { display: grid; gap: 8px; }
+#menu #streak-defaults { color: var(--menu-orange) !important; border: 1px solid #ffb06b66; border-radius: 5px; padding: 10px 14px; white-space: nowrap; }
+#menu #menu-panel-streaks .killstreak-slot-grid { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)) !important; gap: 12px; }
+#menu #menu-panel-streaks .killstreak-slot-card { grid-column: auto !important; display: flex; flex-direction: column; gap: 12px; padding: 14px 10px; border: 1px solid var(--menu-line); border-radius: 8px; min-width: 0; }
+#menu #menu-panel-streaks .killstreak-slot-card>span { color: var(--menu-orange) !important; font: 700 11px/1.4 Inter,sans-serif; letter-spacing: .06em; }
+#menu .streak-choices { display: grid; gap: 8px; }
+#menu .streak-choice { position: relative; display: grid; grid-template-columns: 28px 1fr; align-items: center; gap: 4px 8px; min-height: 70px; padding: 10px 8px; border: 1px solid var(--menu-line); border-radius: 5px; text-align: left; cursor: pointer; }
+#menu .streak-icon { width: 24px; height: 24px; grid-row: span 2; color: var(--menu-orange); }
+#menu .streak-choice>span { font: 650 12px/1.3 Inter,sans-serif; }
+#menu .streak-choice>small { grid-column: 2; font: 500 10px/1.3 Inter,sans-serif; }
+#menu .streak-choice .streak-chosen { display: none; position: absolute; top: 3px; right: 5px; font-size: 10px; }
+#menu .streak-choice[aria-pressed='true'] { background: #ffb06b16 !important; border-color: var(--menu-orange) !important; }
+#menu .streak-choice[aria-pressed='true'] :is(span,.streak-chosen) { color: var(--menu-orange) !important; }
+#menu .streak-choice[aria-pressed='true'] .streak-chosen { display: block; }
+#menu .killstreak-slot-card>small { font: 400 11px/1.6 Inter,sans-serif; }
+#menu .streak-choice:disabled { opacity: .65; cursor: default; }
+@media(max-width:1350px) {
+  #menu #menu-panel-streaks .killstreak-slot-grid { grid-template-columns: repeat(3,minmax(0,1fr)) !important; }
+}
+@media(max-width:800px) {
+  #menu #menu-panel-streaks .killstreak-slot-grid { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
+  #menu #menu-panel-streaks .kit-heading { align-items: flex-start; flex-direction: column; }
+}
+#menu #menu-panel-options :is(.kit-heading strong,.kit-heading b,.settings-heading strong,.settings-heading b,.advanced-settings>summary) { color: var(--menu-yellow) !important; }
+#menu #menu-panel-kit :is(.kit-heading strong,.kit-heading b) { color: var(--menu-purple) !important; }
+#menu #menu-panel-operator :is(.kit-heading strong,.kit-heading b) { color: var(--menu-green) !important; }
+#menu #menu-panel-deploy .manifest-heading strong { color: var(--menu-green) !important; }
+#menu #menu-panel-options :is(.options-heading>b,.settings-section>header>b,.advanced-settings>summary>span,.graphics-preset-row>label) { color: var(--menu-yellow) !important; }
+#menu #menu-panel-operator :is(.operator-heading>b,.operator-group>h3) { color: var(--menu-green) !important; }
+#menu .audio-setting-row { grid-template-columns: minmax(115px,auto) minmax(70px,1fr) auto auto !important; }

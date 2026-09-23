@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Executable allowlist of every parentless (root) commit that may appear in this repository history. A root not listed here is refused by scripts/release/pipeline-guard.mjs and by acceptance-gate.mjs --phase reconciliation. Adding an entry is an explicit reviewed decision, never an automatic fix for a red guard.",
+  "legitimate": [
+    {
+      "sha": "090f074d9bc075364cf3b0cdc8c122f111570994",
+      "date": "2026-07-25",
+      "subject": "test: retain stable WebGPU frame pacing"
+    },
+    {
+      "sha": "c98c93672567889d63eee4d522e9201c2a057b9c",
+      "date": "2026-07-24",
+      "subject": "refactor: enforce unused code cleanup"
+    },
+    {
+      "sha": "fcce40e92e5b71b874bcf95f087936bbd8f2424a",
+      "date": "2026-07-23",
+      "subject": "fix(pass60): keep authored spawns clear of earth banks"
+    },
+    {
+      "sha": "70f5bd86a567f9a83bf791a6091f33a470ec5072",
+      "date": "2026-07-23",
+      "subject": "docs: record Pass 59 production release"
+    },
+    {
+      "sha": "36ada19041f9d85c9a0dea9d00c73cbd7843cd27",
+      "date": "2026-07-23",
+      "subject": "test: stabilize bounded Pass 59 browser gates"
+    },
+    {
+      "sha": "8dafe47678ed5b8ace11469fec4e4eee6481bdd4",
+      "date": "2026-07-22",
+      "subject": "Keep established menu baseline unchanged"
+    },
+    {
+      "sha": "65a92b957444abe554a5e6faa78a95d36cf9b255",
+      "date": "2026-07-22",
+      "subject": "Record Pass 58 and harden Pages receipt wait"
+    },
+    {
+      "sha": "17fb328864f8b49f6dae9d219e049a4432da5f78",
+      "date": "2026-07-22",
+      "subject": "Merge pull request #15 from daveinturkey15-byte/contrib/dave-gaming-pc/codex/release-ci-identity-20260722"
+    }
+  ],
+  "quarantined": [
+    {
+      "sha": "4132e7c03b2c1c8fc2d6b44d52f18d0312c9a72e",
+      "date": "2026-09-03",
+      "subject": "docs(nuketown2-tiptop): cycle 3 critic A scores",
+      "files": 6509,
+      "insertions": 2069148,
+      "incident": "snapshot-import-2026-09-03..05",
+      "remediation": "S1 / HF-536 evidence only; these roots are load-bearing ancestors of the live PASS 94 bytes and cannot be removed without rewriting published history"
+    },
+    {
+      "sha": "567b4a3149f56321430e39408aa0b9588f4ec749",
+      "date": "2026-09-03",
+      "subject": "fix(movement): HF-433 - crouching cancels sprint, and crouch keeps its own speed",
+      "files": 6400,
+      "insertions": 2048553,
+      "incident": "snapshot-import-2026-09-03..05",
+      "remediation": "S1 / HF-536 evidence only; these roots are load-bearing ancestors of the live PASS 94 bytes and cannot be removed without rewriting published history"
+    },
+    {
+      "sha": "f94d50dd4e69c1d32e4963d5586bf38922e82c34",
+      "date": "2026-09-03",
+      "subject": "docs: HF-432 Nuke Town refinement + HF-433 crouch speed (Lane AU2 brief)",
+      "files": 6400,
+      "insertions": 2047564,
+      "incident": "snapshot-import-2026-09-03..05",
+      "remediation": "S1 / HF-536 evidence only; these roots are load-bearing ancestors of the live PASS 94 bytes and cannot be removed without rewriting published history"
+    },
+    {
+      "sha": "93dacd33934823fa2a6bc931bffb7c1b7fd94d05",
+      "date": "2026-09-03",
+      "subject": "qa(hf419): shadow-pass cut, a findability metric, and a Map 3 pipeline census",
+      "files": 5811,
+      "insertions": 1827433,
+      "incident": "snapshot-import-2026-09-03..05",
+      "remediation": "S1 / HF-536 evidence only; these roots are load-bearing ancestors of the live PASS 94 bytes and cannot be removed without rewriting published history"
+    },
+    {
+      "sha": "13addcbab123f7b74f5ef3308a8d08eae3b4d38d",
+      "date": "2026-09-05",
+      "subject": "fix(mp): muse review - harden audit row verdicts",
+      "files": 6965,
+      "insertions": 2597059,
+      "incident": "snapshot-import-2026-09-03..05",
+      "remediation": "S1 / HF-536 evidence only; these roots are load-bearing ancestors of the live PASS 94 bytes and cannot be removed without rewriting published history"
+    },
+    {
+      "sha": "23b140c19f4b84b51c8ada047b85a3402ba09a96",
+      "date": "2026-09-05",
+      "subject": "build(hitl6): integrate multiplayer-first candidate6 evidence",
+      "files": 7068,
+      "insertions": 2790143,
+      "incident": "snapshot-import-2026-09-03..05",
+      "remediation": "S1 / HF-536 evidence only; these roots are load-bearing ancestors of the live PASS 94 bytes and cannot be removed without rewriting published history"
+    },
+    {
+      "sha": "9bf869c5d76ab36995b1b54b4e6a90e52187c783",
+      "date": "2026-09-05",
+      "subject": "fix(qa): soak triage - bound cold boot and preserve evidence",
+      "files": 6970,
+      "insertions": 2597510,
+      "incident": "snapshot-import-2026-09-03..05",
+      "remediation": "S1 / HF-536 evidence only; these roots are load-bearing ancestors of the live PASS 94 bytes and cannot be removed without rewriting published history"
+    }
+  ],
+  "policy": {
+    "unlistedRootIsFatal": true,
+    "quarantinedRootIsReported": true,
+    "bannedOperations": [
+      "git checkout --orphan",
+      "git init + copy of a working tree",
+      "importing a directory as a fresh history"
+    ],
+    "rationale": "Seven parentless full-tree snapshot imports on 2026-09-03..05 severed the shipping line from origin/main, produced 385 phantom merge conflicts against a tree that was already a strict superset of main, and broke pipeline-guard contribute for every lane. Nothing executable refused them. This file is that refusal. See docs/RELEASE_LINE_RECONCILIATION_2026-09-06.md."
+  }
+}

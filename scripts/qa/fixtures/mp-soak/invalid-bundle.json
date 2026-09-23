@@ -1,0 +1,15 @@
+{
+  "contract": "mp-soak-gate-v1",
+  "completed": true,
+  "config": { "rttMs": 120, "positionBoundM": 1.5 },
+  "timing": { "playDurationMs": 180000 },
+  "replication": {
+    "samples": [{ "second": 0 }],
+    "divergences": [{ "second": 0, "peer": "guestB", "distanceM": 57.27 }],
+    "pairDirections": { "host->guestA": true }
+  },
+  "rejoin": { "role": "guestB", "leaveObserved": true, "rejoinObserved": false, "seenByEveryoneAfter": false, "damage": { "triggered": false, "maxLatencyMs": null } },
+  "scenarios": { "guests": { "guestA": {}, "guestB": {} } },
+  "consoleErrors": { "host": ["runtime error"], "guestA": [], "guestB": [] },
+  "scoreboard": { "agreement": false }
+}

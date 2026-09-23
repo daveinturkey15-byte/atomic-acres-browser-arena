@@ -50,6 +50,7 @@ describe('Pass 65 destructible shed presentation', () => {
       detachedChunks: 0,
       retiredGeometries: 0,
       frameCollapsed: false,
+      prewarmed: false,
     });
     presentation.dispose();
   });
@@ -399,6 +400,78 @@ describe('Pass 65 destructible shed presentation', () => {
     const frame = presentation.root.getObjectByName('field-shed-structural-frame') as THREE.InstancedMesh;
     expect(frame.visible).toBe(true);
     expect(presentation.telemetry(initial)).toMatchObject({ frameCollapsed: false });
+    presentation.dispose();
+  });
+
+  // HF-332: Prewarms interactive destruction and collapse debris presentation resources
+  it('prewarms rims, dents, and debris pipelines and sets prewarmed telemetry', async () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.1, 100);
+    const initial = createInitialShedState(FIELD_SHED_DEFINITION, placement, 9);
+    const presentation = createFieldShedPresentation(placement, initial);
+    scene.add(presentation.root);
+
+    let compileRuns = 0;
+    const runtime = {
+      compileAndRender: async (root: THREE.Object3D) => {
+        compileRuns += 1;
+        expect(root).toBe(presentation.root);
+        const rims = presentation.root.getObjectByName('field-shed-aperture-rims') as THREE.InstancedMesh;
+        const dents = presentation.root.getObjectByName('field-shed-dents') as THREE.InstancedMesh;
+        const debris = presentation.root.getObjectByName('field-shed-major-debris') as THREE.InstancedMesh;
+        expect(rims.count).toBeGreaterThan(0);
+        expect(dents.count).toBeGreaterThan(0);
+        expect(debris.count).toBeGreaterThan(0);
+      },
+    };
+
+    expect(presentation.telemetry(initial).prewarmed).toBe(false);
+    await presentation.prewarm(runtime, camera, 1);
+    expect(compileRuns).toBe(1);
+    expect(presentation.telemetry(initial).prewarmed).toBe(true);
+
+    // Idempotent with same generation
+    await presentation.prewarm(runtime, camera, 1);
+    expect(compileRuns).toBe(1);
+
+    // Runs again for a new sceneGeneration
+    await presentation.prewarm(runtime, camera, 2);
+    expect(compileRuns).toBe(2);
+
+    // Instance counts restored after prewarm
+    const rimsAfter = presentation.root.getObjectByName('field-shed-aperture-rims') as THREE.InstancedMesh;
+    const dentsAfter = presentation.root.getObjectByName('field-shed-dents') as THREE.InstancedMesh;
+    const debrisAfter = presentation.root.getObjectByName('field-shed-major-debris') as THREE.InstancedMesh;
+    expect(rimsAfter.count).toBe(0);
+    expect(dentsAfter.count).toBe(0);
+    expect(debrisAfter.count).toBe(0);
+
+    presentation.dispose();
+  });
+
+  it('throws on prewarm when detached and re-arms on failure', async () => {
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.1, 100);
+    const initial = createInitialShedState(FIELD_SHED_DEFINITION, placement, 10);
+    const presentation = createFieldShedPresentation(placement, initial);
+
+    await expect(presentation.prewarm({ compileAndRender: async () => undefined }, camera, 1))
+      .rejects.toThrow('Destructible shed presentation must be attached to a scene before prewarm');
+    expect(presentation.telemetry(initial).prewarmed).toBe(false);
+
+    const scene = new THREE.Scene();
+    scene.add(presentation.root);
+    const failingRuntime = {
+      compileAndRender: async () => {
+        throw new Error('synthetic WebGPU compile error');
+      },
+    };
+    await expect(presentation.prewarm(failingRuntime, camera, 1)).rejects.toThrow('synthetic WebGPU compile error');
+    // HF-332: Re-armed for retry on next deployment
+    expect(presentation.telemetry(initial).prewarmed).toBe(false);
+
+    // Succeeded retry
+    await presentation.prewarm({ compileAndRender: async () => undefined }, camera, 1);
+    expect(presentation.telemetry(initial).prewarmed).toBe(true);
     presentation.dispose();
   });
 });

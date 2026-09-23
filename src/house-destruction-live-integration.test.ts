@@ -2,6 +2,16 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+// CANDIDATE 8: `thin-metal-perforation` hoisted the ballistic-impact routing
+// out of legacy-main.ts into `routeInteractiveWorldBallisticImpact()` (to pay
+// the legacy size ratchet), so the composition this file pins now spans two
+// modules. The scanned SURFACE widens to follow the hoist; not one assertion
+// below is relaxed, and legacy-main.ts is still required to call the hoisted
+// router (asserted immediately below), so the route cannot be quietly dropped.
+const routedSource = readFileSync(
+  new URL('./thin-metal-perforation-runtime.ts', import.meta.url), 'utf8');
+const composition = `${source}
+${routedSource}`;
 
 describe('live Atomic-house destruction composition contract', () => {
   it('replaces map-static movement and ballistic authority with the revisioned runtime', () => {
@@ -18,7 +28,10 @@ describe('live Atomic-house destruction composition contract', () => {
   });
 
   it('routes house shots, physics and windows through the shared deterministic budget', () => {
-    expect(source).toContain('interactiveWorldRuntime.applyHouseBulletImpact({');
+    // legacy-main must still reach the hoisted router, or the composition below
+    // would be satisfied by dead code in a module nothing calls.
+    expect(source).toContain('routeInteractiveWorldBallisticImpact(');
+    expect(composition).toContain('interactiveWorldRuntime.applyHouseBulletImpact({');
     expect(source).toContain('`house-debris:${impact.surface.houseMajorDebris.fragmentId}`');
     expect(source).toContain("canAdmitMajorDebris(counts, 'window')");
     expect(source).toContain('Math.min(capacity, SHARED_MAJOR_DEBRIS_BUDGET.window)');

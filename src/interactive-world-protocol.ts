@@ -1,4 +1,5 @@
 import { stableStringify } from './canonical-state';
+import { isArenaId } from './arena-identity';
 import type { ShedArenaId } from './destructible-world';
 import {
   isInteractiveWorldStateEnvelope,
@@ -60,7 +61,7 @@ export function isShedInteractionIntentMessage(value: unknown): value is ShedInt
     || value.type !== 'shed-interact-request'
     || value.schemaVersion !== INTERACTIVE_WORLD_SCHEMA_VERSION
     || !canonicalId(value.by)
-    || !['atomic-acres', 'skyline-terminal', 'rustworks-1v1'].includes(String(value.arenaId))
+    || !isArenaId(value.arenaId)
     || !canonicalId(value.placementId)
     || !boundedInteger(value.matchEpoch, 1)
     || !boundedInteger(value.lifeId, 1)

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "recipeId": "pass97-newworld-prime-menu-preview-v1",
+  "generatedAt": "2026-09-14",
+  "inheritsMotionContract": "pass66-authoritative-runtime-menu-preview-v2",
+  "note": "NEWWORLD-PRIME (PASS 97, 2026-09-14). Additive family, same reason as pass77, pass79, pass84, pass85 and pass87: the Pass 66 masters choreography is digest-pinned by the retained production gate, so a new arena rides beside it rather than rewriting accepted history. This is the AUTHORING recipe only - no capture has been run against it yet, which is why src/ui/menu-preview-video.ts still declares mediaAvailable false and the card renders PREVIEW STANDBY. The orbit is fitted to NEWWORLD_PRIME_ARENA_BOUNDS (80 x 92 m, src/newworld-prime-arena.ts): radius 40 x 46 is the half-extent of that box, so the long axis of the sweep is the north-south long axis of the horseshoe loop road. The 30 m altitude clears the map's tallest authored mass (the ~6.5 m two-storey house roof, see src/graphics-refinement.ts) by the same margin nuketown2's 30 m clears its two-storey houses. The phase opens the pass down the loop road between the west teal and east yellow houses with the school bus + semi-trailer holding the centre of frame, rather than over a spawn apron.",
+  "arenas": {
+    "newworld-prime": {
+      "kind": "helicopter",
+      "label": "HELO FLYOVER // NEW WORLD PRIME · PREVIEW",
+      "presentationId": "menu-video-runtime-helo-newworld-prime-v1",
+      "cockpitAssetId": "pass66-compact-cockpit-overlay-v1",
+      "seed": 97097001,
+      "fovDegrees": 68,
+      "posterFrame": 60,
+      "centre": [
+        0,
+        2.6,
+        0
+      ],
+      "radius": [
+        40,
+        46
+      ],
+      "altitudeM": 30,
+      "lookAt": [
+        0,
+        2,
+        0
+      ],
+      "phaseRadians": 1.15,
+      "safeVolume": {
+        "x": [
+          -41.5,
+          41.5
+        ],
+        "y": [
+          29,
+          31
+        ],
+        "z": [
+          -47.5,
+          47.5
+        ]
+      },
+      "reviewLabel": "New World Prime high-desert loop cockpit flyover"
+    }
+  }
+}

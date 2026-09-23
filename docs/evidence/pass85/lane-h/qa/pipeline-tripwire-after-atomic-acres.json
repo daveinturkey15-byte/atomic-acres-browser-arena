@@ -1,0 +1,482 @@
+{
+  "contract": "pipeline-compile-stall-probe-v1",
+  "measuredAt": "2026-09-02T20:06:14.887Z",
+  "label": "pass85-after-atomic",
+  "arena": "atomic-acres",
+  "idle": false,
+  "dist": "C:\\Users\\david\\AppData\\Local\\Temp\\claude\\C--Users-david-Desktop-stuff\\4cfe1b40-a256-4a42-8146-934f0cf22570\\scratchpad\\dist-after",
+  "seconds": 75,
+  "hooked": true,
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "window": {
+    "windowS": 75.008,
+    "rafCallbacks": 3964,
+    "stallCount": 5,
+    "stallsPerMinute": 4,
+    "frozenFractionPercent": 0.76,
+    "medianStallMs": 111.1,
+    "maxStallMs": 127.8
+  },
+  "pipelines": {
+    "beforeWindow": 398,
+    "inWindow": 1,
+    "perMinuteInWindow": 0.8,
+    "inStall": 0,
+    "inStallSharePercent": 0,
+    "expectedIfUnrelatedPercent": 0.76,
+    "enrichment": 0
+  },
+  "shaderModules": {
+    "beforeWindow": 457,
+    "inWindow": 0,
+    "perMinuteInWindow": 0,
+    "inStall": 0,
+    "inStallSharePercent": null,
+    "expectedIfUnrelatedPercent": 0.76,
+    "enrichment": null
+  },
+  "stateTransitions": [
+    {
+      "atMs": 74177,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 87222,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 88945,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 96183,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 98205,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 104958,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 106705,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 114951,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 116919,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 122459,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 124184,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 128939,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 130941,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 135698,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 137694,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 143943,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 145711,
+      "alive": true,
+      "weapon": "carbine"
+    }
+  ],
+  "cacheKeyDiffs": [
+    {
+      "atMs": 87028,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [
+        "MAT_Pass65_carbine_Gunmetal:0:2",
+        "MAT_Pass65_carbine_Gunmetal:0:2",
+        "MAT_Pass65_carbine_Gunmetal:0:2",
+        "MAT_Pass65_carbine_Lens:0:2",
+        "MAT_Pass65_carbine_Polymer_PBR:0:2",
+        "MAT_Pass65_carbine_Primary_PBR:0:2",
+        "MAT_Pass65_carbine_Rubber:0:2"
+      ],
+      "materialsLost": []
+    },
+    {
+      "atMs": 96208,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 104908,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 115057,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 117000,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 122243,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 126044,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 128782,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 134817,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 135560,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 143903,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 144944,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    }
+  ],
+  "cacheKeyDiffCount": 12,
+  "determinantFlips": [
+    {
+      "atMs": 73945,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:4.22e+0",
+        "MAT_Pass65_Arms_Glove_PBR:pos:4.22e+0",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:4.22e+0",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:4.22e+0",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 87028,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_Glove_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:5.27e-12",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 96208,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_Glove_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:5.27e-12",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.00e+0",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 104908,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_Glove_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:5.27e-12",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 115057,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_Glove_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:5.27e-12",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.00e+0",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 117000,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:4.26e+0",
+        "MAT_Pass65_Arms_Glove_PBR:pos:4.26e+0",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:4.26e+0",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:4.26e+0",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 122242,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_Glove_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:5.27e-12",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 126044,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:4.22e+0",
+        "MAT_Pass65_Arms_Glove_PBR:pos:4.22e+0",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:4.22e+0",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:4.22e+0",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 128765,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_Glove_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:5.27e-12",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 134817,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:4.22e+0",
+        "MAT_Pass65_Arms_Glove_PBR:pos:4.22e+0",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:4.22e+0",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:4.22e+0",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 135560,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_Glove_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:5.27e-12",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 143902,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_Glove_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:5.27e-12",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 144989,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_Glove_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:5.27e-12",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:5.27e-12",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    }
+  ],
+  "determinantFlipCount": 13,
+  "samplePipelineLabels": [
+    {
+      "atMs": 88960,
+      "syncMs": 0.1,
+      "label": "renderPipeline_MeshBasicMaterial_774",
+      "stack": "at GPUDevice.patched [as createRenderPipeline] (<anonymous>:31:50) <- at iG.createRenderPipeline (http://127.0.0.1:4193/assets/vendor-three-DMMu-fsD.js:4644:12500) <- at wG.createRenderPipeline (http://127.0.0.1:4193/assets/vendor-three-DMMu-fsD.js:4645:29414) <- at sN._getRenderPipeline (http://127.0.0.1:4193/assets/vendor-three-DMMu-fsD.js:4130:96560) <- at sN.getForRender (http://127.0.0.1:4193/assets/vendor-three-DMMu-fsD.js:4130:95356) <- at sN.updateForRender (http://127.0.0.1:4193/assets/vendor-three-DMMu-fsD.js:4130:96185) <- at OG._renderObjectDirect (http://127.0.0.1:4193/assets/vendor-three-DMMu-fsD.js:4136:70133) <- at OG.renderObject (http://127.0.0.1:4193/assets/vendor-three-DMMu-fsD.js:4136:68962) <- at OG._renderObjects (http://127.0.0.1:4193/assets/vendor-three-DMMu-fsD.js:4136:66141) <- at OG._renderTransparents (http://127.0.0.1:4193/assets/vendor-three-DMMu-fsD.js:4136:65982)"
+    }
+  ],
+  "stalls": [
+    {
+      "startMs": 112116.9,
+      "endMs": 112228,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 126661.8,
+      "endMs": 126784,
+      "durationMs": 122.2
+    },
+    {
+      "startMs": 126873,
+      "endMs": 126973,
+      "durationMs": 100
+    },
+    {
+      "startMs": 134411.2,
+      "endMs": 134539,
+      "durationMs": 127.8
+    },
+    {
+      "startMs": 141900.9,
+      "endMs": 142012,
+      "durationMs": 111.1
+    }
+  ]
+}

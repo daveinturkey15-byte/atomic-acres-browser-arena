@@ -1,11 +1,12 @@
 import {
   CHANGELOG,
   PENDING_PRODUCTION_RELEASE,
-  resolveProductionReleasedAt,
+  latestChangelogEntry,
   type ChangelogEntry,
 } from './changelog';
+import { ARENA_IDS } from './arena-identity';
 import releaseChannelsJson from '../release-channels.json';
-import { PASS64_FAILED_REGRESSION_IDENTITY, PASS66_RELEASE_IDENTITY } from './release-identity';
+import { PASS64_FAILED_REGRESSION_IDENTITY } from './release-identity';
 
 export type ProjectMapNode = Readonly<{
   id: string;
@@ -22,7 +23,7 @@ export type ProjectMapBundle = Readonly<{
   current: Readonly<{
     product: 'Nuke Town';
     generatedAt: string;
-    architectureRevision: 'pass66-big-one-v1';
+    architectureRevision: 'atomic-acres-domains-v1';
     releaseState: 'release-candidate' | 'released';
     release: ChangelogEntry;
     previousRelease: string | null;
@@ -49,47 +50,14 @@ export type ProjectMapBundle = Readonly<{
 }>;
 
 /**
- * The project map describes the active publication candidate or the same bytes after
- * protected timestamp injection. Keeping this copy state-aware prevents either
- * an unpublished pass claiming to be live or a publication-first release
- * claiming that owner HITL already happened.
+ * HF-406: the project map's "current release" is no longer a second, hand-written copy
+ * of the release notes. It IS the changelog's current entry, which in turn takes its
+ * pass number from the build stamp. Before this, the map rendered
+ * `PASS 84 · Pass 73 · release candidate` - three surfaces, two of them eleven passes
+ * stale, and an `HITL` area chip on a player-facing panel (measured 2026-09-02 on the
+ * local build AND on the live PASS 83 channel).
  */
-export function projectMapReleaseCopy(releasedAt: string): Readonly<{
-  summary: string;
-  approvalHighlight: string;
-}> {
-  const released = releasedAt !== PENDING_PRODUCTION_RELEASE;
-  return Object.freeze({
-    summary: released
-      ? 'Pass 73 is the current released build for owner-reported first-person, combat, collision, graphics and Firefox corrections; the exact Pass 72 previous-live channel and stable Pass 63 WebGL fallback stay frozen.'
-      : 'Pass 73 is the mechanically gated publication candidate for owner-reported first-person, combat, collision, graphics and Firefox corrections; the exact Pass 72 previous-live channel and stable Pass 63 WebGL fallback stay frozen.',
-    approvalHighlight: released
-      ? 'Pass 73 was published under Dave\'s publication-first authorization after mechanical gates; public owner HITL remains pending'
-      : 'Dave\'s publication-first authorization is recorded; he did not inspect the immutable Pass 73 preview and public owner HITL follows protected publication',
-  });
-}
-
-const projectMapReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
-const projectMapCopy = projectMapReleaseCopy(projectMapReleasedAt);
-
-export const PROJECT_MAP_RELEASE: ChangelogEntry = Object.freeze({
-  id: 'pass73',
-  pass: PASS66_RELEASE_IDENTITY.pass,
-  title: 'Pass 73',
-  releasedAt: projectMapReleasedAt,
-  areas: Object.freeze(['FIRST-PERSON', 'COMBAT', 'COLLISION', 'GRAPHICS', 'FIREFOX', 'HITL']),
-  summary: projectMapCopy.summary,
-  highlights: Object.freeze([
-    'Authored first-person sleeves are thicker and extend beyond the lower frame across the weapon and stance catalog',
-    'Railgun and M14 EBR ADS thermal target presentation, first-grenade preparation and explosive-crossbow glass authority are explicit behavioral contracts',
-    'M14 EBR damage stays at the single exact 40-percent reduction while offline, host-authoritative and replicated paths share the same values',
-    'Live-safe graphics controls update inside the current match and staged topology changes are reported honestly',
-    'Nuke Town floor, canopy and opening authority plus native-WebGPU Firefox parity remain release-blocking evidence lanes',
-    'The release chooser preserves exact Pass 72, Pass 70, Pass 69, Pass 67.1 and Pass 63 evidence paths for comparison and rollback',
-    projectMapCopy.approvalHighlight,
-    'Pass 63 stays frozen as the selectable stable WebGL fallback',
-  ]),
-});
+export const PROJECT_MAP_RELEASE: ChangelogEntry = latestChangelogEntry();
 
 export const PROJECT_MAP_TREE: readonly ProjectMapNode[] = Object.freeze([
   Object.freeze({
@@ -159,6 +127,23 @@ export const PROJECT_MAP_TREE: readonly ProjectMapNode[] = Object.freeze([
           'src/render-profile.ts',
           'src/destructible-shed-presentation.ts',
           'src/house-destruction-presentation.ts',
+        ]),
+      }),
+      Object.freeze({
+        // HF-406: "the map button contains the proper project map too". The arena list
+        // is DERIVED from the canonical id list, so shipping a new arena updates the
+        // project map without anyone remembering to edit it.
+        id: 'arena-catalog',
+        title: 'Arena catalog',
+        summary: `The ${ARENA_IDS.length} canonical arena ids in this build: ${ARENA_IDS.join(', ')}. Menu roster, spawn safety, audio, replay and the network protocol all decode against this one list.`,
+        authority: 'One canonical id list. Display labels, route ids and selectability are projections of it, never a second hand-maintained roster.',
+        status: 'active',
+        paths: Object.freeze([
+          'src/arena-identity.ts',
+          'src/map-selection.ts',
+          'src/additional-maps.ts',
+          'src/rendering/arenas',
+          'src/spawn-safety.ts',
         ]),
       }),
       Object.freeze({
@@ -269,13 +254,15 @@ export function createProjectMapBundle(
   entries: readonly ChangelogEntry[] = CHANGELOG,
 ): ProjectMapBundle {
   if (Number.isNaN(Date.parse(generatedAt))) throw new Error(`Invalid project-map timestamp: ${generatedAt}`);
-  const release = PROJECT_MAP_RELEASE;
+  // HF-406: one source. The map's current release is whatever the changelog says is
+  // current, for the default list and for any list a caller hands in.
+  const release = latestChangelogEntry(entries);
   return {
     schemaVersion: 1,
     current: {
       product: 'Nuke Town',
       generatedAt,
-      architectureRevision: 'pass66-big-one-v1',
+      architectureRevision: 'atomic-acres-domains-v1',
       releaseState: release.releasedAt === PENDING_PRODUCTION_RELEASE ? 'release-candidate' : 'released',
       release,
       previousRelease: entries.find((entry) => entry.id !== release.id)?.pass ?? null,

@@ -1,0 +1,50 @@
+{
+  "family": "shingle",
+  "candidate": "candidate-01",
+  "input": "docs/forge/textures/shingle/candidate-01-source.png",
+  "route": "codex-built-in-image-generation",
+  "licence": "owner-authorised AI texture 2026-09-07",
+  "allowedUse": "shipped",
+  "resolutions": [
+    {
+      "size": 512,
+      "family": "shingle",
+      "metresPerTile": 3,
+      "mmPerPixel": 5.859375,
+      "normalStrength": 1,
+      "wrapDelta": 0,
+      "fractionMostlyZ": 0.9853096008300781,
+      "roughnessBand": [
+        0.74,
+        1
+      ],
+      "detail": {
+        "albedoStddev": 0.09084956885363485,
+        "albedoLaplace": 0.14718655500011835,
+        "normalSlopeMean": 0.15215197348419807,
+        "normalZMean": 0.9922756124874468,
+        "roughnessStddev": 0.013147004162942844
+      }
+    },
+    {
+      "size": 1024,
+      "family": "shingle",
+      "metresPerTile": 3,
+      "mmPerPixel": 2.9296875,
+      "normalStrength": 1,
+      "wrapDelta": 0,
+      "fractionMostlyZ": 0.5910091400146484,
+      "roughnessBand": [
+        0.74,
+        1
+      ],
+      "detail": {
+        "albedoStddev": 0.10669247439304491,
+        "albedoLaplace": 0.1737440450836516,
+        "normalSlopeMean": 0.35733644241833584,
+        "normalZMean": 0.9564407711187073,
+        "roughnessStddev": 0.010764210474244414
+      }
+    }
+  ]
+}

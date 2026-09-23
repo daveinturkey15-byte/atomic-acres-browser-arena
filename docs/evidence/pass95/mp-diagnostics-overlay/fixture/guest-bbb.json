@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "generatedAtEpochMs": 1757020000000,
+  "windowMs": 120000,
+  "roomCode": "FIXTURE1",
+  "localPeerId": "guest-bbb",
+  "localRole": "guest",
+  "protocolVersion": 18,
+  "pass": "pass95",
+  "traces": [
+    {
+      "t": 12,
+      "dir": "in",
+      "kind": "state",
+      "peer": "host-aaa",
+      "seq": 120,
+      "bytes": 214
+    },
+    {
+      "t": 30,
+      "dir": "out",
+      "kind": "state",
+      "peer": "host-aaa",
+      "seq": 121,
+      "bytes": 238
+    }
+  ],
+  "diffs": [],
+  "requests": [],
+  "peers": [
+    {
+      "peer": "host-aaa",
+      "role": "host",
+      "rttMs": 39.0,
+      "jitterMs": 4.6,
+      "lossFraction": 0.0,
+      "inboundRateHz": 39.4,
+      "outboundRateHz": 39.9,
+      "disagreementMeanM": 0.052,
+      "disagreementP95M": 0.11,
+      "disagreementMaxM": 0.21,
+      "desync": 0.055,
+      "sampleCount": 476,
+      "desyncSessionP95": 0.362
+    }
+  ],
+  "dropped": {
+    "traces": 0,
+    "diffs": 0,
+    "requests": 0,
+    "byBytes": 0
+  }
+}

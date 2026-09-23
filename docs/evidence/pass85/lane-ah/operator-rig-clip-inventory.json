@@ -1,0 +1,62 @@
+{
+ "pass65-third-person-operator-lod0.glb": {
+  "animations": [
+   "Death",
+   "Gun_Shoot",
+   "HitRecieve",
+   "HitRecieve_2",
+   "Idle",
+   "Idle_Gun",
+   "Idle_Gun_Pointing",
+   "Idle_Gun_Shoot",
+   "Idle_Neutral",
+   "Idle_Sword",
+   "Interact",
+   "Kick_Left",
+   "Kick_Right",
+   "Punch_Left",
+   "Punch_Right",
+   "Roll",
+   "Run",
+   "Run_Back",
+   "Run_Left",
+   "Run_Right",
+   "Run_Shoot",
+   "Sword_Slash",
+   "Walk",
+   "Wave"
+  ],
+  "animation_count": 24,
+  "skin_joint_counts": [
+   62,
+   62,
+   62,
+   62
+  ]
+ },
+ "pass65-first-person-arms-lod0.glb": {
+  "animations": [
+   "ads-in",
+   "ads-out",
+   "dry-fire",
+   "empty-reload",
+   "equip",
+   "fire",
+   "idle",
+   "inspect",
+   "melee",
+   "reload",
+   "sprint",
+   "unequip",
+   "walk"
+  ],
+  "animation_count": 13,
+  "skin_joint_counts": [
+   37,
+   37,
+   37,
+   37
+  ]
+ },
+ "_finding": "The third-person operator rig carries no reload, crouch, prone, ADS or knife clip; the first-person arms rig carries reload, empty-reload, melee, ads-in and ads-out. None of the four PASS 80 Kimodo_* clips measured shippable in docs/PASS80_SPRINT_LOG_2026-08-26.md is present in any shipped operator GLB."
+}

@@ -1,14 +1,19 @@
 import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
+import { operatorBodyColour, operatorSkinPalette } from './operator-skin-catalog';
 import {
   BOT_EMISSIVE_BRIGHTNESS_SCALE,
   FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY,
+  FIRST_PERSON_ARM_NORMAL_SCALE,
   RIGGED_OPERATOR_RUNTIME_ACTION_NAMES,
   applyBotEmissiveBrightness,
   createOperatorInstanceMaterialResolver,
   enforceRiggedOperatorHandBindDeltaFloor,
+  FIRST_PERSON_ARM_TARGET_SRGB_LUMINANCE,
+  applyFirstPersonArmSkinMaterial,
   firstPersonArmHandedness,
   firstPersonArmMaterialReadabilityProfile,
+  firstPersonArmSkinAlbedo,
   isEmbeddedWeaponObjectName,
   riggedStanceTarget,
   riggedOperatorRuntimeClips,
@@ -207,13 +212,40 @@ describe('rigged operator presentation contract', () => {
     expect(firstMeshMaterial).toBe(siblingMeshMaterial);
     expect(firstMeshMaterial).not.toBe(source);
     expect(secondOwnerMaterial).not.toBe(firstMeshMaterial);
-    expect((firstMeshMaterial as THREE.MeshStandardMaterial).color.getHex()).toBe(0x2d7882);
-    expect((secondOwnerMaterial as THREE.MeshStandardMaterial).color.getHex()).toBe(0x2d7882);
+    // HF-366: the body colour is now the SELECTED SKIN washed with the team
+    // rather than one hard-coded team constant - four skins used to arrive here
+    // and leave identical, which is what "they all looked greyed out" was. The
+    // pin moves to the canonical projection so a colour change still has to be
+    // deliberate, and the aqua team read is asserted alongside it.
+    const aquaDefault = operatorBodyColour('default', 0, 'swat');
+    expect((firstMeshMaterial as THREE.MeshStandardMaterial).color.getHex()).toBe(aquaDefault);
+    expect((secondOwnerMaterial as THREE.MeshStandardMaterial).color.getHex()).toBe(aquaDefault);
+    // ...and the two teams must still be told apart on the same skin.
+    expect(operatorBodyColour('default', 1, 'swat')).not.toBe(aquaDefault);
 
     const secondOwnerDisposed = vi.fn();
     secondOwnerMaterial.addEventListener('dispose', secondOwnerDisposed);
     firstMeshMaterial.dispose();
     expect(secondOwnerDisposed).not.toHaveBeenCalled();
+  });
+
+  it('paints the lens with the skin colour itself, not a multiply over the baked atlas (HF-380)', () => {
+    // The archetype lens IS the creature/visor read: the symbiote's baked lens
+    // atlas is teal, and colour multiplies the map, so even a white tint left
+    // it teal on the live turntable (captured frame, artifacts/hf380). The
+    // resolver must drop the baked map (retaining it for recovery) so the
+    // palette lens colour reaches the mesh on every skin.
+    for (const skinId of ['default', 'explorer', 'symbiote', 'navalops'] as const) {
+      const source = new THREE.MeshStandardMaterial({ color: 0xffffff });
+      source.name = 'Visor';
+      const baked = new THREE.Texture();
+      source.map = baked;
+      const resolved = createOperatorInstanceMaterialResolver(0, false, 'team', skinId)(source);
+      const material = resolved as THREE.MeshStandardMaterial;
+      expect(material.color.getHex()).toBe(operatorSkinPalette(skinId).body.visor);
+      expect(material.map).toBeNull();
+      expect(material.userData.authoredVisorBaseColorMap).toBe(baked);
+    }
   });
 
   it('admits only controller-reachable authored clips in deterministic prewarm order', () => {
@@ -225,7 +257,12 @@ describe('rigged operator presentation contract', () => {
 
     const runtimeClips = riggedOperatorRuntimeClips(authored);
     expect(runtimeClips.map((clip) => clip.name)).toEqual(RIGGED_OPERATOR_RUNTIME_ACTION_NAMES);
-    expect(runtimeClips).toHaveLength(12);
+    // Pass 75 added 'Wave' as the only clip the selectable-emote catalog needs
+    // beyond the controller set. The guarantee this test protects is that the
+    // bound set stays SMALL and deterministic, not that it is frozen forever -
+    // so it is asserted against the declared list rather than a bare number.
+    expect(runtimeClips).toHaveLength(RIGGED_OPERATOR_RUNTIME_ACTION_NAMES.length);
+    expect(runtimeClips.length).toBeLessThanOrEqual(14);
     expect(runtimeClips).not.toContain(authored[0]);
     expect(runtimeClips).not.toContain(authored.at(-1));
     expect(runtimeClips.every((clip) => authored.includes(clip))).toBe(true);
@@ -561,5 +598,164 @@ describe('post-mixer authored-bind hand floor', () => {
         }
       });
     }
+  });
+});
+
+/**
+ * HF-388 falsifier. Every assertion here is on what the arm material ENDS UP
+ * WITH, never on the palette that fed it, because the palette input was
+ * already asserted for months while the surface it produced was arithmetically
+ * incapable of showing a skin.
+ *
+ * Three properties, all of which the pre-HF-388 code fails:
+ *   1. The produced albedo lands on the first-person luminance target, so the
+ *      arms stop returning printer-paper values under a 17.5-intensity fill.
+ *   2. It stays far above the readable floor, so this cannot walk back toward
+ *      the flat black wedge it is on the other side of.
+ *   3. The four skins stay MORE separable than the old palette-level gate
+ *      required, so value was not bought with identity.
+ */
+describe('HF-388: first-person arm albedo is exposure-corrected, not palette-raw', () => {
+  const SLEEVE = 'MAT_Pass65_Arms_Sleeve_PBR';
+  const GLOVE = 'MAT_Pass65_Arms_Glove_PBR';
+  const SKINS = ['default', 'explorer', 'symbiote', 'navalops'] as const;
+  /** sRGB, matching operator-skin-appearance.test.ts's READABLE_ALBEDO_FLOOR. */
+  const READABLE_ALBEDO_FLOOR = 0.16;
+  /**
+   * The palette-level gate in operator-skin-appearance.test.ts requires 0.12.
+   * The produced albedos are measurably better separated than that, so this
+   * pins the better number: a future change may not quietly spend it.
+   */
+  const PRODUCED_SEPARATION_FLOOR = 0.16;
+  /**
+   * The tightest pair in the RAW palette - default vs navalops, sRGB #9fc6cc
+   * vs #93b6d8 - separates by 0.157. The correction must not merely survive
+   * that, it must beat it: taking value out of a colour takes channel
+   * separation with it unless chroma is put back, and this is where "we did
+   * not pay for the fix with skin identity" is actually proven.
+   */
+  const RAW_PALETTE_WORST_PAIR_SEPARATION = 0.156;
+
+  const srgb = (hex: number) => ({
+    r: ((hex >> 16) & 0xff) / 255,
+    g: ((hex >> 8) & 0xff) / 255,
+    b: (hex & 0xff) / 255,
+  });
+  const luminance = (hex: number) => {
+    const colour = srgb(hex);
+    return colour.r * 0.2126 + colour.g * 0.7152 + colour.b * 0.0722;
+  };
+  const separation = (a: number, b: number) => {
+    const left = srgb(a);
+    const right = srgb(b);
+    return Math.abs(left.r - right.r) + Math.abs(left.g - right.g) + Math.abs(left.b - right.b);
+  };
+
+  it('re-bases every skin onto the first-person luminance target', () => {
+    for (const skinId of SKINS) {
+      const palette = operatorSkinPalette(skinId).arm;
+      for (const [role, hex] of [['sleeve', palette.sleeve], ['glove', palette.glove]] as const) {
+        const produced = firstPersonArmSkinAlbedo(hex, role);
+        // Within a rounding step of the target: the correction is the point,
+        // and "roughly darker" would let a future edit drift back up.
+        expect(luminance(produced), `${skinId}/${role}`)
+          .toBeCloseTo(FIRST_PERSON_ARM_TARGET_SRGB_LUMINANCE[role], 2);
+        // ...and never back toward the silhouette failure.
+        expect(luminance(produced), `${skinId}/${role}`).toBeGreaterThan(READABLE_ALBEDO_FLOOR);
+      }
+      // The default sleeve is the loudest case: sRGB #9fc6cc, luminance 0.75,
+      // brighter than paper. It must actually come down.
+      expect(luminance(firstPersonArmSkinAlbedo(palette.sleeve, 'sleeve')))
+        .toBeLessThan(luminance(palette.sleeve));
+      // Gloves stay darker than sleeves, which is what gives the arm a
+      // readable interior instead of one flat value.
+      expect(luminance(firstPersonArmSkinAlbedo(palette.glove, 'glove')))
+        .toBeLessThan(luminance(firstPersonArmSkinAlbedo(palette.sleeve, 'sleeve')));
+    }
+  });
+
+  it('keeps the four skins separable AFTER the correction, not just in the palette', () => {
+    const produced = SKINS.map((skinId) => ({
+      skinId,
+      sleeve: firstPersonArmSkinAlbedo(operatorSkinPalette(skinId).arm.sleeve, 'sleeve'),
+    }));
+    for (let i = 0; i < produced.length; i += 1) {
+      for (let j = i + 1; j < produced.length; j += 1) {
+        expect(
+          separation(produced[i]!.sleeve, produced[j]!.sleeve),
+          `${produced[i]!.skinId} vs ${produced[j]!.skinId}`,
+        ).toBeGreaterThan(PRODUCED_SEPARATION_FLOOR);
+      }
+    }
+    const worstProduced = Math.min(...produced.flatMap((left, i) => (
+      produced.slice(i + 1).map((right) => separation(left.sleeve, right.sleeve))
+    )));
+    expect(worstProduced).toBeGreaterThan(RAW_PALETTE_WORST_PAIR_SEPARATION);
+  });
+
+  it('drives both crushed-albedo roles to a dielectric response', () => {
+    for (const name of [SLEEVE, GLOVE]) {
+      const material = new THREE.MeshStandardMaterial({ name, color: 0xffffff, metalness: 0.82 });
+      expect(applyFirstPersonArmSkinMaterial(material, name, 'default')).toBe(true);
+      expect(material.metalness, name).toBe(0);
+      // The authored ORM map is kept: this removes an impossible scalar, it
+      // does not throw away authored surface detail.
+      material.metalnessMap = new THREE.Texture();
+      applyFirstPersonArmSkinMaterial(material, name, 'navalops');
+      expect(material.metalnessMap, name).toBeInstanceOf(THREE.Texture);
+    }
+  });
+});
+
+describe('HF-388 first-person arm surface detail contract', () => {
+  const SLEEVE_NAME = 'MAT_Pass65_Arms_Sleeve_PBR';
+  const GLOVE_NAME = 'MAT_Pass65_Arms_Glove_PBR';
+
+  /**
+   * The crushed-albedo fix deliberately DROPS the base-colour map for sleeve
+   * and glove, which makes the normal map the only spatial signal those two
+   * materials have left. The shipped GLB delivers it at normalScale 0.68-0.72,
+   * i.e. attenuated, and the result rendered as a smooth latex tube with no
+   * weave or wrinkle at all. Measured local detail over arm pixels on real
+   * WebGPU at Nuke Town sunset: 8.42 at the authored scale, 9.24 at 2.4.
+   */
+  it('drives the authored arm normal map above the attenuation the asset ships', () => {
+    // Strictly stronger than the authored 0.72, and short of the 4.0 that
+    // measured higher but reads as ropey synthetic fabric rather than cloth.
+    expect(FIRST_PERSON_ARM_NORMAL_SCALE).toBeGreaterThan(1);
+    expect(FIRST_PERSON_ARM_NORMAL_SCALE).toBeLessThanOrEqual(3.2);
+
+    for (const name of [SLEEVE_NAME, GLOVE_NAME]) {
+      const material = new THREE.MeshStandardMaterial({ name });
+      material.normalMap = new THREE.Texture();
+      material.normalScale.set(0.724, 0.724);
+      expect(applyFirstPersonArmSkinMaterial(material, name, 'default')).toBe(true);
+      expect(material.normalScale.x, name).toBe(FIRST_PERSON_ARM_NORMAL_SCALE);
+      expect(material.normalScale.y, name).toBe(FIRST_PERSON_ARM_NORMAL_SCALE);
+    }
+  });
+
+  /**
+   * A skin change re-enters the same painter. If the scale were applied only
+   * where materials are first cloned, switching operator would hand that one
+   * player a smooth arm again - exactly the class of bug this project keeps
+   * shipping, where a system is correct on the path someone tested and absent
+   * on the path the player takes.
+   */
+  it('keeps the normal scale through a later skin repaint', () => {
+    const material = new THREE.MeshStandardMaterial({ name: SLEEVE_NAME });
+    material.normalMap = new THREE.Texture();
+    applyFirstPersonArmSkinMaterial(material, SLEEVE_NAME, 'default');
+    material.normalScale.set(0.724, 0.724);
+    applyFirstPersonArmSkinMaterial(material, SLEEVE_NAME, 'navalops');
+    expect(material.normalScale.x).toBe(FIRST_PERSON_ARM_NORMAL_SCALE);
+  });
+
+  it('leaves a material with no authored normal map alone', () => {
+    const material = new THREE.MeshStandardMaterial({ name: SLEEVE_NAME });
+    material.normalScale.set(1, 1);
+    applyFirstPersonArmSkinMaterial(material, SLEEVE_NAME, 'default');
+    expect(material.normalMap).toBeNull();
+    expect(material.normalScale.x).toBe(1);
   });
 });

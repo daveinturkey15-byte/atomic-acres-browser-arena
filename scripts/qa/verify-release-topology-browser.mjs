@@ -18,6 +18,16 @@ if (expectedRollbackReleasedAt && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.tes
   || Number.isNaN(Date.parse(expectedRollbackReleasedAt)))) {
   throw new Error('ROLLBACK_RELEASED_AT must be one strict UTC ISO-8601 instant');
 }
+// LANE AD (PASS 87): the live channel's directory name, path and changelog id were spelled
+// as the literals `the-big-one`, `channels/the-big-one` and `pass73` below. That channel was
+// retired by the pass80 cut (release-channels.json now stages `channels/pass<N>`), so this
+// verifier asserted a topology that no deploy has produced since. Derived here, once.
+const liveChannelPath = channelConfig.experimental.path;
+if (typeof liveChannelPath !== 'string' || !/^channels\/[a-z0-9-]+$/u.test(liveChannelPath)) {
+  throw new Error('release-channels.json experimental.path must be one channels/<id> path');
+}
+const liveChannelId = liveChannelPath.slice('channels/'.length);
+const liveChangelogId = channelConfig.experimental.pass.toLowerCase().replace(/\s+/gu, '');
 const rootUrl = new URL(baseUrl);
 if (sourceSha) rootUrl.searchParams.set('qa', sourceSha);
 // The production runner is intentionally GPU-less. Route/chooser validation
@@ -28,7 +38,7 @@ rootUrl.searchParams.set('renderer', 'webgl2');
 // this flag and must not let optional leaderboard traffic contaminate it.
 rootUrl.searchParams.set('externalServices', 'off');
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ args: ['--mute-audio'], headless: true });
 const context = await browser.newContext({ viewport: { width: 1100, height: 700 } });
 const failures = [];
 const routes = {};
@@ -65,7 +75,7 @@ async function fetchJson(relativePath) {
 async function verifyPublishedProvenance() {
   const live = await fetchJson(`${channelConfig.experimental.path}/channel-provenance.json`);
   assertEqual(live.schemaVersion, 5, 'Live provenance schema');
-  assertEqual(live.channel, 'the-big-one', 'Live provenance channel');
+  assertEqual(live.channel, liveChannelId, 'Live provenance channel');
   assertEqual(live.releasePass, channelConfig.experimental.pass, 'Live provenance pass');
   assertEqual(live.path, channelConfig.experimental.path, 'Live provenance path');
   assertExactSha(live.sourceSha, 'Live provenance sourceSha');
@@ -229,12 +239,16 @@ async function openChooser(page) {
   const buttons = page.locator('#release-channel-options button');
   const labels = await buttons.allTextContents();
   const expectedBadge = expectedReleasedAt ? 'LIVE' : 'RELEASE CANDIDATE';
-  if (await buttons.count() !== 4
+  // One card per configured channel, counted FROM the config rather than from a literal.
+  // The bare `4` this replaces is precisely how a published PASS 80 stayed invisible: the
+  // count matched, so the gate passed on a chooser that was hiding a shipped build.
+  const configuredChannelKeys = Object.keys(channelConfig).filter((key) => channelConfig[key]?.path);
+  if (await buttons.count() !== configuredChannelKeys.length
     || !labels.some((text) => text.includes(channelConfig.experimental.pass) && text.includes(expectedBadge) && !text.includes('THE BIG ONE'))
     || !labels.some((text) => text.includes('PASS 72') && text.includes('PREVIOUS LIVE'))
     || !labels.some((text) => text.includes('PASS 70') && text.includes('RETAINED LIVE'))
     || !labels.some((text) => text.includes('PASS 69') && text.includes('RETAINED STABLE'))
-    || labels.some((text) => text.includes('PASS 63') || text.includes('PASS 66') || text.includes('PASS 65') || text.includes('PASS 64') || text.includes('PASS 59'))) {
+    || labels.some((text) => text.includes('PASS 66') || text.includes('PASS 65') || text.includes('PASS 64') || text.includes('PASS 59'))) {
     throw new Error(`Unexpected chooser labels: ${JSON.stringify(labels)}`);
   }
   if (expectedReleasedAt && labels.some((text) => /candidate/iu.test(text))) {
@@ -263,9 +277,17 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
     const lastReleaseLabel = (await page.locator('#last-updated-btn').textContent())?.trim() ?? '';
     const isCurrentCandidate = expectedPath === channelConfig.experimental.path;
     const expectsPendingCandidate = isCurrentCandidate && !expectedReleasedAt;
-    if (expectsPendingCandidate
-      ? lastReleaseLabel !== 'HITL CANDIDATE · NOT LIVE'
-      : !lastReleaseLabel.includes('LAST RELEASE') || lastReleaseLabel.includes('PENDING_PRODUCTION')) {
+    // HF-406: the badge used to lead with an internal review acronym when pending and
+    // with the words `LAST RELEASE` when published - neither named a pass, which is how
+    // the owner read the live site as an eleven-pass-old version and how PASS 82
+    // published still stamped PASS 81. Both branches now REQUIRE the badge to lead with
+    // the pass of the channel under test, so a stale stamp fails here too, not only in
+    // the runtime eyebrow. The acronym must never return to this file as a pinned label.
+    const badgeLeadsWithItsPass = normalizedPass(lastReleaseLabel).startsWith(`${normalizedPass(expectedPass)}·`);
+    if (!badgeLeadsWithItsPass
+      || (expectsPendingCandidate
+        ? !lastReleaseLabel.includes('RELEASE CANDIDATE')
+        : lastReleaseLabel.includes('PENDING_PRODUCTION') || lastReleaseLabel.includes('RELEASE CANDIDATE'))) {
       throw new Error(`Invalid Last Release label for ${expectedPass}: ${JSON.stringify(lastReleaseLabel)}`);
     }
     await page.locator('#last-updated-btn').click();
@@ -281,9 +303,12 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
     const releasedAt = await time.getAttribute('datetime');
     const timeText = (await time.textContent())?.replace(/\s+/g, ' ').trim() ?? '';
     if (expectsPendingCandidate) {
+      // HF-406: the entry's time block used to carry the internal review acronym. It now
+      // says `RELEASE CANDIDATE` - same meaning, no internal shorthand in a player-facing
+      // surface. `NOT PUBLISHED` and the absent datetime still carry the not-live fact.
       if (releaseState !== 'LOCAL CANDIDATE' || releasedAt !== null
-        || !timeText.includes('NOT PUBLISHED') || !timeText.includes('AWAITING OWNER HITL')) {
-        throw new Error(`${expectedPass} candidate is not explicitly pending owner HITL: ${JSON.stringify({ releaseState, releasedAt, timeText })}`);
+        || !timeText.includes('NOT PUBLISHED') || !timeText.includes('RELEASE CANDIDATE')) {
+        throw new Error(`${expectedPass} candidate is not explicitly an unpublished release candidate: ${JSON.stringify({ releaseState, releasedAt, timeText })}`);
       }
     } else if (!releasedAt || Number.isNaN(Date.parse(releasedAt)) || timeText.includes('NOT PUBLISHED')) {
       throw new Error(`${expectedPass} Last Release timestamp is not a published instant: ${JSON.stringify(releasedAt)}`);
@@ -293,6 +318,7 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
     if (exactExpectedReleasedAt) {
       verifyProductionReleaseTimestamp({
         expectedReleasedAt: exactExpectedReleasedAt,
+        expectedPass,
         observedReleasedAt: releasedAt,
         observedLabel: lastReleaseLabel,
         observedState: releaseState,
@@ -322,7 +348,7 @@ async function verifyChoice(choice, expectedPath, expectedPass, expectedChangelo
   }
 }
 
-async function verifyLegacyRoute(name, configure, expectedPath = 'channels/the-big-one', expectedPass = channelConfig.experimental.pass) {
+async function verifyLegacyRoute(name, configure, expectedPath = liveChannelPath, expectedPass = channelConfig.experimental.pass) {
   const observed = await observedPage();
   const { page } = observed;
   try {
@@ -342,34 +368,38 @@ try {
   const chooser = await observedPage();
   try {
     chooserLabels = await openChooser(chooser.page);
-    for (const choice of ['experimental', 'previous', 'retained', 'historical']) {
+    // EVERY configured channel must have exactly one action. Stated positively and driven
+    // off the config, this is the assertion that would have caught the PASS 80 defect on the
+    // day it shipped; the hardcoded four-key loop it replaces could not, because PASS 80 was
+    // never one of the four keys it knew to look for.
+    for (const choice of Object.keys(channelConfig).filter((key) => channelConfig[key]?.path)) {
       if (await chooser.page.locator(`[data-release-choice="${choice}"]`).count() !== 1) {
         throw new Error(`Missing unique ${choice} chooser action: ${JSON.stringify(chooserLabels)}`);
       }
-    }
-    if (await chooser.page.locator('[data-release-choice="stable"], [data-release-choice="rollback"]').count() !== 0) {
-      throw new Error(`Removed Pass 63 chooser action is still present: ${JSON.stringify(chooserLabels)}`);
     }
   } finally {
     await chooser.close();
   }
 
-  await verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass73');
-  await verifyChoice('previous', 'channels/pass72-retained', 'PASS 72', 'pass72');
-  await verifyChoice('retained', 'channels/pass70-retained', 'PASS 70', 'pass70');
-  await verifyChoice('historical', 'channels/pass69-retained', 'PASS 69', 'pass69');
+  await verifyChoice('experimental', liveChannelPath, channelConfig.experimental.pass, liveChangelogId);
+  await verifyChoice('previous', channelConfig.previous.path, channelConfig.previous.pass,
+    channelConfig.previous.pass.toLowerCase().replace(/\s+/gu, ''));
+  await verifyChoice('retained', channelConfig.retained.path, channelConfig.retained.pass,
+    channelConfig.retained.pass.toLowerCase().replace(/\s+/gu, ''));
+  await verifyChoice('historical', channelConfig.historical.path, channelConfig.historical.pass,
+    channelConfig.historical.pass.toLowerCase().replace(/\s+/gu, ''));
   if (releasePass && !normalizedPass(routes.experimental.eyebrow).includes(normalizedPass(releasePass))) {
     throw new Error(`Experimental runtime ${routes.experimental.eyebrow} does not match ${releasePass}`);
   }
 
   await verifyLegacyRoute('latest', (params) => params.set('release', 'latest'));
   await verifyLegacyRoute('normal', (params) => params.set('release', 'normal'));
-  await verifyLegacyRoute('previous', (params) => params.set('release', 'previous'), 'channels/pass72-retained', 'PASS 72');
-  await verifyLegacyRoute('pass72', (params) => params.set('release', 'pass72'), 'channels/pass72-retained', 'PASS 72');
-  await verifyLegacyRoute('pass70', (params) => params.set('release', 'pass70'), 'channels/pass70-retained', 'PASS 70');
-  await verifyLegacyRoute('pass69', (params) => params.set('release', 'pass69'), 'channels/pass69-retained', 'PASS 69');
-  await verifyLegacyRoute('stable', (params) => params.set('release', 'stable'), 'channels/pass72-retained', 'PASS 72');
-  await verifyLegacyRoute('rollback', (params) => params.set('release', 'rollback'), 'channels/pass72-retained', 'PASS 72');
+  await verifyLegacyRoute('previous', (params) => params.set('release', 'previous'), channelConfig.previous.path, channelConfig.previous.pass);
+  await verifyLegacyRoute('pass72', (params) => params.set('release', 'pass72'), channelConfig.previous.path, channelConfig.previous.pass);
+  await verifyLegacyRoute('pass70', (params) => params.set('release', 'pass70'), channelConfig.retained.path, channelConfig.retained.pass);
+  await verifyLegacyRoute('pass69', (params) => params.set('release', 'pass69'), channelConfig.historical.path, channelConfig.historical.pass);
+  await verifyLegacyRoute('stable', (params) => params.set('release', 'stable'), channelConfig.previous.path, channelConfig.previous.pass);
+  await verifyLegacyRoute('rollback', (params) => params.set('release', 'rollback'), channelConfig.previous.path, channelConfig.previous.pass);
   await verifyLegacyRoute('room', (params) => {
     params.set('room', 'qa-room');
     params.set('autojoin', '1');

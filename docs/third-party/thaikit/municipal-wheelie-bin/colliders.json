@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "assetId": "municipal-wheelie-bin",
+  "frame": "root-local",
+  "units": "m",
+  "groundY": 0,
+  "derived": true,
+  "handTuned": false,
+  "generatedAt": "2026-09-03T12:58:26.947Z",
+  "generator": {
+    "script": "scripts/derive-colliders.mjs",
+    "version": "1.0.0",
+    "bundleSha256": "3b855dbc085bb9302da1ccbc45ab495b83b478e5b1e0d453c8e2c1fc851e082d",
+    "params": {
+      "maxParts": 4,
+      "voxel": 0.02,
+      "minLayer": 0.08,
+      "playerRadius": 0.35,
+      "stepHeight": 0.3,
+      "cylinders": true,
+      "yaw": false
+    }
+  },
+  "yaw": 0,
+  "parts": [
+    {
+      "name": "layer0-0",
+      "type": "box",
+      "offset": [
+        -0.24,
+        -0.01,
+        -0.2
+      ],
+      "scale": [
+        0.04,
+        0.05,
+        0.09
+      ],
+      "isTrigger": false
+    },
+    {
+      "name": "layer0-1",
+      "type": "box",
+      "offset": [
+        0.24,
+        -0.01,
+        -0.2
+      ],
+      "scale": [
+        0.04,
+        0.05,
+        0.09
+      ],
+      "isTrigger": false
+    },
+    {
+      "name": "layer1",
+      "type": "box",
+      "offset": [
+        0,
+        0.56,
+        0
+      ],
+      "scale": [
+        0.34,
+        0.52,
+        0.33
+      ],
+      "isTrigger": false
+    }
+  ],
+  "selfCheck": {
+    "samples": 1167,
+    "coverage": 0.9614,
+    "meanAbsDelta": 0.0494,
+    "p95AbsDelta": 0.065,
+    "maxAbsDelta": 0.1,
+    "overshoot": 0,
+    "undershoot": 0,
+    "footprintOvershoot": 0,
+    "volumeRatio": 1.306
+  },
+  "ledgesPreserved": "1/1",
+  "ledgesLost": [],
+  "trueLedges": [
+    {
+      "y": 1,
+      "area": 0.26
+    }
+  ],
+  "suggestedMassKg": 140.9,
+  "notes": []
+}

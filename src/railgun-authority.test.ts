@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { ARENA_BOUNDS, HOUSE_LAYOUT } from './arena-layout';
+import { createHouseArchitecture } from './house-navigation';
+import { NUKETOWN2_BOUNDS, NUKETOWN2_RARE_GUN_SITES } from './nuketown2-layout';
 import {
   RAILGUN_DAMAGE,
   RAILGUN_MAX_TARGET_OUTCOMES,
@@ -9,10 +12,12 @@ import {
   RAILGUN_SPAWN_DELAY_MS,
   RAILGUN_STATE_RESYNC_MS,
   RAILGUN_TOTAL_ROUNDS,
+  RAILGUN_ARENA_IDS,
   RAILGUN_UPPER_ROOM_SPAWN_SITES,
   advanceRailgunAuthority,
   advanceRailgunChamber,
   admitRailgunTargets,
+  chooseRailgunSpawnSite,
   chooseRailgunUpperRoom,
   claimRailgun,
   createRailgunBeamAuthority,
@@ -25,25 +30,105 @@ import {
   railgunStateResyncDue,
   isRailgunProtocolMessage,
   railgunThermalTargetEligible,
+  railgunSpawnSitesForArena,
   replenishRailgunAmmo,
+  railgunSpawnDelayMs,
+  RAILGUN_SPAWN_DELAY_BASE_MS,
+  RAILGUN_SPAWN_DELAY_JITTER_MS,
 } from './railgun-authority';
 
 describe('host-authoritative railgun', () => {
   it('schedules only on Nuke Town and selects each authored upper room uniformly', () => {
     expect(createRailgunAuthorityState('skyline-terminal', 10_000, 0).status).toBe('disabled');
     const scheduled = createRailgunAuthorityState('atomic-acres', 10_000, 0.5);
-    expect(scheduled).toMatchObject({ status: 'scheduled', spawnAtHostTimeMs: 10_000 + RAILGUN_SPAWN_DELAY_MS });
+    // HF-384: the delay is now 150 s +/- 30 s, derived deterministically from the same
+    // replicated randomUnit that picks the site, so this pins the FUNCTION not a literal.
+    expect(scheduled).toMatchObject({ status: 'scheduled', spawnAtHostTimeMs: 10_000 + railgunSpawnDelayMs(0.5) });
     expect([0, 0.249999, 0.25, 0.499999, 0.5, 0.749999, 0.75, 0.999999].map(chooseRailgunUpperRoom).map((site) => site.id))
       .toEqual(['aqua-front', 'aqua-front', 'aqua-rear', 'aqua-rear', 'coral-front', 'coral-front', 'coral-rear', 'coral-rear']);
     expect(new Set(RAILGUN_UPPER_ROOM_SPAWN_SITES.map((site) => site.position[1]))).toEqual(new Set([4.18]));
   });
 
-  it('spawns and announces exactly once at 180 seconds', () => {
+  // HF-384. The old sites were hand-written world coordinates authored against the
+  // pre-Pass-78 layout. When the arena was rebuilt they were never moved: none was inside
+  // a house any more and two sat at |z| = 32 against ARENA_BOUNDS of |z| <= 30, outside
+  // the map, so half of all matches put the rare weapon somewhere no player can stand.
+  // Nothing caught it - the only prior assertion on these constants checked the y value.
+  //
+  // So this does not pin the new numbers. It DERIVES the rooms from the same source the
+  // arena is built from and asserts each site is genuinely inside one. Move the houses
+  // again and this fails loudly, which is the whole point.
+  it('places every spawn inside a real upper room derived from the live house layout', () => {
+    const upperRooms = HOUSE_LAYOUT.flatMap((house) =>
+      createHouseArchitecture(house.team, house.x, house.z, house.facing).rooms
+        .filter((room) => room.level === 'upper'));
+    expect(upperRooms).toHaveLength(4);
+
+    for (const site of RAILGUN_UPPER_ROOM_SPAWN_SITES) {
+      const [x, , z] = site.position;
+      expect(x, `${site.id} x is outside ARENA_BOUNDS`)
+        .toBeGreaterThanOrEqual(ARENA_BOUNDS.minX);
+      expect(x, `${site.id} x is outside ARENA_BOUNDS`).toBeLessThanOrEqual(ARENA_BOUNDS.maxX);
+      expect(z, `${site.id} z is outside ARENA_BOUNDS`)
+        .toBeGreaterThanOrEqual(ARENA_BOUNDS.minZ);
+      expect(z, `${site.id} z is outside ARENA_BOUNDS`).toBeLessThanOrEqual(ARENA_BOUNDS.maxZ);
+
+      const containing = upperRooms.find((room) =>
+        Math.abs(x - room.centre[0]) <= room.size[0] / 2
+        && Math.abs(z - room.centre[2]) <= room.size[1] / 2);
+      expect(containing, `${site.id} at (${x}, ${z}) is not inside any authored upper room`)
+        .toBeDefined();
+    }
+
+    // One site per room: a duplicate would silently halve the spawn variety. Keyed by
+    // INDEX, not room.id - both houses name their rooms 'upper-front-room' and
+    // 'upper-rear-room', so ids are unique per house but not across the map.
+    const occupied = RAILGUN_UPPER_ROOM_SPAWN_SITES.map((site) => {
+      const [x, , z] = site.position;
+      return upperRooms.findIndex((room) =>
+        Math.abs(x - room.centre[0]) <= room.size[0] / 2
+        && Math.abs(z - room.centre[2]) <= room.size[1] / 2);
+    });
+    expect(occupied, 'every site must land in a distinct upper room').not.toContain(-1);
+    expect(new Set(occupied).size).toBe(4);
+
+    // 180-degree rotational symmetry about the origin, which the map's whole design rests on.
+    for (const site of RAILGUN_UPPER_ROOM_SPAWN_SITES) {
+      const [x, y, z] = site.position;
+      expect(RAILGUN_UPPER_ROOM_SPAWN_SITES.some((other) =>
+        Math.abs(other.position[0] + x) < 1e-6
+        && Math.abs(other.position[2] + z) < 1e-6
+        && Math.abs(other.position[1] - y) < 1e-6),
+      `${site.id} has no 180-degree partner`).toBe(true);
+    }
+  });
+
+  it('spawns and announces exactly once at its jittered spawn time', () => {
     const scheduled = createRailgunAuthorityState('atomic-acres', 1_000, 0, 7);
-    expect(advanceRailgunAuthority(scheduled, 1_000 + RAILGUN_SPAWN_DELAY_MS - 1).spawned).toBe(false);
-    const spawned = advanceRailgunAuthority(scheduled, 1_000 + RAILGUN_SPAWN_DELAY_MS);
+    const spawnDelay = railgunSpawnDelayMs(0);
+    expect(advanceRailgunAuthority(scheduled, 1_000 + spawnDelay - 1).spawned).toBe(false);
+    const spawned = advanceRailgunAuthority(scheduled, 1_000 + spawnDelay);
     expect(spawned).toMatchObject({ spawned: true, announcement: 'RARE WEAPON SPAWNED' });
     expect(advanceRailgunAuthority(spawned.state, 999_999)).toMatchObject({ spawned: false, announcement: null });
+  });
+
+  it('jitters the spawn delay deterministically, bounded, and uncorrelated with the site', () => {
+    // HF-384. Deterministic: host and guests derive the same time from the replicated
+    // unit. Bounded: never outside base +/- jitter, so the announcement window remains
+    // predictable enough to design around. Uncorrelated: the site index must not imply
+    // the spawn time, or knowing the room re-enables the clock-camp this removes.
+    const units = [0, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.999999];
+    for (const unit of units) {
+      const delay = railgunSpawnDelayMs(unit);
+      expect(delay).toBe(railgunSpawnDelayMs(unit));
+      expect(delay).toBeGreaterThanOrEqual(RAILGUN_SPAWN_DELAY_BASE_MS - RAILGUN_SPAWN_DELAY_JITTER_MS);
+      expect(delay).toBeLessThanOrEqual(RAILGUN_SPAWN_DELAY_BASE_MS + RAILGUN_SPAWN_DELAY_JITTER_MS);
+    }
+    // Same room, different times: units 0.25 and 0.4999 both choose aqua-rear.
+    expect(chooseRailgunUpperRoom(0.26).id).toBe(chooseRailgunUpperRoom(0.49).id);
+    expect(railgunSpawnDelayMs(0.26)).not.toBe(railgunSpawnDelayMs(0.49));
+    // Degenerate input stays in bounds rather than throwing or drifting.
+    expect(railgunSpawnDelayMs(Number.NaN)).toBe(railgunSpawnDelayMs(0));
   });
 
   it('orders every mutation within a generation and rejects stale equal-generation snapshots', () => {
@@ -277,5 +362,78 @@ describe('host-authoritative railgun', () => {
       type: 'railgun-claim-request', protocolVersion: 5, by: 'player-a', generation: 1,
       position: [1, 2, 3], nonce: 1,
     }, 6)).toBe(false);
+  });
+});
+
+
+// HF-407 (owner's third kept feature). The rare gun was gated on a single arena id, so
+// the Nuke Town rebuild - an arena that exists to carry the shipped map's gameplay -
+// scheduled nothing. These cases pin BOTH halves: the shipped arena is untouched, and the
+// rebuild spawns the weapon at sites DERIVED from its own house layout rather than at the
+// shipped map's coordinates, which is the failure this file's header records.
+describe('railgun arena set (HF-407)', () => {
+  it('leaves the shipped Nuke Town byte-identical', () => {
+    expect(RAILGUN_ARENA_IDS.has('atomic-acres')).toBe(true);
+    expect(railgunSpawnSitesForArena('atomic-acres')).toBe(RAILGUN_UPPER_ROOM_SPAWN_SITES);
+    // Same site for the same replicated unit, same schedule, same order as before.
+    for (const unit of [0, 0.249999, 0.25, 0.499999, 0.5, 0.749999, 0.75, 0.999999]) {
+      expect(chooseRailgunSpawnSite('atomic-acres', unit)).toBe(chooseRailgunUpperRoom(unit));
+      const state = createRailgunAuthorityState('atomic-acres', 10_000, unit);
+      expect(state.status).toBe('scheduled');
+      expect(state.spawnSite).toEqual(chooseRailgunUpperRoom(unit));
+      expect(state.spawnAtHostTimeMs).toBe(10_000 + railgunSpawnDelayMs(unit));
+    }
+  });
+
+  it('spawns the rare gun on nuketown2 at its own derived sites', () => {
+    expect(RAILGUN_ARENA_IDS.has('nuketown2')).toBe(true);
+    const sites = railgunSpawnSitesForArena('nuketown2');
+    expect(sites).not.toBeNull();
+    expect(sites).toHaveLength(NUKETOWN2_RARE_GUN_SITES.length);
+    expect(sites).toHaveLength(2);
+
+    // DERIVED, not transcribed: every site is the arena's own, to full precision.
+    for (const [index, site] of sites!.entries()) {
+      const authored = NUKETOWN2_RARE_GUN_SITES[index]!;
+      expect(site.id).toBe(authored.id);
+      expect(site.position[0]).toBe(authored.position[0]);
+      expect(site.position[1]).toBe(authored.position[1]);
+      expect(site.position[2]).toBe(authored.position[2]);
+      // Inside this arena's bounds, and NOT at a shipped-map coordinate.
+      expect(NUKETOWN2_BOUNDS.minX).toBeLessThanOrEqual(site.position[0]);
+      expect(NUKETOWN2_BOUNDS.maxX).toBeGreaterThanOrEqual(site.position[0]);
+      expect(NUKETOWN2_BOUNDS.minZ).toBeLessThanOrEqual(site.position[2]);
+      expect(NUKETOWN2_BOUNDS.maxZ).toBeGreaterThanOrEqual(site.position[2]);
+      expect(RAILGUN_UPPER_ROOM_SPAWN_SITES.some((shipped) =>
+        shipped.position[0] === site.position[0]
+        && shipped.position[1] === site.position[1]
+        && shipped.position[2] === site.position[2])).toBe(false);
+    }
+
+    // A real match on the rebuild schedules the pickup, at one of those sites, on the
+    // same delay function as the shipped map. This is the assertion that was false
+    // before HF-407: the state came back 'disabled'.
+    for (const unit of [0, 0.499999, 0.5, 0.999999]) {
+      const state = createRailgunAuthorityState('nuketown2', 10_000, unit);
+      expect(state.status).toBe('scheduled');
+      expect(state.spawnAtHostTimeMs).toBe(10_000 + railgunSpawnDelayMs(unit));
+      expect(state.pickupPosition).not.toBeNull();
+      expect(sites!.some((site) => site.id === state.spawnSite?.id)).toBe(true);
+    }
+    // Both sites are reachable by the uniform choice - one unreachable half is exactly
+    // the shipped map's HF-384 defect.
+    expect(new Set([0, 0.499999, 0.5, 0.999999]
+      .map((unit) => createRailgunAuthorityState('nuketown2', 10_000, unit).spawnSite?.id)))
+      .toEqual(new Set(sites!.map((site) => site.id)));
+  });
+
+  it('still schedules nothing on an arena that does not carry the weapon', () => {
+    expect(railgunSpawnSitesForArena('skyline-terminal')).toBeNull();
+    expect(chooseRailgunSpawnSite('skyline-terminal', 0.5)).toBeNull();
+    for (const arenaId of ['skyline-terminal', 'high-seas', 'gun-range', 'map3', 'disabled']) {
+      const state = createRailgunAuthorityState(arenaId, 10_000, 0.5);
+      expect(state.status, arenaId).toBe('disabled');
+      expect(state.spawnSite, arenaId).toBeNull();
+    }
   });
 });

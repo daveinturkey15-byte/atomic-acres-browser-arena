@@ -1,0 +1,513 @@
+{
+  "contract": "blind-ab-v1",
+  "ranAt": "2026-09-05T05:17:17.738Z",
+  "critic": "omp-muse",
+  "liveness": {
+    "ok": true,
+    "detail": "meta-contributor/muse-spark-1.3 reachable (OMP liveness output received)"
+  },
+  "seed": "candidate6-vs-7",
+  "candidates": {
+    "A": {
+      "label": "candidate6",
+      "dir": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2"
+    },
+    "B": {
+      "label": "candidate7",
+      "dir": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2"
+    }
+  },
+  "references": [
+    {
+      "path": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-garage.png",
+      "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+    },
+    {
+      "path": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-north-yard.png",
+      "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+    },
+    {
+      "path": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-nuke-street.png",
+      "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+    },
+    {
+      "path": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-overhead.png",
+      "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+    }
+  ],
+  "stations": [
+    "nuketown2-overhead",
+    "nuketown2-north-yard",
+    "nuketown2-street-centre",
+    "nuketown2-garage",
+    "nuketown2-vehicle-near",
+    "nuketown2-nuke-street"
+  ],
+  "aggregate": {
+    "contract": "blind-ab-v1",
+    "stations": 6,
+    "valid": 6,
+    "invalid": 0,
+    "invalidReasons": {},
+    "decisive": 5,
+    "ties": 1,
+    "candidates": {
+      "A": {
+        "label": "candidate6",
+        "wins": 2,
+        "winRateDecisive": 0.4,
+        "winRateWithHalfTies": 0.4167,
+        "wilson95": {
+          "low": 0.1176,
+          "high": 0.7693
+        }
+      },
+      "B": {
+        "label": "candidate7",
+        "wins": 3,
+        "winRateDecisive": 0.6,
+        "winRateWithHalfTies": 0.5833,
+        "wilson95": {
+          "low": 0.2307,
+          "high": 0.8824
+        }
+      }
+    },
+    "meanConfidence": 0.8933,
+    "claimState": "VERIFIED",
+    "separates": false
+  },
+  "rows": [
+    {
+      "station": "nuketown2-overhead",
+      "assignment": {
+        "left": "A",
+        "right": "B"
+      },
+      "valid": true,
+      "invalidReason": null,
+      "errors": [],
+      "winnerSide": "left",
+      "winner": "A",
+      "confidence": 0.85,
+      "probes": {
+        "left": {
+          "expected": "NDJA",
+          "answered": "NDJA"
+        },
+        "right": {
+          "expected": "YEUR",
+          "answered": "YEUR"
+        }
+      },
+      "images": {
+        "left": {
+          "candidate": "A",
+          "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-overhead.png",
+          "sourceSha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c",
+          "shownSha256": "fad24301717068eb92f8315e9969a51269badca2d26a96399133f83e15063dd2",
+          "leakedFields": []
+        },
+        "right": {
+          "candidate": "B",
+          "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-overhead.png",
+          "sourceSha256": "1ee079ecac28031e6d20af821598eb2a2274c6de28acda55a92877b3cc826240",
+          "shownSha256": "10cedbe70b49e7ddff13f9b3097220dd6ac57ccb0bd029c159ceedeb449db01f",
+          "leakedFields": []
+        },
+        "references": [
+          {
+            "shownAs": "reference-1.png",
+            "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+          },
+          {
+            "shownAs": "reference-2.png",
+            "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+          },
+          {
+            "shownAs": "reference-3.png",
+            "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+          },
+          {
+            "shownAs": "reference-4.png",
+            "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+          }
+        ]
+      },
+      "why": "Against the overhead reference, LEFT preserves the reference value structure in r1c1 while RIGHT breaks it: the top-block roof in r1c1 stays mid-gray with two black caps in the reference and LEFT but blows to near-white in RIGHT, and both circular-pad box trucks in r1c1 read dark in the reference and LEFT but the lower truck flips to light silver-white in RIGHT, with central compound shading in r1c1-r1c2 also darker and closer to reference in LEFT.",
+      "leftCloser": [
+        "Top-block roof value in r1c1 stays mid-gray with two black caps as in references, not overbright",
+        "Both circular-pad trucks in r1c1 stay dark as in references, not one light silver",
+        "Central road, pad and shadow contrast in r1c1-r1c2 tracks reference depth and layout"
+      ],
+      "rightCloser": [
+        "Distant conifer haze and sandy apron in r0c0-r0c2 remain broadly similar, no structural advantage"
+      ],
+      "largestDifference": {
+        "region": "r1c1",
+        "what": "lower circular-pad truck and adjacent top-block roof read dark gray/black in LEFT vs light silver/near-white in RIGHT"
+      },
+      "elapsedMs": 47528,
+      "route": "omp-muse",
+      "model": "meta-contributor/muse-spark-1.3"
+    },
+    {
+      "station": "nuketown2-north-yard",
+      "assignment": {
+        "left": "B",
+        "right": "A"
+      },
+      "valid": true,
+      "invalidReason": null,
+      "errors": [],
+      "winnerSide": "right",
+      "winner": "A",
+      "confidence": 0.96,
+      "probes": {
+        "left": {
+          "expected": "CKAW",
+          "answered": "CKAW"
+        },
+        "right": {
+          "expected": "CRCK",
+          "answered": "CRCK"
+        }
+      },
+      "images": {
+        "left": {
+          "candidate": "B",
+          "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-north-yard.png",
+          "sourceSha256": "4d262e8c4b176975045d05c2a3b32d1c4bd106001a579455a1d7ad8c5b034705",
+          "shownSha256": "4bed9cb9e9542f43df6a53d889a353707ae53376c7561946efcba3ba1e424d27",
+          "leakedFields": []
+        },
+        "right": {
+          "candidate": "A",
+          "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-north-yard.png",
+          "sourceSha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb",
+          "shownSha256": "838c98c6e3e0eaaefd1f04a22df8ffaa02fc5a5fb3f8ffc71fcc55f1ca208335",
+          "leakedFields": []
+        },
+        "references": [
+          {
+            "shownAs": "reference-1.png",
+            "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+          },
+          {
+            "shownAs": "reference-2.png",
+            "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+          },
+          {
+            "shownAs": "reference-3.png",
+            "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+          },
+          {
+            "shownAs": "reference-4.png",
+            "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+          }
+        ]
+      },
+      "why": "Structure and layout are identical in LEFT and RIGHT, but value and lighting relationships against reference-1 decide it: reference-1 shows very dark shadowed grass across r2c0-r2c2, near-black side faces on the foreground platform in r1c1-r2c1, and a deep dark-red upper house in r0c1-r1c1 with deep contact shadow under the house in r1c0-r2c0; RIGHT reproduces all of those dark values while LEFT renders lime-bright grass, green platform sides, and orange upper walls.",
+      "leftCloser": [],
+      "rightCloser": [
+        "dark shadowed grass value in r2c0-r2c2 matches reference-1 versus LEFT bright lime grass",
+        "near-black side faces of foreground platform in r1c1-r2c1 match reference-1 versus LEFT green sides",
+        "deep dark-red upper cladding in r0c1-r1c1 matches reference-1 versus LEFT orange",
+        "deep contact shadow under house and in r1c0 matches reference-1 versus LEFT lifted bright wash"
+      ],
+      "largestDifference": {
+        "region": "r2c1",
+        "what": "ground-plane and foreground-block value: LEFT bright lime grass and green block sides versus RIGHT near-black shadowed grass and black block sides"
+      },
+      "elapsedMs": 30556,
+      "route": "omp-muse",
+      "model": "meta-contributor/muse-spark-1.3"
+    },
+    {
+      "station": "nuketown2-street-centre",
+      "assignment": {
+        "left": "A",
+        "right": "B"
+      },
+      "valid": true,
+      "invalidReason": null,
+      "errors": [],
+      "winnerSide": "right",
+      "winner": "B",
+      "confidence": 0.88,
+      "probes": {
+        "left": {
+          "expected": "WDRK",
+          "answered": "WDRK"
+        },
+        "right": {
+          "expected": "KHTU",
+          "answered": "KHTU"
+        }
+      },
+      "images": {
+        "left": {
+          "candidate": "A",
+          "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-street-centre.png",
+          "sourceSha256": "bf506d1f2a746e6921f512ea38745c6ea0a316b38f1e1bf516c301eed6ea2056",
+          "shownSha256": "aa2da14700f064b9066fc26f971fe977952bfd9c0ec0ab3498162f270f7062cc",
+          "leakedFields": []
+        },
+        "right": {
+          "candidate": "B",
+          "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-street-centre.png",
+          "sourceSha256": "d262ba7fe660b561775a3f1e5b442aeaafb80de0b5531cd1592a27facf82c2f3",
+          "shownSha256": "770c258bb59e3d95cbd0a2771266425ea83adfdcf31d8416703ffd04fc9570f8",
+          "leakedFields": []
+        },
+        "references": [
+          {
+            "shownAs": "reference-1.png",
+            "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+          },
+          {
+            "shownAs": "reference-2.png",
+            "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+          },
+          {
+            "shownAs": "reference-3.png",
+            "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+          },
+          {
+            "shownAs": "reference-4.png",
+            "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+          }
+        ]
+      },
+      "why": "Both share identical layout but RIGHT preserves the reference daylight value and material read while LEFT crushes shadows to black; the asphalt road readable as mid-grey in the aerial reference is near-black in LEFT in r2c0 and r2c1, the left foreground building that should read as light siding like the white houses in the references is a solid black mass in LEFT in r1c0, and the bus body in r1c1 loses all modelling and reads black in LEFT versus dark blue-grey with highlights in RIGHT, matching the brighter balanced exposure of the reference set.",
+      "leftCloser": [],
+      "rightCloser": [
+        "road in r2c0 and r2c1 reads as mid-grey asphalt with curb and lane detail matching references instead of crushed black",
+        "left building in r1c0 retains light siding and doorway detail matching reference houses instead of solid black",
+        "bus body in r1c1 shows volume, glass and highlight modelling matching reference vehicle read instead of black silhouette",
+        "contact shadow under bus in r2c1 is soft grey with falloff matching reference daylight instead of harsh deep black"
+      ],
+      "largestDifference": {
+        "region": "r2c0",
+        "what": "road surface and left foreground are near-black featureless in LEFT versus mid-grey asphalt with visible detail in RIGHT"
+      },
+      "elapsedMs": 66824,
+      "route": "omp-muse",
+      "model": "meta-contributor/muse-spark-1.3"
+    },
+    {
+      "station": "nuketown2-garage",
+      "assignment": {
+        "left": "B",
+        "right": "A"
+      },
+      "valid": true,
+      "invalidReason": null,
+      "errors": [],
+      "winnerSide": "left",
+      "winner": "B",
+      "confidence": 0.84,
+      "probes": {
+        "left": {
+          "expected": "UMRD",
+          "answered": "UMRD"
+        },
+        "right": {
+          "expected": "RMAW",
+          "answered": "RMAW"
+        }
+      },
+      "images": {
+        "left": {
+          "candidate": "B",
+          "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-garage.png",
+          "sourceSha256": "722c1a35d1e05d0ae35f34ece82efde2b3f1d8d9970021be8e2c3ccce2431863",
+          "shownSha256": "3a2d14ecbb98508e057f44a85f34a1d58fb960c511ead9840a1595694811176e",
+          "leakedFields": []
+        },
+        "right": {
+          "candidate": "A",
+          "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-garage.png",
+          "sourceSha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142",
+          "shownSha256": "bff553a98d16c50236dd43b02175c1dbcd47bcaa275c6364e2a6687aedbd7fbe",
+          "leakedFields": []
+        },
+        "references": [
+          {
+            "shownAs": "reference-1.png",
+            "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+          },
+          {
+            "shownAs": "reference-2.png",
+            "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+          },
+          {
+            "shownAs": "reference-3.png",
+            "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+          },
+          {
+            "shownAs": "reference-4.png",
+            "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+          }
+        ]
+      },
+      "why": "Both match reference-4 structure, but LEFT preserves its value and lighting relationships: the exterior driveway in r1c1 stays the brightest evenly-sunlit plane with a light reflective car rear glass, the header panel in r0c1 stays pale blue-gray, and the side siding walls in r1c0 and r1c2 stay even off-white, while RIGHT darkens the driveway with a broad shadow, darkens the header to gray, blacks the car glass, and adds a harsh diagonal sun streak on the left wall in r1c0 not present in the reference.",
+      "leftCloser": [
+        "pale blue-gray header panel above opening in r0c1 matches reference vs dark gray in RIGHT",
+        "exterior driveway in r1c1 remains brightest evenly sunlit plane like reference vs shadow-darkened in RIGHT",
+        "left siding wall in r1c0 and right siding wall in r1c2 even off-white without harsh diagonal streak like reference",
+        "car rear glass in r1c1 light reflective like reference vs blacked out in RIGHT"
+      ],
+      "rightCloser": [
+        "wood plank deck in r2c2 deeper brown saturation slightly closer to reference plank tone",
+        "foreground mat in r2c1 darker value slightly closer to reference dark mat"
+      ],
+      "largestDifference": {
+        "region": "r1c1",
+        "what": "exterior driveway is bright evenly sunlit in LEFT but darkened by a broad shadow in RIGHT"
+      },
+      "elapsedMs": 42965,
+      "route": "omp-muse",
+      "model": "meta-contributor/muse-spark-1.3"
+    },
+    {
+      "station": "nuketown2-vehicle-near",
+      "assignment": {
+        "left": "B",
+        "right": "A"
+      },
+      "valid": true,
+      "invalidReason": null,
+      "errors": [],
+      "winnerSide": "left",
+      "winner": "B",
+      "confidence": 0.84,
+      "probes": {
+        "left": {
+          "expected": "WJHR",
+          "answered": "WJHR"
+        },
+        "right": {
+          "expected": "CWYJ",
+          "answered": "CWYJ"
+        }
+      },
+      "images": {
+        "left": {
+          "candidate": "B",
+          "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-vehicle-near.png",
+          "sourceSha256": "f3869364092e222641bdd71ad23ca83f8e4207c5b35b1f8cda3bffb3c247305c",
+          "shownSha256": "b451f5f38148086dc99019665b267f6d45046cd70b112e08f9844d130f9da383",
+          "leakedFields": []
+        },
+        "right": {
+          "candidate": "A",
+          "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-vehicle-near.png",
+          "sourceSha256": "1f6d6bd21fe167c1a53c41e3b1bee2de4ef8906fd72622b4733ae6e08069c45b",
+          "shownSha256": "ed58ffe5c4d5a9969357b9422f599d3ef307a2266ee910265d3c6b18ef124a5d",
+          "leakedFields": []
+        },
+        "references": [
+          {
+            "shownAs": "reference-1.png",
+            "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+          },
+          {
+            "shownAs": "reference-2.png",
+            "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+          },
+          {
+            "shownAs": "reference-3.png",
+            "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+          },
+          {
+            "shownAs": "reference-4.png",
+            "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+          }
+        ]
+      },
+      "why": "Structure and proportion are identical in both renders, so the decision is on material read and value relationships against the daylight references. LEFT preserves the reference daylight hierarchy in r0c2, r1c1 and r2c0-r2c1 where the sunlit building is brightest, the road is mid-value gray and the contact shadow under the car is deep but separated, while RIGHT crushes the sunlit road in r2c0-r2c1 and the sedan flank in r1c1 to near-black, losing asphalt versus paint versus shadow distinction seen in the reference set.",
+      "leftCloser": [
+        "sunlit road in r2c0-r2c1 reads as mid gray asphalt matching daylight reference values, not black",
+        "sedan side and hood in r1c1 retain dark paint versus light hood material separation with readable highlight",
+        "building facade in r0c2-r1c2 remains brightest off-white plane with siding detail",
+        "contact shadow under center car in r2c1 is deep but distinct from car body and road"
+      ],
+      "rightCloser": [],
+      "largestDifference": {
+        "region": "r2c1",
+        "what": "foreground road and under-car shadow brightness: readable gray asphalt and separated shadow in LEFT versus crushed near-black mass in RIGHT"
+      },
+      "elapsedMs": 38685,
+      "route": "omp-muse",
+      "model": "meta-contributor/muse-spark-1.3"
+    },
+    {
+      "station": "nuketown2-nuke-street",
+      "assignment": {
+        "left": "B",
+        "right": "A"
+      },
+      "valid": true,
+      "invalidReason": null,
+      "errors": [],
+      "winnerSide": "tie",
+      "winner": "tie",
+      "confidence": 0.99,
+      "probes": {
+        "left": {
+          "expected": "JHXM",
+          "answered": "JHXM"
+        },
+        "right": {
+          "expected": "UYUA",
+          "answered": "UYUA"
+        }
+      },
+      "images": {
+        "left": {
+          "candidate": "B",
+          "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-nuke-street.png",
+          "sourceSha256": "a5e72307559a81dab0dad9cbcc451583b6fe741032ed36c74a99a8ec05424cbb",
+          "shownSha256": "ec4b4c36174486f3f3a3821c84970aa310578ef68d024b0ab17494845a2497a4",
+          "leakedFields": []
+        },
+        "right": {
+          "candidate": "A",
+          "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-nuke-street.png",
+          "sourceSha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c",
+          "shownSha256": "a5c83f74d8ee0e0385df53a06a89930f248e9d3b2d0c83c9b8a1ff9735009d86",
+          "leakedFields": []
+        },
+        "references": [
+          {
+            "shownAs": "reference-1.png",
+            "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+          },
+          {
+            "shownAs": "reference-2.png",
+            "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+          },
+          {
+            "shownAs": "reference-3.png",
+            "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+          },
+          {
+            "shownAs": "reference-4.png",
+            "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+          }
+        ]
+      },
+      "why": "Both LEFT and RIGHT reproduce the reference interior close-up (reference-2/reference-4) identically across r0c0 through r2c2: same dark brown occluded field in r0c0-r1c0, same warm highlight falloff in r0c2-r1c2, and same small dark silhouette with orange base in r2c2; neither shows the exterior house, aerial layout, structure, proportion or material detail from reference-1 and reference-3 any more or less than the other.",
+      "leftCloser": [],
+      "rightCloser": [],
+      "largestDifference": {
+        "region": "r1c1",
+        "what": "no material difference between LEFT and RIGHT outside the corner probe boxes; central gradient and geometry are pixel-identical"
+      },
+      "elapsedMs": 21248,
+      "route": "omp-muse",
+      "model": "meta-contributor/muse-spark-1.3"
+    }
+  ]
+}

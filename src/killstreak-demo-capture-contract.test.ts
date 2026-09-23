@@ -159,7 +159,13 @@ function validReceipt(): KillstreakDemoCaptureReceipt {
 
 describe('Pass 66 real test-bay killstreak capture contract', () => {
   it('projects every capture ID and poster path from the canonical catalog', () => {
-    expect(KILLSTREAK_DEMO_CAPTURE_IDS).toEqual(PASS65_KILLSTREAK_CATALOG.definitions.map(({ id }) => id));
+    // Every SELECTABLE killstreak must be demoable; care-package-only weapon
+    // rewards (HF-334) are deliberately not filmed and must stay excluded.
+    expect(KILLSTREAK_DEMO_CAPTURE_IDS).toEqual(PASS65_KILLSTREAK_CATALOG.definitions
+      .filter(({ availability }) => availability !== 'care-only')
+      .map(({ id }) => id));
+    expect(KILLSTREAK_DEMO_CAPTURE_IDS).not.toContain('crimson-flamethrower');
+    expect(PASS65_KILLSTREAK_CATALOG.definitions.some(({ availability }) => availability === 'care-only')).toBe(true);
     expect(Object.keys(KILLSTREAK_DEMO_EXPECTED_PROOF).sort()).toEqual([...KILLSTREAK_DEMO_CAPTURE_IDS].sort());
     for (const id of KILLSTREAK_DEMO_CAPTURE_IDS) {
       expect(killstreakDemoPosterPath(id)).toBe(`./assets/original/killstreak-demo/${id}.jpg`);

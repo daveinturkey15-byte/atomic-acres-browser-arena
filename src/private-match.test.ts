@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { GUN_RANGE_ROUND_MS } from './gun-range-rules';
 import {
   DEFAULT_PRIVATE_MATCH_CONFIG,
+  LOBBY_KILL_LIMITS,
+  LOBBY_TIME_LIMITS_MS,
   MAX_HOST_START_FUTURE_LEAD_MS,
   MIN_RECOVERED_HOST_START_TIME_MS,
   balanceLobbyTeams,
@@ -48,6 +51,39 @@ describe('private match lobby', () => {
     expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, mode: 'tdm' })).toBe(true);
   });
 
+  it('admits every canonical arena ID and rejects compatibility aliases on the wire', () => {
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'farcrysis' })).toBe(true);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'high-seas' })).toBe(true);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'nuke-town' as 'atomic-acres' })).toBe(false);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'unknown' as 'atomic-acres' })).toBe(false);
+  });
+
+  it('HF-377: defaults to an uncapped five-minute match and admits every published limit', () => {
+    expect(DEFAULT_PRIVATE_MATCH_CONFIG.scoreLimit).toBeNull();
+    expect(DEFAULT_PRIVATE_MATCH_CONFIG.durationMs).toBe(300_000);
+    for (const scoreLimit of LOBBY_KILL_LIMITS) {
+      expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, scoreLimit })).toBe(true);
+    }
+    for (const durationMs of LOBBY_TIME_LIMITS_MS) {
+      expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, durationMs })).toBe(true);
+    }
+  });
+
+  it('HF-377: rejects kill limits that are not a bounded first-to-N target', () => {
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, scoreLimit: 0 })).toBe(false);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, scoreLimit: -25 })).toBe(false);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, scoreLimit: 1_000 })).toBe(false);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, scoreLimit: 12.5 })).toBe(false);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, scoreLimit: '25' })).toBe(false);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, scoreLimit: undefined })).toBe(false);
+  });
+
+  it('HF-377: keeps the gun-range lobby a fixed untimed-score-practice round', () => {
+    const range = { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range' as const, mode: 'ffa' as const, hostedBotCount: 0 as const, autoBalance: false, durationMs: GUN_RANGE_ROUND_MS };
+    expect(isPrivateMatchConfig(range)).toBe(true);
+    expect(isPrivateMatchConfig({ ...range, scoreLimit: 25 })).toBe(false);
+  });
+
   it('holds an identity through 89.9 seconds and expires it at 90 seconds on monotonic time', () => {
     expect(rejoinReservationExpired(1_000, 90_999)).toBe(false);
     expect(rejoinReservationExpired(1_000, 91_000)).toBe(true);
@@ -59,10 +95,10 @@ describe('private match lobby', () => {
     expect(balanceLobbyTeams(members)).toEqual(balanced);
   });
 
-  it('lets a ready host start alone or with hosted bots while still requiring every connected human ready', () => {
+  it('requires a second connected human, or a hosted bot, before start', () => {
     expect(canHostStart(snapshot())).toBe(true);
     expect(canHostStart(snapshot({ members: members.map((member, index) => index === 2 ? { ...member, ready: false } : member) }))).toBe(false);
-    expect(canHostStart(snapshot({ members: [members[0]] }))).toBe(true);
+    expect(canHostStart(snapshot({ members: [members[0]] }))).toBe(false);
     expect(canHostStart(snapshot({
       members: [{ ...members[0], ready: false }],
       config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, hostedBotCount: 4 },
@@ -73,12 +109,13 @@ describe('private match lobby', () => {
     }))).toBe(true);
     expect(canHostStart(snapshot({ members: [] }))).toBe(false);
     expect(canHostStart(snapshot({ phase: 'active' }))).toBe(false);
+    expect(canHostStart(snapshot({ members: [{ ...members[0], ready: true }, { ...members[1], connected: false }] }))).toBe(false);
   });
 
-  it('treats Start Match as the host ready commit without weakening guest readiness', () => {
+  it('requires the host readiness bit to agree with every connected guest', () => {
     expect(canHostCommitStart(snapshot({
       members: members.map((member) => member.id === 'host' ? { ...member, ready: false } : member),
-    }))).toBe(true);
+    }))).toBe(false);
     expect(canHostCommitStart(snapshot({
       members: members.map((member) => member.id === 'host' || member.id === 'b'
         ? { ...member, ready: false }
@@ -86,6 +123,14 @@ describe('private match lobby', () => {
     }))).toBe(false);
     expect(canHostCommitStart(snapshot({ members: members.filter((member) => member.id !== 'host') }))).toBe(false);
     expect(canHostCommitStart(snapshot({ phase: 'active' }))).toBe(false);
+  });
+
+  it('refuses to start when guest admission or transport connection is in flight (HF-323)', () => {
+    const readySnapshot = snapshot();
+    expect(canHostCommitStart(readySnapshot, false)).toBe(true);
+    expect(canHostCommitStart(readySnapshot, true)).toBe(false);
+    expect(canHostStart(readySnapshot, false)).toBe(true);
+    expect(canHostStart(readySnapshot, true)).toBe(false);
   });
 
   it('treats colours as presentation-only in FFA', () => {
@@ -139,6 +184,8 @@ describe('private match lobby', () => {
     expect(isLobbySnapshot(snapshot())).toBe(true);
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'rustworks-1v1' } }))).toBe(true);
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'skyline-terminal' } }))).toBe(true);
+    expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'farcrysis' } }))).toBe(true);
+    expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'high-seas' } }))).toBe(true);
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: 120_000 } }))).toBe(true);
     expect(isLobbySnapshot(snapshot({
       phase: 'active',
@@ -163,6 +210,16 @@ describe('private match lobby', () => {
     expect(isLobbySnapshot(snapshot({
       phase: 'countdown', activeAtHostTimeMs: 500 + MAX_HOST_START_FUTURE_LEAD_MS + 1, activeAtEpochMs: 2_000,
     }))).toBe(false);
+  });
+
+  it('tolerates legacy free-form squad metadata on restored members while keeping wire bounds (HF-328)', () => {
+    // HF-328: identity is prescribed (canonical AQUA/CORAL), but pre-Pass-74
+    // checkpoints and rejoin envelopes may still carry free-form values —
+    // validators stay tolerant; renderers collapse to the canonical pair.
+    const legacy = members.map((member) => ({ ...member, squadName: 'North Wing', squadColor: '#123456' }));
+    expect(isLobbySnapshot(snapshot({ members: legacy }))).toBe(true);
+    expect(isLobbySnapshot(snapshot({ members }))).toBe(true);
+    expect(isLobbySnapshot(snapshot({ members: members.map((member) => ({ ...member, squadColor: 'red' })) }))).toBe(false);
   });
 
   it('returns host and guests to a valid readyable lobby before a second match', () => {
@@ -205,5 +262,14 @@ describe('private match lobby', () => {
     expect(latencyQuality(70)).toBe('good');
     expect(latencyQuality(120)).toBe('fair');
     expect(latencyQuality(220)).toBe('poor');
+  });
+});
+
+describe('Domination lobby contract (owner 2026-08-30)', () => {
+  it('admits Domination only on Test2', () => {
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'test2', mode: 'domination' })).toBe(true);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'atomic-acres', mode: 'domination' })).toBe(false);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'test1', mode: 'domination' })).toBe(false);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'test2', mode: 'tdm' })).toBe(true);
   });
 });

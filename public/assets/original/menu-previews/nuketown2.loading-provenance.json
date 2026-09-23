@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "generator": "generate-loading-poster",
+  "arenaId": "nuketown2",
+  "camera": "nuketown2-street-centre",
+  "cameraCurated": true,
+  "sourceSha": "fca74423b89025cc6b2c3bc755000a29bd4d7058",
+  "capture": {
+    "label": "loading-poster-nuketown2",
+    "viewport": "2560x1440",
+    "samples": 1,
+    "frameSha256": "674b587e0df9b8256e2cbcb31744eec2c4280006a700551b114d812d6d25a43f"
+  },
+  "output": {
+    "path": "public/assets/original/menu-previews/nuketown2.webp",
+    "sha256": "7e115967cb62d85e23c1f51edd82533ba2714f028f1e77a2b35c5c7b758c5f34",
+    "bytes": 556302,
+    "width": 2560,
+    "height": 1440,
+    "quality": 88
+  },
+  "generatorScript": {
+    "path": "scripts/generate-loading-poster.mjs",
+    "sha256": "6b4d720e047767e8e52ffc984dcb7273941e5f84b23eeae76abfcadbb75f07f9"
+  },
+  "generatedAt": "2026-09-08T11:59:51.464Z"
+}

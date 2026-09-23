@@ -1,0 +1,109 @@
+{
+  "generatedAt": "2026-09-02T17:19:14.039Z",
+  "label": "pass85e-c",
+  "base": "http://127.0.0.1:41948",
+  "gitSha": "bf92195dc6fc8f6fe18bd446d3178caac0fe7da0",
+  "method": "in-place environment suppression on the shipped build; suppressed = pre-2026-08-31 presented state",
+  "isGate": false,
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "seed": "iblparity",
+  "machine": {
+    "comfyUi": "absent",
+    "gpuFreeMiB": 14806,
+    "gpuTotalMiB": 16303
+  },
+  "arenas": {
+    "farcrysis": {
+      "ok": true,
+      "backend": "webgpu",
+      "adapter": {
+        "gpu": true,
+        "adapter": true,
+        "device": true
+      },
+      "observation": {
+        "reviewCameraIds": [
+          "farcrysis-beach-golden",
+          "farcrysis-jungle-dapple",
+          "farcrysis-core-interior",
+          "farcrysis-seaplane-throwback",
+          "farcrysis-island-topdown",
+          "farcrysis-west-shoreline"
+        ],
+        "sceneEnvironment": "pass64-arena-environment-farcrysis-256",
+        "sceneEnvironmentIntensity": 0.18,
+        "sceneBackground": "pass66-sky-backdrop-jungle-golden-hour",
+        "published": {
+          "arenaId": "farcrysis",
+          "reflectionQuality": "high",
+          "present": true,
+          "environmentName": "pass64-arena-environment-farcrysis-256",
+          "environmentIntensity": 0.18,
+          "expectedEnvironmentIntensity": 0.18,
+          "matchesIblState": true,
+          "sourceTextureName": "pass66-sky-backdrop-jungle-golden-hour",
+          "resolutionTier": 256,
+          "generatedCubeSize": 2048
+        }
+      },
+      "shots": [
+        {
+          "cameraId": "farcrysis-beach-golden",
+          "ok": true,
+          "heldName": "pass64-arena-environment-farcrysis-256",
+          "heldIntensity": 0.18,
+          "suppressedEnvironment": null,
+          "suppressedIntensity": 1,
+          "restored": {
+            "environment": "pass64-arena-environment-farcrysis-256",
+            "intensity": 0.18
+          },
+          "meanLuminanceSuppressed": 0.2859,
+          "meanLuminanceShipped": 0.2943,
+          "meanLuminanceDeltaPercent": 2.93,
+          "pixelsMovedPercent": 33.5,
+          "meanAbsDelta": 0.00848,
+          "floorLuminancePercent": 0.01,
+          "floorPixelsMovedPercent": 0
+        },
+        {
+          "cameraId": "farcrysis-jungle-dapple",
+          "ok": true,
+          "heldName": "pass64-arena-environment-farcrysis-256",
+          "heldIntensity": 0.18,
+          "suppressedEnvironment": null,
+          "suppressedIntensity": 1,
+          "restored": {
+            "environment": "pass64-arena-environment-farcrysis-256",
+            "intensity": 0.18
+          },
+          "meanLuminanceSuppressed": 0.1619,
+          "meanLuminanceShipped": 0.1717,
+          "meanLuminanceDeltaPercent": 6.06,
+          "pixelsMovedPercent": 47.2,
+          "meanAbsDelta": 0.00996,
+          "floorLuminancePercent": 0.01,
+          "floorPixelsMovedPercent": 0
+        }
+      ],
+      "errors": [],
+      "combat": {
+        "hp": 100,
+        "alive": true,
+        "lowHealthOpacity": 0,
+        "lowHealthActive": false,
+        "damageMarkerOpacity": 0
+      },
+      "combatAfter": {
+        "hp": 100,
+        "alive": true,
+        "lowHealthOpacity": 0,
+        "lowHealthActive": false,
+        "damageMarkerOpacity": 0
+      }
+    }
+  }
+}

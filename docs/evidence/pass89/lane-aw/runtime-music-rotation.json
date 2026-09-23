@@ -1,0 +1,46 @@
+{
+  "producedBy": "vitest run src/audio-music-rotation-runtime.test.ts (LANE_AW_EVIDENCE=1)",
+  "harness": "ArenaAudio on an instrumented AudioContext, 18000 frames at 60 Hz",
+  "seed": 20260903,
+  "gain": {
+    "previous": 0.054,
+    "halved": 0.027,
+    "ratio": 0.5
+  },
+  "virtualSeconds": 300,
+  "frames": 18000,
+  "rotation": [
+    {
+      "track": "bunker-lullaby",
+      "startedAtSeconds": 0.12,
+      "durationSeconds": 90,
+      "barSeconds": 2.7273,
+      "tempoBpm": 88,
+      "leadWaveform": "triangle"
+    },
+    {
+      "track": "fallout-drift",
+      "startedAtSeconds": 90.12,
+      "durationSeconds": 90,
+      "barSeconds": 2.5,
+      "tempoBpm": 96,
+      "leadWaveform": "sawtooth"
+    },
+    {
+      "track": "static-vault",
+      "startedAtSeconds": 180.12,
+      "durationSeconds": 90,
+      "barSeconds": 2.1429,
+      "tempoBpm": 112,
+      "leadWaveform": "square"
+    },
+    {
+      "track": "cobalt-circuit",
+      "startedAtSeconds": 270.12,
+      "durationSeconds": 90,
+      "barSeconds": 1.875,
+      "tempoBpm": 128,
+      "leadWaveform": "square"
+    }
+  ]
+}

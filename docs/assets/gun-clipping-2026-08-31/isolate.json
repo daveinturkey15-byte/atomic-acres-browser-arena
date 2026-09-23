@@ -1,0 +1,794 @@
+{
+  "openBaseline": {
+    "cameraFov": 82,
+    "cameraNear": 0.08,
+    "parts": [
+      {
+        "name": "Pass65_Arms_Batch_Sleeve",
+        "frustumCulled": false,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_Arms_Sleeve_PBR",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 2388,
+        "camMin": [
+          -0.9662330629698239,
+          -0.966108598371129,
+          -2.930727065053194
+        ],
+        "camMax": [
+          1.6468361120560253,
+          0.25715811617270035,
+          0.6559341239528074
+        ],
+        "screenX": [
+          483.80029253486333,
+          789.9708024405581
+        ],
+        "screenY": [
+          318.4282260068802,
+          516.1795867151324
+        ],
+        "boundingSphereRadius": 1.1611223638905517
+      },
+      {
+        "name": "Pass65_Arms_Batch_Glove",
+        "frustumCulled": false,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_Arms_Glove_PBR",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 3010,
+        "camMin": [
+          -1.5289017456948208,
+          -0.836778731064939,
+          -2.900957012634361
+        ],
+        "camMax": [
+          2.206053133247206,
+          0.12994103002456514,
+          0.6023045034959829
+        ],
+        "screenX": [
+          366.8483146776982,
+          879.067709707349
+        ],
+        "screenY": [
+          336.78489710429665,
+          509.4978479002069
+        ],
+        "boundingSphereRadius": 1.3245183157161757
+      },
+      {
+        "name": "Pass65_Arms_Batch_Skin",
+        "frustumCulled": false,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_Arms_FingerGlove_PBR",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 2702,
+        "camMin": [
+          -1.5083615852938053,
+          -0.9340904185203547,
+          -2.8289643754236664
+        ],
+        "camMax": [
+          2.1878935182018857,
+          0.22687345835283823,
+          0.5436146163794362
+        ],
+        "screenX": [
+          362.2274189236367,
+          25446.790963065236
+        ],
+        "screenY": [
+          -2212.3383746078753,
+          10950.91110241975
+        ],
+        "boundingSphereRadius": 1.2007168363894478
+      },
+      {
+        "name": "Pass65_Arms_Batch_WristAccent",
+        "frustumCulled": false,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_Arms_WristAccent_PBR",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 1644,
+        "camMin": [
+          -1.4549988143516082,
+          -0.7771900071681488,
+          -2.43484391708202
+        ],
+        "camMax": [
+          2.1324465881011925,
+          0.07020976481477925,
+          0.13691824167723965
+        ],
+        "screenX": [
+          313.8950866532381,
+          2601.741938782577
+        ],
+        "screenY": [
+          295.4106025830843,
+          1074.975108859392
+        ],
+        "boundingSphereRadius": 1.1617621330592331
+      },
+      {
+        "name": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Gunmetal",
+        "frustumCulled": true,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_carbine_Gunmetal",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 2460,
+        "camMin": [
+          0.1507239549498003,
+          -0.3720851191422907,
+          -1.9486016698206363
+        ],
+        "camMax": [
+          0.4805935196697355,
+          -0.229922678788409,
+          -0.6019275614318822
+        ],
+        "screenX": [
+          672.2976513522428,
+          962.1114589793317
+        ],
+        "screenY": [
+          408.8650705867964,
+          615.9984329053907
+        ],
+        "boundingSphereRadius": 1.0076669399165048
+      },
+      {
+        "name": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Lens",
+        "frustumCulled": true,
+        "layerMask": 12,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_carbine_Lens",
+        "depthTest": true,
+        "opacity": 0.02,
+        "visibleTris": 188,
+        "camMin": [
+          0.27438021144345015,
+          -0.16073280208184149,
+          -1.1864525252904308
+        ],
+        "camMax": [
+          0.3961866944409316,
+          -0.07247846309835437,
+          -1.1483844854509542
+        ],
+        "screenX": [
+          737.5503681506998,
+          780.2334564920557
+        ],
+        "screenY": [
+          385.29869139725884,
+          417.9637728915519
+        ],
+        "boundingSphereRadius": 1.2462850933870016
+      },
+      {
+        "name": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Polymer_PBR",
+        "frustumCulled": true,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_carbine_Polymer_PBR",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 1320,
+        "camMin": [
+          0.1316574872052989,
+          -0.7144005584274331,
+          -1.752357928255659
+        ],
+        "camMax": [
+          0.5522143187893214,
+          -0.23505478053619688,
+          -0.5093630307118424
+        ],
+        "screenX": [
+          671.7778195262374,
+          1058.8893071162051
+        ],
+        "screenY": [
+          415.55021156844236,
+          940.8363816515771
+        ],
+        "boundingSphereRadius": 1.0865439615006771
+      },
+      {
+        "name": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+        "frustumCulled": true,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_carbine_Primary_PBR",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 6444,
+        "camMin": [
+          0.07572367947703995,
+          -0.6493321159387275,
+          -1.972411791809403
+        ],
+        "camMax": [
+          0.4987985276966995,
+          -0.04273553285263376,
+          -0.8902314776129927
+        ],
+        "screenX": [
+          656.2497856221,
+          861.4517589799163
+        ],
+        "screenY": [
+          368.97286182473977,
+          662.0670707243399
+        ],
+        "boundingSphereRadius": 1.1747996160509617
+      },
+      {
+        "name": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Rubber",
+        "frustumCulled": true,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_carbine_Rubber",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 280,
+        "camMin": [
+          0.09103890110899826,
+          -0.5114346297414989,
+          -1.9753688311488204
+        ],
+        "camMax": [
+          0.5593212337447042,
+          -0.26057267118412186,
+          -0.4705129303701412
+        ],
+        "screenX": [
+          659.4464011151514,
+          1096.773184584723
+        ],
+        "screenY": [
+          414.6286476100449,
+          810.1506118929663
+        ],
+        "boundingSphereRadius": 1.0232381085947941
+      },
+      {
+        "name": "carbine_FP_LOD0_Runtime_action_MAT_Pass65_carbine_Gunmetal",
+        "frustumCulled": true,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_carbine_Gunmetal",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 756,
+        "camMin": [
+          0.18426815624687265,
+          -0.5514622975198056,
+          -1.232396291797187
+        ],
+        "camMax": [
+          0.37202976183560565,
+          -0.28149581390569267,
+          -0.9702300045280126
+        ],
+        "screenX": [
+          703.2745207499148,
+          794.5970506767508
+        ],
+        "screenY": [
+          454.5934368396584,
+          595.3859689730026
+        ],
+        "boundingSphereRadius": 1.4441736194101766
+      },
+      {
+        "name": "carbine_FP_LOD0_Runtime_magazine_MAT_Pass65_carbine_Gunmetal",
+        "frustumCulled": true,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_carbine_Gunmetal",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 444,
+        "camMin": [
+          0.24200045808958492,
+          -0.771521568496812,
+          -1.3163360005747045
+        ],
+        "camMax": [
+          0.40449454731700385,
+          -0.48354434467301766,
+          -1.1507862815364085
+        ],
+        "screenX": [
+          717.6044815863014,
+          782.4807565681181
+        ],
+        "screenY": [
+          512.1279441186542,
+          637.646908697261
+        ],
+        "boundingSphereRadius": 1.2165025485339092
+      }
+    ],
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -27.0000057220459,
+        1.7000975394248963,
+        19.99997901916504
+      ],
+      "yawRadians": 4.712,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": null
+        }
+      ],
+      "nearestForwardMeters": null,
+      "nearestColliderBounds": null,
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 0,
+        "highReadyBlend": 0,
+        "fireBlocked": false,
+        "blockReason": "open-space",
+        "spreadPenaltyRadians": 0,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    }
+  },
+  "postContact": {
+    "cameraFov": 82,
+    "cameraNear": 0.08,
+    "parts": [
+      {
+        "name": "Pass65_Arms_Batch_Sleeve",
+        "frustumCulled": false,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_Arms_Sleeve_PBR",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 2388,
+        "camMin": [
+          -0.5615081751591049,
+          -1.8872896981661509,
+          -2.1135229695193676
+        ],
+        "camMax": [
+          1.2487781099388044,
+          0.8016002585967947,
+          0.4165714058998944
+        ],
+        "screenX": [
+          203.35993099071672,
+          2426.3663511525233
+        ],
+        "screenY": [
+          113.12743502257887,
+          2849.130777020029
+        ],
+        "boundingSphereRadius": 1.1611223638905517
+      },
+      {
+        "name": "Pass65_Arms_Batch_Glove",
+        "frustumCulled": false,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_Arms_Glove_PBR",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 3010,
+        "camMin": [
+          -1.0176062882967258,
+          -1.7666239973117714,
+          -1.9821525570239622
+        ],
+        "camMax": [
+          1.704653652360271,
+          0.6960313726729166,
+          0.27347303325831973
+        ],
+        "screenX": [
+          -283.1551580128298,
+          3121.188033726613
+        ],
+        "screenY": [
+          142.4550816912176,
+          2592.777625746613
+        ],
+        "boundingSphereRadius": 1.3245183157161757
+      },
+      {
+        "name": "Pass65_Arms_Batch_Skin",
+        "frustumCulled": false,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_Arms_FingerGlove_PBR",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 2702,
+        "camMin": [
+          -1.0160672669809898,
+          -1.7844902475947841,
+          -1.9994471366125506
+        ],
+        "camMax": [
+          1.703537412695809,
+          0.7058924903970332,
+          0.29782511650508425
+        ],
+        "screenX": [
+          -102.19350941515145,
+          2535.0096932950773
+        ],
+        "screenY": [
+          122.45904583469125,
+          2087.524237094925
+        ],
+        "boundingSphereRadius": 1.2007168363894478
+      },
+      {
+        "name": "Pass65_Arms_Batch_WristAccent",
+        "frustumCulled": false,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_Arms_WristAccent_PBR",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 1644,
+        "camMin": [
+          -1.00735995268532,
+          -1.4613713184640722,
+          -1.6918314473074947
+        ],
+        "camMax": [
+          1.6945686425443895,
+          0.3902706797089128,
+          -0.016511766868154254
+        ],
+        "screenX": [
+          -2718.363390131476,
+          41633.688250265295
+        ],
+        "screenY": [
+          213.44993594621116,
+          19772.260305094194
+        ],
+        "boundingSphereRadius": 1.1617621330592331
+      },
+      {
+        "name": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Gunmetal",
+        "frustumCulled": true,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_carbine_Gunmetal",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 2460,
+        "camMin": [
+          0.274305190197893,
+          -0.8648955882163534,
+          -1.299599836397089
+        ],
+        "camMax": [
+          0.39721690869822623,
+          -0.0018886282075210037,
+          -0.4864404151429724
+        ],
+        "screenX": [
+          730.6245729145074,
+          969.585136249689
+        ],
+        "screenY": [
+          360.64382973200486,
+          1027.8895136627898
+        ],
+        "boundingSphereRadius": 1.0076669399165048
+      },
+      {
+        "name": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Lens",
+        "frustumCulled": true,
+        "layerMask": 12,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_carbine_Lens",
+        "depthTest": true,
+        "opacity": 0.02,
+        "visibleTris": 188,
+        "camMin": [
+          0.2752757463704256,
+          -0.43079255309611963,
+          -0.7593636129699011
+        ],
+        "camMax": [
+          0.37700721947011573,
+          -0.3653266465488565,
+          -0.6957427658860436
+        ],
+        "screenX": [
+          793.541356628017,
+          860.6820482348987
+        ],
+        "screenY": [
+          574.6784262056373,
+          597.759308291133
+        ],
+        "boundingSphereRadius": 1.2462850933870016
+      },
+      {
+        "name": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Polymer_PBR",
+        "frustumCulled": true,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_carbine_Polymer_PBR",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 1320,
+        "camMin": [
+          0.2360314591035717,
+          -1.100297660597051,
+          -1.3858790179735223
+        ],
+        "camMax": [
+          0.4694148477751412,
+          -0.12168681006392945,
+          -0.44262540393629024
+        ],
+        "screenX": [
+          720.6941012155539,
+          1047.378493507637
+        ],
+        "screenY": [
+          405.68951525680774,
+          1138.7173175376317
+        ],
+        "boundingSphereRadius": 1.0865439615006771
+      },
+      {
+        "name": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Primary_PBR",
+        "frustumCulled": true,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_carbine_Primary_PBR",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 6444,
+        "camMin": [
+          0.20228408634355333,
+          -0.8415194694320847,
+          -1.4676431173781808
+        ],
+        "camMax": [
+          0.46560540043098797,
+          0.10967307152683015,
+          -0.541221045027239
+        ],
+        "screenX": [
+          709.22337005678,
+          963.342239586806
+        ],
+        "screenY": [
+          319.091899631873,
+          750.5090473442364
+        ],
+        "boundingSphereRadius": 1.1747996160509617
+      },
+      {
+        "name": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Rubber",
+        "frustumCulled": true,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_carbine_Rubber",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 280,
+        "camMin": [
+          0.23065025757719582,
+          -1.0145611487970898,
+          -1.3907923099916726
+        ],
+        "camMax": [
+          0.45629311511888204,
+          -0.004509750504138932,
+          -0.4360918532247826
+        ],
+        "screenX": [
+          713.9797812390159,
+          1056.414915974358
+        ],
+        "screenY": [
+          361.50643676998084,
+          1184.3275778484472
+        ],
+        "boundingSphereRadius": 1.0232381085947941
+      },
+      {
+        "name": "carbine_FP_LOD0_Runtime_action_MAT_Pass65_carbine_Gunmetal",
+        "frustumCulled": true,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_carbine_Gunmetal",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 756,
+        "camMin": [
+          0.2244150749461724,
+          -0.7414945949154326,
+          -1.017888875697471
+        ],
+        "camMax": [
+          0.36688901231600113,
+          -0.44829562903039855,
+          -0.7285065989465824
+        ],
+        "screenX": [
+          739.0969124082106,
+          837.6765484744999
+        ],
+        "screenY": [
+          576.4857578932398,
+          705.4902588282368
+        ],
+        "boundingSphereRadius": 1.4441736194101766
+      },
+      {
+        "name": "carbine_FP_LOD0_Runtime_magazine_MAT_Pass65_carbine_Gunmetal",
+        "frustumCulled": true,
+        "layerMask": 4,
+        "renderOrder": 0,
+        "material": "MAT_Pass65_carbine_Gunmetal",
+        "depthTest": true,
+        "opacity": 1,
+        "visibleTris": 444,
+        "camMin": [
+          0.29309475108747307,
+          -0.7556621252926754,
+          -1.182386685652748
+        ],
+        "camMax": [
+          0.4274382634628964,
+          -0.5092388463775777,
+          -0.9349474854084256
+        ],
+        "screenX": [
+          749.8129105388601,
+          820.282752950439
+        ],
+        "screenY": [
+          568.4065660404223,
+          643.1034634801283
+        ],
+        "boundingSphereRadius": 1.2165025485339092
+      }
+    ],
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -34.500003814697266,
+        1.7051914715766907,
+        10.711097717285156
+      ],
+      "yawRadians": 0,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.259
+        }
+      ],
+      "nearestForwardMeters": 0.259,
+      "nearestColliderBounds": {
+        "minX": -34.806,
+        "maxX": -34.194,
+        "minZ": 9.693999999999999,
+        "maxZ": 10.306000000000001,
+        "minY": 0,
+        "maxY": 3.6
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    }
+  },
+  "hiddenRoots": 27
+}

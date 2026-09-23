@@ -1,0 +1,33 @@
+{
+ "contract": "farcrysis-solo-60s-v1",
+ "measuredAt": "2026-09-02T23:42:38.864Z",
+ "arena": "farcrysis",
+ "url": "http://127.0.0.1:4180",
+ "seconds": 60,
+ "path": "real menu: callsign field, .map-card, #solo - no debug API is used to enter the match",
+ "ok": true,
+ "stoppedAt": null,
+ "admittedMs": 89892,
+ "pageErrorsBeforeHold": 0,
+ "consoleErrorsBeforeHold": 0,
+ "hold": {
+  "frames": 1967,
+  "meanFps": 32.8,
+  "p50FrameMs": 30.3,
+  "p95FrameMs": 40.7,
+  "p99FrameMs": 47.4,
+  "worstFrameMs": 115.5,
+  "gapsOver1000ms": 0,
+  "longFramesOver33ms": 515
+ },
+ "snapshotAfterHold": {
+  "matchPhase": "active",
+  "gameStarted": true,
+  "arena": null
+ },
+ "pageErrorsDuringHold": [],
+ "consoleErrorsDuringHold": [],
+ "stillActive": true,
+ "pageErrorsAll": [],
+ "consoleErrorsAll": []
+}

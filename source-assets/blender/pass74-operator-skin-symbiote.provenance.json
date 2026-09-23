@@ -1,0 +1,69 @@
+{
+  "id": "pass74-operator-skin-symbiote",
+  "title": "Carapace Bulwark - original operator archetype skin (symbiote)",
+  "creator": "Atomic Acres project",
+  "created": "2026-08-22",
+  "license": "Project-original; no third-party assets",
+  "inspirationBoundary": "Project-original operator archetypes authored for Atomic Acres. Broad archetype spirit only (adventurous explorer, bulky symbiote-like composite, naval special operations); no franchise likeness, trademarked names, copied characters, extracted assets, or licensed geometry.",
+  "blenderVersion": "5.1.2",
+  "generator": "scripts/blender/create-pass74-operator-archetype-skins.py",
+  "sourceSpec": "source-assets/blender/pass74-operator-skin-specs.json",
+  "sourceBlend": "source-assets/blender/pass74-operator-skin-symbiote.blend",
+  "sourceBlendSha256": "799470d1a116fe889ba5b12e3d842c697c60b6e4e6ee3d44bd3d16d3f1b341f5",
+  "sourceGltf": "public/assets/third-party/quaternius/ultimate-modular-males/Swat.gltf",
+  "canonicalRig": {
+    "animationClipCount": 24,
+    "jointCount": 62,
+    "materialNames": [
+      "Skin",
+      "Swat",
+      "Swat_Black",
+      "Visor"
+    ],
+    "rigId": "pass65-third-person-operator-family-v1",
+    "skeletonAndClipsUntouched": true
+  },
+  "silhouette": {
+    "accessoryScale": 1.0,
+    "clamped": false,
+    "maxSilhouetteScale": 1.1,
+    "measuredScale": 1.0022
+  },
+  "requestedProportions": {
+    "limbThicknessMultiplier": 1.1,
+    "shoulderWidthMultiplier": 1.12,
+    "torsoBulkMultiplier": 1.16
+  },
+  "effectiveProportions": {
+    "limbThicknessMultiplier": 1.1,
+    "shoulderWidthMultiplier": 1.12,
+    "torsoBulkMultiplier": 1.16
+  },
+  "accessories": [
+    "grafted-chest-plate-harness",
+    "spine-ridge-back-lashing",
+    "forearm-guard-wraps",
+    "hip-armor-lashings",
+    "knee-guard-straps",
+    "sealed-lens-visor-variant"
+  ],
+  "deliveries": [
+    {
+      "path": "artifacts/blender-operator-skins/raw/pass74-operator-skin-symbiote-lod0.glb",
+      "sha256": "13e2ccaf29d0615c2328564a72491501ae5fbd39459c9288626efa5556f3dbe2",
+      "bytes": 5706668
+    },
+    {
+      "path": "artifacts/blender-operator-skins/raw/pass74-operator-skin-symbiote-lod1.glb",
+      "sha256": "2fd7035e760e94301eb3d5566183205a8e7f09031cba98d61f0bec91357ae663",
+      "bytes": 4841768
+    },
+    {
+      "path": "artifacts/blender-operator-skins/raw/pass74-operator-skin-symbiote-lod2.glb",
+      "sha256": "3756a517fe59b408555c5d905b509b881b609597dfe859b92062e417fb3f0de5",
+      "bytes": 4543140
+    }
+  ],
+  "integrationStatus": "STAGED, NOT WIRED. No runtime importer, protocol field, lobby affordance or replication path consumes these GLBs. They are deliverable assets awaiting an integration lane, and must not be read as a closed defect (HF-364).",
+  "licenceNote": "Authored from the vendored CC0 source operator with procedural Blender geometry. MiniMax H3 was available locally for texture/concept assistance and is NOT for distribution; if a published build ever ships assets derived from it, revisit the licence position at release time."
+}
