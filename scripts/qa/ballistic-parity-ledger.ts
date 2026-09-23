@@ -130,7 +130,34 @@ export const ACCEPTED_SHOOT_THROUGH: Readonly<Record<string, readonly AcceptedSh
   // for the authority pass to rate, not a row to add here to turn the gate
   // green (see the header rule). The gate below measures the blockout's
   // presentation-only meshes against ceiling 0 until that pass lands.
-  'newworld-prime': [],
+  //
+  // Authority pass (2026-09-23): everything substantial now carries real
+  // authority (fences, vehicles, roofs, siding skins - see
+  // newworld-prime-authority.ts). What remains is the two presentation
+  // families that are shoot-through BY DESIGN, both matching the arena's own
+  // walk-through ledger rows:
+  //   - dusk window-glow cards (scale-read pass): 0.02 m emissive film
+  //     spanning an OPEN window reveal - the aperture is the design, and a
+  //     bullet that crosses the film must keep flying into the reveal.
+  //   - hedge blobs (props fact 7): shrub dressing a player walks through
+  //     (Direction B accepted rows in collider-visual-parity-gate.test.ts);
+  //     stopping bullets in walk-through shrubs would make soft cover hard.
+  'newworld-prime': [
+    { name: 'newworld-prime-glow-east-s0-0', count: 1, reason: 'emissive dusk-glow film over an open window reveal; the aperture is the design' },
+    { name: 'newworld-prime-glow-east-s0-1', count: 1, reason: 'emissive dusk-glow film over an open window reveal; the aperture is the design' },
+    { name: 'newworld-prime-glow-west-s0-0', count: 1, reason: 'emissive dusk-glow film over an open window reveal; the aperture is the design' },
+    { name: 'newworld-prime-glow-west-s0-1', count: 1, reason: 'emissive dusk-glow film over an open window reveal; the aperture is the design' },
+    { name: 'newworld-prime-newworld-prime-hedge-north-hedge-blob-0', count: 1, reason: 'shrub dressing, by-design walk-through (fact 7); soft cover must not stop rounds' },
+    { name: 'newworld-prime-newworld-prime-hedge-north-hedge-blob-1', count: 1, reason: 'shrub dressing, by-design walk-through (fact 7); soft cover must not stop rounds' },
+    { name: 'newworld-prime-newworld-prime-hedge-north-hedge-blob-2', count: 1, reason: 'shrub dressing, by-design walk-through (fact 7); soft cover must not stop rounds' },
+    { name: 'newworld-prime-newworld-prime-hedge-north-hedge-blob-3', count: 1, reason: 'shrub dressing, by-design walk-through (fact 7); soft cover must not stop rounds' },
+    { name: 'newworld-prime-newworld-prime-hedge-north-hedge-blob-4', count: 1, reason: 'shrub dressing, by-design walk-through (fact 7); soft cover must not stop rounds' },
+    { name: 'newworld-prime-newworld-prime-hedge-south-hedge-blob-0', count: 1, reason: 'shrub dressing, by-design walk-through (fact 7); soft cover must not stop rounds' },
+    { name: 'newworld-prime-newworld-prime-hedge-south-hedge-blob-1', count: 1, reason: 'shrub dressing, by-design walk-through (fact 7); soft cover must not stop rounds' },
+    { name: 'newworld-prime-newworld-prime-hedge-south-hedge-blob-2', count: 1, reason: 'shrub dressing, by-design walk-through (fact 7); soft cover must not stop rounds' },
+    { name: 'newworld-prime-newworld-prime-hedge-south-hedge-blob-3', count: 1, reason: 'shrub dressing, by-design walk-through (fact 7); soft cover must not stop rounds' },
+    { name: 'newworld-prime-newworld-prime-hedge-south-hedge-blob-4', count: 1, reason: 'shrub dressing, by-design walk-through (fact 7); soft cover must not stop rounds' },
+  ],
   'gun-range': [
     // Merged static presentation batch spanning the tall test-bay shell. Every
     // source wall is individually registered with an authored material

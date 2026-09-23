@@ -90,7 +90,14 @@ export const NEWWORLD_PRIME_SCALE_READ_FENCE_CLOSURES: readonly (
   // East lot street side (x=9.8 threads house wall 9.6 / road edge 9.5):
   // entry gap z -3.5..1.8 walks to the door (door world z = 1.763).
   Object.freeze({ id: 'newworld-prime-fence-lot-east-street-north', x: 9.8, z: -3.5, rotationY: Math.PI / 2, bays: 6 }),
-  Object.freeze({ id: 'newworld-prime-fence-lot-east-street-south', x: 9.8, z: 16.2, rotationY: Math.PI / 2, bays: 6 }),
+  // 5 bays, not 6: the nominal entry gap (z -3.5..1.8) is unwalkable - the
+  // east house occupies z -4.7..1.7 at this x, so the real gap between the
+  // house's north wall and the first south bay was 1.3 m of fence-free strip,
+  // too tight for the 0.88 m player capsule to thread with margins and enough
+  // to leave the bot flood-fill no 1 m cell (spawn-layout route row). Five
+  // bays end the run at z 5.4, opening a 3.7 m door gap that both the player
+  // and the bot can actually walk.
+  Object.freeze({ id: 'newworld-prime-fence-lot-east-street-south', x: 9.8, z: 16.2, rotationY: Math.PI / 2, bays: 5 }),
   // East outer line extension: meets fence-east (z -8 -> -22.4) at its head.
   Object.freeze({ id: 'newworld-prime-fence-lot-east-outer-north', x: 26, z: 16.2, rotationY: Math.PI / 2, bays: 10 }),
 ]);

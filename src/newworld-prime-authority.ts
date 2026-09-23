@@ -7,6 +7,9 @@ import type { Team } from './protocol';
 import {
   NEWWORLD_PRIME_FENCE_BAY_LENGTH_METRES,
   NEWWORLD_PRIME_PRIVACY_FENCE_RUNS,
+  NEWWORLD_PRIME_RUSTY_CAR_LENGTH_METRES,
+  NEWWORLD_PRIME_RUSTY_CAR_PLACEMENT,
+  NEWWORLD_PRIME_RUSTY_CAR_WIDTH_METRES,
   NEWWORLD_PRIME_SCHOOL_BUS_LENGTH_METRES,
   NEWWORLD_PRIME_SCHOOL_BUS_PLACEMENT,
   NEWWORLD_PRIME_SCHOOL_BUS_WIDTH_METRES,
@@ -18,8 +21,29 @@ import {
   NEWWORLD_PRIME_SHED_DEPTH_METRES,
   NEWWORLD_PRIME_SHED_PLACEMENTS,
   NEWWORLD_PRIME_SHED_WIDTH_METRES,
+  NEWWORLD_PRIME_SIGN_BOARD_HEIGHT_METRES,
+  NEWWORLD_PRIME_SIGN_BOARD_WIDTH_METRES,
+  NEWWORLD_PRIME_WELCOME_SIGN_PLACEMENT,
 } from './newworld-prime-props';
+import {
+  NEWWORLD_PRIME_EAST_YELLOW_D_M,
+  NEWWORLD_PRIME_EAST_YELLOW_W_M,
+  NEWWORLD_PRIME_ROOF_OVERHANG_M,
+  NEWWORLD_PRIME_ROOF_RISE_M,
+  NEWWORLD_PRIME_ROOF_SLAB_THICKNESS_MM,
+  NEWWORLD_PRIME_STOREY_HEIGHT_M,
+  NEWWORLD_PRIME_WEST_TEAL_D_M,
+  NEWWORLD_PRIME_WEST_TEAL_W_M,
+} from './newworld-prime-structures';
+import { NEWWORLD_PRIME_SCALE_READ_FENCE_CLOSURES } from './newworld-prime-scale-read';
 import { newworldPrimeHouseShellSolids, newworldPrimeInteriorWallSolids } from './newworld-prime-interiors';
+
+// House ground-centre origins, restated (not imported) so this module never
+// cycles back into newworld-prime-arena.ts. Values equal
+// NEWWORLD_PRIME_WEST_TEAL_ORIGIN (-13.5, 1.5) and
+// NEWWORLD_PRIME_EAST_YELLOW_ORIGIN (13.5, -1.5); both rotation 0.
+const WEST_TEAL_ORIGIN = Object.freeze({ x: -13.5, z: 1.5 });
+const EAST_YELLOW_ORIGIN = Object.freeze({ x: 13.5, z: -1.5 });
 
 /**
  * newworld-prime Day-2 gameplay authority (movement + shot).
@@ -89,7 +113,8 @@ type SolidSpec = Readonly<{
   ballisticMaterial: BallisticMaterialId;
 }>;
 
-/** World-axis extents of a yawed w(x) by d(z) footprint. */
+/** World-axis extents of a yawed w(x) by d(z) footprint: the AABB every
+ *  authority consumer reads (authority boxes are deliberately rotation-free). */
 function yawedExtents(w: number, d: number, yaw: number): readonly [number, number] {
   const c = Math.abs(Math.cos(yaw));
   const s = Math.abs(Math.sin(yaw));
@@ -117,6 +142,13 @@ function solidSpecs(): SolidSpec[] {
   ];
 
   // Fact 4: school bus — 11.2 m hull yawed ~90 deg, long axis along world x.
+  // Authority bounds are WORLD-AABB and rotation-free: every consumer (Rapier,
+  // the lightweight collision queries, ballistics.surfaceInterval, and the
+  // parity audit's collider explanation) reads min/max as-is, so a yaw field
+  // on a pre-expanded box double-rotates (the Day-4 bug that parked a
+  // perpendicular phantom slab over every fence line), while local dims +
+  // rotation leave the audit's collider explanation blind to rotated boxes.
+  // Axis-aligned world AABBs are the one shape every consumer agrees on.
   {
     const p = NEWWORLD_PRIME_SCHOOL_BUS_PLACEMENT;
     const [sizeX, sizeZ] = yawedExtents(
@@ -128,7 +160,6 @@ function solidSpecs(): SolidSpec[] {
       id: 'newworld-prime-school-bus-center',
       x: p.x, z: p.z, sizeX, sizeZ,
       minY: 0, maxY: BUS_MAX_Y_M,
-      yaw: p.rotationY,
       ballisticMaterial: 'vehicle',
     });
   }
@@ -150,14 +181,12 @@ function solidSpecs(): SolidSpec[] {
       id: 'newworld-prime-semi-cab-center',
       x: p.x + cabX, z: p.z + cabZ, sizeX: cabSizeX, sizeZ: cabSizeZ,
       minY: 0, maxY: SEMI_CAB_MAX_Y_M,
-      yaw: p.rotationY,
       ballisticMaterial: 'vehicle',
     });
     specs.push({
       id: 'newworld-prime-semi-trailer-center',
       x: p.x + trailerX, z: p.z + trailerZ, sizeX: trailerSizeX, sizeZ: trailerSizeZ,
       minY: 0, maxY: SEMI_TRAILER_MAX_Y_M,
-      yaw: p.rotationY,
       ballisticMaterial: 'container',
     });
   }
@@ -171,28 +200,27 @@ function solidSpecs(): SolidSpec[] {
       id: p.id,
       x: p.x, z: p.z, sizeX, sizeZ,
       minY: 0, maxY: SHED_MAX_Y_M,
-      yaw: p.rotationY,
       ballisticMaterial: 'wood',
     });
   }
 
-  // Fact 6: lot-division privacy fence runs. One authority box per bay,
-  // centred on the bay origin exactly like the visual panel (the panel spans
-  // +/-1.2 m about the bay origin; the closing post stands on the +1.2 m
-  // boundary inside the same box). A run-level box fails the parity audit:
-  // 14.4 m of collider explained by 2.4 m of mesh each (coverage 0.17).
-  for (const run of NEWWORLD_PRIME_PRIVACY_FENCE_RUNS) {
+  // Fact 6: lot-division privacy fence runs, plus the Day-4 scale-read lot
+  // closures. One authority box per bay, centred on the bay origin exactly
+  // like the visual panel (the panel spans +/-1.2 m about the bay origin; the
+  // closing post stands on the +1.2 m boundary inside the same box). A
+  // run-level box fails the parity audit: 14.4 m of collider explained by
+  // 2.4 m of mesh each (coverage 0.17). Quarter-turn runs are axis-aligned
+  // after yawing, so the world AABB IS the fence line (0.12 m deep: the
+  // 0.06 m panel plus the closing post; 0.3 m drops planar coverage to 0.2
+  // under the 0.35 explanation bar, 0.12 m holds 0.5+).
+  for (const run of [...NEWWORLD_PRIME_PRIVACY_FENCE_RUNS, ...NEWWORLD_PRIME_SCALE_READ_FENCE_CLOSURES]) {
     for (let bay = 0; bay < run.bays; bay += 1) {
       const [cx, cz] = yawedOffset(bay * NEWWORLD_PRIME_FENCE_BAY_LENGTH_METRES, 0, run.rotationY);
-      // 0.12 m deep: the 0.06 m panel plus the closing post on the bay
-      // boundary. A 0.3 m box drops planar coverage to 0.2 under the 0.35
-      // explanation bar; 0.12 m holds 0.5+.
       const [sizeX, sizeZ] = yawedExtents(NEWWORLD_PRIME_FENCE_BAY_LENGTH_METRES, 0.12, run.rotationY);
       specs.push({
         id: `${run.id}-bay-${bay}`,
         x: run.x + cx, z: run.z + cz, sizeX, sizeZ,
         minY: 0, maxY: FENCE_MAX_Y_M,
-        yaw: run.rotationY,
         ballisticMaterial: 'fence',
       });
     }
@@ -206,6 +234,105 @@ function solidSpecs(): SolidSpec[] {
     x: 17.55, z: -1.5, sizeX: 0.8, sizeZ: 0.8,
     minY: 0, maxY: 5.45,
     ballisticMaterial: 'brick',
+  });
+
+  // Fact 2 details + fact 9: dressing that carries mass — driveway sedan,
+  // rusty-car showcase, welcome-sign board. Their parts live in
+  // newworld-prime-props; until these boxes existed the vehicles' whole top
+  // faces were fall-through (the walkable gate's sedan/rusty-car rows) and
+  // the sign board was an unrated ghost shot surface. Bodies start at their
+  // wheel-line so the boxes read as the car mass; cabins stack on the body.
+  specs.push({
+    id: 'newworld-prime-sedan-body',
+    x: -13.5, z: 7.0, sizeX: 1.8, sizeZ: 4.4,
+    minY: 0, maxY: 0.825,
+    ballisticMaterial: 'vehicle',
+  });
+  specs.push({
+    id: 'newworld-prime-sedan-cabin',
+    x: -13.5, z: 6.8, sizeX: 1.6, sizeZ: 2.2,
+    minY: 0.825, maxY: 1.35,
+    ballisticMaterial: 'vehicle',
+  });
+  {
+    const p = NEWWORLD_PRIME_RUSTY_CAR_PLACEMENT;
+    const [cabX, cabZ] = yawedOffset(0, 0.2, p.rotationY);
+    const [bodySizeX, bodySizeZ] = yawedExtents(NEWWORLD_PRIME_RUSTY_CAR_WIDTH_METRES, NEWWORLD_PRIME_RUSTY_CAR_LENGTH_METRES, p.rotationY);
+    const [cabSizeX, cabSizeZ] = yawedExtents(1.6, 2.2, p.rotationY);
+    specs.push({
+      id: 'newworld-prime-rusty-car-body',
+      x: p.x, z: p.z, sizeX: bodySizeX, sizeZ: bodySizeZ,
+      minY: 0, maxY: 1.075,
+      ballisticMaterial: 'vehicle',
+    });
+    specs.push({
+      id: 'newworld-prime-rusty-car-cabin',
+      x: p.x + cabX, z: p.z + cabZ, sizeX: cabSizeX, sizeZ: cabSizeZ,
+      minY: 1.075, maxY: 1.575,
+      ballisticMaterial: 'vehicle',
+    });
+  }
+  {
+    const p = NEWWORLD_PRIME_WELCOME_SIGN_PLACEMENT;
+    const [sizeX, sizeZ] = yawedExtents(NEWWORLD_PRIME_SIGN_BOARD_WIDTH_METRES, 0.12, p.rotationY);
+    specs.push({
+      id: 'newworld-prime-welcome-sign-board',
+      x: p.x, z: p.z, sizeX, sizeZ,
+      minY: 1.9, maxY: 1.9 + NEWWORLD_PRIME_SIGN_BOARD_HEIGHT_METRES,
+      ballisticMaterial: 'wood',
+    });
+  }
+
+  // Day-4 gable roofs: one slab box per slope, footprint-matched to the
+  // emitted slab AABBs (shingleRoofParts). The box base sits on the wall head
+  // (not the slab underside) so the collider's rise is measured with slack
+  // against the float32 mesh bounds - a 0.12 m slab collinear with the mesh
+  // top fails the audit's rise check by float epsilon. Standby has no route
+  // above the second storey, but the walkable census reads each slab's flat
+  // top face and the ballistic census reads its 0.12 m sheet - both need
+  // authority beneath them. Unreachable masses: the boxes change no route,
+  // they only give the roofs real cover and real support.
+  for (const house of [
+    { id: 'newworld-west-teal', origin: WEST_TEAL_ORIGIN, w: NEWWORLD_PRIME_WEST_TEAL_W_M, d: NEWWORLD_PRIME_WEST_TEAL_D_M },
+    { id: 'newworld-east-yellow', origin: EAST_YELLOW_ORIGIN, w: NEWWORLD_PRIME_EAST_YELLOW_W_M, d: NEWWORLD_PRIME_EAST_YELLOW_D_M },
+  ] as const) {
+    const slabT = NEWWORLD_PRIME_ROOF_SLAB_THICKNESS_MM / 1000;
+    const wallTop = NEWWORLD_PRIME_STOREY_HEIGHT_M * 2;
+    const slopeLen = Math.sqrt((house.d / 2 + NEWWORLD_PRIME_ROOF_OVERHANG_M) ** 2 + NEWWORLD_PRIME_ROOF_RISE_M ** 2);
+    const midY = wallTop + NEWWORLD_PRIME_ROOF_RISE_M / 2;
+    const zOff = house.d / 4 + NEWWORLD_PRIME_ROOF_OVERHANG_M / 2;
+    for (const [side, zc] of [['south', zOff], ['north', -zOff]] as const) {
+      specs.push({
+        id: `newworld-prime-${house.id}-roof-${side}`,
+        x: house.origin.x, z: house.origin.z + zc,
+        sizeX: house.w + NEWWORLD_PRIME_ROOF_OVERHANG_M * 2, sizeZ: slopeLen,
+        minY: wallTop, maxY: midY + slabT / 2,
+        ballisticMaterial: 'wood',
+      });
+    }
+  }
+
+  // Day-4 ground-storey south lap-siding skins: the shell walls behind them
+  // are registered but carved (door portal + window reveals), so the census's
+  // single-surface footprint rule tops out near the 0.25 bar against the
+  // biggest segment. Shot-only skins exactly on the panel bounds (the
+  // door-leaf precedent: shots stop at the skin, movement stays with the
+  // shell) rate the panels for real.
+  specs.push({
+    id: 'newworld-prime-newworld-west-teal-siding-south-skin',
+    x: WEST_TEAL_ORIGIN.x, z: WEST_TEAL_ORIGIN.z + NEWWORLD_PRIME_WEST_TEAL_D_M / 2 + 0.008,
+    sizeX: NEWWORLD_PRIME_WEST_TEAL_W_M, sizeZ: 0.14,
+    minY: 0, maxY: NEWWORLD_PRIME_STOREY_HEIGHT_M,
+    movement: false,
+    ballisticMaterial: 'interior-wall',
+  });
+  specs.push({
+    id: 'newworld-prime-newworld-east-yellow-siding-south-skin',
+    x: EAST_YELLOW_ORIGIN.x, z: EAST_YELLOW_ORIGIN.z + NEWWORLD_PRIME_EAST_YELLOW_D_M / 2 + 0.008,
+    sizeX: NEWWORLD_PRIME_EAST_YELLOW_W_M, sizeZ: 0.14,
+    minY: 0, maxY: NEWWORLD_PRIME_STOREY_HEIGHT_M,
+    movement: false,
+    ballisticMaterial: 'interior-wall',
   });
 
   // INTERIORS PILOT: ground-floor partition walls, both houses (data-owned by
@@ -232,8 +359,17 @@ function solidSpecs(): SolidSpec[] {
 // (spread rule), and clear of the fact-9 jeep (13.5,-21) / sandbag (0,8.5)
 // reservations. Cross-team pairs keep 40 m+ with the centre solids (bus,
 // semi, houses) breaking eye-height lines; the sight gate is the arbiter.
+// (-27.6, 10) is (-27, 10) nudged 0.6 m west: the lot-west outer-north fence
+// line (x -26.06, 2.0 m tall) measured 0.94 m off the old point - inside the
+// 1.2 m wall-in-the-face bar once the fence carried real authority.
+// (-23.5, -15.2) is (-22.5, -16) moved off the lot-west-south closure: its
+// bay at x -22.4..-20.0, z -16.26..-16.14 stood 0.17 m from the old point
+// (inside the 0.44 m spawn capsule - not standable) and 1.53 m of face.
+// (-23.5, -14.3) then clears the same 2.0 m fence LINE (z -16.26, running the
+// lot's whole south edge) by 1.84 m - the 1.53 m placement above still sat
+// inside the wall-in-the-face bar measured north-south off the run.
 const TEAL_SPAWNS: ReadonlyArray<readonly [number, number]> = [
-  [-31, -8], [-30, -1], [-29, 5], [-27, 10], [-22.5, -16], [-21, -3],
+  [-31, -8], [-30, -1], [-29, 5], [-27.6, 10], [-23.5, -14.3], [-21, -3],
 ];
 const YELLOW_SPAWNS: ReadonlyArray<readonly [number, number]> = [
   [31, -8], [30, -14], [29, -20], [27, -25], [21, -6], [21, 0],
