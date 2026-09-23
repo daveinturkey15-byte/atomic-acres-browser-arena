@@ -56,3 +56,25 @@ Fixed genuine newworld-prime gate findings; visuals re-verified stable.
   premise broken by Day-3/4 deltas, contracts re-verified), R3/R4/R5 pending
   with Day-4 evidence; standby expectations superseded by the Day-2
   selectable promotion (integrator/owner rewrite, not a worker edit).
+
+## Resume 2026-09-23 PM (same lane, session continuity)
+
+Session closed ~10:03Z after the Day-4 push; resumed 16:58 BST same day.
+
+- CI `static-and-unit` (run 35840697552) failed on both runners at
+  `npm run lint` → `qa:text-integrity`: `src/world-studio/pbr-library.ts`
+  contained double-encoded UTF-8 (mojibake `â€”`/`â€¦`/`â†’`/`Ã—`). Fixed in
+  `2d9783c7d` (comment-only, restores real `—`/`…`/`→`/`×`); local scan of
+  all 3,897 locally-present tracked text files ok, `tsc --noEmit` 0.
+- Root cause of the false "no lint script" belief: the 1,731 tracked
+  `.qa-dist/**` build artifacts carry skip-worktree in this checkout, so the
+  local integrity run crashes ENOENT before reporting; CI checks them out
+  and scans them. Local lint therefore cannot complete on this worktree as
+  configured. Flagged for integrator: `.qa-dist/**` sits outside this
+  lane's `allowedPaths` (pre-existing commits, not Day-4).
+- Dev server on :4201 restored as a persistent supervised process
+  (previously died with the closed terminal).
+- Run 35886312271 (fix head) hung 25+ min inside `actions/checkout@v4`
+  (infra, not content); cancelled and re-triggered by this docs-only push,
+  which the workflow's `cancel-in-progress` concurrency converts into a
+  clean fresh run.
