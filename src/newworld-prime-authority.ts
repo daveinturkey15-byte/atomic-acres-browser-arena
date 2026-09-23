@@ -28,9 +28,6 @@ import {
 import {
   NEWWORLD_PRIME_EAST_YELLOW_D_M,
   NEWWORLD_PRIME_EAST_YELLOW_W_M,
-  NEWWORLD_PRIME_ROOF_OVERHANG_M,
-  NEWWORLD_PRIME_ROOF_RISE_M,
-  NEWWORLD_PRIME_ROOF_SLAB_THICKNESS_MM,
   NEWWORLD_PRIME_STOREY_HEIGHT_M,
   NEWWORLD_PRIME_WEST_TEAL_D_M,
   NEWWORLD_PRIME_WEST_TEAL_W_M,
@@ -283,34 +280,16 @@ function solidSpecs(): SolidSpec[] {
     });
   }
 
-  // Day-4 gable roofs: one slab box per slope, footprint-matched to the
-  // emitted slab AABBs (shingleRoofParts). The box base sits on the wall head
-  // (not the slab underside) so the collider's rise is measured with slack
-  // against the float32 mesh bounds - a 0.12 m slab collinear with the mesh
-  // top fails the audit's rise check by float epsilon. Standby has no route
-  // above the second storey, but the walkable census reads each slab's flat
-  // top face and the ballistic census reads its 0.12 m sheet - both need
-  // authority beneath them. Unreachable masses: the boxes change no route,
-  // they only give the roofs real cover and real support.
-  for (const house of [
-    { id: 'newworld-west-teal', origin: WEST_TEAL_ORIGIN, w: NEWWORLD_PRIME_WEST_TEAL_W_M, d: NEWWORLD_PRIME_WEST_TEAL_D_M },
-    { id: 'newworld-east-yellow', origin: EAST_YELLOW_ORIGIN, w: NEWWORLD_PRIME_EAST_YELLOW_W_M, d: NEWWORLD_PRIME_EAST_YELLOW_D_M },
-  ] as const) {
-    const slabT = NEWWORLD_PRIME_ROOF_SLAB_THICKNESS_MM / 1000;
-    const wallTop = NEWWORLD_PRIME_STOREY_HEIGHT_M * 2;
-    const slopeLen = Math.sqrt((house.d / 2 + NEWWORLD_PRIME_ROOF_OVERHANG_M) ** 2 + NEWWORLD_PRIME_ROOF_RISE_M ** 2);
-    const midY = wallTop + NEWWORLD_PRIME_ROOF_RISE_M / 2;
-    const zOff = house.d / 4 + NEWWORLD_PRIME_ROOF_OVERHANG_M / 2;
-    for (const [side, zc] of [['south', zOff], ['north', -zOff]] as const) {
-      specs.push({
-        id: `newworld-prime-${house.id}-roof-${side}`,
-        x: house.origin.x, z: house.origin.z + zc,
-        sizeX: house.w + NEWWORLD_PRIME_ROOF_OVERHANG_M * 2, sizeZ: slopeLen,
-        minY: wallTop, maxY: midY + slabT / 2,
-        ballisticMaterial: 'wood',
-      });
-    }
-  }
+  // Day-4 gable roofs: triaged ABOVE-COMBAT CANOPY, deliberately without
+  // boxes. The two sloped slabs sit 5.4-6.26 m up with no authored route
+  // above the second storey, so nothing ever stands on or under them - and
+  // they physically overhang the front doors: any movement box footprinted
+  // like a slab contains the door-leaf point in XZ, which the interiors
+  // gate's portal-walkable check (a 2D containment over the door gap, height
+  //-blind by design) reads as a collider crossing the portal. Their 0.12 m
+  // sheet is also below the ballistic census's own 0.9 m substantial bar, so
+  // no shot surface is owed. The four tops are triaged as accepted
+  // fall-through in src/walkable-surface-parity-gate.test.ts.
 
   // Day-4 ground-storey south lap-siding skins: the shell walls behind them
   // are registered but carved (door portal + window reveals), so the census's

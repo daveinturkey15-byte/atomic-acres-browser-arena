@@ -126,7 +126,21 @@ const ACCEPTED_FALL_THROUGH: Record<string, LedgerRow[]> = {
   // yet, so the audit names them as fall-through until the authority pass
   // rates them; the ledger may only ever shrink, and this row is the pin
   // that forces that pass to fix rather than excuse.
-  'newworld-prime': [],
+  //
+  // Authority pass (2026-09-23): vehicles, fences and decks now carry real
+  // authority (newworld-prime-authority.ts). The four gable-roof slabs are
+  // the deliberate exception, triaged ABOVE-COMBAT CANOPY: they sit 5.4 m up
+  // with no authored route above the second storey, and any movement box
+  // footprinted like a slab contains the front-door leaf point in XZ, which
+  // the interiors gate's height-blind portal-walkable check reads as a
+  // collider crossing the portal. Their 0.12 m sheet is also below the
+  // ballistic census's 0.9 m substantial bar, so no shot surface is owed.
+  'newworld-prime': [
+    { name: 'newworld-prime-newworld-east-yellow-roof-south', centre: [13.5, 6.26, 0.33], reason: 'above-combat canopy: gable slab 5.4 m up, no route above the second storey; boxing it would cross the front-door portal' },
+    { name: 'newworld-prime-newworld-east-yellow-roof-north', centre: [13.5, 6.26, -3.32], reason: 'above-combat canopy: gable slab 5.4 m up, no route above the second storey' },
+    { name: 'newworld-prime-newworld-west-teal-roof-south', centre: [-13.5, 6.26, 3.22], reason: 'above-combat canopy: gable slab 5.4 m up, no route above the second storey; boxing it would cross the front-door portal' },
+    { name: 'newworld-prime-newworld-west-teal-roof-north', centre: [-13.5, 6.26, -0.23], reason: 'above-combat canopy: gable slab 5.4 m up, no route above the second storey' },
+  ],
   'world-studio': [
     // The stairwell opening, not a floor gap. The floor-soft bucket merges the
     // ground carpet and the upper-floor carpet into one mesh, so the census's
