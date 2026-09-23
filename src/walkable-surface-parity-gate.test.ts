@@ -127,6 +127,19 @@ const ACCEPTED_FALL_THROUGH: Record<string, LedgerRow[]> = {
   // rates them; the ledger may only ever shrink, and this row is the pin
   // that forces that pass to fix rather than excuse.
   'newworld-prime': [],
+  'world-studio': [
+    // The stairwell opening, not a floor gap. The floor-soft bucket merges the
+    // ground carpet and the upper-floor carpet into one mesh, so the census's
+    // flat-AABB top face (y 3.3) spans the authored STAIR_HOLE
+    // (house.ts: x 0.08-1.55, z 2.55-6.7) that the 16-tread staircase climbs
+    // through. The 80 unsupported samples are exactly that opening; its
+    // landing is a mid-flight tread top (1.65 m below). Putting movement
+    // authority "under" it would cap the stairwell and wall off the stairs,
+    // and splitting the merged mesh cannot tighten the AABB around a hole its
+    // own floor strips surround. Triaged 2026-09-23, world-studio lane.
+    { name: 'world-studio-teal-house-floor-soft', centre: [-16.61, 3.3, 0], reason: 'census AABB spans the authored stairwell opening; the treads climbing it are the authority - not a floor gap' },
+    { name: 'world-studio-yellow-house-floor-soft', centre: [16.61, 3.3, 0], reason: 'census AABB spans the authored stairwell opening; the treads climbing it are the authority - not a floor gap' },
+  ],
 };
 
 let auditPromise: Promise<WalkableArenaResult[]> | null = null;

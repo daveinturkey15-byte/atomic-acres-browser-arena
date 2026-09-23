@@ -110,6 +110,21 @@ export const ACCEPTED_SHOOT_THROUGH: Readonly<Record<string, readonly AcceptedSh
   // RAID2 (owner 2026-09-02, HF-408): same rule. The audit measured 0 ghost
   // shot surfaces on this arena, so an empty ledger is the measurement.
   raid2: [],
+  // HF-571 world-studio (2026-09-23): the two merged shed paint shells. The
+  // whole `paint` role of each yard IS its shed - walls, lap cladding, gables
+  // and roof mass in one draw group - and every solid among those parts is
+  // registered (world-studio:teal|yellow-shed-* proxies trace every shot, so
+  // the felt authority exists). The census cannot credit that union: its
+  // single-surface footprint rule needs ONE proxy over >=25% of the shell
+  // footprint, and each 0.1 m wall proxy covers ~3% while the roof proxy's
+  // Y band (1.95-3.25 m) misses the 0-1.8 m combat range entirely. Stamping
+  // the merged mesh with one solid's surface id was tried and withdrawn
+  // (poisoned the shared build for newworld-prime); these rows record the
+  // honest state: presentation shells over registered authority.
+  'world-studio': [
+    { name: 'world-studio-gardens-paintedTeal', count: 1, reason: 'shed paint shell (walls+cladding+roof mass) over its own registered teal-shed-* surfaces; census single-surface rule cannot credit a hollow shell' },
+    { name: 'world-studio-gardens-paintedYellow', count: 1, reason: 'shed paint shell (walls+cladding+roof mass) over its own registered yellow-shed-* surfaces; census single-surface rule cannot credit a hollow shell' },
+  ],
   // PASS 97 (2026-09-14): New World Prime Day-1 standby enters with an EMPTY
   // accepted ledger, like every new arena. Anything the audit finds is a bug
   // for the authority pass to rate, not a row to add here to turn the gate

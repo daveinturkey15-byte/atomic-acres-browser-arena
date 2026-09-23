@@ -877,7 +877,15 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
   // ---------------------------------------------------------------- chimney
 
   box('chimney', masonry, 'brick', -1.7, 0.3, 0, 9.2, -10, -HOUSE_HALF_DEPTH + 0.1, EXTERIOR_CONTACT);
-  box('chimney-cap', masonry, null, -1.85, 0.45, 9.2, 9.42, -10.14, -HOUSE_HALF_DEPTH - 0.04);
+  // The cap carries the stack's ballistic family so its own top face has
+  // movement authority beneath it: with the cap presentation-only, the
+  // walkable-surface gate measured its top as unsupported with a 0.25 m drop.
+  // The cap's north edge is pulled out to mirror the 0.14 m south overhang -
+  // the authored cap stopped 0.14 m short of the stack's north face, which
+  // both read wrong and left a 0.14 m ledge of the walkable census AABB with
+  // nothing beneath it. Unreachable masonry above the ridge; the colliders
+  // change no route, they only stop bullets and fall-through lies.
+  box('chimney-cap', masonry, 'brick', -1.85, 0.45, 9.2, 9.42, -10.14, -HOUSE_HALF_DEPTH + 0.24);
   box('chimney-shoulder', masonry, null, -1.55, 0.15, 2.6, 2.78, -10.08, -10, EXTERIOR_CONTACT);
 
   // ---------------------------------------------------------------- exterior trim
