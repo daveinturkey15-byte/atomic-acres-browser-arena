@@ -1,0 +1,516 @@
+
+ RUN  v4.1.9 C:/Users/david/Desktop/stuff/aa-omp-newworld-prime-live
+
+ ❯ src/rendering/raytracing/arena-proxy-coverage.test.ts (5 tests | 5 skipped) 1576ms
+ ❯ src/collider-visual-parity-gate.test.ts (6 tests | 4 failed) 8299ms
+     × explains EVERY movement collider with a visible mesh (zero invisible colliders) 5ms
+     × flags NO walk-through mesh beyond the accepted, triaged ledger 2ms
+     × Direction C: rates every substantial visible mesh for gunfire beyond the accepted shoot-through ledger 1ms
+     × Direction C: the ballistic ratchet ceilings stay at their triaged floor (they may only go DOWN) 0ms
+ ❯ src/walkable-surface-parity-gate.test.ts (10 tests | 2 failed) 12277ms
+     × finds NO fall-through floor beyond the accepted, triaged ledger 4ms
+     × gives every arena an explicit ledger, even an empty one 1ms
+ ❯ src/spawn-layout-quality.test.ts (181 tests | 7 failed) 43ms
+       × pins a per-arena count, axis span, and mean nearest-neighbour floor 3ms
+       × authors enough spawn points per team to spread a full lobby 0ms
+       × spreads its spawns across the map rather than blobbing them in a corner 0ms
+       × puts hard cover within 6 m of every spawn 0ms
+       × reports no failure at all - and none the rules above did not already name 3ms
+       × puts hard cover within 6 m of every spawn 0ms
+       × reports no failure at all - and none the rules above did not already name 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/rendering/raytracing/arena-proxy-coverage.test.ts [ src/rendering/raytracing/arena-proxy-coverage.test.ts ]
+TypeError: factories[id] is not a function
+ ❯ src/rendering/raytracing/arena-proxy-coverage.test.ts:270:18
+    268|   for (const id of ALL_ARENA_IDS) {
+    269|     const scene = new THREE.Scene();
+    270|     factories[id](scene);
+       |                  ^
+    271|     // atomic-acres' street dressing and arena art are separate passes…
+    272|     // reflective surfaces they add are part of what the preset sees l…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/14]⎯
+
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 13 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/collider-visual-parity-gate.test.ts > collider/visual parity gate (all six arenas) > explains EVERY movement collider with a visible mesh (zero invisible colliders)
+AssertionError: newworld-prime: unexplained colliders: expected [ { sources: [ …(2) ], …(5) }, …(2) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "bestPartialCoverage": 0.03,
++     "centre": [
++       -26,
++       1,
++       -1.2,
++     ],
++     "nearestVisibleMesh": "newworld-prime-newworld-prime-fence-west-fence-panel-bay-3 @ (-26, -1.2) (0.0m from collider centre)",
++     "size": [
++       0.3,
++       2,
++       14.4,
++     ],
++     "sources": [
++       "colliders",
++       "physicsColliders",
++     ],
++     "worldBounds": {
++       "maxX": -25.85,
++       "maxY": 2,
++       "maxZ": 6,
++       "minX": -26.15,
++       "minY": 0,
++       "minZ": -8.4,
++     },
++   },
++   {
++     "bestPartialCoverage": 0.03,
++     "centre": [
++       26,
++       1,
++       -15.2,
++     ],
++     "nearestVisibleMesh": "newworld-prime-newworld-prime-fence-east-fence-panel-bay-3 @ (26, -15.2) (0.0m from collider centre)",
++     "size": [
++       0.3,
++       2,
++       14.4,
++     ],
++     "sources": [
++       "colliders",
++       "physicsColliders",
++     ],
++     "worldBounds": {
++       "maxX": 26.15,
++       "maxY": 2,
++       "maxZ": -8,
++       "minX": 25.85,
++       "minY": 0,
++       "minZ": -22.4,
++     },
++   },
++   {
++     "bestPartialCoverage": 0.04,
++     "centre": [
++       -2,
++       1,
++       -30,
++     ],
++     "nearestVisibleMesh": "newworld-prime-newworld-prime-fence-north-fence-post-bay-2 @ (-2, -30) (0.0m from collider centre)",
++     "size": [
++       12,
++       2,
++       0.3,
++     ],
++     "sources": [
++       "colliders",
++       "physicsColliders",
++     ],
++     "worldBounds": {
++       "maxX": 4,
++       "maxY": 2,
++       "maxZ": -29.85,
++       "minX": -8,
++       "minY": 0,
++       "minZ": -30.15,
++     },
++   },
++ ]
+
+ ❯ src/collider-visual-parity-gate.test.ts:122:86
+    120|     const results = await audit();
+    121|     for (const result of results) {
+    122|       expect(result.invisibleColliders ?? [], `${result.id}: unexplain…
+       |                                                                                      ^
+    123|     }
+    124|   }, 120_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/14]⎯
+
+ FAIL  src/collider-visual-parity-gate.test.ts > collider/visual parity gate (all six arenas) > flags NO walk-through mesh beyond the accepted, triaged ledger
+AssertionError: newworld-prime: new walk-through meshes need triage and a ledger row: expected [ { …(7) }, { …(7) }, { …(7) }, …(8) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "centre": [
++       -14,
++       0.57,
++       -24,
++     ],
++     "instanced": false,
++     "name": "newworld-prime-newworld-prime-hedge-north-hedge-blob-0",
++     "path": "New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-north-hedge-blob-0",
++     "presentationOnly": true,
++     "size": [
++       0.98,
++       0.92,
++       0.98,
++     ],
++     "vertices": 60,
++   },
++   {
++     "centre": [
++       -12.9,
++       0.55,
++       -24,
++     ],
++     "instanced": false,
++     "name": "newworld-prime-newworld-prime-hedge-north-hedge-blob-1",
++     "path": "New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-north-hedge-blob-1",
++     "presentationOnly": true,
++     "size": [
++       1.12,
++       0.92,
++       1.12,
++     ],
++     "vertices": 60,
++   },
++   {
++     "centre": [
++       -11.8,
++       0.57,
++       -24,
++     ],
++     "instanced": false,
++     "name": "newworld-prime-newworld-prime-hedge-north-hedge-blob-2",
++     "path": "New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-north-hedge-blob-2",
++     "presentationOnly": true,
++     "size": [
++       0.96,
++       0.92,
++       0.96,
++     ],
++     "vertices": 60,
++   },
++   {
++     "centre": [
++       -10.7,
++       0.51,
++       -24,
++     ],
++     "instanced": false,
++     "name": "newworld-prime-newworld-prime-hedge-north-hedge-blob-3",
++     "path": "New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-north-hedge-blob-3",
++     "presentationOnly": true,
++     "size": [
++       1.01,
++       0.92,
++       1.01,
++     ],
++     "vertices": 60,
++   },
++   {
++     "centre": [
++       -9.6,
++       0.52,
++       -24,
++     ],
++     "instanced": false,
++     "name": "newworld-prime-newworld-prime-hedge-north-hedge-blob-4",
++     "path": "New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-north-hedge-blob-4",
++     "presentationOnly": true,
++     "size": [
++       1.15,
++       0.92,
++       1.15,
++     ],
++     "vertices": 60,
++   },
++   {
++     "centre": [
++       14,
++       0.57,
++       24,
++     ],
++     "instanced": false,
++     "name": "newworld-prime-newworld-prime-hedge-south-hedge-blob-0",
++     "path": "New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-south-hedge-blob-0",
++     "presentationOnly": true,
++     "size": [
++       0.98,
++       0.92,
++       0.98,
++     ],
++     "vertices": 60,
++   },
++   {
++     "centre": [
++       12.9,
++       0.55,
++       24,
++     ],
++     "instanced": false,
++     "name": "newworld-prime-newworld-prime-hedge-south-hedge-blob-1",
++     "path": "New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-south-hedge-blob-1",
++     "presentationOnly": true,
++     "size": [
++       1.12,
++       0.92,
++       1.12,
++     ],
++     "vertices": 60,
++   },
++   {
++     "centre": [
++       11.8,
++       0.57,
++       24,
++     ],
++     "instanced": false,
++     "name": "newworld-prime-newworld-prime-hedge-south-hedge-blob-2",
++     "path": "New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-south-hedge-blob-2",
++     "presentationOnly": true,
++     "size": [
++       0.96,
++       0.92,
++       0.96,
++     ],
++     "vertices": 60,
++   },
++   {
++     "centre": [
++       10.7,
++       0.51,
++       24,
++     ],
++     "instanced": false,
++     "name": "newworld-prime-newworld-prime-hedge-south-hedge-blob-3",
++     "path": "New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-south-hedge-blob-3",
++     "presentationOnly": true,
++     "size": [
++       1.01,
++       0.92,
++       1.01,
++     ],
++     "vertices": 60,
++   },
++   {
++     "centre": [
++       9.6,
++       0.52,
++       24,
++     ],
++     "instanced": false,
++     "name": "newworld-prime-newworld-prime-hedge-south-hedge-blob-4",
++     "path": "New World Prime arena (blockout)/newworld-prime-newworld-prime-hedge-south-hedge-blob-4",
++     "presentationOnly": true,
++     "size": [
++       1.15,
++       0.92,
++       1.15,
++     ],
++     "vertices": 60,
++   },
++   {
++     "centre": [
++       17.55,
++       3.35,
++       -1.5,
++     ],
++     "instanced": false,
++     "name": "newworld-prime-newworld-east-yellow-chimney-stack",
++     "path": "New World Prime arena (blockout)/newworld-prime-newworld-east-yellow-chimney-stack",
++     "presentationOnly": true,
++     "size": [
++       0.8,
++       5.45,
++       0.8,
++     ],
++     "vertices": 24,
++   },
++ ]
+
+ ❯ src/collider-visual-parity-gate.test.ts:139:96
+    137|         ));
+    138|       });
+    139|       expect(unexpected, `${result.id}: new walk-through meshes need t…
+       |                                                                                                ^
+    140|     }
+    141|   }, 120_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/14]⎯
+
+ FAIL  src/collider-visual-parity-gate.test.ts > collider/visual parity gate (all six arenas) > Direction C: rates every substantial visible mesh for gunfire beyond the accepted shoot-through ledger
+AssertionError: world-studio: 2 unrated ghost shot surface(s) over ceiling 0: world-studio-gardens-paintedTeal @ [-33.95,1.66,-21] size [3.7,3.08,3.6] | world-studio-gardens-paintedYellow @ [33.95,1.66,-21] size [3.7,3.08,3.6]: expected 2 to be less than or equal to 0
+ ❯ src/collider-visual-parity-gate.test.ts:159:9
+    157|         summary.length,
+    158|         `${result.id}: ${summary.length} unrated ghost shot surface(s)…
+    159|       ).toBeLessThanOrEqual(ceiling);
+       |         ^
+    160|       // A row that matches nothing is rot: the geometry it excused is…
+    161|       // Delete the row so the ledger only ever shrinks truthfully.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/14]⎯
+
+ FAIL  src/collider-visual-parity-gate.test.ts > collider/visual parity gate (all six arenas) > Direction C: the ballistic ratchet ceilings stay at their triaged floor (they may only go DOWN)
+AssertionError: world-studio must have an explicit (possibly empty) ledger: expected undefined to be defined
+ ❯ src/collider-visual-parity-gate.test.ts:199:107
+    197|     });
+    198|     for (const arenaId of ALL_ARENA_IDS) {
+    199|       expect(ACCEPTED_SHOOT_THROUGH[arenaId], `${arenaId} must have an…
+       |                                                                                                           ^
+    200|     }
+    201|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/14]⎯
+
+ FAIL  src/spawn-layout-quality.test.ts > authored spawn layouts, on every registered arena > New World Prime > pins a per-arena count, axis span, and mean nearest-neighbour floor
+AssertionError: newworld-prime team 0 count: expected 3 to be greater than or equal to 6
+ ❯ src/spawn-layout-quality.test.ts:113:71
+    111|           const spanX = Math.max(...points.map((point) => point.x)) - …
+    112|           const spanZ = Math.max(...points.map((point) => point.z)) - …
+    113|           expect(points.length, `${selection.id} team ${team} count`).…
+       |                                                                       ^
+    114|           expect(Math.max(spanX, spanZ) / longestAxis, `${selection.id…
+    115|           expect(meanNearest, `${selection.id} team ${team} mean neare…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/14]⎯
+
+ FAIL  src/spawn-layout-quality.test.ts > authored spawn layouts, on every registered arena > New World Prime > authors enough spawn points per team to spread a full lobby
+AssertionError: newworld-prime team 0: expected 3 to be greater than or equal to 4
+ ❯ src/spawn-layout-quality.test.ts:121:65
+    119|       it('authors enough spawn points per team to spread a full lobby'…
+    120|         for (const [team, points] of teams.entries()) {
+    121|           expect(points.length, `${selection.id} team ${team}`).toBeGr…
+       |                                                                 ^
+    122|         }
+    123|       });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/14]⎯
+
+ FAIL  src/spawn-layout-quality.test.ts > authored spawn layouts, on every registered arena > New World Prime > spreads its spawns across the map rather than blobbing them in a corner
+AssertionError: newworld-prime team 0 spans only 16.0 m of a 92 m map: expected 0.17391304347826086 to be greater than or equal to 0.18
+ ❯ src/spawn-layout-quality.test.ts:168:13
+    166|             Math.max(spanX, spanZ) / longestAxis,
+    167|             `${selection.id} team ${team} spans only ${Math.max(spanX,…
+    168|           ).toBeGreaterThanOrEqual(MINIMUM_SPREAD_FRACTION);
+       |             ^
+    169|         }
+    170|       });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/14]⎯
+
+ FAIL  src/spawn-layout-quality.test.ts > HF-402: every authored spawn is inside the map, on a floor, with a route, cover, and no enemy spawn in sight > Nuke Town · New World > puts hard cover within 6 m of every spawn
+AssertionError: world-studio team 0 spawn (-32, 20) is 7.77 m from the nearest cover: expected 7.77 to be less than or equal to 6
+ ❯ src/spawn-layout-quality.test.ts:223:119
+    221|       it(`puts hard cover within ${SPAWN_LAYOUT_THRESHOLDS.maximumCove…
+    222|         for (const point of report.points) {
+    223|           expect(point.coverDistanceM, `${describePoint(point)} is ${p…
+       |                                                                                                                       ^
+    224|         }
+    225|       });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/14]⎯
+
+ FAIL  src/spawn-layout-quality.test.ts > HF-402: every authored spawn is inside the map, on a floor, with a route, cover, and no enemy spawn in sight > Nuke Town · New World > reports no failure at all - and none the rules above did not already name
+AssertionError: world-studio per-point failures: expected [ …(2) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "world-studio team 0 spawn (-32, 20): no-cover-in-reach",
++   "world-studio team 1 spawn (32, 20): no-cover-in-reach",
++ ]
+
+ ❯ src/spawn-layout-quality.test.ts:273:160
+    271|           for (const failure of point.failures) expect(named.has(failu…
+    272|         }
+    273|         expect(report.points.flatMap((point) => point.failures.map((fa…
+       |                                                                                                                                                                ^
+    274|         expect(report.failures, `${selection.id} layout-level failures…
+    275|       });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/14]⎯
+
+ FAIL  src/spawn-layout-quality.test.ts > HF-402: every authored spawn is inside the map, on a floor, with a route, cover, and no enemy spawn in sight > New World Prime > puts hard cover within 6 m of every spawn
+AssertionError: newworld-prime team 0 spawn (-33, 0) is 6.85 m from the nearest cover: expected 6.85 to be less than or equal to 6
+ ❯ src/spawn-layout-quality.test.ts:223:119
+    221|       it(`puts hard cover within ${SPAWN_LAYOUT_THRESHOLDS.maximumCove…
+    222|         for (const point of report.points) {
+    223|           expect(point.coverDistanceM, `${describePoint(point)} is ${p…
+       |                                                                                                                       ^
+    224|         }
+    225|       });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/14]⎯
+
+ FAIL  src/spawn-layout-quality.test.ts > HF-402: every authored spawn is inside the map, on a floor, with a route, cover, and no enemy spawn in sight > New World Prime > reports no failure at all - and none the rules above did not already name
+AssertionError: newworld-prime per-point failures: expected [ …(4) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "newworld-prime team 0 spawn (-33, 0): no-cover-in-reach",
++   "newworld-prime team 0 spawn (-32, 8): no-cover-in-reach",
++   "newworld-prime team 1 spawn (33, 0): no-cover-in-reach",
++   "newworld-prime team 1 spawn (32, 8): no-cover-in-reach",
++ ]
+
+ ❯ src/spawn-layout-quality.test.ts:273:160
+    271|           for (const failure of point.failures) expect(named.has(failu…
+    272|         }
+    273|         expect(report.points.flatMap((point) => point.failures.map((fa…
+       |                                                                                                                                                                ^
+    274|         expect(report.failures, `${selection.id} layout-level failures…
+    275|       });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/14]⎯
+
+ FAIL  src/walkable-surface-parity-gate.test.ts > walkable-surface parity gate (Direction D, all ten arenas) > finds NO fall-through floor beyond the accepted, triaged ledger
+AssertionError: world-studio: new fall-through floors need a fix or a triaged ledger row: expected [ …(4) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "world-studio-teal-house-floor-soft @ [-16.61,3.3,0] 4% unsupported, 1.65 m drop",
++   "world-studio-yellow-house-floor-soft @ [16.61,3.3,0] 4% unsupported, 1.65 m drop",
++   "world-studio-teal-house-brick @ [-20.7,9.42,-9.52] 100% unsupported, 0.25 m drop",
++   "world-studio-yellow-house-stone @ [20.7,9.42,-9.52] 100% unsupported, 0.25 m drop",
++ ]
+
+ ❯ src/walkable-surface-parity-gate.test.ts:184:9
+    182|           + ` ${Math.round(finding.unsupportedShare * 100)}% unsupport…
+    183|         `${result.id}: new fall-through floors need a fix or a triaged…
+    184|       ).toEqual([]);
+       |         ^
+    185|     }
+    186|   }, 300_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/14]⎯
+
+ FAIL  src/walkable-surface-parity-gate.test.ts > walkable-surface parity gate (Direction D, all ten arenas) > gives every arena an explicit ledger, even an empty one
+AssertionError: world-studio must have an explicit (possibly empty) ledger: expected undefined to be defined
+ ❯ src/walkable-surface-parity-gate.test.ts:263:106
+    261|   it('gives every arena an explicit ledger, even an empty one', () => {
+    262|     for (const arenaId of ALL_ARENA_IDS) {
+    263|       expect(ACCEPTED_FALL_THROUGH[arenaId], `${arenaId} must have an …
+       |                                                                                                          ^
+    264|     }
+    265|     expect(Object.keys(ACCEPTED_FALL_THROUGH).sort()).toEqual([...ALL_…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/14]⎯
+
+
+ Test Files  4 failed (4)
+      Tests  13 failed | 184 passed | 5 skipped (202)
+   Start at  08:13:34
+   Duration  29.49s (transform 11.52s, setup 0ms, import 30.53s, tests 22.19s, environment 0ms)
+
+EXIT:1
